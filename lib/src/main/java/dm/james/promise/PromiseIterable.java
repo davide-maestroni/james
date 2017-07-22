@@ -29,20 +29,40 @@ import java.util.concurrent.TimeUnit;
 public interface PromiseIterable<O> extends Promise<Iterable<O>>, Iterable<O> {
 
   @NotNull
+  <R> PromiseIterable<R> applyAll(@NotNull Mapper<PromiseIterable<O>, PromiseIterable<R>> mapper);
+
+  @NotNull
+  <R> PromiseIterable<R> applyEach(@NotNull Mapper<Promise<O>, Promise<R>> mapper);
+
+  @NotNull
+  List<O> getAll();
+
+  @NotNull
+  List<O> getAll(long timeout, @NotNull TimeUnit timeUnit);
+
+  @NotNull
   Iterator<O> iterator(long timeout, @NotNull TimeUnit timeUnit);
 
   O remove();
 
   O remove(long timeout, @NotNull TimeUnit timeUnit);
 
+  @NotNull
   List<O> remove(int maxSize);
 
+  @NotNull
   List<O> remove(int maxSize, long timeout, @NotNull TimeUnit timeUnit);
+
+  @NotNull
+  List<O> removeAll();
+
+  @NotNull
+  List<O> removeAll(long timeout, @NotNull TimeUnit timeUnit);
 
   O removeOr(O other, long timeout, @NotNull TimeUnit timeUnit);
 
   @NotNull
-  <R, S> PromiseIterable<R> then(@NotNull StateFulProcessor<O, R, S> processor);
+  <R, S> PromiseIterable<R> then(@NotNull StatefulProcessor<O, R, S> processor);
 
   @NotNull
   PromiseIterable<O> thenAccept(@NotNull Observer<Iterable<O>> observer);
@@ -104,7 +124,7 @@ public interface PromiseIterable<O> extends Promise<Iterable<O>>, Iterable<O> {
     void addDeferred(@NotNull Promise<O> promise);
   }
 
-  interface StateFulProcessor<I, O, S> {
+  interface StatefulProcessor<I, O, S> {
 
     S add(S state, I input, @NotNull CallbackIterable<O> callback) throws Exception;
 

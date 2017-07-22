@@ -194,29 +194,8 @@ public class Bond implements Serializable {
 
     public Promise<O> apply(final Promise<O> promise) {
       final ResolvablePromise<O, O> resolvable = mResolvable;
-      promise.then(new CacheProcessor<O>(resolvable));
+      promise.then(new ResolvableProcessor<O>(resolvable));
       return resolvable;
-    }
-  }
-
-  private static class CacheProcessor<O> implements StatelessProcessor<O, O>, Serializable {
-
-    private final ResolvablePromise<O, O> mResolvable;
-
-    private CacheProcessor(@NotNull final ResolvablePromise<O, O> resolvable) {
-      mResolvable = resolvable;
-    }
-
-    public void reject(final Throwable reason, @NotNull final Callback<O> callback) {
-      mResolvable.reject(reason);
-    }
-
-    public void resolve(@NotNull final Callback<O> callback) {
-      mResolvable.resolve();
-    }
-
-    public void resolve(final O input, @NotNull final Callback<O> callback) {
-      mResolvable.resolve(input);
     }
   }
 
@@ -237,6 +216,27 @@ public class Bond implements Serializable {
 
     public void accept(final Callback<O> callback) {
       callback.reject(mReason);
+    }
+  }
+
+  private static class ResolvableProcessor<O> implements StatelessProcessor<O, O>, Serializable {
+
+    private final ResolvablePromise<O, O> mResolvable;
+
+    private ResolvableProcessor(@NotNull final ResolvablePromise<O, O> resolvable) {
+      mResolvable = resolvable;
+    }
+
+    public void reject(final Throwable reason, @NotNull final Callback<O> callback) {
+      mResolvable.reject(reason);
+    }
+
+    public void resolve(@NotNull final Callback<O> callback) {
+      mResolvable.resolve();
+    }
+
+    public void resolve(final O input, @NotNull final Callback<O> callback) {
+      mResolvable.resolve(input);
     }
   }
 
