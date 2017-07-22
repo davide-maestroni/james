@@ -145,8 +145,8 @@ public abstract class ScheduledExecutor implements Executor {
    * Note that, even if the implementation of this method is not strictly mandatory, it will be
    * used to optimize the invocation commands.
    * <p>
-   * Consider inheriting from {@link AsyncExecutor AsyncExecutor} or
-   * {@link SyncExecutor SyncExecutor} class for a default
+   * Consider inheriting from {@link dm.james.executor.AsyncExecutor AsyncExecutor} or
+   * {@link dm.james.executor.SyncExecutor SyncExecutor} class for a default
    * implementation of most of the abstract methods.
    *
    * @return whether this executor is synchronous.

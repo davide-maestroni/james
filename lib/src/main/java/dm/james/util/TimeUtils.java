@@ -28,12 +28,12 @@ public class TimeUtils {
   private static final long ONE_MILLI_NANOS = TimeUnit.MILLISECONDS.toNanos(1);
 
   /**
-   * Performs a {@link Thread#sleep(long, int)} using the specified duration as timeout,
+   * Performs a {@link java.lang.Thread#sleep(long, int)} using the specified duration as timeout,
    * ensuring that the sleep time is respected even if spurious wake-ups happen in the while.
    *
    * @param time the time value.
    * @param unit the time unit.
-   * @throws InterruptedException if the current thread is interrupted.
+   * @throws java.lang.InterruptedException if the current thread is interrupted.
    */
   public static void sleepAtLeast(final long time, @NotNull final TimeUnit unit) throws
       InterruptedException {
@@ -60,15 +60,15 @@ public class TimeUtils {
   }
 
   /**
-   * Performs a {@link Thread#sleep(long, int)} as if started from the specified system
+   * Performs a {@link java.lang.Thread#sleep(long, int)} as if started from the specified system
    * time in milliseconds, by using the specified time as timeout.
    *
    * @param time      the time value.
    * @param unit      the time unit.
    * @param milliTime the starting system time in milliseconds.
    * @return whether the sleep happened at all.
-   * @throws IllegalStateException if this duration overflows the maximum sleep time.
-   * @throws InterruptedException  if the current thread is interrupted.
+   * @throws java.lang.IllegalStateException if this duration overflows the maximum sleep time.
+   * @throws java.lang.InterruptedException  if the current thread is interrupted.
    * @see System#currentTimeMillis()
    */
   public static boolean sleepSinceMillis(final long time, @NotNull final TimeUnit unit,
@@ -87,15 +87,15 @@ public class TimeUtils {
   }
 
   /**
-   * Performs a {@link Thread#sleep(long, int)} as if started from the specified high
+   * Performs a {@link java.lang.Thread#sleep(long, int)} as if started from the specified high
    * precision system time in nanoseconds, by using the specified time as timeout.
    *
    * @param time     the time value.
    * @param unit     the time unit.
    * @param nanoTime the starting system time in nanoseconds.
    * @return whether the sleep happened at all.
-   * @throws IllegalStateException if this duration overflows the maximum sleep time.
-   * @throws InterruptedException  if the current thread is interrupted.
+   * @throws java.lang.IllegalStateException if this duration overflows the maximum sleep time.
+   * @throws java.lang.InterruptedException  if the current thread is interrupted.
    * @see System#nanoTime()
    */
   public static boolean sleepSinceNanos(final long time, @NotNull final TimeUnit unit,
