@@ -19,7 +19,7 @@ package dm.james.promise;
 /**
  * Created by davide-maestroni on 07/20/2017.
  */
-public interface Observer<T> {
+public interface Observer<I> {
 
-  void accept(T input) throws Exception;
+  void accept(I input) throws Exception;
 }

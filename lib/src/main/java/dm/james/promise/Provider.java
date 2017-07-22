@@ -19,7 +19,7 @@ package dm.james.promise;
 /**
  * Created by davide-maestroni on 07/20/2017.
  */
-public interface Provider<T> {
+public interface Provider<O> {
 
-  T get() throws Exception;
+  O get() throws Exception;
 }

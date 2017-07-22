@@ -32,7 +32,7 @@ import dm.james.util.SerializableProxy;
 /**
  * Created by davide-maestroni on 07/21/2017.
  */
-public class ScheduleProcessor<T> implements StatelessProcessor<T, T>, Serializable {
+public class ScheduleProcessor<I> implements StatelessProcessor<I, I>, Serializable {
 
   // TODO: 21/07/2017 throttle, priority, backoff
 
@@ -43,11 +43,11 @@ public class ScheduleProcessor<T> implements StatelessProcessor<T, T>, Serializa
   }
 
   @NotNull
-  public ScheduleProcessor<T> delayed(final long delay, @NotNull final TimeUnit timeUnit) {
-    return new DelayedProcessor<T>(mExecutor, delay, timeUnit);
+  public ScheduleProcessor<I> delayed(final long delay, @NotNull final TimeUnit timeUnit) {
+    return new DelayedProcessor<I>(mExecutor, delay, timeUnit);
   }
 
-  public void reject(final Throwable reason, @NotNull final Callback<T> callback) {
+  public void reject(final Throwable reason, @NotNull final Callback<I> callback) {
     mExecutor.execute(new Runnable() {
 
       public void run() {
@@ -56,7 +56,7 @@ public class ScheduleProcessor<T> implements StatelessProcessor<T, T>, Serializa
     });
   }
 
-  public void resolve(@NotNull final Callback<T> callback) {
+  public void resolve(@NotNull final Callback<I> callback) {
     mExecutor.execute(new Runnable() {
 
       public void run() {
@@ -65,7 +65,7 @@ public class ScheduleProcessor<T> implements StatelessProcessor<T, T>, Serializa
     });
   }
 
-  public void resolve(final T input, @NotNull final Callback<T> callback) {
+  public void resolve(final I input, @NotNull final Callback<I> callback) {
     mExecutor.execute(new Runnable() {
 
       public void run() {
@@ -75,10 +75,10 @@ public class ScheduleProcessor<T> implements StatelessProcessor<T, T>, Serializa
   }
 
   private Object writeReplace() throws ObjectStreamException {
-    return new ProcessorProxy<T>(mExecutor);
+    return new ProcessorProxy<I>(mExecutor);
   }
 
-  private static class DelayedProcessor<T> extends ScheduleProcessor<T> {
+  private static class DelayedProcessor<I> extends ScheduleProcessor<I> {
 
     private final long mDelay;
 
@@ -96,7 +96,7 @@ public class ScheduleProcessor<T> implements StatelessProcessor<T, T>, Serializa
 
     @NotNull
     @Override
-    public ScheduleProcessor<T> delayed(final long delay, @NotNull final TimeUnit timeUnit) {
+    public ScheduleProcessor<I> delayed(final long delay, @NotNull final TimeUnit timeUnit) {
       ConstantConditions.notNegative("delay", delay);
       final TimeUnit currentUnit = mTimeUnit;
       final long newDelay;
@@ -110,10 +110,10 @@ public class ScheduleProcessor<T> implements StatelessProcessor<T, T>, Serializa
         newUnit = currentUnit;
       }
 
-      return new DelayedProcessor<T>(mExecutor, newDelay, newUnit);
+      return new DelayedProcessor<I>(mExecutor, newDelay, newUnit);
     }
 
-    public void reject(final Throwable reason, @NotNull final Callback<T> callback) {
+    public void reject(final Throwable reason, @NotNull final Callback<I> callback) {
       mExecutor.execute(new Runnable() {
 
         public void run() {
@@ -122,7 +122,7 @@ public class ScheduleProcessor<T> implements StatelessProcessor<T, T>, Serializa
       }, mDelay, mTimeUnit);
     }
 
-    public void resolve(@NotNull final Callback<T> callback) {
+    public void resolve(@NotNull final Callback<I> callback) {
       mExecutor.execute(new Runnable() {
 
         public void run() {
@@ -131,7 +131,7 @@ public class ScheduleProcessor<T> implements StatelessProcessor<T, T>, Serializa
       }, mDelay, mTimeUnit);
     }
 
-    public void resolve(final T input, @NotNull final Callback<T> callback) {
+    public void resolve(final I input, @NotNull final Callback<I> callback) {
       mExecutor.execute(new Runnable() {
 
         public void run() {
@@ -141,10 +141,10 @@ public class ScheduleProcessor<T> implements StatelessProcessor<T, T>, Serializa
     }
 
     private Object writeReplace() throws ObjectStreamException {
-      return new ProcessorProxy<T>(mExecutor, mDelay, mTimeUnit);
+      return new ProcessorProxy<I>(mExecutor, mDelay, mTimeUnit);
     }
 
-    private static class ProcessorProxy<T> extends SerializableProxy {
+    private static class ProcessorProxy<I> extends SerializableProxy {
 
       private ProcessorProxy(final ScheduledExecutor executor, final long delay,
           final TimeUnit timeUnit) {
@@ -155,7 +155,7 @@ public class ScheduleProcessor<T> implements StatelessProcessor<T, T>, Serializa
       Object readResolve() throws ObjectStreamException {
         try {
           final Object[] args = deserializeArgs();
-          return new DelayedProcessor<T>((ScheduledExecutor) args[0], (Long) args[1],
+          return new DelayedProcessor<I>((ScheduledExecutor) args[0], (Long) args[1],
               (TimeUnit) args[2]);
 
         } catch (final Throwable t) {
@@ -165,7 +165,7 @@ public class ScheduleProcessor<T> implements StatelessProcessor<T, T>, Serializa
     }
   }
 
-  private static class ProcessorProxy<T> extends SerializableProxy {
+  private static class ProcessorProxy<I> extends SerializableProxy {
 
     private ProcessorProxy(final ScheduledExecutor executor) {
       super(executor);
@@ -175,7 +175,7 @@ public class ScheduleProcessor<T> implements StatelessProcessor<T, T>, Serializa
     Object readResolve() throws ObjectStreamException {
       try {
         final Object[] args = deserializeArgs();
-        return new ScheduleProcessor<T>((ScheduledExecutor) args[0]);
+        return new ScheduleProcessor<I>((ScheduledExecutor) args[0]);
 
       } catch (final Throwable t) {
         throw new InvalidObjectException(t.getMessage());

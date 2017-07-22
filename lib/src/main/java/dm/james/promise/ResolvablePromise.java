@@ -36,10 +36,19 @@ public interface ResolvablePromise<I, O> extends Promise<O>, Resolvable<I> {
       @Nullable Observer<Callback<R>> emptyHandler);
 
   @NotNull
+  ResolvablePromise<I, O> thenAccept(@NotNull Observer<O> observer);
+
+  @NotNull
   ResolvablePromise<I, O> thenCatch(@NotNull Mapper<Throwable, O> mapper);
 
   @NotNull
+  ResolvablePromise<I, O> thenDo(@NotNull Action action);
+
+  @NotNull
   ResolvablePromise<I, O> thenFill(@NotNull Provider<O> provider);
+
+  @NotNull
+  ResolvablePromise<I, O> thenFinally(@NotNull Observer<Throwable> observer);
 
   @NotNull
   <R> ResolvablePromise<I, R> thenMap(@NotNull Mapper<O, R> mapper);

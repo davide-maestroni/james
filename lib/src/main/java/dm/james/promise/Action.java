@@ -17,13 +17,9 @@
 package dm.james.promise;
 
 /**
- * Created by davide-maestroni on 07/20/2017.
+ * Created by davide-maestroni on 07/22/2017.
  */
-public interface Resolvable<I> {
+public interface Action {
 
-  void reject(Throwable reason);
-
-  void resolve(I input);
-
-  void resolve();
+  void perform() throws Exception;
 }

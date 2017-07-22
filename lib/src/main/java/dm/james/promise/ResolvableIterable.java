@@ -16,14 +16,14 @@
 
 package dm.james.promise;
 
+import org.jetbrains.annotations.Nullable;
+
 /**
- * Created by davide-maestroni on 07/20/2017.
+ * Created by davide-maestroni on 07/22/2017.
  */
-public interface Resolvable<I> {
+public interface ResolvableIterable<I> extends Resolvable<I> {
 
-  void reject(Throwable reason);
+  void add(I output);
 
-  void resolve(I input);
-
-  void resolve();
+  void addAll(@Nullable Iterable<I> outputs);
 }

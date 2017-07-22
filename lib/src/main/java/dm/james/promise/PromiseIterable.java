@@ -19,13 +19,48 @@ package dm.james.promise;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
+import java.util.Iterator;
+import java.util.List;
+import java.util.concurrent.TimeUnit;
+
 /**
  * Created by davide-maestroni on 07/21/2017.
  */
-public interface PromiseIterable<O> extends Promise<Iterable<O>> {
+public interface PromiseIterable<O> extends Promise<Iterable<O>>, Iterable<O> {
+
+  @NotNull
+  Iterator<O> iterator(long timeout, @NotNull TimeUnit timeUnit);
+
+  O remove();
+
+  O remove(long timeout, @NotNull TimeUnit timeUnit);
+
+  List<O> remove(int maxSize);
+
+  List<O> remove(int maxSize, long timeout, @NotNull TimeUnit timeUnit);
+
+  O removeOr(O other, long timeout, @NotNull TimeUnit timeUnit);
 
   @NotNull
   <R, S> PromiseIterable<R> then(@NotNull StateFulProcessor<O, R, S> processor);
+
+  @NotNull
+  PromiseIterable<O> thenAccept(@NotNull Observer<Iterable<O>> observer);
+
+  @NotNull
+  PromiseIterable<O> thenCatch(@NotNull Mapper<Throwable, Iterable<O>> mapper);
+
+  @NotNull
+  PromiseIterable<O> thenDo(@NotNull Action action);
+
+  @NotNull
+  PromiseIterable<O> thenFill(@NotNull Provider<Iterable<O>> provider);
+
+  @NotNull
+  PromiseIterable<O> thenFinally(@NotNull Observer<Throwable> observer);
+
+  @NotNull
+  PromiseIterable<O> thenAcceptEach(@NotNull Observer<O> observer);
 
   @NotNull
   <R> PromiseIterable<R> thenAll(@NotNull StatelessProcessor<Iterable<O>, Iterable<R>> processor);
@@ -37,13 +72,10 @@ public interface PromiseIterable<O> extends Promise<Iterable<O>> {
       @Nullable Observer<CallbackIterable<R>> emptyHandler);
 
   @NotNull
-  PromiseIterable<O> thenCatch(@NotNull Mapper<Throwable, Iterable<O>> mapper);
-
-  @NotNull
-  PromiseIterable<O> thenFill(@NotNull Provider<Iterable<O>> provider);
-
-  @NotNull
   PromiseIterable<O> thenCatchEach(@NotNull Mapper<Throwable, O> mapper);
+
+  @NotNull
+  PromiseIterable<O> thenDoEach(@NotNull Action action);
 
   @NotNull
   <R> PromiseIterable<R> thenEach(@Nullable Handler<O, R, CallbackIterable<R>> outputHandler,
@@ -57,16 +89,15 @@ public interface PromiseIterable<O> extends Promise<Iterable<O>> {
   PromiseIterable<O> thenFillEach(@NotNull Provider<O> provider);
 
   @NotNull
+  PromiseIterable<O> thenFinallyEach(@NotNull Observer<Throwable> observer);
+
+  @NotNull
   <R> PromiseIterable<R> thenMapAll(@NotNull Mapper<Iterable<O>, Iterable<R>> mapper);
 
   @NotNull
   <R> PromiseIterable<R> thenMapEach(@NotNull Mapper<O, R> mapper);
 
-  interface CallbackIterable<O> extends Callback<O> {
-
-    void add(O output);
-
-    void addAll(@Nullable Iterable<O> outputs);
+  interface CallbackIterable<O> extends Callback<O>, ResolvableIterable<O> {
 
     void addAllDeferred(@NotNull Promise<? extends Iterable<O>> promise);
 

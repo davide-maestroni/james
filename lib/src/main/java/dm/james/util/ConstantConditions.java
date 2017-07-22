@@ -96,12 +96,12 @@ public class ConstantConditions {
    * Asserts that the specified object is not null.
    *
    * @param object the object.
-   * @param <TYPE> the object type.
+   * @param <T> the object type.
    * @return the object.
    * @throws NullPointerException is the object is null.
    */
   @NotNull
-  public static <TYPE> TYPE notNull(final TYPE object) {
+  public static <T> T notNull(final T object) {
     return notNull("object", object);
   }
 
@@ -110,12 +110,12 @@ public class ConstantConditions {
    *
    * @param name   the name of the parameter used to build the error message.
    * @param object the object.
-   * @param <TYPE> the object type.
+   * @param <T> the object type.
    * @return the object.
    * @throws NullPointerException is the object is null.
    */
   @NotNull
-  public static <TYPE> TYPE notNull(final String name, final TYPE object) {
+  public static <T> T notNull(final String name, final T object) {
     if (object == null) {
       throw new NullPointerException("the " + name + " must not be null");
     }

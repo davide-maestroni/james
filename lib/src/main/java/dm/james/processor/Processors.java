@@ -34,7 +34,7 @@ public class Processors {
   }
 
   @NotNull
-  public static <T> ScheduleProcessor<T> scheduleOn(@NotNull final ScheduledExecutor executor) {
-    return new ScheduleProcessor<T>(executor);
+  public static <I> ScheduleProcessor<I> scheduleOn(@NotNull final ScheduledExecutor executor) {
+    return new ScheduleProcessor<I>(executor);
   }
 }

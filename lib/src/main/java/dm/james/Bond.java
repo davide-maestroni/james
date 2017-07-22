@@ -95,16 +95,6 @@ public class Bond implements Serializable {
   }
 
   @NotNull
-  public <O> Promise<O> trust(@NotNull final Promise<O> promise) {
-    return promise(new Observer<Callback<O>>() {
-
-      public void accept(final Callback<O> callback) {
-        callback.defer(promise);
-      }
-    });
-  }
-
-  @NotNull
   public Bond withLog(@Nullable final Log log) {
     return new Bond(mPropagationType, log, mLogLevel);
   }

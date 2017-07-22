@@ -28,6 +28,7 @@ import java.util.concurrent.TimeUnit;
 public interface Promise<O> extends Serializable {
 
   // TODO: 18/07/2017 float timeout??
+  // TODO: 22/07/2017 thenAccept(Observer<O>), thenFinally(Observer<Throwable>), thenDo(Action)
 
   @NotNull
   <R> Promise<R> apply(@NotNull Mapper<Promise<O>, Promise<R>> mapper);
@@ -65,10 +66,19 @@ public interface Promise<O> extends Serializable {
       @Nullable Observer<Callback<R>> emptyHandler);
 
   @NotNull
+  Promise<O> thenAccept(@NotNull Observer<O> observer);
+
+  @NotNull
   Promise<O> thenCatch(@NotNull Mapper<Throwable, O> mapper);
 
   @NotNull
+  Promise<O> thenDo(@NotNull Action action);
+
+  @NotNull
   Promise<O> thenFill(@NotNull Provider<O> provider);
+
+  @NotNull
+  Promise<O> thenFinally(@NotNull Observer<Throwable> observer);
 
   @NotNull
   <R> Promise<R> thenMap(@NotNull Mapper<O, R> mapper);

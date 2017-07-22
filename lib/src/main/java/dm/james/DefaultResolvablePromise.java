@@ -29,6 +29,7 @@ import java.util.concurrent.TimeUnit;
 import dm.james.log.Log;
 import dm.james.log.Log.Level;
 import dm.james.log.Logger;
+import dm.james.promise.Action;
 import dm.james.promise.Mapper;
 import dm.james.promise.Observer;
 import dm.james.promise.Promise;
@@ -94,13 +95,28 @@ class DefaultResolvablePromise<I, O> implements ResolvablePromise<I, O> {
   }
 
   @NotNull
+  public ResolvablePromise<I, O> thenAccept(@NotNull final Observer<O> observer) {
+    return new DefaultResolvablePromise<I, O>(mPromise.thenAccept(observer), mLogger, mState);
+  }
+
+  @NotNull
   public ResolvablePromise<I, O> thenCatch(@NotNull final Mapper<Throwable, O> mapper) {
     return new DefaultResolvablePromise<I, O>(mPromise.thenCatch(mapper), mLogger, mState);
   }
 
   @NotNull
+  public ResolvablePromise<I, O> thenDo(@NotNull final Action action) {
+    return new DefaultResolvablePromise<I, O>(mPromise.thenDo(action), mLogger, mState);
+  }
+
+  @NotNull
   public ResolvablePromise<I, O> thenFill(@NotNull final Provider<O> provider) {
     return new DefaultResolvablePromise<I, O>(mPromise.thenFill(provider), mLogger, mState);
+  }
+
+  @NotNull
+  public ResolvablePromise<I, O> thenFinally(@NotNull final Observer<Throwable> observer) {
+    return new DefaultResolvablePromise<I, O>(mPromise.thenFinally(observer), mLogger, mState);
   }
 
   @NotNull

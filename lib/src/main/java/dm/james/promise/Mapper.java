@@ -19,7 +19,7 @@ package dm.james.promise;
 /**
  * Created by davide-maestroni on 07/20/2017.
  */
-public interface Mapper<T, R> {
+public interface Mapper<I, O> {
 
-  R apply(T input) throws Exception;
+  O apply(I input) throws Exception;
 }

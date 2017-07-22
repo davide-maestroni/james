@@ -32,6 +32,7 @@ import dm.james.executor.InterruptedExecutionException;
 import dm.james.log.Log;
 import dm.james.log.Log.Level;
 import dm.james.log.Logger;
+import dm.james.promise.Action;
 import dm.james.promise.Mapper;
 import dm.james.promise.NoResolutionException;
 import dm.james.promise.Observer;
@@ -308,23 +309,37 @@ class DefaultPromise<O> implements Promise<O> {
   public <R> Promise<R> then(@Nullable final Handler<O, R, Callback<R>> outputHandler,
       @Nullable final Handler<Throwable, R, Callback<R>> errorHandler,
       @Nullable final Observer<Callback<R>> emptyHandler) {
-    return chain(
-        new ChainHandle<O, R>(mPropagationType, outputHandler, errorHandler, emptyHandler));
+    return then(new HandlerProcessor<O, R>(outputHandler, errorHandler, emptyHandler));
+  }
+
+  @NotNull
+  public Promise<O> thenAccept(@NotNull final Observer<O> observer) {
+    return then(new AcceptProcessor<O>(observer));
   }
 
   @NotNull
   public Promise<O> thenCatch(@NotNull final Mapper<Throwable, O> mapper) {
-    return chain(new ChainCatch<O>(mPropagationType, mapper));
+    return then(new CatchProcessor<O>(mapper));
+  }
+
+  @NotNull
+  public Promise<O> thenDo(@NotNull final Action action) {
+    return then(new DoProcessor<O>(action));
   }
 
   @NotNull
   public Promise<O> thenFill(@NotNull final Provider<O> provider) {
-    return chain(new ChainFill<O>(mPropagationType, provider));
+    return then(new FillProcessor<O>(provider));
+  }
+
+  @NotNull
+  public Promise<O> thenFinally(@NotNull final Observer<Throwable> observer) {
+    return then(new FinallyProcessor<O>(observer));
   }
 
   @NotNull
   public <R> Promise<R> thenMap(@NotNull final Mapper<O, R> mapper) {
-    return chain(new ChainMap<O, R>(mPropagationType, mapper));
+    return then(new MapProcessor<O, R>(mapper));
   }
 
   public boolean waitFulfilled(final long timeout, @NotNull final TimeUnit timeUnit) {
@@ -457,38 +472,71 @@ class DefaultPromise<O> implements Promise<O> {
     Pending, Fulfilled, Rejected
   }
 
-  private static class ChainCatch<O> extends PromiseChain<O, O> {
+  private static class AcceptProcessor<O> extends DefaultProcessor<O, O> implements Serializable {
+
+    private final Observer<O> mObserver;
+
+    private AcceptProcessor(@NotNull final Observer<O> observer) {
+      mObserver = ConstantConditions.notNull("observer", observer);
+    }
+
+    private Object writeReplace() throws ObjectStreamException {
+      return new ChainProxy<O>(mObserver);
+    }
+
+    private static class ChainProxy<O> extends SerializableProxy {
+
+      private ChainProxy(final Observer<O> observer) {
+        super(observer);
+      }
+
+      @SuppressWarnings("unchecked")
+      Object readResolve() throws ObjectStreamException {
+        try {
+          final Object[] args = deserializeArgs();
+          return new AcceptProcessor<O>((Observer<O>) args[0]);
+
+        } catch (final Throwable t) {
+          throw new InvalidObjectException(t.getMessage());
+        }
+      }
+    }
+
+    @Override
+    public void resolve(final O input, @NotNull final Callback<O> callback) throws Exception {
+      mObserver.accept(input);
+      super.resolve(input, callback);
+    }
+  }
+
+  private static class CatchProcessor<O> extends DefaultProcessor<O, O> implements Serializable {
 
     private final Mapper<Throwable, O> mMapper;
 
-    private final PropagationType mPropagationType;
-
-    private ChainCatch(@NotNull final PropagationType propagationType,
-        @NotNull final Mapper<Throwable, O> mapper) {
+    private CatchProcessor(@NotNull final Mapper<Throwable, O> mapper) {
       mMapper = ConstantConditions.notNull("mapper", mapper);
-      mPropagationType = propagationType;
     }
 
-    @NotNull
-    PromiseChain<O, O> copy() {
-      return new ChainCatch<O>(mPropagationType, mMapper);
+    public void reject(final Throwable reason, @NotNull final Callback<O> callback) throws
+        Exception {
+      callback.resolve(mMapper.apply(reason));
     }
 
     private Object writeReplace() throws ObjectStreamException {
-      return new ChainProxy<O>(mPropagationType, mMapper);
+      return new ChainProxy<O>(mMapper);
     }
 
     private static class ChainProxy<O> extends SerializableProxy {
 
-      private ChainProxy(final PropagationType propagationType, final Mapper<Throwable, O> mapper) {
-        super(propagationType, mapper);
+      private ChainProxy(final Mapper<Throwable, O> mapper) {
+        super(mapper);
       }
 
       @SuppressWarnings("unchecked")
       Object readResolve() throws ObjectStreamException {
         try {
           final Object[] args = deserializeArgs();
-          return new ChainCatch<O>((PropagationType) args[0], (Mapper<Throwable, O>) args[1]);
+          return new CatchProcessor<O>((Mapper<Throwable, O>) args[0]);
 
         } catch (final Throwable t) {
           throw new InvalidObjectException(t.getMessage());
@@ -496,224 +544,6 @@ class DefaultPromise<O> implements Promise<O> {
       }
     }
 
-    void reject(@NotNull final PromiseChain<O, ?> next, final Throwable reason) {
-      mPropagationType.execute(new Runnable() {
-
-        public void run() {
-          try {
-            getLogger().dbg("Catching rejection with reason: %s", reason);
-            next.resolve(mMapper.apply(reason));
-
-          } catch (final Throwable t) {
-            InterruptedExecutionException.throwIfInterrupt(t);
-            getLogger().err(t, "Error while catching rejection with reason: %s", reason);
-            next.reject(t);
-          }
-        }
-      });
-    }
-
-    void resolve(@NotNull final PromiseChain<O, ?> next, final O input) {
-      mPropagationType.execute(new Runnable() {
-
-        public void run() {
-          getLogger().dbg("Passing on resolution: %s", input);
-          next.resolve(input);
-        }
-      });
-    }
-
-    void resolve(@NotNull final PromiseChain<O, ?> next) {
-      mPropagationType.execute(new Runnable() {
-
-        public void run() {
-          getLogger().dbg("Passing on empty resolution");
-          next.resolve();
-        }
-      });
-    }
-  }
-
-  private static class ChainFill<O> extends PromiseChain<O, O> {
-
-    private final PropagationType mPropagationType;
-
-    private final Provider<O> mProvider;
-
-    private ChainFill(@NotNull final PropagationType propagationType,
-        @NotNull final Provider<O> provider) {
-      mProvider = ConstantConditions.notNull("provider", provider);
-      mPropagationType = propagationType;
-    }
-
-    private Object writeReplace() throws ObjectStreamException {
-      return new ChainProxy<O>(mPropagationType, mProvider);
-    }
-
-    private static class ChainProxy<O> extends SerializableProxy {
-
-      private ChainProxy(final PropagationType propagationType, final Provider<O> provider) {
-        super(propagationType, provider);
-      }
-
-      @SuppressWarnings("unchecked")
-      Object readResolve() throws ObjectStreamException {
-        try {
-          final Object[] args = deserializeArgs();
-          return new ChainFill<O>((PropagationType) args[0], (Provider<O>) args[1]);
-
-        } catch (final Throwable t) {
-          throw new InvalidObjectException(t.getMessage());
-        }
-      }
-    }
-
-    @NotNull
-    PromiseChain<O, O> copy() {
-      return new ChainFill<O>(mPropagationType, mProvider);
-    }
-
-    void reject(@NotNull final PromiseChain<O, ?> next, final Throwable reason) {
-      mPropagationType.execute(new Runnable() {
-
-        public void run() {
-          getLogger().dbg("Passing on rejection with reason: %s", reason);
-          next.reject(reason);
-        }
-      });
-    }
-
-    void resolve(@NotNull final PromiseChain<O, ?> next, final O input) {
-      mPropagationType.execute(new Runnable() {
-
-        public void run() {
-          getLogger().dbg("Passing on resolution: %s", input);
-          next.resolve(input);
-        }
-      });
-    }
-
-    void resolve(@NotNull final PromiseChain<O, ?> next) {
-      mPropagationType.execute(new Runnable() {
-
-        public void run() {
-          try {
-            getLogger().dbg("Filling empty resolution");
-            next.resolve(mProvider.get());
-
-          } catch (final Throwable t) {
-            InterruptedExecutionException.throwIfInterrupt(t);
-            getLogger().err(t, "Error while filling empty resolution");
-            next.reject(t);
-          }
-        }
-      });
-    }
-  }
-
-  private static class ChainHandle<O, R> extends PromiseChain<O, R> {
-
-    private final Observer<Callback<R>> mEmptyHandler;
-
-    private final Handler<Throwable, R, Callback<R>> mErrorHandler;
-
-    private final Handler<O, R, Callback<R>> mOutputHandler;
-
-    private final PropagationType mPropagationType;
-
-    private ChainHandle(@NotNull final PropagationType propagationType,
-        @Nullable final Handler<O, R, Callback<R>> outputHandler,
-        @Nullable final Handler<Throwable, R, Callback<R>> errorHandler,
-        @Nullable final Observer<Callback<R>> emptyHandler) {
-      mPropagationType = propagationType;
-      mOutputHandler =
-          (outputHandler != null) ? outputHandler : new PassThroughOutputHandler<O, R>();
-      mErrorHandler = (errorHandler != null) ? errorHandler : new PassThroughErrorHandler<R>();
-      mEmptyHandler = (emptyHandler != null) ? emptyHandler : new PassThroughEmptyHandler<R>();
-    }
-
-    private Object writeReplace() throws ObjectStreamException {
-      return new ChainProxy<O, R>(mPropagationType, mOutputHandler, mErrorHandler, mEmptyHandler);
-    }
-
-    private static class ChainProxy<O, R> extends SerializableProxy {
-
-      private ChainProxy(final PropagationType propagationType,
-          final Handler<O, R, Callback<R>> outputHandler,
-          final Handler<Throwable, R, Callback<R>> errorHandler,
-          final Observer<Callback<R>> emptyHandler) {
-        super(propagationType, outputHandler, errorHandler, emptyHandler);
-      }
-
-      @SuppressWarnings("unchecked")
-      Object readResolve() throws ObjectStreamException {
-        try {
-          final Object[] args = deserializeArgs();
-          return new ChainHandle<O, R>((PropagationType) args[0],
-              (Handler<O, R, Callback<R>>) args[1], (Handler<Throwable, R, Callback<R>>) args[2],
-              (Observer<Callback<R>>) args[3]);
-
-        } catch (final Throwable t) {
-          throw new InvalidObjectException(t.getMessage());
-        }
-      }
-    }
-
-    @NotNull
-    PromiseChain<O, R> copy() {
-      return new ChainHandle<O, R>(mPropagationType, mOutputHandler, mErrorHandler, mEmptyHandler);
-    }
-
-    void reject(@NotNull final PromiseChain<R, ?> next, final Throwable reason) {
-      mPropagationType.execute(new Runnable() {
-
-        public void run() {
-          try {
-            getLogger().dbg("Handling rejection with reason: %s", reason);
-            mErrorHandler.accept(reason, next);
-
-          } catch (final Throwable t) {
-            InterruptedExecutionException.throwIfInterrupt(t);
-            getLogger().err(t, "Error while handling rejection with reason: %s", reason);
-            next.reject(t);
-          }
-        }
-      });
-    }
-
-    void resolve(@NotNull final PromiseChain<R, ?> next) {
-      mPropagationType.execute(new Runnable() {
-
-        public void run() {
-          try {
-            getLogger().dbg("Handling empty resolution");
-            mEmptyHandler.accept(next);
-
-          } catch (final Throwable t) {
-            InterruptedExecutionException.throwIfInterrupt(t);
-            getLogger().err(t, "Error while handling empty resolution");
-            next.reject(t);
-          }
-        }
-      });
-    }
-
-    void resolve(@NotNull final PromiseChain<R, ?> next, final O input) {
-      mPropagationType.execute(new Runnable() {
-
-        public void run() {
-          try {
-            getLogger().dbg("Handling resolution: %s", input);
-            mOutputHandler.accept(input, next);
-
-          } catch (final Throwable t) {
-            InterruptedExecutionException.throwIfInterrupt(t);
-            getLogger().err(t, "Error while handling resolution: %s", input);
-            next.reject(t);
-          }
-        }
-      });
-    }
   }
 
   private static class ChainHead<O> extends PromiseChain<O, O> {
@@ -729,6 +559,11 @@ class DefaultPromise<O> implements Promise<O> {
     @Nullable
     Runnable bind(@NotNull final PromiseChain<?, ?> bond) {
       return mState.bind(bond);
+    }
+
+    @NotNull
+    ChainHead<O> copy() {
+      return new ChainHead<O>();
     }
 
     @Nullable
@@ -749,12 +584,12 @@ class DefaultPromise<O> implements Promise<O> {
       mState.innerReject(reason);
     }
 
-    void innerResolve(final Object output) {
-      mState.innerResolve(output);
-    }
-
     void innerResolve() {
       mState.innerResolve();
+    }
+
+    void innerResolve(final Object output) {
+      mState.innerResolve(output);
     }
 
     boolean isTerminated() {
@@ -921,94 +756,12 @@ class DefaultPromise<O> implements Promise<O> {
       next.resolve(input);
     }
 
-    @NotNull
-    ChainHead<O> copy() {
-      return new ChainHead<O>();
-    }
-
     public void reject(@NotNull final PromiseChain<O, ?> next, final Throwable reason) {
       next.reject(reason);
     }
 
     public void resolve(@NotNull final PromiseChain<O, ?> next) {
       next.resolve();
-    }
-  }
-
-  private static class ChainMap<O, R> extends PromiseChain<O, R> {
-
-    private final Mapper<O, R> mMapper;
-
-    private final PropagationType mPropagationType;
-
-    private ChainMap(@NotNull final PropagationType propagationType,
-        @NotNull final Mapper<O, R> mapper) {
-      mMapper = ConstantConditions.notNull("mapper", mapper);
-      mPropagationType = propagationType;
-    }
-
-    private Object writeReplace() throws ObjectStreamException {
-      return new ChainProxy<O, R>(mPropagationType, mMapper);
-    }
-
-    private static class ChainProxy<O, R> extends SerializableProxy {
-
-      private ChainProxy(final PropagationType propagationType, final Mapper<O, R> mapper) {
-        super(propagationType, mapper);
-      }
-
-      @SuppressWarnings("unchecked")
-      Object readResolve() throws ObjectStreamException {
-        try {
-          final Object[] args = deserializeArgs();
-          return new ChainMap<O, R>((PropagationType) args[0], (Mapper<O, R>) args[1]);
-
-        } catch (final Throwable t) {
-          throw new InvalidObjectException(t.getMessage());
-        }
-      }
-    }
-
-    @NotNull
-    PromiseChain<O, R> copy() {
-      return new ChainMap<O, R>(mPropagationType, mMapper);
-    }
-
-    void reject(@NotNull final PromiseChain<R, ?> next, final Throwable reason) {
-      mPropagationType.execute(new Runnable() {
-
-        public void run() {
-          getLogger().dbg("Passing on rejection with reason: %s", reason);
-          next.reject(reason);
-        }
-      });
-    }
-
-    void resolve(@NotNull final PromiseChain<R, ?> next, final O input) {
-      mPropagationType.execute(new Runnable() {
-
-        public void run() {
-          try {
-            getLogger().dbg("Mapping resolution: %s", input);
-            next.resolve(mMapper.apply(input));
-
-          } catch (final Throwable t) {
-            InterruptedExecutionException.throwIfInterrupt(t);
-            getLogger().err(t, "Error while mapping resolution: %s", input);
-            next.reject(t);
-          }
-        }
-      });
-    }
-
-    void resolve(@NotNull final PromiseChain<R, ?> next) {
-      mPropagationType.execute(new Runnable() {
-
-        public void run() {
-          getLogger().dbg("Passing on empty resolution");
-          next.resolve();
-        }
-      });
     }
   }
 
@@ -1101,6 +854,225 @@ class DefaultPromise<O> implements Promise<O> {
           }
         }
       });
+    }
+  }
+
+  private static class DefaultProcessor<I, O> implements StatelessProcessor<I, O> {
+
+    public void reject(final Throwable reason, @NotNull final Callback<O> callback) throws
+        Exception {
+      callback.reject(reason);
+    }
+
+    public void resolve(@NotNull final Callback<O> callback) throws Exception {
+      callback.resolve();
+    }
+
+    @SuppressWarnings("unchecked")
+    public void resolve(final I input, @NotNull final Callback<O> callback) throws Exception {
+      callback.resolve((O) input);
+    }
+  }
+
+  private static class DoProcessor<O> extends DefaultProcessor<O, O> implements Serializable {
+
+    private final Action mAction;
+
+    private DoProcessor(@NotNull final Action action) {
+      mAction = ConstantConditions.notNull("action", action);
+    }
+
+    private Object writeReplace() throws ObjectStreamException {
+      return new ChainProxy<O>(mAction);
+    }
+
+    private static class ChainProxy<O> extends SerializableProxy {
+
+      private ChainProxy(final Action action) {
+        super(action);
+      }
+
+      @SuppressWarnings("unchecked")
+      Object readResolve() throws ObjectStreamException {
+        try {
+          final Object[] args = deserializeArgs();
+          return new DoProcessor<O>((Action) args[0]);
+
+        } catch (final Throwable t) {
+          throw new InvalidObjectException(t.getMessage());
+        }
+      }
+    }
+
+    @Override
+    public void resolve(@NotNull final Callback<O> callback) throws Exception {
+      mAction.perform();
+      super.resolve(callback);
+    }
+  }
+
+  private static class FillProcessor<O> extends DefaultProcessor<O, O> implements Serializable {
+
+    private final Provider<O> mProvider;
+
+    private FillProcessor(@NotNull final Provider<O> provider) {
+      mProvider = ConstantConditions.notNull("provider", provider);
+    }
+
+    private Object writeReplace() throws ObjectStreamException {
+      return new ChainProxy<O>(mProvider);
+    }
+
+    private static class ChainProxy<O> extends SerializableProxy {
+
+      private ChainProxy(final Provider<O> provider) {
+        super(provider);
+      }
+
+      @SuppressWarnings("unchecked")
+      Object readResolve() throws ObjectStreamException {
+        try {
+          final Object[] args = deserializeArgs();
+          return new FillProcessor<O>((Provider<O>) args[0]);
+
+        } catch (final Throwable t) {
+          throw new InvalidObjectException(t.getMessage());
+        }
+      }
+    }
+
+    @Override
+    public void resolve(@NotNull final Callback<O> callback) throws Exception {
+      callback.resolve(mProvider.get());
+    }
+  }
+
+  private static class FinallyProcessor<O> extends DefaultProcessor<O, O> implements Serializable {
+
+    private final Observer<Throwable> mObserver;
+
+    private FinallyProcessor(@NotNull final Observer<Throwable> observer) {
+      mObserver = ConstantConditions.notNull("observer", observer);
+    }
+
+    private Object writeReplace() throws ObjectStreamException {
+      return new ChainProxy<O>(mObserver);
+    }
+
+    private static class ChainProxy<O> extends SerializableProxy {
+
+      private ChainProxy(final Observer<Throwable> observer) {
+        super(observer);
+      }
+
+      @SuppressWarnings("unchecked")
+      Object readResolve() throws ObjectStreamException {
+        try {
+          final Object[] args = deserializeArgs();
+          return new FinallyProcessor<O>((Observer<Throwable>) args[0]);
+
+        } catch (final Throwable t) {
+          throw new InvalidObjectException(t.getMessage());
+        }
+      }
+    }
+
+    @Override
+    public void reject(final Throwable reason, @NotNull final Callback<O> callback) throws
+        Exception {
+      mObserver.accept(reason);
+      super.reject(reason, callback);
+    }
+  }
+
+  private static class HandlerProcessor<I, O> implements StatelessProcessor<I, O>, Serializable {
+
+    private final Observer<Callback<O>> mEmptyHandler;
+
+    private final Handler<Throwable, O, Callback<O>> mErrorHandler;
+
+    private final Handler<I, O, Callback<O>> mOutputHandler;
+
+    private HandlerProcessor(@Nullable final Handler<I, O, Callback<O>> outputHandler,
+        @Nullable final Handler<Throwable, O, Callback<O>> errorHandler,
+        @Nullable final Observer<Callback<O>> emptyHandler) {
+      mOutputHandler =
+          (outputHandler != null) ? outputHandler : new PassThroughOutputHandler<I, O>();
+      mErrorHandler = (errorHandler != null) ? errorHandler : new PassThroughErrorHandler<O>();
+      mEmptyHandler = (emptyHandler != null) ? emptyHandler : new PassThroughEmptyHandler<O>();
+    }
+
+    private Object writeReplace() throws ObjectStreamException {
+      return new ChainProxy<I, O>(mOutputHandler, mErrorHandler, mEmptyHandler);
+    }
+
+    private static class ChainProxy<I, O> extends SerializableProxy {
+
+      private ChainProxy(final Handler<I, O, Callback<O>> outputHandler,
+          final Handler<Throwable, O, Callback<O>> errorHandler,
+          final Observer<Callback<O>> emptyHandler) {
+        super(outputHandler, errorHandler, emptyHandler);
+      }
+
+      @SuppressWarnings("unchecked")
+      Object readResolve() throws ObjectStreamException {
+        try {
+          final Object[] args = deserializeArgs();
+          return new HandlerProcessor<I, O>((Handler<I, O, Callback<O>>) args[0],
+              (Handler<Throwable, O, Callback<O>>) args[1], (Observer<Callback<O>>) args[2]);
+
+        } catch (final Throwable t) {
+          throw new InvalidObjectException(t.getMessage());
+        }
+      }
+    }
+
+    public void reject(final Throwable reason, @NotNull final Callback<O> callback) throws
+        Exception {
+      mErrorHandler.accept(reason, callback);
+    }
+
+    public void resolve(@NotNull final Callback<O> callback) throws Exception {
+      mEmptyHandler.accept(callback);
+    }
+
+    public void resolve(final I input, @NotNull final Callback<O> callback) throws Exception {
+      mOutputHandler.accept(input, callback);
+    }
+  }
+
+  private static class MapProcessor<I, O> extends DefaultProcessor<I, O> implements Serializable {
+
+    private final Mapper<I, O> mMapper;
+
+    private MapProcessor(final Mapper<I, O> mapper) {
+      mMapper = ConstantConditions.notNull("mapper", mapper);
+    }
+
+    private Object writeReplace() throws ObjectStreamException {
+      return new ChainProxy<I, O>(mMapper);
+    }
+
+    private static class ChainProxy<I, O> extends SerializableProxy {
+
+      private ChainProxy(final Mapper<I, O> mapper) {
+        super(mapper);
+      }
+
+      @SuppressWarnings("unchecked")
+      Object readResolve() throws ObjectStreamException {
+        try {
+          final Object[] args = deserializeArgs();
+          return new MapProcessor<I, O>((Mapper<I, O>) args[0]);
+
+        } catch (final Throwable t) {
+          throw new InvalidObjectException(t.getMessage());
+        }
+      }
+    }
+
+    public void resolve(final I input, @NotNull final Callback<O> callback) throws Exception {
+      callback.resolve(mMapper.apply(input));
     }
   }
 
