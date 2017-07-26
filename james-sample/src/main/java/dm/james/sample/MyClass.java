@@ -22,7 +22,7 @@ import dm.james.promise.Promise;
 public class MyClass {
 
   public static Promise<Integer> convert(Promise<CharSequence> promise) {
-    return promise.thenMap(MyClass::count);
+    return promise.then(MyClass::count);
   }
 
   public static int count(CharSequence sequence) {
@@ -35,14 +35,9 @@ public class MyClass {
 
   public static void test() {
     final Promise<String> promise = new Bond().resolved("test");
-    promise.thenMap(String::toLowerCase);
-    promise.thenMap(CharSequence::length);
-    promise.thenMap(MyClass::count);
-    promise.thenMap(CharSequence.class::cast).apply(MyClass::convert);
-  }
-
-  public static void testN() {
-    final Promise<Number> promise = new Bond().resolved(0);
-    promise.thenFill(MyClass::getInt);
+    promise.then(String::toLowerCase);
+    promise.then(CharSequence::length);
+    promise.then(MyClass::count);
+    promise.then(CharSequence.class::cast).apply(MyClass::convert);
   }
 }

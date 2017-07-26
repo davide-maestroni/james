@@ -25,16 +25,16 @@ import java.util.concurrent.TimeUnit;
 
 import dm.james.executor.ScheduledExecutor;
 import dm.james.promise.Promise.Callback;
-import dm.james.promise.Promise.StatelessProcessor;
+import dm.james.promise.Promise.Processor;
 import dm.james.util.ConstantConditions;
 import dm.james.util.SerializableProxy;
 
 /**
  * Created by davide-maestroni on 07/21/2017.
  */
-public class ScheduleProcessor<I> implements StatelessProcessor<I, I>, Serializable {
+public class ScheduleProcessor<I> implements Processor<I, I>, Serializable {
 
-  // TODO: 21/07/2017 throttle, priority, backoff
+  // TODO: 21/07/2017 delay, backoff to ScheduledExecutors
 
   private final ScheduledExecutor mExecutor;
 
@@ -52,15 +52,6 @@ public class ScheduleProcessor<I> implements StatelessProcessor<I, I>, Serializa
 
       public void run() {
         callback.reject(reason);
-      }
-    });
-  }
-
-  public void resolve(@NotNull final Callback<I> callback) {
-    mExecutor.execute(new Runnable() {
-
-      public void run() {
-        callback.resolve();
       }
     });
   }
@@ -118,15 +109,6 @@ public class ScheduleProcessor<I> implements StatelessProcessor<I, I>, Serializa
 
         public void run() {
           callback.reject(reason);
-        }
-      }, mDelay, mTimeUnit);
-    }
-
-    public void resolve(@NotNull final Callback<I> callback) {
-      mExecutor.execute(new Runnable() {
-
-        public void run() {
-          callback.resolve();
         }
       }, mDelay, mTimeUnit);
     }

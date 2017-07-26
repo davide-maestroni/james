@@ -14,31 +14,31 @@
  * limitations under the License.
  */
 
-package dm.james;
-
-import org.jetbrains.annotations.NotNull;
-
-import dm.james.executor.ScheduledExecutor;
-import dm.james.executor.ScheduledExecutors;
+package dm.james.util;
 
 /**
- * Created by davide-maestroni on 07/20/2017.
+ * Created by davide-maestroni on 07/25/2017.
  */
-public enum PropagationType {
-  IMMEDIATE(ScheduledExecutors.immediateExecutor()), LOOP(ScheduledExecutors.loopExecutor());
+public class IdentityReference<T> {
 
-  private final ScheduledExecutor mExecutor;
+  private final T mObject;
 
-  PropagationType(@NotNull final ScheduledExecutor executor) {
-    mExecutor = executor;
+  public IdentityReference(final T object) {
+    mObject = object;
   }
 
-  void execute(@NotNull final Runnable command) {
-    mExecutor.execute(command);
+  public T get() {
+    return mObject;
   }
 
-  @NotNull
-  ScheduledExecutor executor() {
-    return mExecutor;
+  @Override
+  public int hashCode() {
+    return mObject != null ? mObject.hashCode() : 0;
+  }
+
+  @Override
+  public boolean equals(final Object o) {
+    return (this == o) || ((o instanceof IdentityReference) && (mObject
+        == ((IdentityReference<?>) o).mObject));
   }
 }

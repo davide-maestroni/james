@@ -28,7 +28,6 @@ import java.util.concurrent.TimeUnit;
 public interface Promise<O> extends Serializable {
 
   // TODO: 18/07/2017 float timeout??
-  // TODO: 22/07/2017 thenAccept(Observer<O>), thenFinally(Observer<Throwable>), thenDo(Action)
 
   @NotNull
   <R> Promise<R> apply(@NotNull Mapper<Promise<O>, Promise<R>> mapper);
@@ -58,38 +57,30 @@ public interface Promise<O> extends Serializable {
   boolean isResolved();
 
   @NotNull
-  <R> Promise<R> then(@NotNull StatelessProcessor<O, R> processor);
-
-  @NotNull
   <R> Promise<R> then(@Nullable Handler<O, R, Callback<R>> outputHandler,
-      @Nullable Handler<Throwable, R, Callback<R>> errorHandler,
-      @Nullable Observer<Callback<R>> emptyHandler);
+      @Nullable Handler<Throwable, R, Callback<R>> errorHandler);
 
   @NotNull
-  Promise<O> thenAccept(@NotNull Observer<O> observer);
+  <R> Promise<R> then(@NotNull Mapper<O, R> mapper);
 
   @NotNull
-  Promise<O> thenCatch(@NotNull Mapper<Throwable, O> mapper);
+  <R> Promise<R> then(@NotNull Processor<O, R> processor);
 
   @NotNull
-  Promise<O> thenDo(@NotNull Action action);
+  Promise<O> thenCatch(@NotNull Mapper<Throwable, O> mapper); // TODO: 25/07/2017 catchError?
 
-  @NotNull
-  Promise<O> thenFill(@NotNull Provider<O> provider);
-
-  @NotNull
-  Promise<O> thenFinally(@NotNull Observer<Throwable> observer);
-
-  @NotNull
-  <R> Promise<R> thenMap(@NotNull Mapper<O, R> mapper);
-
-  boolean waitFulfilled(long timeout, @NotNull TimeUnit timeUnit);
-
-  boolean waitPending(long timeout, @NotNull TimeUnit timeUnit);
-
-  boolean waitRejected(long timeout, @NotNull TimeUnit timeUnit);
+  void waitResolved();
 
   boolean waitResolved(long timeout, @NotNull TimeUnit timeUnit);
+
+  @NotNull
+  Promise<O> whenFulfilled(@NotNull Observer<O> observer);
+
+  @NotNull
+  Promise<O> whenRejected(@NotNull Observer<Throwable> observer);
+
+  @NotNull
+  Promise<O> whenResolved(@NotNull Action action);
 
   interface Callback<O> extends Resolvable<O> {
 
@@ -101,11 +92,9 @@ public interface Promise<O> extends Serializable {
     void accept(I input, @NotNull C callback) throws Exception;
   }
 
-  interface StatelessProcessor<I, O> {
+  interface Processor<I, O> {
 
     void reject(Throwable reason, @NotNull Callback<O> callback) throws Exception;
-
-    void resolve(@NotNull Callback<O> callback) throws Exception;
 
     void resolve(I input, @NotNull Callback<O> callback) throws Exception;
   }

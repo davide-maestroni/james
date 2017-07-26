@@ -24,6 +24,4 @@ public interface Resolvable<I> {
   void reject(Throwable reason);
 
   void resolve(I input);
-
-  void resolve();
 }

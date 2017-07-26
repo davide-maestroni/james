@@ -21,10 +21,10 @@ import org.jetbrains.annotations.Nullable;
 
 import java.util.concurrent.TimeUnit;
 
+import dm.james.promise.Action;
 import dm.james.promise.Mapper;
 import dm.james.promise.Observer;
 import dm.james.promise.Promise;
-import dm.james.promise.Provider;
 import dm.james.promise.RejectionException;
 import dm.james.util.ConstantConditions;
 
@@ -95,15 +95,19 @@ class APlusPromise<O> implements Promise<O> {
   }
 
   @NotNull
-  public <R> Promise<R> then(@NotNull final StatelessProcessor<O, R> processor) {
-    return new APlusPromise<R>(mBond, mPromise.then(processor));
+  public <R> Promise<R> then(@Nullable final Handler<O, R, Callback<R>> outputHandler,
+      @Nullable final Handler<Throwable, R, Callback<R>> errorHandler) {
+    return new APlusPromise<R>(mBond, mPromise.then(outputHandler, errorHandler));
   }
 
   @NotNull
-  public <R> Promise<R> then(@Nullable final Handler<O, R, Callback<R>> outputHandler,
-      @Nullable final Handler<Throwable, R, Callback<R>> errorHandler,
-      @Nullable final Observer<Callback<R>> emptyHandler) {
-    return new APlusPromise<R>(mBond, mPromise.then(outputHandler, errorHandler, emptyHandler));
+  public <R> Promise<R> then(@NotNull final Mapper<O, R> mapper) {
+    return new APlusPromise<R>(mBond, mPromise.then(mapper));
+  }
+
+  @NotNull
+  public <R> Promise<R> then(@NotNull final Processor<O, R> processor) {
+    return new APlusPromise<R>(mBond, mPromise.then(processor));
   }
 
   @NotNull
@@ -111,29 +115,26 @@ class APlusPromise<O> implements Promise<O> {
     return new APlusPromise<O>(mBond, mPromise.thenCatch(mapper));
   }
 
-  @NotNull
-  public Promise<O> thenFill(@NotNull final Provider<O> provider) {
-    return new APlusPromise<O>(mBond, mPromise.thenFill(provider));
-  }
-
-  @NotNull
-  public <R> Promise<R> thenMap(@NotNull final Mapper<O, R> mapper) {
-    return new APlusPromise<R>(mBond, mPromise.thenMap(mapper));
-  }
-
-  public boolean waitFulfilled(final long timeout, @NotNull final TimeUnit timeUnit) {
-    return mPromise.waitFulfilled(timeout, timeUnit);
-  }
-
-  public boolean waitPending(final long timeout, @NotNull final TimeUnit timeUnit) {
-    return mPromise.waitPending(timeout, timeUnit);
-  }
-
-  public boolean waitRejected(final long timeout, @NotNull final TimeUnit timeUnit) {
-    return mPromise.waitRejected(timeout, timeUnit);
+  public void waitResolved() {
+    mPromise.waitResolved();
   }
 
   public boolean waitResolved(final long timeout, @NotNull final TimeUnit timeUnit) {
     return mPromise.waitResolved(timeout, timeUnit);
+  }
+
+  @NotNull
+  public Promise<O> whenFulfilled(@NotNull final Observer<O> observer) {
+    return new APlusPromise<O>(mBond, mPromise.whenFulfilled(observer));
+  }
+
+  @NotNull
+  public Promise<O> whenRejected(@NotNull final Observer<Throwable> observer) {
+    return new APlusPromise<O>(mBond, mPromise.whenRejected(observer));
+  }
+
+  @NotNull
+  public Promise<O> whenResolved(@NotNull final Action action) {
+    return new APlusPromise<O>(mBond, mPromise.whenResolved(action));
   }
 }

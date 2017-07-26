@@ -45,12 +45,12 @@ public class TestPromise {
         callback.resolve(random.nextInt());
       }
     }));
-    assertThat(promise.thenMap(new Mapper<Integer, Integer>() {
+    assertThat(promise.then(new Mapper<Integer, Integer>() {
 
       public Integer apply(final Integer input) {
         return input;
       }
-    }).get()).isEqualTo(promise.thenMap(new Mapper<Integer, Integer>() {
+    }).get()).isEqualTo(promise.then(new Mapper<Integer, Integer>() {
 
       public Integer apply(final Integer input) {
         return input;
@@ -68,7 +68,7 @@ public class TestPromise {
     })).isNotNull();
   }
 
-  @Test(expected = NullPointerException.class)
+  @Test(expected = RuntimeException.class)
   @SuppressWarnings("ConstantConditions")
   public void testConstructorFail() {
     new Bond().promise(null);
@@ -118,12 +118,12 @@ public class TestPromise {
         callback.resolve(random.nextInt());
       }
     });
-    assertThat(promise.thenMap(new Mapper<Integer, Integer>() {
+    assertThat(promise.then(new Mapper<Integer, Integer>() {
 
       public Integer apply(final Integer input) {
         return input;
       }
-    }).get()).isNotEqualTo(promise.thenMap(new Mapper<Integer, Integer>() {
+    }).get()).isNotEqualTo(promise.then(new Mapper<Integer, Integer>() {
 
       public Integer apply(final Integer input) {
         return input;

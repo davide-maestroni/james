@@ -65,63 +65,54 @@ public interface PromiseIterable<O> extends Promise<Iterable<O>>, Iterable<O> {
   <R, S> PromiseIterable<R> then(@NotNull StatefulProcessor<O, R, S> processor);
 
   @NotNull
-  PromiseIterable<O> thenAccept(@NotNull Observer<Iterable<O>> observer);
+  <R> PromiseIterable<R> thenAll(
+      @Nullable Handler<Iterable<O>, R, CallbackIterable<R>> outputHandler,
+      @Nullable Handler<Throwable, R, CallbackIterable<R>> errorHandler);
+
+  @NotNull
+  <R> PromiseIterable<R> thenAll(@NotNull Mapper<Iterable<O>, Iterable<R>> mapper);
+
+  @NotNull
+  <R> PromiseIterable<R> thenAll(@NotNull StatelessProcessor<Iterable<O>, R> processor);
 
   @NotNull
   PromiseIterable<O> thenCatch(@NotNull Mapper<Throwable, Iterable<O>> mapper);
 
   @NotNull
-  PromiseIterable<O> thenDo(@NotNull Action action);
+  PromiseIterable<O> whenFulfilled(@NotNull Observer<Iterable<O>> observer);
 
   @NotNull
-  PromiseIterable<O> thenFill(@NotNull Provider<Iterable<O>> provider);
+  PromiseIterable<O> whenRejected(@NotNull Observer<Throwable> observer);
 
   @NotNull
-  PromiseIterable<O> thenFinally(@NotNull Observer<Throwable> observer);
-
-  @NotNull
-  PromiseIterable<O> thenAcceptEach(@NotNull Observer<O> observer);
-
-  @NotNull
-  <R> PromiseIterable<R> thenAll(@NotNull StatelessProcessor<Iterable<O>, Iterable<R>> processor);
-
-  @NotNull
-  <R> PromiseIterable<R> thenAll(
-      @Nullable Handler<Iterable<O>, R, CallbackIterable<R>> outputHandler,
-      @Nullable Handler<Throwable, R, CallbackIterable<R>> errorHandler,
-      @Nullable Observer<CallbackIterable<R>> emptyHandler);
+  PromiseIterable<O> whenResolved(@NotNull Action action);
 
   @NotNull
   PromiseIterable<O> thenCatchEach(@NotNull Mapper<Throwable, O> mapper);
 
   @NotNull
-  PromiseIterable<O> thenDoEach(@NotNull Action action);
+  <R> PromiseIterable<R> thenEach(@Nullable Handler<O, R, CallbackIterable<R>> outputHandler,
+      @Nullable Handler<Throwable, R, CallbackIterable<R>> errorHandler);
 
   @NotNull
-  <R> PromiseIterable<R> thenEach(@Nullable Handler<O, R, CallbackIterable<R>> outputHandler,
-      @Nullable Handler<Throwable, R, CallbackIterable<R>> errorHandler,
-      @Nullable Observer<CallbackIterable<R>> emptyHandler);
+  <R> PromiseIterable<R> thenEach(@NotNull Mapper<O, R> mapper);
 
   @NotNull
   <R> PromiseIterable<R> thenEach(@NotNull StatelessProcessor<O, R> processor);
 
   @NotNull
-  PromiseIterable<O> thenFillEach(@NotNull Provider<O> provider);
+  PromiseIterable<O> whenFulfilledEach(@NotNull Observer<O> observer);
 
   @NotNull
-  PromiseIterable<O> thenFinallyEach(@NotNull Observer<Throwable> observer);
-
-  @NotNull
-  <R> PromiseIterable<R> thenMapAll(@NotNull Mapper<Iterable<O>, Iterable<R>> mapper);
-
-  @NotNull
-  <R> PromiseIterable<R> thenMapEach(@NotNull Mapper<O, R> mapper);
+  PromiseIterable<O> whenRejectedEach(@NotNull Observer<Throwable> observer);
 
   interface CallbackIterable<O> extends Callback<O>, ResolvableIterable<O> {
 
     void addAllDeferred(@NotNull Promise<? extends Iterable<O>> promise);
 
     void addDeferred(@NotNull Promise<O> promise);
+
+    void resolve();
   }
 
   interface StatefulProcessor<I, O, S> {
@@ -133,5 +124,12 @@ public interface PromiseIterable<O> extends Promise<Iterable<O>>, Iterable<O> {
     void reject(S state, Throwable reason, @NotNull CallbackIterable<O> callback) throws Exception;
 
     void resolve(S state, @NotNull CallbackIterable<O> callback) throws Exception;
+  }
+
+  interface StatelessProcessor<I, O> {
+
+    void reject(Throwable reason, @NotNull CallbackIterable<O> callback) throws Exception;
+
+    void resolve(I input, @NotNull CallbackIterable<O> callback) throws Exception;
   }
 }

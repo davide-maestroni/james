@@ -30,18 +30,17 @@ import dm.james.log.Log;
 import dm.james.log.Log.Level;
 import dm.james.log.Logger;
 import dm.james.promise.Action;
+import dm.james.promise.DeferredPromise;
 import dm.james.promise.Mapper;
 import dm.james.promise.Observer;
 import dm.james.promise.Promise;
-import dm.james.promise.Provider;
 import dm.james.promise.RejectionException;
-import dm.james.promise.ResolvablePromise;
 import dm.james.util.SerializableProxy;
 
 /**
  * Created by davide-maestroni on 07/19/2017.
  */
-class DefaultResolvablePromise<I, O> implements ResolvablePromise<I, O> {
+class DefaultDeferredPromise<I, O> implements DeferredPromise<I, O> {
 
   private final Logger mLogger;
 
@@ -52,7 +51,7 @@ class DefaultResolvablePromise<I, O> implements ResolvablePromise<I, O> {
   private final StateHolder<I> mState;
 
   @SuppressWarnings("unchecked")
-  DefaultResolvablePromise(@Nullable final PropagationType propagationType, @Nullable final Log log,
+  DefaultDeferredPromise(@Nullable final PropagationType propagationType, @Nullable final Log log,
       @Nullable final Level level) {
     mLogger = Logger.newLogger(log, level, this);
     mState = new StateHolder<I>();
@@ -60,7 +59,7 @@ class DefaultResolvablePromise<I, O> implements ResolvablePromise<I, O> {
     mPromise = (DefaultPromise<O>) new DefaultPromise<I>(mState, propagationType, log, level);
   }
 
-  private DefaultResolvablePromise(@NotNull final Promise<O> promise, @NotNull final Logger logger,
+  private DefaultDeferredPromise(@NotNull final Promise<O> promise, @NotNull final Logger logger,
       @NotNull final StateHolder<I> state) {
     mPromise = promise;
     mLogger = logger;
@@ -68,7 +67,7 @@ class DefaultResolvablePromise<I, O> implements ResolvablePromise<I, O> {
     mState = state;
   }
 
-  private DefaultResolvablePromise(@NotNull final Promise<O> promise, @Nullable final Log log,
+  private DefaultDeferredPromise(@NotNull final Promise<O> promise, @Nullable final Log log,
       @Nullable final Level level, @NotNull final StateHolder<I> state) {
     mPromise = promise;
     mLogger = Logger.newLogger(log, level, this);
@@ -77,67 +76,55 @@ class DefaultResolvablePromise<I, O> implements ResolvablePromise<I, O> {
   }
 
   @NotNull
-  public <R> ResolvablePromise<I, R> apply(@NotNull final Mapper<Promise<O>, Promise<R>> mapper) {
-    return new DefaultResolvablePromise<I, R>(mPromise.apply(mapper), mLogger, mState);
+  public <R> DeferredPromise<I, R> apply(@NotNull final Mapper<Promise<O>, Promise<R>> mapper) {
+    return new DefaultDeferredPromise<I, R>(mPromise.apply(mapper), mLogger, mState);
   }
 
   @NotNull
-  public <R> ResolvablePromise<I, R> then(@NotNull final StatelessProcessor<O, R> processor) {
-    return new DefaultResolvablePromise<I, R>(mPromise.then(processor), mLogger, mState);
+  public <R> DeferredPromise<I, R> then(@Nullable final Handler<O, R, Callback<R>> outputHandler,
+      @Nullable final Handler<Throwable, R, Callback<R>> errorHandler) {
+    return new DefaultDeferredPromise<I, R>(mPromise.then(outputHandler, errorHandler), mLogger,
+        mState);
   }
 
   @NotNull
-  public <R> ResolvablePromise<I, R> then(@Nullable final Handler<O, R, Callback<R>> outputHandler,
-      @Nullable final Handler<Throwable, R, Callback<R>> errorHandler,
-      @Nullable final Observer<Callback<R>> emptyHandler) {
-    return new DefaultResolvablePromise<I, R>(
-        mPromise.then(outputHandler, errorHandler, emptyHandler), mLogger, mState);
+  public <R> DeferredPromise<I, R> then(@NotNull final Mapper<O, R> mapper) {
+    return new DefaultDeferredPromise<I, R>(mPromise.then(mapper), mLogger, mState);
   }
 
   @NotNull
-  public ResolvablePromise<I, O> thenAccept(@NotNull final Observer<O> observer) {
-    return new DefaultResolvablePromise<I, O>(mPromise.thenAccept(observer), mLogger, mState);
+  public <R> DeferredPromise<I, R> then(@NotNull final Processor<O, R> processor) {
+    return new DefaultDeferredPromise<I, R>(mPromise.then(processor), mLogger, mState);
   }
 
   @NotNull
-  public ResolvablePromise<I, O> thenCatch(@NotNull final Mapper<Throwable, O> mapper) {
-    return new DefaultResolvablePromise<I, O>(mPromise.thenCatch(mapper), mLogger, mState);
+  public DeferredPromise<I, O> thenCatch(@NotNull final Mapper<Throwable, O> mapper) {
+    return new DefaultDeferredPromise<I, O>(mPromise.thenCatch(mapper), mLogger, mState);
   }
 
   @NotNull
-  public ResolvablePromise<I, O> thenDo(@NotNull final Action action) {
-    return new DefaultResolvablePromise<I, O>(mPromise.thenDo(action), mLogger, mState);
+  public DeferredPromise<I, O> whenFulfilled(@NotNull final Observer<O> observer) {
+    return new DefaultDeferredPromise<I, O>(mPromise.whenFulfilled(observer), mLogger, mState);
   }
 
   @NotNull
-  public ResolvablePromise<I, O> thenFill(@NotNull final Provider<O> provider) {
-    return new DefaultResolvablePromise<I, O>(mPromise.thenFill(provider), mLogger, mState);
+  public DeferredPromise<I, O> whenRejected(@NotNull final Observer<Throwable> observer) {
+    return new DefaultDeferredPromise<I, O>(mPromise.whenRejected(observer), mLogger, mState);
   }
 
   @NotNull
-  public ResolvablePromise<I, O> thenFinally(@NotNull final Observer<Throwable> observer) {
-    return new DefaultResolvablePromise<I, O>(mPromise.thenFinally(observer), mLogger, mState);
+  public DeferredPromise<I, O> whenResolved(@NotNull final Action action) {
+    return new DefaultDeferredPromise<I, O>(mPromise.whenResolved(action), mLogger, mState);
   }
 
   @NotNull
-  public <R> ResolvablePromise<I, R> thenMap(@NotNull final Mapper<O, R> mapper) {
-    return new DefaultResolvablePromise<I, R>(mPromise.thenMap(mapper), mLogger, mState);
-  }
-
-  @NotNull
-  public ResolvablePromise<I, O> rejected(final Throwable reason) {
+  public DeferredPromise<I, O> rejected(final Throwable reason) {
     reject(reason);
     return this;
   }
 
   @NotNull
-  public ResolvablePromise<I, O> resolved() {
-    resolve();
-    return this;
-  }
-
-  @NotNull
-  public ResolvablePromise<I, O> resolved(final I input) {
+  public DeferredPromise<I, O> resolved(final I input) {
     resolve(input);
     return this;
   }
@@ -189,16 +176,8 @@ class DefaultResolvablePromise<I, O> implements ResolvablePromise<I, O> {
     return mPromise.isResolved();
   }
 
-  public boolean waitFulfilled(final long timeout, @NotNull final TimeUnit timeUnit) {
-    return mPromise.waitFulfilled(timeout, timeUnit);
-  }
-
-  public boolean waitPending(final long timeout, @NotNull final TimeUnit timeUnit) {
-    return mPromise.waitPending(timeout, timeUnit);
-  }
-
-  public boolean waitRejected(final long timeout, @NotNull final TimeUnit timeUnit) {
-    return mPromise.waitRejected(timeout, timeUnit);
+  public void waitResolved() {
+    mPromise.waitResolved();
   }
 
   public boolean waitResolved(final long timeout, @NotNull final TimeUnit timeUnit) {
@@ -206,7 +185,7 @@ class DefaultResolvablePromise<I, O> implements ResolvablePromise<I, O> {
   }
 
   public void reject(final Throwable reason) {
-    mLogger.dbg("Rejecting resolvable promise with reason: %s", reason);
+    mLogger.dbg("Rejecting deferred promise with reason: %s", reason);
     final List<Callback<I>> callbacks;
     synchronized (mMutex) {
       callbacks = mState.reject(reason);
@@ -220,7 +199,7 @@ class DefaultResolvablePromise<I, O> implements ResolvablePromise<I, O> {
   }
 
   public void resolve(final I input) {
-    mLogger.dbg("Resolving resolvable promise with resolution: %s", input);
+    mLogger.dbg("Resolving deferred promise with resolution: %s", input);
     final List<Callback<I>> callbacks;
     synchronized (mMutex) {
       callbacks = mState.resolve(input);
@@ -229,20 +208,6 @@ class DefaultResolvablePromise<I, O> implements ResolvablePromise<I, O> {
     if (callbacks != null) {
       for (final Callback<I> callback : callbacks) {
         callback.resolve(input);
-      }
-    }
-  }
-
-  public void resolve() {
-    mLogger.dbg("Resolving resolvable promise with empty resolution");
-    final List<Callback<I>> callbacks;
-    synchronized (mMutex) {
-      callbacks = mState.resolve();
-    }
-
-    if (callbacks != null) {
-      for (final Callback<I> callback : callbacks) {
-        callback.resolve();
       }
     }
   }
@@ -263,7 +228,7 @@ class DefaultResolvablePromise<I, O> implements ResolvablePromise<I, O> {
     Object readResolve() throws ObjectStreamException {
       try {
         final Object[] args = deserializeArgs();
-        return new DefaultResolvablePromise<I, O>((Promise<O>) args[0], (Log) args[1],
+        return new DefaultDeferredPromise<I, O>((Promise<O>) args[0], (Log) args[1],
             (Level) args[2], (StateHolder<I>) args[3]);
 
       } catch (final Throwable t) {
@@ -301,10 +266,6 @@ class DefaultResolvablePromise<I, O> implements ResolvablePromise<I, O> {
       return mState.reject(reason);
     }
 
-    List<Callback<I>> resolve() {
-      return mState.resolve();
-    }
-
     List<Callback<I>> resolve(final I input) {
       return mState.resolve(input);
     }
@@ -329,11 +290,6 @@ class DefaultResolvablePromise<I, O> implements ResolvablePromise<I, O> {
 
       List<Callback<I>> reject(final Throwable reason) {
         mState = new StateRejected(reason);
-        return mCallbacks;
-      }
-
-      List<Callback<I>> resolve() {
-        mState = new StateResolvedEmpty();
         return mCallbacks;
       }
 
@@ -371,11 +327,6 @@ class DefaultResolvablePromise<I, O> implements ResolvablePromise<I, O> {
         throw exception();
       }
 
-      @Override
-      List<Callback<I>> resolve() {
-        throw exception();
-      }
-
       public void accept(final Callback<I> callback) {
         callback.reject(mException);
       }
@@ -409,24 +360,8 @@ class DefaultResolvablePromise<I, O> implements ResolvablePromise<I, O> {
         throw exception();
       }
 
-      @Override
-      List<Callback<I>> resolve() {
-        throw exception();
-      }
-
       public void accept(final Callback<I> callback) {
         callback.resolve(mInput);
-      }
-    }
-
-    private class StateResolvedEmpty extends StateResolved {
-
-      private StateResolvedEmpty() {
-        super(null);
-      }
-
-      public void accept(final Callback<I> callback) {
-        callback.resolve();
       }
     }
 

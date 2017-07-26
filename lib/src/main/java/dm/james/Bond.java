@@ -19,19 +19,25 @@ package dm.james;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
+import java.io.Closeable;
 import java.io.InvalidObjectException;
 import java.io.ObjectStreamException;
 import java.io.Serializable;
 
 import dm.james.log.Log;
 import dm.james.log.Log.Level;
+import dm.james.promise.DeferredPromise;
 import dm.james.promise.Mapper;
 import dm.james.promise.Observer;
 import dm.james.promise.Promise;
 import dm.james.promise.Promise.Callback;
-import dm.james.promise.Promise.StatelessProcessor;
-import dm.james.promise.ResolvablePromise;
+import dm.james.promise.Promise.Handler;
+import dm.james.promise.Promise.Processor;
+import dm.james.promise.PromiseIterable;
+import dm.james.promise.Provider;
+import dm.james.util.ConstantConditions;
 import dm.james.util.ReflectionUtils;
+import dm.james.util.SerializableProxy;
 
 /**
  * Created by davide-maestroni on 06/30/2017.
@@ -65,8 +71,28 @@ public class Bond implements Serializable {
   }
 
   @NotNull
+  public <O> PromiseIterable<O> all(final Iterable<Promise<O>> promises) {
+    return null;
+  }
+
+  @NotNull
+  public <O> PromiseIterable<O> any(final Iterable<Promise<O>> promises) {
+    return null;
+  }
+
+  @NotNull
   public <O> Mapper<Promise<O>, Promise<O>> cache() {
-    return new CacheMapper<O>(this.<O>resolvable());
+    return new CacheMapper<O>(this.<O>deferred());
+  }
+
+  @NotNull
+  public <I> DeferredPromise<I, I> deferred() {
+    return new DefaultDeferredPromise<I, I>(mPropagationType, mLog, mLogLevel);
+  }
+
+  @NotNull
+  public <O> PromiseIterable<O> each(final Iterable<Promise<O>> promises) {
+    return null;
   }
 
   @NotNull
@@ -80,18 +106,20 @@ public class Bond implements Serializable {
   }
 
   @NotNull
-  public <I> ResolvablePromise<I, I> resolvable() {
-    return new DefaultResolvablePromise<I, I>(mPropagationType, mLog, mLogLevel);
-  }
-
-  @NotNull
   public <O> Promise<O> resolved(final O output) {
     return promise(new ResolvedObserver<O>(output));
   }
 
   @NotNull
-  public <O> Promise<O> resolved() {
-    return promise(new EmptyObserver<O>());
+  public <O> PromiseIterable<O> resolvedIterable(final Iterable<O> outputs) {
+    return null;
+  }
+
+  @NotNull
+  public <I extends Closeable, O> Promise<O> tryUsing(@NotNull final Provider<I> provider,
+      @NotNull final Handler<I, O, Callback<O>> handler) {
+    return new DefaultPromise<O>(new CloseableObserver<I, O>(provider, handler), mPropagationType,
+        mLog, mLogLevel);
   }
 
   @NotNull
@@ -186,23 +214,74 @@ public class Bond implements Serializable {
 
   private static class CacheMapper<O> implements Mapper<Promise<O>, Promise<O>>, Serializable {
 
-    private final ResolvablePromise<O, O> mResolvable;
+    private final DeferredPromise<O, O> mDeferred;
 
-    private CacheMapper(@NotNull final ResolvablePromise<O, O> resolvable) {
-      mResolvable = resolvable;
+    private CacheMapper(@NotNull final DeferredPromise<O, O> deferred) {
+      mDeferred = deferred;
     }
 
     public Promise<O> apply(final Promise<O> promise) {
-      final ResolvablePromise<O, O> resolvable = mResolvable;
-      promise.then(new ResolvableProcessor<O>(resolvable));
-      return resolvable;
+      final DeferredPromise<O, O> deferred = mDeferred;
+      promise.then(new DeferredProcessor<O>(deferred));
+      return deferred;
     }
   }
 
-  private static class EmptyObserver<O> implements Observer<Callback<O>>, Serializable {
+  private static class CloseableObserver<I extends Closeable, O>
+      implements Observer<Callback<O>>, Serializable {
 
-    public void accept(final Callback<O> callback) {
-      callback.resolve();
+    private final Handler<I, O, Callback<O>> mHandler;
+
+    private final Provider<I> mProvider;
+
+    private CloseableObserver(@NotNull final Provider<I> provider,
+        @NotNull final Handler<I, O, Callback<O>> handler) {
+      mProvider = ConstantConditions.notNull("provider", provider);
+      mHandler = ConstantConditions.notNull("handler", handler);
+    }
+
+    public void accept(final Callback<O> callback) throws Exception {
+      mHandler.accept(mProvider.get(), callback);
+    }
+
+    private Object writeReplace() throws ObjectStreamException {
+      return new ObserverProxy<I, O>(mProvider, mHandler);
+    }
+
+    private static class ObserverProxy<I extends Closeable, O> extends SerializableProxy {
+
+      private ObserverProxy(final Provider<I> provider, final Handler<I, O, Callback<O>> handler) {
+        super(provider, handler);
+      }
+
+      @SuppressWarnings("unchecked")
+      Object readResolve() throws ObjectStreamException {
+        try {
+          final Object[] args = deserializeArgs();
+          return new CloseableObserver<I, O>((Provider<I>) args[0],
+              (Handler<I, O, Callback<O>>) args[1]);
+
+        } catch (final Throwable t) {
+          throw new InvalidObjectException(t.getMessage());
+        }
+      }
+    }
+  }
+
+  private static class DeferredProcessor<O> implements Processor<O, O>, Serializable {
+
+    private final DeferredPromise<O, O> mDeferred;
+
+    private DeferredProcessor(@NotNull final DeferredPromise<O, O> deferred) {
+      mDeferred = deferred;
+    }
+
+    public void reject(final Throwable reason, @NotNull final Callback<O> callback) {
+      mDeferred.reject(reason);
+    }
+
+    public void resolve(final O input, @NotNull final Callback<O> callback) {
+      mDeferred.resolve(input);
     }
   }
 
@@ -216,27 +295,6 @@ public class Bond implements Serializable {
 
     public void accept(final Callback<O> callback) {
       callback.reject(mReason);
-    }
-  }
-
-  private static class ResolvableProcessor<O> implements StatelessProcessor<O, O>, Serializable {
-
-    private final ResolvablePromise<O, O> mResolvable;
-
-    private ResolvableProcessor(@NotNull final ResolvablePromise<O, O> resolvable) {
-      mResolvable = resolvable;
-    }
-
-    public void reject(final Throwable reason, @NotNull final Callback<O> callback) {
-      mResolvable.reject(reason);
-    }
-
-    public void resolve(@NotNull final Callback<O> callback) {
-      mResolvable.resolve();
-    }
-
-    public void resolve(final O input, @NotNull final Callback<O> callback) {
-      mResolvable.resolve(input);
     }
   }
 

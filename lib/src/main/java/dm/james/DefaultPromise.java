@@ -23,8 +23,6 @@ import java.io.InvalidObjectException;
 import java.io.ObjectStreamException;
 import java.io.Serializable;
 import java.util.ArrayList;
-import java.util.Collections;
-import java.util.HashSet;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 
@@ -34,10 +32,8 @@ import dm.james.log.Log.Level;
 import dm.james.log.Logger;
 import dm.james.promise.Action;
 import dm.james.promise.Mapper;
-import dm.james.promise.NoResolutionException;
 import dm.james.promise.Observer;
 import dm.james.promise.Promise;
-import dm.james.promise.Provider;
 import dm.james.promise.RejectionException;
 import dm.james.promise.TimeoutException;
 import dm.james.util.ConstantConditions;
@@ -211,7 +207,7 @@ class DefaultPromise<O> implements Promise<O> {
             return head.isTerminated();
           }
         }, timeout, timeUnit)) {
-          return head.getException();
+          return wrapException(head.getException());
         }
 
       } catch (final InterruptedException e) {
@@ -235,7 +231,7 @@ class DefaultPromise<O> implements Promise<O> {
             return head.isTerminated();
           }
         }, timeout, timeUnit)) {
-          return head.getException();
+          return wrapException(head.getException());
         }
 
       } catch (final InterruptedException e) {
@@ -277,44 +273,42 @@ class DefaultPromise<O> implements Promise<O> {
 
   public boolean isFulfilled() {
     synchronized (mMutex) {
-      return (mState == PromiseState.Fulfilled);
+      return (mState == PromiseState.Fulfilled) || (mHead.getState() == PromiseState.Fulfilled);
     }
   }
 
   public boolean isPending() {
     synchronized (mMutex) {
-      return (mState == PromiseState.Pending);
+      return (mState == PromiseState.Pending) || (mHead.getState() == PromiseState.Pending);
     }
   }
 
   public boolean isRejected() {
     synchronized (mMutex) {
-      return (mState == PromiseState.Rejected);
+      return (mState == PromiseState.Rejected) || (mHead.getState() == PromiseState.Rejected);
     }
   }
 
   public boolean isResolved() {
     synchronized (mMutex) {
-      final PromiseState state = mState;
-      return (state == PromiseState.Fulfilled) || (state == PromiseState.Rejected);
+      return (mState.isResolved() || mHead.getState().isResolved());
     }
   }
 
   @NotNull
-  public <R> Promise<R> then(@NotNull final StatelessProcessor<O, R> processor) {
-    return chain(new ChainProcessor<O, R>(mPropagationType, processor));
-  }
-
-  @NotNull
   public <R> Promise<R> then(@Nullable final Handler<O, R, Callback<R>> outputHandler,
-      @Nullable final Handler<Throwable, R, Callback<R>> errorHandler,
-      @Nullable final Observer<Callback<R>> emptyHandler) {
-    return then(new ProcessorHandle<O, R>(outputHandler, errorHandler, emptyHandler));
+      @Nullable final Handler<Throwable, R, Callback<R>> errorHandler) {
+    return then(new ProcessorHandle<O, R>(outputHandler, errorHandler));
   }
 
   @NotNull
-  public Promise<O> thenAccept(@NotNull final Observer<O> observer) {
-    return then(new ProcessorAccept<O>(observer));
+  public <R> Promise<R> then(@NotNull final Mapper<O, R> mapper) {
+    return then(new ProcessorMap<O, R>(mapper));
+  }
+
+  @NotNull
+  public <R> Promise<R> then(@NotNull final Processor<O, R> processor) {
+    return chain(new ChainProcessor<O, R>(mPropagationType, processor));
   }
 
   @NotNull
@@ -322,46 +316,43 @@ class DefaultPromise<O> implements Promise<O> {
     return then(new ProcessorCatch<O>(mapper));
   }
 
-  @NotNull
-  public Promise<O> thenDo(@NotNull final Action action) {
-    return then(new ProcessorDo<O>(action));
-  }
-
-  @NotNull
-  public Promise<O> thenFill(@NotNull final Provider<O> provider) {
-    return then(new ProcessorFill<O>(provider));
-  }
-
-  @NotNull
-  public Promise<O> thenFinally(@NotNull final Observer<Throwable> observer) {
-    return then(new ProcessorFinally<O>(observer));
-  }
-
-  @NotNull
-  public <R> Promise<R> thenMap(@NotNull final Mapper<O, R> mapper) {
-    return then(new ProcessorMap<O, R>(mapper));
-  }
-
-  public boolean waitFulfilled(final long timeout, @NotNull final TimeUnit timeUnit) {
-    return wait(timeout, timeUnit, PromiseState.Fulfilled);
-  }
-
-  public boolean waitPending(final long timeout, @NotNull final TimeUnit timeUnit) {
-    return wait(timeout, timeUnit, PromiseState.Pending);
-  }
-
-  public boolean waitRejected(final long timeout, @NotNull final TimeUnit timeUnit) {
-    return wait(timeout, timeUnit, PromiseState.Rejected);
+  public void waitResolved() {
+    waitResolved(-1, TimeUnit.MILLISECONDS);
   }
 
   public boolean waitResolved(final long timeout, @NotNull final TimeUnit timeUnit) {
-    return wait(timeout, timeUnit, PromiseState.Fulfilled, PromiseState.Rejected);
+    synchronized (mMutex) {
+      try {
+        if (TimeUtils.waitUntil(mMutex, new Condition() {
+
+          public boolean isTrue() {
+            return (mState.isResolved() || mHead.getState().isResolved());
+          }
+        }, timeout, timeUnit)) {
+          return true;
+        }
+
+      } catch (final InterruptedException e) {
+        throw new InterruptedExecutionException(e);
+      }
+    }
+
+    return false;
   }
 
-  public boolean is(@NotNull final PromiseState state) {
-    synchronized (mMutex) {
-      return (ConstantConditions.notNull("state", state) == mState);
-    }
+  @NotNull
+  public Promise<O> whenFulfilled(@NotNull final Observer<O> observer) {
+    return then(new ProcessorFulfilled<O>(observer));
+  }
+
+  @NotNull
+  public Promise<O> whenRejected(@NotNull final Observer<Throwable> observer) {
+    return then(new ProcessorRejected<O>(observer));
+  }
+
+  @NotNull
+  public Promise<O> whenResolved(@NotNull final Action action) {
+    return then(new ProcessorResolved<O>(action));
   }
 
   @NotNull
@@ -424,29 +415,6 @@ class DefaultPromise<O> implements Promise<O> {
         (PromiseChain<?, O>) newTail);
   }
 
-  private boolean wait(final long timeout, @NotNull final TimeUnit timeUnit,
-      @NotNull final PromiseState... states) {
-    final HashSet<PromiseState> set = new HashSet<PromiseState>();
-    Collections.addAll(set, states);
-    synchronized (mMutex) {
-      try {
-        if (TimeUtils.waitUntil(mMutex, new Condition() {
-
-          public boolean isTrue() {
-            return set.contains(mState);
-          }
-        }, timeout, timeUnit)) {
-          return true;
-        }
-
-      } catch (final InterruptedException e) {
-        throw new InterruptedExecutionException(e);
-      }
-    }
-
-    return false;
-  }
-
   private Object writeReplace() throws ObjectStreamException {
     final ArrayList<PromiseChain<?, ?>> chains = new ArrayList<PromiseChain<?, ?>>();
     final ChainHead<?> head = mHead;
@@ -469,22 +437,36 @@ class DefaultPromise<O> implements Promise<O> {
   }
 
   private enum PromiseState {
-    Pending, Fulfilled, Rejected
+    Pending(false), Fulfilled(true), Rejected(true);
+
+    private final boolean mIsResolved;
+
+    PromiseState(final boolean isResolved) {
+      mIsResolved = isResolved;
+    }
+
+    public boolean isResolved() {
+      return mIsResolved;
+    }
   }
 
   private static class ChainHead<O> extends PromiseChain<O, O> {
 
     private final Object mMutex = new Object();
 
-    private RejectionException mException;
+    private Throwable mException;
+
+    private StatePending mInnerState = new StatePending();
 
     private Object mOutput;
 
-    private StatePending mState = new StatePending();
+    private PromiseState mState = PromiseState.Pending;
 
     @Nullable
     Runnable bind(@NotNull final PromiseChain<?, ?> bond) {
-      return mState.bind(bond);
+      final Runnable binding = mInnerState.bind(bond);
+      mState = PromiseState.Pending;
+      return binding;
     }
 
     @NotNull
@@ -493,7 +475,7 @@ class DefaultPromise<O> implements Promise<O> {
     }
 
     @Nullable
-    RejectionException getException() {
+    Throwable getException() {
       return mException;
     }
 
@@ -503,46 +485,26 @@ class DefaultPromise<O> implements Promise<O> {
     }
 
     Object getOutput() {
-      return mState.getOutput();
+      return mInnerState.getOutput();
+    }
+
+    @NotNull
+    PromiseState getState() {
+      return mState;
     }
 
     void innerReject(@Nullable final Throwable reason) {
-      mState.innerReject(reason);
-    }
-
-    void innerResolve() {
-      mState.innerResolve();
+      mInnerState.innerReject(reason);
+      mState = PromiseState.Rejected;
     }
 
     void innerResolve(final Object output) {
-      mState.innerResolve(output);
+      mInnerState.innerResolve(output);
+      mState = PromiseState.Fulfilled;
     }
 
     boolean isTerminated() {
-      return mState.isTerminated();
-    }
-
-    private class StateEmpty extends StateResolved {
-
-      @Override
-      Object getOutput() {
-        throw new NoResolutionException();
-      }
-
-      @Nullable
-      @Override
-      Runnable bind(@NotNull final PromiseChain<?, ?> bond) {
-        getLogger().dbg("Binding promise [%s => %s]", PromiseState.Fulfilled, PromiseState.Pending);
-        mState = new StatePending();
-        mMutex.notifyAll();
-        return new Runnable() {
-
-          @SuppressWarnings("unchecked")
-          public void run() {
-            bond.resolve();
-          }
-        };
-      }
+      return mInnerState.isTerminated();
     }
 
     private class StatePending {
@@ -564,24 +526,15 @@ class DefaultPromise<O> implements Promise<O> {
       void innerReject(@Nullable final Throwable reason) {
         getLogger().dbg("Rejecting promise with reason [%s => %s]: %s", PromiseState.Pending,
             PromiseState.Rejected, reason);
-        mException = wrapException(reason);
-        mState = new StateRejected();
-        mMutex.notifyAll();
+        mException = reason;
+        mInnerState = new StateRejected();
       }
 
       void innerResolve(final Object output) {
         getLogger().dbg("Resolving promise with resolution [%s => %s]: %s", PromiseState.Pending,
             PromiseState.Fulfilled, output);
         mOutput = output;
-        mState = new StateResolved();
-        mMutex.notifyAll();
-      }
-
-      void innerResolve() {
-        getLogger().dbg("Resolving promise with empty resolution [%s => %s]", PromiseState.Pending,
-            PromiseState.Fulfilled);
-        mState = new StateEmpty();
-        mMutex.notifyAll();
+        mInnerState = new StateResolved();
       }
 
       boolean isTerminated() {
@@ -597,8 +550,7 @@ class DefaultPromise<O> implements Promise<O> {
         getLogger().dbg("Binding promise [%s => %s]", PromiseState.Rejected, PromiseState.Pending);
         final Throwable exception = mException;
         mException = null;
-        mState = new StatePending();
-        mMutex.notifyAll();
+        mInnerState = new StatePending();
         return new Runnable() {
 
           public void run() {
@@ -608,22 +560,12 @@ class DefaultPromise<O> implements Promise<O> {
       }
 
       @Override
-      Object getOutput() {
-        throw mException;
-      }
-
-      @Override
       void innerReject(@Nullable final Throwable reason) {
         throw exception(PromiseState.Rejected);
       }
 
       @Override
       void innerResolve(final Object output) {
-        throw exception(PromiseState.Rejected);
-      }
-
-      @Override
-      void innerResolve() {
         throw exception(PromiseState.Rejected);
       }
 
@@ -651,11 +593,6 @@ class DefaultPromise<O> implements Promise<O> {
       }
 
       @Override
-      void innerResolve() {
-        throw exception(PromiseState.Fulfilled);
-      }
-
-      @Override
       boolean isTerminated() {
         return true;
       }
@@ -666,8 +603,7 @@ class DefaultPromise<O> implements Promise<O> {
         getLogger().dbg("Binding promise [%s => %s]", PromiseState.Fulfilled, PromiseState.Pending);
         final Object output = mOutput;
         mOutput = null;
-        mState = new StatePending();
-        mMutex.notifyAll();
+        mInnerState = new StatePending();
         return new Runnable() {
 
           @SuppressWarnings("unchecked")
@@ -678,27 +614,23 @@ class DefaultPromise<O> implements Promise<O> {
       }
     }
 
-    public void resolve(@NotNull final PromiseChain<O, ?> next, final O input) {
+    public void resolve(final PromiseChain<O, ?> next, final O input) {
       next.resolve(input);
     }
 
-    public void reject(@NotNull final PromiseChain<O, ?> next, final Throwable reason) {
+    public void reject(final PromiseChain<O, ?> next, final Throwable reason) {
       next.reject(reason);
-    }
-
-    public void resolve(@NotNull final PromiseChain<O, ?> next) {
-      next.resolve();
     }
   }
 
   private static class ChainProcessor<O, R> extends PromiseChain<O, R> {
 
-    private final StatelessProcessor<O, R> mProcessor;
+    private final Processor<O, R> mProcessor;
 
     private final PropagationType mPropagationType;
 
     private ChainProcessor(@NotNull final PropagationType propagationType,
-        @NotNull final StatelessProcessor<O, R> processor) {
+        @NotNull final Processor<O, R> processor) {
       mProcessor = ConstantConditions.notNull("processor", processor);
       mPropagationType = propagationType;
     }
@@ -709,8 +641,7 @@ class DefaultPromise<O> implements Promise<O> {
 
     private static class ChainProxy<O, R> extends SerializableProxy {
 
-      private ChainProxy(final PropagationType propagationType,
-          final StatelessProcessor<O, R> processor) {
+      private ChainProxy(final PropagationType propagationType, final Processor<O, R> processor) {
         super(propagationType, processor);
       }
 
@@ -718,8 +649,7 @@ class DefaultPromise<O> implements Promise<O> {
       Object readResolve() throws ObjectStreamException {
         try {
           final Object[] args = deserializeArgs();
-          return new ChainProcessor<O, R>((PropagationType) args[0],
-              (StatelessProcessor<O, R>) args[1]);
+          return new ChainProcessor<O, R>((PropagationType) args[0], (Processor<O, R>) args[1]);
 
         } catch (final Throwable t) {
           throw new InvalidObjectException(t.getMessage());
@@ -732,7 +662,7 @@ class DefaultPromise<O> implements Promise<O> {
       return new ChainProcessor<O, R>(mPropagationType, mProcessor);
     }
 
-    void reject(@NotNull final PromiseChain<R, ?> next, final Throwable reason) {
+    void reject(final PromiseChain<R, ?> next, final Throwable reason) {
       mPropagationType.execute(new Runnable() {
 
         public void run() {
@@ -749,7 +679,7 @@ class DefaultPromise<O> implements Promise<O> {
       });
     }
 
-    void resolve(@NotNull final PromiseChain<R, ?> next, final O input) {
+    void resolve(final PromiseChain<R, ?> next, final O input) {
       mPropagationType.execute(new Runnable() {
 
         public void run() {
@@ -765,46 +695,18 @@ class DefaultPromise<O> implements Promise<O> {
         }
       });
     }
-
-    void resolve(@NotNull final PromiseChain<R, ?> next) {
-      mPropagationType.execute(new Runnable() {
-
-        public void run() {
-          try {
-            getLogger().dbg("Processing empty resolution");
-            mProcessor.resolve(next);
-
-          } catch (final Throwable t) {
-            InterruptedExecutionException.throwIfInterrupt(t);
-            getLogger().err(t, "Error while processing empty resolution");
-            next.reject(t);
-          }
-        }
-      });
-    }
   }
 
-  private static class DefaultProcessor<I, O> implements StatelessProcessor<I, O> {
+  private static class DefaultProcessor<I, O> implements Processor<I, O> {
 
     public void reject(final Throwable reason, @NotNull final Callback<O> callback) throws
         Exception {
       callback.reject(reason);
     }
 
-    public void resolve(@NotNull final Callback<O> callback) throws Exception {
-      callback.resolve();
-    }
-
     @SuppressWarnings("unchecked")
     public void resolve(final I input, @NotNull final Callback<O> callback) throws Exception {
       callback.resolve((O) input);
-    }
-  }
-
-  private static class PassThroughEmptyHandler<R> implements Observer<Callback<R>>, Serializable {
-
-    public void accept(final Callback<R> callback) {
-      callback.resolve();
     }
   }
 
@@ -822,43 +724,6 @@ class DefaultPromise<O> implements Promise<O> {
     @SuppressWarnings("unchecked")
     public void accept(final O input, @NotNull final Callback<R> callback) {
       callback.resolve((R) input);
-    }
-  }
-
-  private static class ProcessorAccept<O> extends DefaultProcessor<O, O> implements Serializable {
-
-    private final Observer<O> mObserver;
-
-    private ProcessorAccept(@NotNull final Observer<O> observer) {
-      mObserver = ConstantConditions.notNull("observer", observer);
-    }
-
-    private Object writeReplace() throws ObjectStreamException {
-      return new ChainProxy<O>(mObserver);
-    }
-
-    private static class ChainProxy<O> extends SerializableProxy {
-
-      private ChainProxy(final Observer<O> observer) {
-        super(observer);
-      }
-
-      @SuppressWarnings("unchecked")
-      Object readResolve() throws ObjectStreamException {
-        try {
-          final Object[] args = deserializeArgs();
-          return new ProcessorAccept<O>((Observer<O>) args[0]);
-
-        } catch (final Throwable t) {
-          throw new InvalidObjectException(t.getMessage());
-        }
-      }
-    }
-
-    @Override
-    public void resolve(final O input, @NotNull final Callback<O> callback) throws Exception {
-      mObserver.accept(input);
-      super.resolve(input, callback);
     }
   }
 
@@ -896,87 +761,14 @@ class DefaultPromise<O> implements Promise<O> {
         }
       }
     }
-
   }
 
-  private static class ProcessorDo<O> extends DefaultProcessor<O, O> implements Serializable {
+  private static class ProcessorFulfilled<O> extends DefaultProcessor<O, O>
+      implements Serializable {
 
-    private final Action mAction;
+    private final Observer<O> mObserver;
 
-    private ProcessorDo(@NotNull final Action action) {
-      mAction = ConstantConditions.notNull("action", action);
-    }
-
-    private Object writeReplace() throws ObjectStreamException {
-      return new ChainProxy<O>(mAction);
-    }
-
-    private static class ChainProxy<O> extends SerializableProxy {
-
-      private ChainProxy(final Action action) {
-        super(action);
-      }
-
-      @SuppressWarnings("unchecked")
-      Object readResolve() throws ObjectStreamException {
-        try {
-          final Object[] args = deserializeArgs();
-          return new ProcessorDo<O>((Action) args[0]);
-
-        } catch (final Throwable t) {
-          throw new InvalidObjectException(t.getMessage());
-        }
-      }
-    }
-
-    @Override
-    public void resolve(@NotNull final Callback<O> callback) throws Exception {
-      mAction.perform();
-      super.resolve(callback);
-    }
-  }
-
-  private static class ProcessorFill<O> extends DefaultProcessor<O, O> implements Serializable {
-
-    private final Provider<O> mProvider;
-
-    private ProcessorFill(@NotNull final Provider<O> provider) {
-      mProvider = ConstantConditions.notNull("provider", provider);
-    }
-
-    private Object writeReplace() throws ObjectStreamException {
-      return new ChainProxy<O>(mProvider);
-    }
-
-    private static class ChainProxy<O> extends SerializableProxy {
-
-      private ChainProxy(final Provider<O> provider) {
-        super(provider);
-      }
-
-      @SuppressWarnings("unchecked")
-      Object readResolve() throws ObjectStreamException {
-        try {
-          final Object[] args = deserializeArgs();
-          return new ProcessorFill<O>((Provider<O>) args[0]);
-
-        } catch (final Throwable t) {
-          throw new InvalidObjectException(t.getMessage());
-        }
-      }
-    }
-
-    @Override
-    public void resolve(@NotNull final Callback<O> callback) throws Exception {
-      callback.resolve(mProvider.get());
-    }
-  }
-
-  private static class ProcessorFinally<O> extends DefaultProcessor<O, O> implements Serializable {
-
-    private final Observer<Throwable> mObserver;
-
-    private ProcessorFinally(@NotNull final Observer<Throwable> observer) {
+    private ProcessorFulfilled(@NotNull final Observer<O> observer) {
       mObserver = ConstantConditions.notNull("observer", observer);
     }
 
@@ -986,7 +778,7 @@ class DefaultPromise<O> implements Promise<O> {
 
     private static class ChainProxy<O> extends SerializableProxy {
 
-      private ChainProxy(final Observer<Throwable> observer) {
+      private ChainProxy(final Observer<O> observer) {
         super(observer);
       }
 
@@ -994,7 +786,7 @@ class DefaultPromise<O> implements Promise<O> {
       Object readResolve() throws ObjectStreamException {
         try {
           final Object[] args = deserializeArgs();
-          return new ProcessorFinally<O>((Observer<Throwable>) args[0]);
+          return new ProcessorFulfilled<O>((Observer<O>) args[0]);
 
         } catch (final Throwable t) {
           throw new InvalidObjectException(t.getMessage());
@@ -1003,40 +795,34 @@ class DefaultPromise<O> implements Promise<O> {
     }
 
     @Override
-    public void reject(final Throwable reason, @NotNull final Callback<O> callback) throws
-        Exception {
-      mObserver.accept(reason);
-      super.reject(reason, callback);
+    public void resolve(final O input, @NotNull final Callback<O> callback) throws Exception {
+      mObserver.accept(input);
+      super.resolve(input, callback);
     }
   }
 
-  private static class ProcessorHandle<I, O> implements StatelessProcessor<I, O>, Serializable {
-
-    private final Observer<Callback<O>> mEmptyHandler;
+  private static class ProcessorHandle<I, O> implements Processor<I, O>, Serializable {
 
     private final Handler<Throwable, O, Callback<O>> mErrorHandler;
 
     private final Handler<I, O, Callback<O>> mOutputHandler;
 
     private ProcessorHandle(@Nullable final Handler<I, O, Callback<O>> outputHandler,
-        @Nullable final Handler<Throwable, O, Callback<O>> errorHandler,
-        @Nullable final Observer<Callback<O>> emptyHandler) {
+        @Nullable final Handler<Throwable, O, Callback<O>> errorHandler) {
       mOutputHandler =
           (outputHandler != null) ? outputHandler : new PassThroughOutputHandler<I, O>();
       mErrorHandler = (errorHandler != null) ? errorHandler : new PassThroughErrorHandler<O>();
-      mEmptyHandler = (emptyHandler != null) ? emptyHandler : new PassThroughEmptyHandler<O>();
     }
 
     private Object writeReplace() throws ObjectStreamException {
-      return new ChainProxy<I, O>(mOutputHandler, mErrorHandler, mEmptyHandler);
+      return new ChainProxy<I, O>(mOutputHandler, mErrorHandler);
     }
 
     private static class ChainProxy<I, O> extends SerializableProxy {
 
       private ChainProxy(final Handler<I, O, Callback<O>> outputHandler,
-          final Handler<Throwable, O, Callback<O>> errorHandler,
-          final Observer<Callback<O>> emptyHandler) {
-        super(outputHandler, errorHandler, emptyHandler);
+          final Handler<Throwable, O, Callback<O>> errorHandler) {
+        super(outputHandler, errorHandler);
       }
 
       @SuppressWarnings("unchecked")
@@ -1044,7 +830,7 @@ class DefaultPromise<O> implements Promise<O> {
         try {
           final Object[] args = deserializeArgs();
           return new ProcessorHandle<I, O>((Handler<I, O, Callback<O>>) args[0],
-              (Handler<Throwable, O, Callback<O>>) args[1], (Observer<Callback<O>>) args[2]);
+              (Handler<Throwable, O, Callback<O>>) args[1]);
 
         } catch (final Throwable t) {
           throw new InvalidObjectException(t.getMessage());
@@ -1055,10 +841,6 @@ class DefaultPromise<O> implements Promise<O> {
     public void reject(final Throwable reason, @NotNull final Callback<O> callback) throws
         Exception {
       mErrorHandler.accept(reason, callback);
-    }
-
-    public void resolve(@NotNull final Callback<O> callback) throws Exception {
-      mEmptyHandler.accept(callback);
     }
 
     public void resolve(final I input, @NotNull final Callback<O> callback) throws Exception {
@@ -1101,8 +883,88 @@ class DefaultPromise<O> implements Promise<O> {
     }
   }
 
+  private static class ProcessorRejected<O> extends DefaultProcessor<O, O> implements Serializable {
+
+    private final Observer<Throwable> mObserver;
+
+    private ProcessorRejected(@NotNull final Observer<Throwable> observer) {
+      mObserver = ConstantConditions.notNull("observer", observer);
+    }
+
+    private Object writeReplace() throws ObjectStreamException {
+      return new ChainProxy<O>(mObserver);
+    }
+
+    private static class ChainProxy<O> extends SerializableProxy {
+
+      private ChainProxy(final Observer<Throwable> observer) {
+        super(observer);
+      }
+
+      @SuppressWarnings("unchecked")
+      Object readResolve() throws ObjectStreamException {
+        try {
+          final Object[] args = deserializeArgs();
+          return new ProcessorRejected<O>((Observer<Throwable>) args[0]);
+
+        } catch (final Throwable t) {
+          throw new InvalidObjectException(t.getMessage());
+        }
+      }
+    }
+
+    @Override
+    public void reject(final Throwable reason, @NotNull final Callback<O> callback) throws
+        Exception {
+      mObserver.accept(reason);
+      super.reject(reason, callback);
+    }
+  }
+
+  private static class ProcessorResolved<O> implements Processor<O, O>, Serializable {
+
+    private final Action mAction;
+
+    private ProcessorResolved(@NotNull final Action action) {
+      mAction = ConstantConditions.notNull("action", action);
+    }
+
+    private Object writeReplace() throws ObjectStreamException {
+      return new ChainProxy<O>(mAction);
+    }
+
+    private static class ChainProxy<O> extends SerializableProxy {
+
+      private ChainProxy(final Action action) {
+        super(action);
+      }
+
+      @SuppressWarnings("unchecked")
+      Object readResolve() throws ObjectStreamException {
+        try {
+          final Object[] args = deserializeArgs();
+          return new ProcessorResolved<O>((Action) args[0]);
+
+        } catch (final Throwable t) {
+          throw new InvalidObjectException(t.getMessage());
+        }
+      }
+    }
+
+    public void reject(final Throwable reason, @NotNull final Callback<O> callback) throws
+        Exception {
+      mAction.perform();
+      callback.reject(reason);
+    }
+
+    public void resolve(final O input, @NotNull final Callback<O> callback) throws Exception {
+      mAction.perform();
+      callback.resolve(input);
+    }
+  }
+
   private static abstract class PromiseChain<I, O>
-      implements StatelessProcessor<I, O>, Callback<I>, Serializable {
+      implements Processor<I, Void>, Callback<I>, Serializable {
 
     private transient volatile Throwable mException;
 
@@ -1117,6 +979,7 @@ class DefaultPromise<O> implements Promise<O> {
         throw wrapException(exception);
       }
 
+      mException = new IllegalStateException("chain has been already resolved");
       promise.then(this);
     }
 
@@ -1132,19 +995,8 @@ class DefaultPromise<O> implements Promise<O> {
         throw wrapException(exception);
       }
 
-      mException = new IllegalStateException("chain has been already rejected");
+      mException = new IllegalStateException("chain has been already resolved");
       resolve(mNext, input);
-    }
-
-    public final void resolve() {
-      final Throwable exception = mException;
-      if (exception != null) {
-        mLogger.wrn("Chain has been already rejected with reason: %s", exception);
-        throw wrapException(exception);
-      }
-
-      mException = new IllegalStateException("chain has been already rejected");
-      resolve(mNext);
     }
 
     @NotNull
@@ -1158,26 +1010,20 @@ class DefaultPromise<O> implements Promise<O> {
       mLogger = logger.subContextLogger(this);
     }
 
-    abstract void reject(@NotNull PromiseChain<O, ?> next, Throwable reason);
+    abstract void reject(PromiseChain<O, ?> next, Throwable reason);
 
-    abstract void resolve(@NotNull PromiseChain<O, ?> next, I input);
-
-    abstract void resolve(@NotNull PromiseChain<O, ?> next);
+    abstract void resolve(PromiseChain<O, ?> next, I input);
 
     void setNext(@NotNull PromiseChain<O, ?> next) {
       mNext = next;
     }
 
-    public void reject(final Throwable reason, @NotNull final Callback<O> callback) {
-      reject(reason);
+    public void reject(final Throwable reason, @NotNull final Callback<Void> callback) {
+      reject(mNext, reason);
     }
 
-    public void resolve(@NotNull final Callback<O> callback) {
-      resolve();
-    }
-
-    public void resolve(final I input, @NotNull final Callback<O> callback) {
-      resolve(input);
+    public void resolve(final I input, @NotNull final Callback<Void> callback) {
+      resolve(mNext, input);
     }
   }
 
@@ -1212,52 +1058,45 @@ class DefaultPromise<O> implements Promise<O> {
 
   private class ChainTail extends PromiseChain<O, Object> {
 
-    public void setNext(@NotNull final PromiseChain<Object, ?> next) {
-      ConstantConditions.unsupported();
-    }
-
     @NotNull
     PromiseChain<O, Object> copy() {
       return ConstantConditions.unsupported();
     }
 
-    void reject(@NotNull final PromiseChain<Object, ?> next, final Throwable reason) {
+    void reject(final PromiseChain<Object, ?> next, final Throwable reason) {
       final PromiseChain<O, ?> bond;
       synchronized (mMutex) {
-        mState = PromiseState.Rejected;
-        if ((bond = mBond) == null) {
-          mHead.innerReject(reason);
-          return;
+        try {
+          mState = PromiseState.Rejected;
+          if ((bond = mBond) == null) {
+            mHead.innerReject(reason);
+            return;
+          }
+
+        } finally {
+          mMutex.notifyAll();
         }
       }
 
       bond.reject(reason);
     }
 
-    void resolve(@NotNull final PromiseChain<Object, ?> next, final O input) {
+    void resolve(final PromiseChain<Object, ?> next, final O input) {
       final PromiseChain<O, ?> bond;
       synchronized (mMutex) {
-        mState = PromiseState.Fulfilled;
-        if ((bond = mBond) == null) {
-          mHead.innerResolve(input);
-          return;
+        try {
+          mState = PromiseState.Fulfilled;
+          if ((bond = mBond) == null) {
+            mHead.innerResolve(input);
+            return;
+          }
+
+        } finally {
+          mMutex.notifyAll();
         }
       }
 
       bond.resolve(input);
-    }
-
-    void resolve(@NotNull final PromiseChain<Object, ?> next) {
-      final PromiseChain<O, ?> bond;
-      synchronized (mMutex) {
-        mState = PromiseState.Fulfilled;
-        if ((bond = mBond) == null) {
-          mHead.innerResolve();
-          return;
-        }
-      }
-
-      bond.resolve();
     }
   }
 }

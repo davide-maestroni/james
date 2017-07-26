@@ -28,13 +28,12 @@ import java.util.Random;
 import java.util.concurrent.TimeUnit;
 
 import dm.james.executor.ScheduledExecutors;
+import dm.james.promise.DeferredPromise;
 import dm.james.promise.Mapper;
 import dm.james.promise.Observer;
 import dm.james.promise.Promise;
 import dm.james.promise.Promise.Callback;
-import dm.james.promise.Promise.StatelessProcessor;
-import dm.james.promise.Provider;
-import dm.james.promise.ResolvablePromise;
+import dm.james.promise.Promise.Processor;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -43,13 +42,8 @@ import static org.assertj.core.api.Assertions.assertThat;
  */
 public class Testo {
 
-  private static Promise<String> createPromise() {
-    return new Bond().promise(new Observer<Callback<String>>() {
-
-      public void accept(final Callback<String> callback) {
-        callback.resolve("test");
-      }
-    }).thenMap(new Mapper<String, String>() {
+  private static DeferredPromise<String, String> createDeferredPromise() {
+    return new Bond().<String>deferred().then(new Mapper<String, String>() {
 
       public String apply(final String input) {
         return input.toUpperCase();
@@ -57,8 +51,13 @@ public class Testo {
     });
   }
 
-  private static ResolvablePromise<String, String> createResolvablePromise() {
-    return new Bond().<String>resolvable().thenMap(new Mapper<String, String>() {
+  private static Promise<String> createPromise() {
+    return new Bond().promise(new Observer<Callback<String>>() {
+
+      public void accept(final Callback<String> callback) {
+        callback.resolve("test");
+      }
+    }).then(new Mapper<String, String>() {
 
       public String apply(final String input) {
         return input.toUpperCase();
@@ -73,12 +72,12 @@ public class Testo {
       public void accept(final Callback<String> callback) {
         callback.resolve("test");
       }
-    }).thenMap(new Mapper<String, String>() {
+    }).then(new Mapper<String, String>() {
 
       public String apply(final String input) {
         return input.toUpperCase();
       }
-    }).then(new StatelessProcessor<String, String>() {
+    }).then(new Processor<String, String>() {
 
       public void reject(@Nullable final Throwable reason,
           @NotNull final Callback<String> callback) {
@@ -98,15 +97,6 @@ public class Testo {
           }
         }, 100, TimeUnit.MILLISECONDS);
       }
-
-      public void resolve(@NotNull final Callback<String> callback) {
-        ScheduledExecutors.defaultExecutor().execute(new Runnable() {
-
-          public void run() {
-            callback.resolve();
-          }
-        });
-      }
     }).get(1, TimeUnit.SECONDS);
     assertThat(test).isEqualTo("TEST");
   }
@@ -118,7 +108,7 @@ public class Testo {
       public void accept(final Callback<String> callback) {
         callback.resolve("test");
       }
-    }).then(new StatelessProcessor<String, String>() {
+    }).then(new Processor<String, String>() {
 
       public void resolve(final String input, @NotNull final Callback<String> callback) {
         ScheduledExecutors.defaultExecutor().execute(new Runnable() {
@@ -138,16 +128,7 @@ public class Testo {
           }
         });
       }
-
-      public void resolve(@NotNull final Callback<String> callback) {
-        ScheduledExecutors.defaultExecutor().execute(new Runnable() {
-
-          public void run() {
-            callback.resolve();
-          }
-        });
-      }
-    }).thenMap(new Mapper<String, String>() {
+    }).then(new Mapper<String, String>() {
 
       public String apply(final String input) {
         return input.toUpperCase();
@@ -158,7 +139,7 @@ public class Testo {
         return new Bond().promise(new Observer<Callback<String>>() {
 
           public void accept(final Callback<String> callback) throws Exception {
-            callback.defer(promise.thenMap(new Mapper<String, String>() {
+            callback.defer(promise.then(new Mapper<String, String>() {
 
               public String apply(final String input) {
                 return input + "_suffix";
@@ -181,16 +162,16 @@ public class Testo {
       }
     }).apply(bond.<Integer>cache());
     final Integer integer = promise.get();
-    assertThat(promise.thenFill(new Provider<Integer>() {
+    assertThat(promise.whenFulfilled(new Observer<Integer>() {
 
-      public Integer get() {
-        return null;
+      public void accept(final Integer input) {
+
       }
     }).get()).isEqualTo(integer);
-    assertThat(promise.thenFill(new Provider<Integer>() {
+    assertThat(promise.whenFulfilled(new Observer<Integer>() {
 
-      public Integer get() {
-        return null;
+      public void accept(final Integer input) {
+
       }
     }).get()).isEqualTo(integer);
   }
@@ -230,33 +211,9 @@ public class Testo {
   }
 
   @org.junit.Test
-  public void testNotCached() {
-    final Bond bond = new Bond();
-    final Promise<Integer> promise = bond.promise(new Observer<Callback<Integer>>() {
-
-      public void accept(final Callback<Integer> callback) {
-        callback.resolve(new Random().nextInt());
-      }
-    });
-    final Integer integer = promise.get();
-    assertThat(promise.thenFill(new Provider<Integer>() {
-
-      public Integer get() {
-        return null;
-      }
-    }).get()).isEqualTo(integer);
-    assertThat(promise.thenFill(new Provider<Integer>() {
-
-      public Integer get() {
-        return null;
-      }
-    }).get()).isNotEqualTo(integer);
-  }
-
-  @org.junit.Test
-  public void testResolvableInitialState() {
-    final ResolvablePromise<String, String> promise =
-        new Bond().<String>resolvable().thenMap(new Mapper<String, String>() {
+  public void testDeferredInitialState() {
+    final DeferredPromise<String, String> promise =
+        new Bond().<String>deferred().then(new Mapper<String, String>() {
 
           public String apply(final String input) {
             return input.toUpperCase();
@@ -266,9 +223,9 @@ public class Testo {
   }
 
   @org.junit.Test
-  public void testResolvableRejectedState() {
-    final ResolvablePromise<String, String> promise =
-        new Bond().<String>resolvable().thenMap(new Mapper<String, String>() {
+  public void testDeferredRejectedState() {
+    final DeferredPromise<String, String> promise =
+        new Bond().<String>deferred().then(new Mapper<String, String>() {
 
           public String apply(final String input) {
             return input.toUpperCase();
@@ -280,23 +237,23 @@ public class Testo {
   }
 
   @org.junit.Test
-  public void testResolvableResolvedEmptyState() {
-    final ResolvablePromise<String, String> promise =
-        new Bond().<String>resolvable().thenMap(new Mapper<String, String>() {
+  public void testDeferredResolvedNull() {
+    final DeferredPromise<String, String> promise =
+        new Bond().<String>deferred().then(new Mapper<String, String>() {
 
           public String apply(final String input) {
-            return input.toUpperCase();
+            return input;
           }
         });
-    promise.resolve();
+    promise.resolve(null);
     assertThat(promise.isFulfilled()).isTrue();
     assertThat(promise.isResolved()).isTrue();
   }
 
   @org.junit.Test
-  public void testResolvableResolvedState() {
-    final ResolvablePromise<String, String> promise =
-        new Bond().<String>resolvable().thenMap(new Mapper<String, String>() {
+  public void testDeferredResolvedState() {
+    final DeferredPromise<String, String> promise =
+        new Bond().<String>deferred().then(new Mapper<String, String>() {
 
           public String apply(final String input) {
             return input.toUpperCase();
@@ -308,17 +265,41 @@ public class Testo {
   }
 
   @org.junit.Test
-  public void testResolvableSerialize() throws IOException, ClassNotFoundException {
-    final ResolvablePromise<String, String> promise = createResolvablePromise();
+  public void testDeferredSerialize() throws IOException, ClassNotFoundException {
+    final DeferredPromise<String, String> promise = createDeferredPromise();
     final ByteArrayOutputStream byteOutputStream = new ByteArrayOutputStream();
     final ObjectOutputStream objectOutputStream = new ObjectOutputStream(byteOutputStream);
     objectOutputStream.writeObject(promise);
     final ByteArrayInputStream byteInputStream =
         new ByteArrayInputStream(byteOutputStream.toByteArray());
     final ObjectInputStream objectInputStream = new ObjectInputStream(byteInputStream);
-    @SuppressWarnings("unchecked") final ResolvablePromise<String, String> deserialized =
-        (ResolvablePromise<String, String>) objectInputStream.readObject();
+    @SuppressWarnings("unchecked") final DeferredPromise<String, String> deserialized =
+        (DeferredPromise<String, String>) objectInputStream.readObject();
     assertThat(deserialized.resolved("test").get()).isEqualTo("TEST");
+  }
+
+  @org.junit.Test
+  public void testNotCached() {
+    final Bond bond = new Bond();
+    final Promise<Integer> promise = bond.promise(new Observer<Callback<Integer>>() {
+
+      public void accept(final Callback<Integer> callback) {
+        callback.resolve(new Random().nextInt());
+      }
+    });
+    final Integer integer = promise.get();
+    assertThat(promise.whenFulfilled(new Observer<Integer>() {
+
+      public void accept(final Integer input) {
+
+      }
+    }).get()).isEqualTo(integer);
+    assertThat(promise.whenFulfilled(new Observer<Integer>() {
+
+      public void accept(final Integer input) {
+
+      }
+    }).get()).isNotEqualTo(integer);
   }
 
   @org.junit.Test

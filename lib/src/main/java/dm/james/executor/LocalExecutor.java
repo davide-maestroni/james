@@ -123,7 +123,14 @@ class LocalExecutor {
 
   private void addCommand(@NotNull final Runnable command) {
     if (!mIsRunning) {
-      command.run();
+      mIsRunning = true;
+      try {
+        command.run();
+        run();
+
+      } finally {
+        mIsRunning = false;
+      }
 
     } else {
       add(command, 0, TimeUnit.MILLISECONDS);
