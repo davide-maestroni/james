@@ -14,14 +14,25 @@
  * limitations under the License.
  */
 
-package dm.james.promise;
+package dm.james;
+
+import java.io.Serializable;
+
+import dm.james.promise.Observer;
+import dm.james.promise.Promise.Callback;
 
 /**
- * Created by davide-maestroni on 07/20/2017.
+ * Created by davide-maestroni on 07/27/2017.
  */
-public interface Resolvable<O> {
+class ResolvedObserver<O> implements Observer<Callback<O>>, Serializable {
 
-  void reject(Throwable reason);
+  private final O mOutput;
 
-  void resolve(O output);
+  ResolvedObserver(final O output) {
+    mOutput = output;
+  }
+
+  public void accept(final Callback<O> callback) {
+    callback.resolve(mOutput);
+  }
 }

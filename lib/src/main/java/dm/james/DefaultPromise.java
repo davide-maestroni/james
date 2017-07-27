@@ -85,44 +85,10 @@ class DefaultPromise<O> implements Promise<O> {
 
   @SuppressWarnings("unchecked")
   private DefaultPromise(@NotNull final Observer<? extends Callback<?>> observer,
-      @NotNull final PropagationType propagationType, @NotNull final Logger logger,
-      @NotNull final ChainHead<?> head, @NotNull final PromiseChain<?, ?> tail,
-      @NotNull final PromiseChain<?, O> chain) {
-    mObserver = observer;
-    mPropagationType = propagationType;
-    mLogger = logger;
-    mMutex = head.getMutex();
-    mHead = head;
-    mTail = chain;
-    chain.setNext(new ChainTail());
-    ((PromiseChain<?, Object>) tail).setNext((PromiseChain<Object, O>) chain);
-  }
-
-  @SuppressWarnings("unchecked")
-  private DefaultPromise(@NotNull final Observer<? extends Callback<?>> observer,
-      @NotNull final PropagationType propagationType, @NotNull final Logger logger,
-      @NotNull final ChainHead<?> head, @NotNull final PromiseChain<?, O> tail) {
-    mObserver = observer;
-    mPropagationType = propagationType;
-    mLogger = logger;
-    mMutex = head.getMutex();
-    mHead = head;
-    mTail = tail;
-    tail.setNext(new ChainTail());
-    try {
-      ((Observer<Callback<?>>) observer).accept(head);
-
-    } catch (final Throwable t) {
-      InterruptedExecutionException.throwIfInterrupt(t);
-      head.reject(t);
-    }
-  }
-
-  @SuppressWarnings("unchecked")
-  private DefaultPromise(@NotNull final Observer<? extends Callback<?>> observer,
       @NotNull final PropagationType propagationType, @Nullable final Log log,
       @Nullable final Level level, @NotNull final ChainHead<?> head,
       @NotNull final PromiseChain<?, O> tail) {
+    // serialization
     mObserver = observer;
     mPropagationType = propagationType;
     mLogger = Logger.newLogger(log, level, this);
@@ -146,6 +112,43 @@ class DefaultPromise<O> implements Promise<O> {
     }
   }
 
+  @SuppressWarnings("unchecked")
+  private DefaultPromise(@NotNull final Observer<? extends Callback<?>> observer,
+      @NotNull final PropagationType propagationType, @NotNull final Logger logger,
+      @NotNull final ChainHead<?> head, @NotNull final PromiseChain<?, ?> tail,
+      @NotNull final PromiseChain<?, O> chain) {
+    // bind
+    mObserver = observer;
+    mPropagationType = propagationType;
+    mLogger = logger;
+    mMutex = head.getMutex();
+    mHead = head;
+    mTail = chain;
+    chain.setNext(new ChainTail());
+    ((PromiseChain<?, Object>) tail).setNext((PromiseChain<Object, O>) chain);
+  }
+
+  @SuppressWarnings("unchecked")
+  private DefaultPromise(@NotNull final Observer<? extends Callback<?>> observer,
+      @NotNull final PropagationType propagationType, @NotNull final Logger logger,
+      @NotNull final ChainHead<?> head, @NotNull final PromiseChain<?, O> tail) {
+    // copy
+    mObserver = observer;
+    mPropagationType = propagationType;
+    mLogger = logger;
+    mMutex = head.getMutex();
+    mHead = head;
+    mTail = tail;
+    tail.setNext(new ChainTail());
+    try {
+      ((Observer<Callback<?>>) observer).accept(head);
+
+    } catch (final Throwable t) {
+      InterruptedExecutionException.throwIfInterrupt(t);
+      head.reject(t);
+    }
+  }
+
   @NotNull
   private static RejectionException wrapException(@Nullable final Throwable t) {
     return (t instanceof RejectionException) ? (RejectionException) t : new RejectionException(t);
@@ -158,7 +161,8 @@ class DefaultPromise<O> implements Promise<O> {
 
     } catch (final Throwable t) {
       InterruptedExecutionException.throwIfInterrupt(t);
-      throw new RejectionException(t);
+      mLogger.err(t, "Error while applying promise transformation");
+      throw wrapException(t);
     }
   }
 
@@ -614,10 +618,12 @@ class DefaultPromise<O> implements Promise<O> {
       }
     }
 
+    @Override
     public void resolve(final PromiseChain<O, ?> next, final O input) {
       next.resolve(input);
     }
 
+    @Override
     public void reject(final PromiseChain<O, ?> next, final Throwable reason) {
       next.reject(reason);
     }
@@ -662,6 +668,7 @@ class DefaultPromise<O> implements Promise<O> {
       return new ChainProcessor<O, R>(mPropagationType, mProcessor);
     }
 
+    @Override
     void reject(final PromiseChain<R, ?> next, final Throwable reason) {
       mPropagationType.execute(new Runnable() {
 
@@ -679,6 +686,7 @@ class DefaultPromise<O> implements Promise<O> {
       });
     }
 
+    @Override
     void resolve(final PromiseChain<R, ?> next, final O input) {
       mPropagationType.execute(new Runnable() {
 
@@ -735,6 +743,7 @@ class DefaultPromise<O> implements Promise<O> {
       mMapper = ConstantConditions.notNull("mapper", mapper);
     }
 
+    @Override
     public void reject(final Throwable reason, @NotNull final Callback<O> callback) throws
         Exception {
       callback.resolve(mMapper.apply(reason));
@@ -801,21 +810,21 @@ class DefaultPromise<O> implements Promise<O> {
     }
   }
 
-  private static class ProcessorHandle<I, O> implements Processor<I, O>, Serializable {
+  private static class ProcessorHandle<O, R> implements Processor<O, R>, Serializable {
 
-    private final Handler<Throwable, O, Callback<O>> mErrorHandler;
+    private final Handler<Throwable, R, Callback<R>> mErrorHandler;
 
-    private final Handler<I, O, Callback<O>> mOutputHandler;
+    private final Handler<O, R, Callback<R>> mOutputHandler;
 
-    private ProcessorHandle(@Nullable final Handler<I, O, Callback<O>> outputHandler,
-        @Nullable final Handler<Throwable, O, Callback<O>> errorHandler) {
+    private ProcessorHandle(@Nullable final Handler<O, R, Callback<R>> outputHandler,
+        @Nullable final Handler<Throwable, R, Callback<R>> errorHandler) {
       mOutputHandler =
-          (outputHandler != null) ? outputHandler : new PassThroughOutputHandler<I, O>();
-      mErrorHandler = (errorHandler != null) ? errorHandler : new PassThroughErrorHandler<O>();
+          (outputHandler != null) ? outputHandler : new PassThroughOutputHandler<O, R>();
+      mErrorHandler = (errorHandler != null) ? errorHandler : new PassThroughErrorHandler<R>();
     }
 
     private Object writeReplace() throws ObjectStreamException {
-      return new ChainProxy<I, O>(mOutputHandler, mErrorHandler);
+      return new ChainProxy<O, R>(mOutputHandler, mErrorHandler);
     }
 
     private static class ChainProxy<I, O> extends SerializableProxy {
@@ -838,26 +847,26 @@ class DefaultPromise<O> implements Promise<O> {
       }
     }
 
-    public void reject(final Throwable reason, @NotNull final Callback<O> callback) throws
+    public void reject(final Throwable reason, @NotNull final Callback<R> callback) throws
         Exception {
       mErrorHandler.accept(reason, callback);
     }
 
-    public void resolve(final I input, @NotNull final Callback<O> callback) throws Exception {
+    public void resolve(final O input, @NotNull final Callback<R> callback) throws Exception {
       mOutputHandler.accept(input, callback);
     }
   }
 
-  private static class ProcessorMap<I, O> extends DefaultProcessor<I, O> implements Serializable {
+  private static class ProcessorMap<O, R> extends DefaultProcessor<O, R> implements Serializable {
 
-    private final Mapper<I, O> mMapper;
+    private final Mapper<O, R> mMapper;
 
-    private ProcessorMap(final Mapper<I, O> mapper) {
+    private ProcessorMap(final Mapper<O, R> mapper) {
       mMapper = ConstantConditions.notNull("mapper", mapper);
     }
 
     private Object writeReplace() throws ObjectStreamException {
-      return new ChainProxy<I, O>(mMapper);
+      return new ChainProxy<O, R>(mMapper);
     }
 
     private static class ChainProxy<I, O> extends SerializableProxy {
@@ -878,7 +887,8 @@ class DefaultPromise<O> implements Promise<O> {
       }
     }
 
-    public void resolve(final I input, @NotNull final Callback<O> callback) throws Exception {
+    @Override
+    public void resolve(final O input, @NotNull final Callback<R> callback) throws Exception {
       callback.resolve(mMapper.apply(input));
     }
   }
@@ -966,37 +976,26 @@ class DefaultPromise<O> implements Promise<O> {
   private static abstract class PromiseChain<I, O>
       implements Processor<I, Void>, Callback<I>, Serializable {
 
-    private transient volatile Throwable mException;
+    private transient volatile StatePending mInnerState = new StatePending();
 
     private transient Logger mLogger;
 
     private transient volatile PromiseChain<O, ?> mNext;
 
     public final void defer(@NotNull final Promise<I> promise) {
-      final Throwable exception = mException;
-      if (exception != null) {
-        mLogger.wrn("Chain has been already rejected with reason: %s", exception);
-        throw wrapException(exception);
-      }
-
-      mException = new IllegalStateException("chain has been already resolved");
+      mInnerState.resolve();
       promise.then(this);
     }
 
     public final void reject(final Throwable reason) {
-      mException = reason;
-      reject(mNext, reason);
+      if (mInnerState.reject(reason)) {
+        reject(mNext, reason);
+      }
     }
 
-    public final void resolve(final I input) {
-      final Throwable exception = mException;
-      if (exception != null) {
-        mLogger.wrn("Chain has been already rejected with reason: %s", exception);
-        throw wrapException(exception);
-      }
-
-      mException = new IllegalStateException("chain has been already resolved");
-      resolve(mNext, input);
+    public final void resolve(final I output) {
+      mInnerState.resolve();
+      resolve(mNext, output);
     }
 
     @NotNull
@@ -1016,6 +1015,55 @@ class DefaultPromise<O> implements Promise<O> {
 
     void setNext(@NotNull PromiseChain<O, ?> next) {
       mNext = next;
+    }
+
+    private class StatePending {
+
+      boolean reject(final Throwable reason) {
+        mInnerState = new StateRejected(reason);
+        return true;
+      }
+
+      void resolve() {
+        mInnerState = new StateResolved();
+      }
+    }
+
+    private class StateRejected extends StatePending {
+
+      private final Throwable mReason;
+
+      private StateRejected(final Throwable reason) {
+        mReason = reason;
+      }
+
+      @Override
+      boolean reject(final Throwable reason) {
+        mLogger.wrn("Suppressed rejection with reason: %s", reason);
+        return false;
+      }
+
+      @Override
+      void resolve() {
+        final Throwable reason = mReason;
+        mLogger.wrn("Chain has been already rejected with reason: %s", reason);
+        throw wrapException(reason);
+      }
+    }
+
+    private class StateResolved extends StatePending {
+
+      @Override
+      void resolve() {
+        mLogger.wrn("Chain has been already resolved");
+        throw wrapException(new IllegalStateException("chain has been already resolved"));
+      }
+
+      @Override
+      boolean reject(final Throwable reason) {
+        mInnerState = new StateRejected(reason);
+        return true;
+      }
     }
 
     public void reject(final Throwable reason, @NotNull final Callback<Void> callback) {
@@ -1059,10 +1107,12 @@ class DefaultPromise<O> implements Promise<O> {
   private class ChainTail extends PromiseChain<O, Object> {
 
     @NotNull
+    @Override
     PromiseChain<O, Object> copy() {
       return ConstantConditions.unsupported();
     }
 
+    @Override
     void reject(final PromiseChain<Object, ?> next, final Throwable reason) {
       final PromiseChain<O, ?> bond;
       synchronized (mMutex) {
@@ -1081,6 +1131,7 @@ class DefaultPromise<O> implements Promise<O> {
       bond.reject(reason);
     }
 
+    @Override
     void resolve(final PromiseChain<Object, ?> next, final O input) {
       final PromiseChain<O, ?> bond;
       synchronized (mMutex) {

@@ -198,16 +198,16 @@ class DefaultDeferredPromise<I, O> implements DeferredPromise<I, O> {
     }
   }
 
-  public void resolve(final I input) {
-    mLogger.dbg("Resolving deferred promise with resolution: %s", input);
+  public void resolve(final I output) {
+    mLogger.dbg("Resolving deferred promise with resolution: %s", output);
     final List<Callback<I>> callbacks;
     synchronized (mMutex) {
-      callbacks = mState.resolve(input);
+      callbacks = mState.resolve(output);
     }
 
     if (callbacks != null) {
       for (final Callback<I> callback : callbacks) {
-        callback.resolve(input);
+        callback.resolve(output);
       }
     }
   }
