@@ -98,8 +98,8 @@ class DefaultDeferredPromise<I, O> implements DeferredPromise<I, O> {
   }
 
   @NotNull
-  public DeferredPromise<I, O> thenCatch(@NotNull final Mapper<Throwable, O> mapper) {
-    return new DefaultDeferredPromise<I, O>(mPromise.thenCatch(mapper), mLogger, mState);
+  public DeferredPromise<I, O> catchAny(@NotNull final Mapper<Throwable, O> mapper) {
+    return new DefaultDeferredPromise<I, O>(mPromise.catchAny(mapper), mLogger, mState);
   }
 
   @NotNull

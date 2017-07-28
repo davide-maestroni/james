@@ -47,6 +47,11 @@ class APlusPromise<O> implements Promise<O> {
     return new APlusPromise<R>(mBond, mPromise.apply(mapper));
   }
 
+  @NotNull
+  public Promise<O> catchAny(@NotNull final Mapper<Throwable, O> mapper) {
+    return new APlusPromise<O>(mBond, mPromise.catchAny(mapper));
+  }
+
   public O get() {
     return mPromise.get();
   }
@@ -108,11 +113,6 @@ class APlusPromise<O> implements Promise<O> {
   @NotNull
   public <R> Promise<R> then(@NotNull final Processor<O, R> processor) {
     return new APlusPromise<R>(mBond, mPromise.then(processor));
-  }
-
-  @NotNull
-  public Promise<O> thenCatch(@NotNull final Mapper<Throwable, O> mapper) {
-    return new APlusPromise<O>(mBond, mPromise.thenCatch(mapper));
   }
 
   public void waitResolved() {

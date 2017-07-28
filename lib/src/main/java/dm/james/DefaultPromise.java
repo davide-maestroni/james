@@ -166,6 +166,11 @@ class DefaultPromise<O> implements Promise<O> {
     }
   }
 
+  @NotNull
+  public Promise<O> catchAny(@NotNull final Mapper<Throwable, O> mapper) {
+    return then(new ProcessorCatch<O>(mapper));
+  }
+
   public O get() {
     return get(-1, TimeUnit.MILLISECONDS);
   }
@@ -313,11 +318,6 @@ class DefaultPromise<O> implements Promise<O> {
   @NotNull
   public <R> Promise<R> then(@NotNull final Processor<O, R> processor) {
     return chain(new ChainProcessor<O, R>(mPropagationType, processor));
-  }
-
-  @NotNull
-  public Promise<O> thenCatch(@NotNull final Mapper<Throwable, O> mapper) {
-    return then(new ProcessorCatch<O>(mapper));
   }
 
   public void waitResolved() {

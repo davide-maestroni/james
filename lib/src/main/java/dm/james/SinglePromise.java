@@ -55,13 +55,18 @@ class SinglePromise<I, O> implements Promise<O> {
     final SinglePromise<I, O> cachedPromise =
         new SinglePromise<I, O>(ConstantConditions.notNull("promise", promise),
             ConstantConditions.notNull("deferred", deferred));
-    promise.thenAll(new DeferredProcessor<I>(deferred));
+    promise.all(new DeferredProcessor<I>(deferred));
     return cachedPromise;
   }
 
   @NotNull
   public <R> Promise<R> apply(@NotNull final Mapper<Promise<O>, Promise<R>> mapper) {
     return new SinglePromise<I, R>(mPromise, mDeferred.apply(mapper));
+  }
+
+  @NotNull
+  public Promise<O> catchAny(@NotNull final Mapper<Throwable, O> mapper) {
+    return new SinglePromise<I, O>(mPromise, mDeferred.catchAny(mapper));
   }
 
   public O get() {
@@ -125,11 +130,6 @@ class SinglePromise<I, O> implements Promise<O> {
   @NotNull
   public <R> Promise<R> then(@NotNull final Processor<O, R> processor) {
     return new SinglePromise<I, R>(mPromise, mDeferred.then(processor));
-  }
-
-  @NotNull
-  public Promise<O> thenCatch(@NotNull final Mapper<Throwable, O> mapper) {
-    return new SinglePromise<I, O>(mPromise, mDeferred.thenCatch(mapper));
   }
 
   public void waitResolved() {

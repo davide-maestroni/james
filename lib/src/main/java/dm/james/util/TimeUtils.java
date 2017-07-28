@@ -27,6 +27,14 @@ public class TimeUtils {
 
   private static final long ONE_MILLI_NANOS = TimeUnit.MILLISECONDS.toNanos(1);
 
+  public static long currentTimeIn(@NotNull final TimeUnit timeUnit) {
+    if (timeUnit == TimeUnit.NANOSECONDS) {
+      return System.nanoTime();
+    }
+
+    return timeUnit.convert(System.currentTimeMillis(), TimeUnit.MILLISECONDS);
+  }
+
   /**
    * Performs a {@link java.lang.Thread#sleep(long, int)} using the specified duration as timeout,
    * ensuring that the sleep time is respected even if spurious wake-ups happen in the while.

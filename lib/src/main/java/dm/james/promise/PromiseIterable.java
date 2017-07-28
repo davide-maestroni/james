@@ -29,10 +29,50 @@ import java.util.concurrent.TimeUnit;
 public interface PromiseIterable<O> extends Promise<Iterable<O>>, Iterable<O> {
 
   @NotNull
+    // TODO: 27/07/2017 all?
+  <R> PromiseIterable<R> all(@Nullable Handler<Iterable<O>, R, CallbackIterable<R>> outputHandler,
+      @Nullable Handler<Throwable, R, CallbackIterable<R>> errorHandler);
+
+  @NotNull
+  <R> PromiseIterable<R> all(@NotNull Mapper<Iterable<O>, Iterable<R>> mapper);
+
+  @NotNull
+  <R> PromiseIterable<R> all(@NotNull StatelessProcessor<Iterable<O>, R> processor);
+
+  @NotNull
   <R> PromiseIterable<R> applyAll(@NotNull Mapper<PromiseIterable<O>, PromiseIterable<R>> mapper);
 
   @NotNull
   <R> PromiseIterable<R> applyEach(@NotNull Mapper<Promise<O>, Promise<R>> mapper);
+
+  @NotNull
+  PromiseIterable<O> catchAny(@NotNull Mapper<Throwable, Iterable<O>> mapper);
+
+  @NotNull
+  PromiseIterable<O> whenFulfilled(@NotNull Observer<Iterable<O>> observer);
+
+  @NotNull
+  PromiseIterable<O> whenRejected(@NotNull Observer<Throwable> observer);
+
+  @NotNull
+  PromiseIterable<O> whenResolved(@NotNull Action action);
+
+  // TODO: 27/07/2017 any? same methods as 'each' but implementation as 'all'
+  // any(Handler, Handler), any(Mapper), any(StatelessProcessor), whenFulfilledAny(Observer)
+  // applyAny(Mapper)
+
+  @NotNull
+  PromiseIterable<O> catchEach(@NotNull Mapper<Throwable, O> mapper);
+
+  @NotNull
+  <R> PromiseIterable<R> each(@Nullable Handler<O, R, CallbackIterable<R>> outputHandler,
+      @Nullable Handler<Throwable, R, CallbackIterable<R>> errorHandler);
+
+  @NotNull
+  <R> PromiseIterable<R> each(@NotNull Mapper<O, R> mapper);
+
+  @NotNull
+  <R> PromiseIterable<R> each(@NotNull StatelessProcessor<O, R> processor);
 
   @NotNull
   List<O> getAll();
@@ -63,47 +103,6 @@ public interface PromiseIterable<O> extends Promise<Iterable<O>>, Iterable<O> {
 
   @NotNull
   <R, S> PromiseIterable<R> then(@NotNull StatefulProcessor<O, R, S> processor);
-
-  // TODO: 27/07/2017 any?
-
-  @NotNull
-    // TODO: 27/07/2017 all?
-  <R> PromiseIterable<R> thenAll(
-      @Nullable Handler<Iterable<O>, R, CallbackIterable<R>> outputHandler,
-      @Nullable Handler<Throwable, R, CallbackIterable<R>> errorHandler);
-
-  @NotNull
-  <R> PromiseIterable<R> thenAll(@NotNull Mapper<Iterable<O>, Iterable<R>> mapper);
-
-  @NotNull
-  <R> PromiseIterable<R> thenAll(@NotNull StatelessProcessor<Iterable<O>, R> processor);
-
-  @NotNull
-  PromiseIterable<O> thenCatch(@NotNull Mapper<Throwable, Iterable<O>> mapper);
-
-  @NotNull
-  PromiseIterable<O> whenFulfilled(@NotNull Observer<Iterable<O>> observer);
-
-  @NotNull
-  PromiseIterable<O> whenRejected(@NotNull Observer<Throwable> observer);
-
-  @NotNull
-  PromiseIterable<O> whenResolved(@NotNull Action action);
-
-  @NotNull
-    // TODO: 27/07/2017 catchEach??
-  PromiseIterable<O> thenCatchEach(@NotNull Mapper<Throwable, O> mapper);
-
-  @NotNull
-    // TODO: 27/07/2017 each?
-  <R> PromiseIterable<R> thenEach(@Nullable Handler<O, R, CallbackIterable<R>> outputHandler,
-      @Nullable Handler<Throwable, R, CallbackIterable<R>> errorHandler);
-
-  @NotNull
-  <R> PromiseIterable<R> thenEach(@NotNull Mapper<O, R> mapper);
-
-  @NotNull
-  <R> PromiseIterable<R> thenEach(@NotNull StatelessProcessor<O, R> processor);
 
   void waitCompleted();
 

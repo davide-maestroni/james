@@ -28,6 +28,9 @@ public interface DeferredPromise<I, O> extends Promise<O>, Resolvable<I> {
   <R> DeferredPromise<I, R> apply(@NotNull Mapper<Promise<O>, Promise<R>> mapper);
 
   @NotNull
+  DeferredPromise<I, O> catchAny(@NotNull Mapper<Throwable, O> mapper);
+
+  @NotNull
   <R> DeferredPromise<I, R> then(@Nullable Handler<O, R, Callback<R>> outputHandler,
       @Nullable Handler<Throwable, R, Callback<R>> errorHandler);
 
@@ -36,9 +39,6 @@ public interface DeferredPromise<I, O> extends Promise<O>, Resolvable<I> {
 
   @NotNull
   <R> DeferredPromise<I, R> then(@NotNull Processor<O, R> processor);
-
-  @NotNull
-  DeferredPromise<I, O> thenCatch(@NotNull Mapper<Throwable, O> mapper);
 
   @NotNull
   DeferredPromise<I, O> whenFulfilled(@NotNull Observer<O> observer);

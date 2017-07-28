@@ -168,6 +168,260 @@ class DefaultPromiseIterable<O> implements PromiseIterable<O>, Serializable {
   }
 
   @NotNull
+  public <R> PromiseIterable<R> all(
+      @Nullable final Handler<Iterable<O>, R, CallbackIterable<R>> outputHandler,
+      @Nullable final Handler<Throwable, R, CallbackIterable<R>> errorHandler) {
+    return all(new ProcessorHandle<Iterable<O>, R>(outputHandler, errorHandler));
+  }
+
+  @NotNull
+  public <R> PromiseIterable<R> all(@NotNull final Mapper<Iterable<O>, Iterable<R>> mapper) {
+    return all(new ProcessorMapAll<O, R>(mapper));
+  }
+
+  @NotNull
+  public <R> PromiseIterable<R> all(@NotNull final StatelessProcessor<Iterable<O>, R> processor) {
+    return then(new ProcessorAll<O, R>(processor));
+  }
+
+  @NotNull
+  public <R> PromiseIterable<R> applyAll(
+      @NotNull final Mapper<PromiseIterable<O>, PromiseIterable<R>> mapper) {
+    try {
+      return ConstantConditions.notNull("promise", mapper.apply(this));
+
+    } catch (final Throwable t) {
+      InterruptedExecutionException.throwIfInterrupt(t);
+      mLogger.err(t, "Error while applying promise transformation");
+      throw wrapException(t);
+    }
+  }
+
+  @NotNull
+  public <R> PromiseIterable<R> applyEach(@NotNull final Mapper<Promise<O>, Promise<R>> mapper) {
+    final Logger logger = mLogger;
+    return each(new ProcessorApplyEach<O, R>(mapper, mPropagationType, logger.getLog(),
+        logger.getLogLevel()));
+  }
+
+  @NotNull
+  public PromiseIterable<O> catchAny(@NotNull final Mapper<Throwable, Iterable<O>> mapper) {
+    return all(new ProcessorCatchAll<O>(mapper));
+  }
+
+  @NotNull
+  public PromiseIterable<O> whenFulfilled(@NotNull final Observer<Iterable<O>> observer) {
+    return all(new ProcessorFulfilled<O>(observer));
+  }
+
+  @NotNull
+  public PromiseIterable<O> whenRejected(@NotNull final Observer<Throwable> observer) {
+    return all(new ProcessorRejected<O>(observer));
+  }
+
+  @NotNull
+  public PromiseIterable<O> whenResolved(@NotNull final Action action) {
+    return all(new ProcessorResolved<O>(action));
+  }
+
+  @NotNull
+  public PromiseIterable<O> catchEach(@NotNull final Mapper<Throwable, O> mapper) {
+    return each(new ProcessorCatchEach<O>(mapper));
+  }
+
+  @NotNull
+  public <R> PromiseIterable<R> each(
+      @Nullable final Handler<O, R, CallbackIterable<R>> outputHandler,
+      @Nullable final Handler<Throwable, R, CallbackIterable<R>> errorHandler) {
+    return each(new ProcessorHandle<O, R>(outputHandler, errorHandler));
+  }
+
+  @NotNull
+  public <R> PromiseIterable<R> each(@NotNull final Mapper<O, R> mapper) {
+    return each(new ProcessorMapEach<O, R>(mapper));
+  }
+
+  @NotNull
+  public <R> PromiseIterable<R> each(@NotNull final StatelessProcessor<O, R> processor) {
+    return chain(new ChainStateless<O, R>(mPropagationType, processor));
+  }
+
+  @NotNull
+  public List<O> getAll() {
+    return getAll(-1, TimeUnit.MILLISECONDS);
+  }
+
+  @NotNull
+  @SuppressWarnings("unchecked")
+  public List<O> getAll(final long timeout, @NotNull final TimeUnit timeUnit) {
+    final ChainHead<?> head = mHead;
+    synchronized (mMutex) {
+      try {
+        if (TimeUtils.waitUntil(mMutex, new Condition() {
+
+          public boolean isTrue() {
+            checkBound();
+            return head.getState().isResolved();
+          }
+        }, timeout, timeUnit)) {
+          return new ArrayList<O>((List<O>) head.getOutputs());
+        }
+
+      } catch (final InterruptedException e) {
+        throw new InterruptedExecutionException(e);
+      }
+    }
+
+    throw new TimeoutException(
+        "timeout while waiting for promise resolution [" + timeout + " " + timeUnit + "]");
+  }
+
+  @NotNull
+  public Iterator<O> iterator(final long timeout, @NotNull final TimeUnit timeUnit) {
+    // TODO: 28/07/2017 implement
+    return null;
+  }
+
+  public O remove() {
+    return remove(-1, TimeUnit.MILLISECONDS);
+  }
+
+  @SuppressWarnings("unchecked")
+  public O remove(final long timeout, @NotNull final TimeUnit timeUnit) {
+    final ChainHead<?> head = mHead;
+    synchronized (mMutex) {
+      try {
+        if (TimeUtils.waitUntil(mMutex, new Condition() {
+
+          public boolean isTrue() {
+            checkBound();
+            return !head.getOutputs().isEmpty();
+          }
+        }, timeout, timeUnit)) {
+          return ((List<O>) head.getOutputs()).remove(0);
+        }
+
+      } catch (final InterruptedException e) {
+        throw new InterruptedExecutionException(e);
+      }
+    }
+
+    throw new TimeoutException(
+        "timeout while waiting for promise resolution [" + timeout + " " + timeUnit + "]");
+  }
+
+  @NotNull
+  public List<O> remove(final int maxSize) {
+    return remove(maxSize, -1, TimeUnit.MILLISECONDS);
+  }
+
+  @NotNull
+  @SuppressWarnings("unchecked")
+  public List<O> remove(final int maxSize, final long timeout, @NotNull final TimeUnit timeUnit) {
+    final ChainHead<?> head = mHead;
+    final ArrayList<O> outputs = new ArrayList<O>();
+    synchronized (mMutex) {
+      final TimeUnit waitUnit =
+          ((timeUnit.toNanos(timeout) % TimeUnit.MILLISECONDS.toNanos(1)) == 0)
+              ? TimeUnit.MILLISECONDS : TimeUnit.NANOSECONDS;
+      final long waitEndTime = (timeout < 0) ? -1
+          : TimeUtils.currentTimeIn(waitUnit) + waitUnit.convert(timeout, timeUnit);
+      while (outputs.size() < maxSize) {
+        try {
+          final long waitTime =
+              (waitEndTime < 0) ? -1 : waitEndTime - TimeUtils.currentTimeIn(waitUnit);
+          if (TimeUtils.waitUntil(mMutex, new Condition() {
+
+            public boolean isTrue() {
+              checkBound();
+              return !head.getOutputs().isEmpty();
+            }
+          }, waitTime, waitUnit)) {
+            outputs.add(((List<O>) head.getOutputs()).remove(0));
+          }
+
+        } catch (final InterruptedException e) {
+          throw new InterruptedExecutionException(e);
+        }
+      }
+    }
+
+    return outputs;
+  }
+
+  @NotNull
+  public List<O> removeAll() {
+    return remove(Integer.MAX_VALUE);
+  }
+
+  @NotNull
+  public List<O> removeAll(final long timeout, @NotNull final TimeUnit timeUnit) {
+    return remove(Integer.MAX_VALUE, timeout, timeUnit);
+  }
+
+  @SuppressWarnings("unchecked")
+  public O removeOr(final O other, final long timeout, @NotNull final TimeUnit timeUnit) {
+    final ChainHead<?> head = mHead;
+    synchronized (mMutex) {
+      try {
+        if (TimeUtils.waitUntil(mMutex, new Condition() {
+
+          public boolean isTrue() {
+            checkBound();
+            return !head.getOutputs().isEmpty();
+          }
+        }, timeout, timeUnit)) {
+          return ((List<O>) head.getOutputs()).remove(0);
+        }
+
+      } catch (final InterruptedException e) {
+        throw new InterruptedExecutionException(e);
+      }
+    }
+
+    return other;
+  }
+
+  @NotNull
+  public <R, S> PromiseIterable<R> then(@NotNull final StatefulProcessor<O, R, S> processor) {
+    return chain(new ChainStateful<O, R, S>(mPropagationType, processor));
+  }
+
+  public void waitCompleted() {
+    waitCompleted(-1, TimeUnit.MILLISECONDS);
+  }
+
+  public boolean waitCompleted(final long timeout, @NotNull final TimeUnit timeUnit) {
+    synchronized (mMutex) {
+      try {
+        if (TimeUtils.waitUntil(mMutex, new Condition() {
+
+          public boolean isTrue() {
+            return mHead.isCompleted();
+          }
+        }, timeout, timeUnit)) {
+          return true;
+        }
+
+      } catch (final InterruptedException e) {
+        throw new InterruptedExecutionException(e);
+      }
+    }
+
+    return false;
+  }
+
+  @NotNull
+  public PromiseIterable<O> whenFulfilledEach(@NotNull final Observer<O> observer) {
+    return each(new ProcessorFulfilledEach<O>(observer));
+  }
+
+  @NotNull
+  public PromiseIterable<O> whenRejectedEach(@NotNull final Observer<Throwable> observer) {
+    return each(new ProcessorRejectedEach<O>(observer));
+  }
+
+  @NotNull
   public <R> Promise<R> apply(@NotNull final Mapper<Promise<Iterable<O>>, Promise<R>> mapper) {
     try {
       return ConstantConditions.notNull("promise", mapper.apply(this));
@@ -351,196 +605,6 @@ class DefaultPromiseIterable<O> implements PromiseIterable<O>, Serializable {
     }
 
     return false;
-  }
-
-  @NotNull
-  public <R> PromiseIterable<R> applyAll(
-      @NotNull final Mapper<PromiseIterable<O>, PromiseIterable<R>> mapper) {
-    try {
-      return ConstantConditions.notNull("promise", mapper.apply(this));
-
-    } catch (final Throwable t) {
-      InterruptedExecutionException.throwIfInterrupt(t);
-      mLogger.err(t, "Error while applying promise transformation");
-      throw wrapException(t);
-    }
-  }
-
-  @NotNull
-  public <R> PromiseIterable<R> applyEach(@NotNull final Mapper<Promise<O>, Promise<R>> mapper) {
-    final Logger logger = mLogger;
-    return thenEach(new ProcessorApplyEach<O, R>(mapper, mPropagationType, logger.getLog(),
-        logger.getLogLevel()));
-  }
-
-  @NotNull
-  public List<O> getAll() {
-    return getAll(-1, TimeUnit.MILLISECONDS);
-  }
-
-  @NotNull
-  @SuppressWarnings("unchecked")
-  public List<O> getAll(final long timeout, @NotNull final TimeUnit timeUnit) {
-    final ChainHead<?> head = mHead;
-    synchronized (mMutex) {
-      try {
-        if (TimeUtils.waitUntil(mMutex, new Condition() {
-
-          public boolean isTrue() {
-            checkBound();
-            return head.getState().isResolved();
-          }
-        }, timeout, timeUnit)) {
-          return new ArrayList<O>((List<O>) head.getOutputs());
-        }
-
-      } catch (final InterruptedException e) {
-        throw new InterruptedExecutionException(e);
-      }
-    }
-
-    throw new TimeoutException(
-        "timeout while waiting for promise resolution [" + timeout + " " + timeUnit + "]");
-  }
-
-  @NotNull
-  public Iterator<O> iterator(final long timeout, @NotNull final TimeUnit timeUnit) {
-    // TODO: 28/07/2017 implement
-    return null;
-  }
-
-  public O remove() {
-    return remove(-1, TimeUnit.MILLISECONDS);
-  }
-
-  public O remove(final long timeout, @NotNull final TimeUnit timeUnit) {
-    // TODO: 28/07/2017 implement
-    return null;
-  }
-
-  @NotNull
-  public List<O> remove(final int maxSize) {
-    return remove(maxSize, -1, TimeUnit.MILLISECONDS);
-  }
-
-  @NotNull
-  public List<O> remove(final int maxSize, final long timeout, @NotNull final TimeUnit timeUnit) {
-    // TODO: 28/07/2017 implement
-    return null;
-  }
-
-  @NotNull
-  public List<O> removeAll() {
-    return remove(Integer.MAX_VALUE);
-  }
-
-  @NotNull
-  public List<O> removeAll(final long timeout, @NotNull final TimeUnit timeUnit) {
-    return remove(Integer.MAX_VALUE, timeout, timeUnit);
-  }
-
-  public O removeOr(final O other, final long timeout, @NotNull final TimeUnit timeUnit) {
-    // TODO: 28/07/2017 implement
-    return null;
-  }
-
-  @NotNull
-  public <R, S> PromiseIterable<R> then(@NotNull final StatefulProcessor<O, R, S> processor) {
-    return chain(new ChainStateful<O, R, S>(mPropagationType, processor));
-  }
-
-  @NotNull
-  public <R> PromiseIterable<R> thenAll(
-      @Nullable final Handler<Iterable<O>, R, CallbackIterable<R>> outputHandler,
-      @Nullable final Handler<Throwable, R, CallbackIterable<R>> errorHandler) {
-    return thenAll(new ProcessorHandle<Iterable<O>, R>(outputHandler, errorHandler));
-  }
-
-  @NotNull
-  public <R> PromiseIterable<R> thenAll(@NotNull final Mapper<Iterable<O>, Iterable<R>> mapper) {
-    return thenAll(new ProcessorMapAll<O, R>(mapper));
-  }
-
-  @NotNull
-  public <R> PromiseIterable<R> thenAll(
-      @NotNull final StatelessProcessor<Iterable<O>, R> processor) {
-    return then(new ProcessorAll<O, R>(processor));
-  }
-
-  @NotNull
-  public PromiseIterable<O> thenCatch(@NotNull final Mapper<Throwable, Iterable<O>> mapper) {
-    return thenAll(new ProcessorCatchAll<O>(mapper));
-  }
-
-  @NotNull
-  public PromiseIterable<O> whenFulfilled(@NotNull final Observer<Iterable<O>> observer) {
-    return thenAll(new ProcessorFulfilled<O>(observer));
-  }
-
-  @NotNull
-  public PromiseIterable<O> whenRejected(@NotNull final Observer<Throwable> observer) {
-    return thenAll(new ProcessorRejected<O>(observer));
-  }
-
-  @NotNull
-  public PromiseIterable<O> whenResolved(@NotNull final Action action) {
-    return thenAll(new ProcessorResolved<O>(action));
-  }
-
-  @NotNull
-  public PromiseIterable<O> thenCatchEach(@NotNull final Mapper<Throwable, O> mapper) {
-    return thenEach(new ProcessorCatchEach<O>(mapper));
-  }
-
-  @NotNull
-  public <R> PromiseIterable<R> thenEach(
-      @Nullable final Handler<O, R, CallbackIterable<R>> outputHandler,
-      @Nullable final Handler<Throwable, R, CallbackIterable<R>> errorHandler) {
-    return thenEach(new ProcessorHandle<O, R>(outputHandler, errorHandler));
-  }
-
-  @NotNull
-  public <R> PromiseIterable<R> thenEach(@NotNull final Mapper<O, R> mapper) {
-    return thenEach(new ProcessorMapEach<O, R>(mapper));
-  }
-
-  @NotNull
-  public <R> PromiseIterable<R> thenEach(@NotNull final StatelessProcessor<O, R> processor) {
-    return chain(new ChainStateless<O, R>(mPropagationType, processor));
-  }
-
-  public void waitCompleted() {
-    waitCompleted(-1, TimeUnit.MILLISECONDS);
-  }
-
-  public boolean waitCompleted(final long timeout, @NotNull final TimeUnit timeUnit) {
-    synchronized (mMutex) {
-      try {
-        if (TimeUtils.waitUntil(mMutex, new Condition() {
-
-          public boolean isTrue() {
-            return mHead.isCompleted();
-          }
-        }, timeout, timeUnit)) {
-          return true;
-        }
-
-      } catch (final InterruptedException e) {
-        throw new InterruptedExecutionException(e);
-      }
-    }
-
-    return false;
-  }
-
-  @NotNull
-  public PromiseIterable<O> whenFulfilledEach(@NotNull final Observer<O> observer) {
-    return thenEach(new ProcessorFulfilledEach<O>(observer));
-  }
-
-  @NotNull
-  public PromiseIterable<O> whenRejectedEach(@NotNull final Observer<Throwable> observer) {
-    return thenEach(new ProcessorRejectedEach<O>(observer));
   }
 
   public Iterator<O> iterator() {
@@ -1395,7 +1459,6 @@ class DefaultPromiseIterable<O> implements PromiseIterable<O>, Serializable {
         @NotNull final CallbackIterable<R> callback) throws Exception {
       mProcessor.resolve(state, callback);
     }
-
   }
 
   private static class ProcessorApplyEach<O, R> implements StatelessProcessor<O, R>, Serializable {

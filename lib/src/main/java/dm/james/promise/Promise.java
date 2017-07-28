@@ -32,6 +32,9 @@ public interface Promise<O> extends Serializable {
   @NotNull
   <R> Promise<R> apply(@NotNull Mapper<Promise<O>, Promise<R>> mapper);
 
+  @NotNull
+  Promise<O> catchAny(@NotNull Mapper<Throwable, O> mapper);
+
   O get();
 
   O get(long timeout, @NotNull TimeUnit timeUnit);
@@ -65,9 +68,6 @@ public interface Promise<O> extends Serializable {
 
   @NotNull
   <R> Promise<R> then(@NotNull Processor<O, R> processor);
-
-  @NotNull
-  Promise<O> thenCatch(@NotNull Mapper<Throwable, O> mapper); // TODO: 25/07/2017 catchError?
 
   void waitResolved();
 

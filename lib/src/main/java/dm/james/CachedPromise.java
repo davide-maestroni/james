@@ -61,6 +61,11 @@ class CachedPromise<I, O> implements Promise<O> {
     return new CachedPromise<I, R>(mPromise, mDeferred.apply(mapper));
   }
 
+  @NotNull
+  public Promise<O> catchAny(@NotNull final Mapper<Throwable, O> mapper) {
+    return new CachedPromise<I, O>(mPromise, mDeferred.catchAny(mapper));
+  }
+
   public O get() {
     return mDeferred.get();
   }
@@ -122,11 +127,6 @@ class CachedPromise<I, O> implements Promise<O> {
   @NotNull
   public <R> Promise<R> then(@NotNull final Processor<O, R> processor) {
     return new CachedPromise<I, R>(mPromise, mDeferred.then(processor));
-  }
-
-  @NotNull
-  public Promise<O> thenCatch(@NotNull final Mapper<Throwable, O> mapper) {
-    return new CachedPromise<I, O>(mPromise, mDeferred.thenCatch(mapper));
   }
 
   public void waitResolved() {
