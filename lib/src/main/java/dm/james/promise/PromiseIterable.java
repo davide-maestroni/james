@@ -64,7 +64,10 @@ public interface PromiseIterable<O> extends Promise<Iterable<O>>, Iterable<O> {
   @NotNull
   <R, S> PromiseIterable<R> then(@NotNull StatefulProcessor<O, R, S> processor);
 
+  // TODO: 27/07/2017 any?
+
   @NotNull
+    // TODO: 27/07/2017 all?
   <R> PromiseIterable<R> thenAll(
       @Nullable Handler<Iterable<O>, R, CallbackIterable<R>> outputHandler,
       @Nullable Handler<Throwable, R, CallbackIterable<R>> errorHandler);
@@ -88,9 +91,11 @@ public interface PromiseIterable<O> extends Promise<Iterable<O>>, Iterable<O> {
   PromiseIterable<O> whenResolved(@NotNull Action action);
 
   @NotNull
+    // TODO: 27/07/2017 catchEach??
   PromiseIterable<O> thenCatchEach(@NotNull Mapper<Throwable, O> mapper);
 
   @NotNull
+    // TODO: 27/07/2017 each?
   <R> PromiseIterable<R> thenEach(@Nullable Handler<O, R, CallbackIterable<R>> outputHandler,
       @Nullable Handler<Throwable, R, CallbackIterable<R>> errorHandler);
 
@@ -99,6 +104,10 @@ public interface PromiseIterable<O> extends Promise<Iterable<O>>, Iterable<O> {
 
   @NotNull
   <R> PromiseIterable<R> thenEach(@NotNull StatelessProcessor<O, R> processor);
+
+  void waitCompleted();
+
+  boolean waitCompleted(long timeout, @NotNull TimeUnit timeUnit);
 
   @NotNull
   PromiseIterable<O> whenFulfilledEach(@NotNull Observer<O> observer);
@@ -117,9 +126,9 @@ public interface PromiseIterable<O> extends Promise<Iterable<O>>, Iterable<O> {
 
   interface StatefulProcessor<I, O, S> {
 
-    S add(S state, I input, @NotNull CallbackIterable<O> callback) throws Exception;
-
     S create(@NotNull CallbackIterable<O> callback) throws Exception;
+
+    S process(S state, I input, @NotNull CallbackIterable<O> callback) throws Exception;
 
     void reject(S state, Throwable reason, @NotNull CallbackIterable<O> callback) throws Exception;
 

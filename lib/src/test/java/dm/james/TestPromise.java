@@ -16,8 +16,14 @@
 
 package dm.james;
 
+import org.jetbrains.annotations.NotNull;
 import org.junit.Test;
 
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
+import java.io.ObjectInputStream;
+import java.io.ObjectOutputStream;
 import java.util.Random;
 import java.util.concurrent.TimeUnit;
 
@@ -34,6 +40,24 @@ import static org.assertj.core.api.Assertions.assertThat;
  * Created by davide-maestroni on 07/21/2017.
  */
 public class TestPromise {
+
+  private static Promise<String> createPromiseTest(@NotNull final Bond bond) {
+    return bond.promise(new Observer<Callback<String>>() {
+
+      public void accept(final Callback<String> callback) {
+        callback.resolve("test");
+      }
+    });
+  }
+
+  private static Promise<String> toUppercase(@NotNull final Promise<String> promise) {
+    return promise.then(new Mapper<String, String>() {
+
+      public String apply(final String input) {
+        return input.toUpperCase();
+      }
+    });
+  }
 
   @Test
   public void testAPlus() {
@@ -56,6 +80,37 @@ public class TestPromise {
         return input;
       }
     }).get());
+  }
+
+  @Test
+  public void testAPlusSerialization() throws IOException, ClassNotFoundException {
+    final Bond bond = new Bond();
+    final Promise<String> promise = toUppercase(bond.aPlus(createPromiseTest(bond)));
+    final ByteArrayOutputStream byteOutputStream = new ByteArrayOutputStream();
+    final ObjectOutputStream objectOutputStream = new ObjectOutputStream(byteOutputStream);
+    objectOutputStream.writeObject(promise);
+    final ByteArrayInputStream byteInputStream =
+        new ByteArrayInputStream(byteOutputStream.toByteArray());
+    final ObjectInputStream objectInputStream = new ObjectInputStream(byteInputStream);
+    @SuppressWarnings("unchecked") final Promise<String> deserialized =
+        (Promise<String>) objectInputStream.readObject();
+    assertThat(deserialized.get()).isEqualTo("TEST");
+  }
+
+  @Test
+  public void testCacheSerialization() throws IOException, ClassNotFoundException {
+    final Bond bond = new Bond();
+    final Promise<String> promise =
+        toUppercase(createPromiseTest(bond)).apply(bond.<String>cache());
+    final ByteArrayOutputStream byteOutputStream = new ByteArrayOutputStream();
+    final ObjectOutputStream objectOutputStream = new ObjectOutputStream(byteOutputStream);
+    objectOutputStream.writeObject(promise);
+    final ByteArrayInputStream byteInputStream =
+        new ByteArrayInputStream(byteOutputStream.toByteArray());
+    final ObjectInputStream objectInputStream = new ObjectInputStream(byteInputStream);
+    @SuppressWarnings("unchecked") final Promise<String> deserialized =
+        (Promise<String>) objectInputStream.readObject();
+    assertThat(deserialized.get()).isEqualTo("TEST");
   }
 
   @Test

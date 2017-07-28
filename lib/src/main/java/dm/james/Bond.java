@@ -221,9 +221,7 @@ public class Bond implements Serializable {
     }
 
     public Promise<O> apply(final Promise<O> promise) {
-      final DeferredPromise<O, O> deferred = mDeferred;
-      promise.then(new DeferredProcessor<O>(deferred)); // TODO: 26/07/2017 not serializable
-      return deferred;
+      return CachedPromise.create(promise, mDeferred);
     }
   }
 
@@ -319,23 +317,6 @@ public class Bond implements Serializable {
           throw new InvalidObjectException(t.getMessage());
         }
       }
-    }
-  }
-
-  private static class DeferredProcessor<O> implements Processor<O, O>, Serializable {
-
-    private final DeferredPromise<O, O> mDeferred;
-
-    private DeferredProcessor(@NotNull final DeferredPromise<O, O> deferred) {
-      mDeferred = deferred;
-    }
-
-    public void reject(final Throwable reason, @NotNull final Callback<O> callback) {
-      mDeferred.reject(reason);
-    }
-
-    public void resolve(final O input, @NotNull final Callback<O> callback) {
-      mDeferred.resolve(input);
     }
   }
 }

@@ -179,7 +179,7 @@ class DefaultPromise<O> implements Promise<O> {
 
           public boolean isTrue() {
             checkBound();
-            return head.isTerminated();
+            return head.getState().isResolved();
           }
         }, timeout, timeUnit)) {
           return (O) head.getOutput();
@@ -208,10 +208,10 @@ class DefaultPromise<O> implements Promise<O> {
 
           public boolean isTrue() {
             checkBound();
-            return head.isTerminated();
+            return head.getState().isResolved();
           }
         }, timeout, timeUnit)) {
-          return wrapException(head.getException());
+          return head.getException();
         }
 
       } catch (final InterruptedException e) {
@@ -232,10 +232,10 @@ class DefaultPromise<O> implements Promise<O> {
 
           public boolean isTrue() {
             checkBound();
-            return head.isTerminated();
+            return head.getState().isResolved();
           }
         }, timeout, timeUnit)) {
-          return wrapException(head.getException());
+          return head.getException();
         }
 
       } catch (final InterruptedException e) {
@@ -255,7 +255,7 @@ class DefaultPromise<O> implements Promise<O> {
 
           public boolean isTrue() {
             checkBound();
-            return head.isTerminated();
+            return head.getState().isResolved();
           }
         }, timeout, timeUnit)) {
           return (O) head.getOutput();
@@ -376,6 +376,7 @@ class DefaultPromise<O> implements Promise<O> {
         chain.setLogger(logger);
         binding = head.bind(chain);
         mBond = chain;
+        mMutex.notifyAll();
       }
     }
 
@@ -479,8 +480,8 @@ class DefaultPromise<O> implements Promise<O> {
     }
 
     @Nullable
-    Throwable getException() {
-      return mException;
+    RejectionException getException() {
+      return mInnerState.getException();
     }
 
     @NotNull
@@ -507,10 +508,6 @@ class DefaultPromise<O> implements Promise<O> {
       mState = PromiseState.Fulfilled;
     }
 
-    boolean isTerminated() {
-      return mInnerState.isTerminated();
-    }
-
     private class StatePending {
 
       @Nullable
@@ -521,6 +518,11 @@ class DefaultPromise<O> implements Promise<O> {
       @NotNull
       IllegalStateException exception(@NotNull final PromiseState state) {
         return new IllegalStateException("invalid state: " + state);
+      }
+
+      @Nullable
+      RejectionException getException() {
+        return null;
       }
 
       Object getOutput() {
@@ -539,10 +541,6 @@ class DefaultPromise<O> implements Promise<O> {
             PromiseState.Fulfilled, output);
         mOutput = output;
         mInnerState = new StateResolved();
-      }
-
-      boolean isTerminated() {
-        return false;
       }
     }
 
@@ -563,6 +561,12 @@ class DefaultPromise<O> implements Promise<O> {
         };
       }
 
+      @Nullable
+      @Override
+      RejectionException getException() {
+        return wrapException(mException);
+      }
+
       @Override
       void innerReject(@Nullable final Throwable reason) {
         throw exception(PromiseState.Rejected);
@@ -571,11 +575,6 @@ class DefaultPromise<O> implements Promise<O> {
       @Override
       void innerResolve(final Object output) {
         throw exception(PromiseState.Rejected);
-      }
-
-      @Override
-      boolean isTerminated() {
-        return true;
       }
     }
 
@@ -594,11 +593,6 @@ class DefaultPromise<O> implements Promise<O> {
       @Override
       void innerResolve(final Object output) {
         throw exception(PromiseState.Fulfilled);
-      }
-
-      @Override
-      boolean isTerminated() {
-        return true;
       }
 
       @Nullable
@@ -827,10 +821,10 @@ class DefaultPromise<O> implements Promise<O> {
       return new ChainProxy<O, R>(mOutputHandler, mErrorHandler);
     }
 
-    private static class ChainProxy<I, O> extends SerializableProxy {
+    private static class ChainProxy<O, R> extends SerializableProxy {
 
-      private ChainProxy(final Handler<I, O, Callback<O>> outputHandler,
-          final Handler<Throwable, O, Callback<O>> errorHandler) {
+      private ChainProxy(final Handler<O, R, Callback<R>> outputHandler,
+          final Handler<Throwable, R, Callback<R>> errorHandler) {
         super(outputHandler, errorHandler);
       }
 
@@ -838,8 +832,8 @@ class DefaultPromise<O> implements Promise<O> {
       Object readResolve() throws ObjectStreamException {
         try {
           final Object[] args = deserializeArgs();
-          return new ProcessorHandle<I, O>((Handler<I, O, Callback<O>>) args[0],
-              (Handler<Throwable, O, Callback<O>>) args[1]);
+          return new ProcessorHandle<O, R>((Handler<O, R, Callback<R>>) args[0],
+              (Handler<Throwable, R, Callback<R>>) args[1]);
 
         } catch (final Throwable t) {
           throw new InvalidObjectException(t.getMessage());
@@ -869,9 +863,9 @@ class DefaultPromise<O> implements Promise<O> {
       return new ChainProxy<O, R>(mMapper);
     }
 
-    private static class ChainProxy<I, O> extends SerializableProxy {
+    private static class ChainProxy<O, R> extends SerializableProxy {
 
-      private ChainProxy(final Mapper<I, O> mapper) {
+      private ChainProxy(final Mapper<O, R> mapper) {
         super(mapper);
       }
 
@@ -879,7 +873,7 @@ class DefaultPromise<O> implements Promise<O> {
       Object readResolve() throws ObjectStreamException {
         try {
           final Object[] args = deserializeArgs();
-          return new ProcessorMap<I, O>((Mapper<I, O>) args[0]);
+          return new ProcessorMap<O, R>((Mapper<O, R>) args[0]);
 
         } catch (final Throwable t) {
           throw new InvalidObjectException(t.getMessage());
