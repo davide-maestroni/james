@@ -35,6 +35,8 @@ import dm.james.promise.Promise.Callback;
 import dm.james.promise.Promise.Handler;
 import dm.james.promise.Promise.Processor;
 import dm.james.promise.PromiseIterable;
+import dm.james.promise.PromiseIterable.CallbackIterable;
+import dm.james.promise.PromiseIterable.StatelessProcessor;
 import dm.james.promise.Provider;
 import dm.james.util.ConstantConditions;
 import dm.james.util.ReflectionUtils;
@@ -64,21 +66,22 @@ public class Bond implements Serializable {
 
   @NotNull
   public <O> Promise<O> aPlus(@NotNull final Promise<O> promise) {
-    if (promise instanceof APlusPromise) {
+    if ((promise instanceof MappedPromise)
+        && (((MappedPromise) promise).getMapper() instanceof APlusMapper)) {
       return promise;
     }
 
-    return new APlusPromise<O>(this, promise);
+    return new MappedPromise<O>(new APlusMapper(this), promise);
   }
 
   @NotNull
-  public <O> PromiseIterable<O> all(final Iterable<Promise<O>> promises) {
-    return null;
+  public <O> PromiseIterable<O> all(@NotNull final Iterable<Promise<O>> promises) {
+    return this.<O>resolvedIterable(null).allSorted(new PromisesProcessor<O>(promises));
   }
 
   @NotNull
-  public <O> PromiseIterable<O> any(final Iterable<Promise<O>> promises) {
-    return null;
+  public <O> PromiseIterable<O> any(@NotNull final Iterable<Promise<O>> promises) {
+    return each(promises).any(IdentityMapper.<O>instance());
   }
 
   @NotNull
@@ -92,8 +95,14 @@ public class Bond implements Serializable {
   }
 
   @NotNull
-  public <O> PromiseIterable<O> each(final Iterable<Promise<O>> promises) {
-    return null;
+  public <O> PromiseIterable<O> each(@NotNull final Iterable<Promise<O>> promises) {
+    return iterable(new PromisesObserver<O>(promises));
+  }
+
+  @NotNull
+  public <O> PromiseIterable<O> iterable(
+      @NotNull final Observer<? super CallbackIterable<O>> observer) {
+    return new DefaultPromiseIterable<O>(observer, mPropagationType, mLog, mLogLevel);
   }
 
   @NotNull
@@ -107,13 +116,18 @@ public class Bond implements Serializable {
   }
 
   @NotNull
+  public <O> PromiseIterable<O> rejectedIterable(final Throwable reason) {
+    return iterable(new RejectedObserver<O>(reason));
+  }
+
+  @NotNull
   public <O> Promise<O> resolved(final O output) {
     return promise(new ResolvedObserver<O>(output));
   }
 
   @NotNull
-  public <O> PromiseIterable<O> resolvedIterable(final Iterable<O> outputs) {
-    return null;
+  public <O> PromiseIterable<O> resolvedIterable(@Nullable final Iterable<O> outputs) {
+    return iterable(new ResolvedIterableObserver<O>(outputs));
   }
 
   @NotNull
@@ -150,6 +164,20 @@ public class Bond implements Serializable {
     }
 
     return proxy;
+  }
+
+  private static class APlusMapper implements Mapper<Promise<?>, Promise<?>>, Serializable {
+
+    private final Bond mBond;
+
+    private APlusMapper(@NotNull final Bond bond) {
+      mBond = bond;
+    }
+
+    @SuppressWarnings("unchecked")
+    public Promise<?> apply(final Promise<?> promise) {
+      return ((Promise<Object>) promise).apply(mBond.cache());
+    }
   }
 
   @SuppressWarnings("unused")
@@ -221,7 +249,7 @@ public class Bond implements Serializable {
     }
 
     public Promise<O> apply(final Promise<O> promise) {
-      return CachedPromise.create(promise, mDeferred);
+      return BondPromise.create(promise, mDeferred);
     }
   }
 
@@ -316,6 +344,42 @@ public class Bond implements Serializable {
         } catch (final Throwable t) {
           throw new InvalidObjectException(t.getMessage());
         }
+      }
+    }
+
+  }
+
+  private static class PromisesObserver<O> implements Observer<CallbackIterable<O>>, Serializable {
+
+    private final Iterable<Promise<O>> mPromises;
+
+    private PromisesObserver(@NotNull final Iterable<Promise<O>> promises) {
+      mPromises = ConstantConditions.notNull("promises", promises);
+    }
+
+    public void accept(final CallbackIterable<O> callback) {
+      for (final Promise<O> promise : mPromises) {
+        callback.addDeferred(promise);
+      }
+    }
+  }
+
+  private static class PromisesProcessor<O>
+      implements StatelessProcessor<Iterable<O>, O>, Serializable {
+
+    private final Iterable<Promise<O>> mPromises;
+
+    private PromisesProcessor(@NotNull final Iterable<Promise<O>> promises) {
+      mPromises = ConstantConditions.notNull("promises", promises);
+    }
+
+    public void reject(final Throwable reason, @NotNull final CallbackIterable<O> callback) {
+      callback.reject(reason);
+    }
+
+    public void resolve(final Iterable<O> input, @NotNull final CallbackIterable<O> callback) {
+      for (final Promise<O> promise : mPromises) {
+        callback.addDeferred(promise);
       }
     }
   }

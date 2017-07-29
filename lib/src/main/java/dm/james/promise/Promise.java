@@ -60,8 +60,8 @@ public interface Promise<O> extends Serializable {
   boolean isResolved();
 
   @NotNull
-  <R> Promise<R> then(@Nullable Handler<O, R, Callback<R>> outputHandler,
-      @Nullable Handler<Throwable, R, Callback<R>> errorHandler);
+  <R> Promise<R> then(@Nullable Handler<O, R, ? super Callback<R>> outputHandler,
+      @Nullable Handler<Throwable, R, ? super Callback<R>> errorHandler);
 
   @NotNull
   <R> Promise<R> then(@NotNull Mapper<O, R> mapper);

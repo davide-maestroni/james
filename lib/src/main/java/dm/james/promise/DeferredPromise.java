@@ -31,8 +31,8 @@ public interface DeferredPromise<I, O> extends Promise<O>, Resolvable<I> {
   DeferredPromise<I, O> catchAny(@NotNull Mapper<Throwable, O> mapper);
 
   @NotNull
-  <R> DeferredPromise<I, R> then(@Nullable Handler<O, R, Callback<R>> outputHandler,
-      @Nullable Handler<Throwable, R, Callback<R>> errorHandler);
+  <R> DeferredPromise<I, R> then(@Nullable Handler<O, R, ? super Callback<R>> outputHandler,
+      @Nullable Handler<Throwable, R, ? super Callback<R>> errorHandler);
 
   @NotNull
   <R> DeferredPromise<I, R> then(@NotNull Mapper<O, R> mapper);

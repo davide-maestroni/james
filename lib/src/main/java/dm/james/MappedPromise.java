@@ -31,25 +31,32 @@ import dm.james.util.ConstantConditions;
 /**
  * Created by davide-maestroni on 07/21/2017.
  */
-class APlusPromise<O> implements Promise<O> {
+class MappedPromise<O> implements Promise<O> {
 
-  private final Bond mBond;
+  private final Mapper<Promise<?>, Promise<?>> mMapper;
 
   private final Promise<O> mPromise;
 
-  APlusPromise(@NotNull final Bond bond, @NotNull final Promise<O> promise) {
-    mBond = ConstantConditions.notNull("bond", bond);
-    mPromise = promise.apply(bond.<O>cache());
+  @SuppressWarnings("unchecked")
+  MappedPromise(@NotNull final Mapper<Promise<?>, Promise<?>> mapper,
+      @NotNull final Promise<O> promise) {
+    mMapper = ConstantConditions.notNull("mapper", mapper);
+    try {
+      mPromise = (Promise<O>) mapper.apply(promise);
+
+    } catch (final Exception e) {
+      throw (e instanceof RejectionException) ? (RejectionException) e : new RejectionException(e);
+    }
   }
 
   @NotNull
   public <R> Promise<R> apply(@NotNull final Mapper<Promise<O>, Promise<R>> mapper) {
-    return new APlusPromise<R>(mBond, mPromise.apply(mapper));
+    return new MappedPromise<R>(mMapper, mPromise.apply(mapper));
   }
 
   @NotNull
   public Promise<O> catchAny(@NotNull final Mapper<Throwable, O> mapper) {
-    return new APlusPromise<O>(mBond, mPromise.catchAny(mapper));
+    return new MappedPromise<O>(mMapper, mPromise.catchAny(mapper));
   }
 
   public O get() {
@@ -100,19 +107,19 @@ class APlusPromise<O> implements Promise<O> {
   }
 
   @NotNull
-  public <R> Promise<R> then(@Nullable final Handler<O, R, Callback<R>> outputHandler,
-      @Nullable final Handler<Throwable, R, Callback<R>> errorHandler) {
-    return new APlusPromise<R>(mBond, mPromise.then(outputHandler, errorHandler));
+  public <R> Promise<R> then(@Nullable final Handler<O, R, ? super Callback<R>> outputHandler,
+      @Nullable final Handler<Throwable, R, ? super Callback<R>> errorHandler) {
+    return new MappedPromise<R>(mMapper, mPromise.then(outputHandler, errorHandler));
   }
 
   @NotNull
   public <R> Promise<R> then(@NotNull final Mapper<O, R> mapper) {
-    return new APlusPromise<R>(mBond, mPromise.then(mapper));
+    return new MappedPromise<R>(mMapper, mPromise.then(mapper));
   }
 
   @NotNull
   public <R> Promise<R> then(@NotNull final Processor<O, R> processor) {
-    return new APlusPromise<R>(mBond, mPromise.then(processor));
+    return new MappedPromise<R>(mMapper, mPromise.then(processor));
   }
 
   public void waitResolved() {
@@ -125,16 +132,21 @@ class APlusPromise<O> implements Promise<O> {
 
   @NotNull
   public Promise<O> whenFulfilled(@NotNull final Observer<O> observer) {
-    return new APlusPromise<O>(mBond, mPromise.whenFulfilled(observer));
+    return new MappedPromise<O>(mMapper, mPromise.whenFulfilled(observer));
   }
 
   @NotNull
   public Promise<O> whenRejected(@NotNull final Observer<Throwable> observer) {
-    return new APlusPromise<O>(mBond, mPromise.whenRejected(observer));
+    return new MappedPromise<O>(mMapper, mPromise.whenRejected(observer));
   }
 
   @NotNull
   public Promise<O> whenResolved(@NotNull final Action action) {
-    return new APlusPromise<O>(mBond, mPromise.whenResolved(action));
+    return new MappedPromise<O>(mMapper, mPromise.whenResolved(action));
+  }
+
+  @NotNull
+  Mapper<Promise<?>, Promise<?>> getMapper() {
+    return mMapper;
   }
 }

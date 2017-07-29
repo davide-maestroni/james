@@ -34,36 +34,36 @@ import dm.james.util.ConstantConditions;
 /**
  * Created by davide-maestroni on 07/21/2017.
  */
-class CachedPromise<I, O> implements Promise<O> {
+class BondPromise<I, O> implements Promise<O> {
 
   private final DeferredPromise<I, O> mDeferred;
 
   private final Promise<I> mPromise;
 
-  private CachedPromise(@NotNull final Promise<I> promise,
+  private BondPromise(@NotNull final Promise<I> promise,
       @NotNull final DeferredPromise<I, O> deferred) {
     mPromise = promise;
     mDeferred = deferred;
   }
 
   @NotNull
-  static <I, O> CachedPromise<I, O> create(@NotNull final Promise<I> promise,
+  static <I, O> BondPromise<I, O> create(@NotNull final Promise<I> promise,
       @NotNull final DeferredPromise<I, O> deferred) {
-    final CachedPromise<I, O> cachedPromise =
-        new CachedPromise<I, O>(ConstantConditions.notNull("promise", promise),
+    final BondPromise<I, O> bondPromise =
+        new BondPromise<I, O>(ConstantConditions.notNull("promise", promise),
             ConstantConditions.notNull("deferred", deferred));
     promise.then(new DeferredProcessor<I>(deferred));
-    return cachedPromise;
+    return bondPromise;
   }
 
   @NotNull
   public <R> Promise<R> apply(@NotNull final Mapper<Promise<O>, Promise<R>> mapper) {
-    return new CachedPromise<I, R>(mPromise, mDeferred.apply(mapper));
+    return new BondPromise<I, R>(mPromise, mDeferred.apply(mapper));
   }
 
   @NotNull
   public Promise<O> catchAny(@NotNull final Mapper<Throwable, O> mapper) {
-    return new CachedPromise<I, O>(mPromise, mDeferred.catchAny(mapper));
+    return new BondPromise<I, O>(mPromise, mDeferred.catchAny(mapper));
   }
 
   public O get() {
@@ -114,19 +114,19 @@ class CachedPromise<I, O> implements Promise<O> {
   }
 
   @NotNull
-  public <R> Promise<R> then(@Nullable final Handler<O, R, Callback<R>> outputHandler,
-      @Nullable final Handler<Throwable, R, Callback<R>> errorHandler) {
-    return new CachedPromise<I, R>(mPromise, mDeferred.then(outputHandler, errorHandler));
+  public <R> Promise<R> then(@Nullable final Handler<O, R, ? super Callback<R>> outputHandler,
+      @Nullable final Handler<Throwable, R, ? super Callback<R>> errorHandler) {
+    return new BondPromise<I, R>(mPromise, mDeferred.then(outputHandler, errorHandler));
   }
 
   @NotNull
   public <R> Promise<R> then(@NotNull final Mapper<O, R> mapper) {
-    return new CachedPromise<I, R>(mPromise, mDeferred.then(mapper));
+    return new BondPromise<I, R>(mPromise, mDeferred.then(mapper));
   }
 
   @NotNull
   public <R> Promise<R> then(@NotNull final Processor<O, R> processor) {
-    return new CachedPromise<I, R>(mPromise, mDeferred.then(processor));
+    return new BondPromise<I, R>(mPromise, mDeferred.then(processor));
   }
 
   public void waitResolved() {
@@ -139,17 +139,17 @@ class CachedPromise<I, O> implements Promise<O> {
 
   @NotNull
   public Promise<O> whenFulfilled(@NotNull final Observer<O> observer) {
-    return new CachedPromise<I, O>(mPromise, mDeferred.whenFulfilled(observer));
+    return new BondPromise<I, O>(mPromise, mDeferred.whenFulfilled(observer));
   }
 
   @NotNull
   public Promise<O> whenRejected(@NotNull final Observer<Throwable> observer) {
-    return new CachedPromise<I, O>(mPromise, mDeferred.whenRejected(observer));
+    return new BondPromise<I, O>(mPromise, mDeferred.whenRejected(observer));
   }
 
   @NotNull
   public Promise<O> whenResolved(@NotNull final Action action) {
-    return new CachedPromise<I, O>(mPromise, mDeferred.whenResolved(action));
+    return new BondPromise<I, O>(mPromise, mDeferred.whenResolved(action));
   }
 
   private Object writeReplace() throws ObjectStreamException {
@@ -186,7 +186,7 @@ class CachedPromise<I, O> implements Promise<O> {
     }
 
     Object readResolve() throws ObjectStreamException {
-      return CachedPromise.create(mPromise, mDeferred);
+      return BondPromise.create(mPromise, mDeferred);
     }
   }
 }

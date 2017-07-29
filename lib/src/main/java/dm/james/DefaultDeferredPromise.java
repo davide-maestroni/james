@@ -59,18 +59,20 @@ class DefaultDeferredPromise<I, O> implements DeferredPromise<I, O> {
     mPromise = (DefaultPromise<O>) new DefaultPromise<I>(mState, propagationType, log, level);
   }
 
-  private DefaultDeferredPromise(@NotNull final Promise<O> promise, @NotNull final Logger logger,
-      @NotNull final StateHolder<I> state) {
+  private DefaultDeferredPromise(@NotNull final Promise<O> promise, @Nullable final Log log,
+      @Nullable final Level level, @NotNull final StateHolder<I> state) {
+    // serialization
     mPromise = promise;
-    mLogger = logger;
+    mLogger = Logger.newLogger(log, level, this);
     mMutex = state.getMutex();
     mState = state;
   }
 
-  private DefaultDeferredPromise(@NotNull final Promise<O> promise, @Nullable final Log log,
-      @Nullable final Level level, @NotNull final StateHolder<I> state) {
+  private DefaultDeferredPromise(@NotNull final Promise<O> promise, @NotNull final Logger logger,
+      @NotNull final StateHolder<I> state) {
+    // copy
     mPromise = promise;
-    mLogger = Logger.newLogger(log, level, this);
+    mLogger = logger;
     mMutex = state.getMutex();
     mState = state;
   }
@@ -81,8 +83,14 @@ class DefaultDeferredPromise<I, O> implements DeferredPromise<I, O> {
   }
 
   @NotNull
-  public <R> DeferredPromise<I, R> then(@Nullable final Handler<O, R, Callback<R>> outputHandler,
-      @Nullable final Handler<Throwable, R, Callback<R>> errorHandler) {
+  public DeferredPromise<I, O> catchAny(@NotNull final Mapper<Throwable, O> mapper) {
+    return new DefaultDeferredPromise<I, O>(mPromise.catchAny(mapper), mLogger, mState);
+  }
+
+  @NotNull
+  public <R> DeferredPromise<I, R> then(
+      @Nullable final Handler<O, R, ? super Callback<R>> outputHandler,
+      @Nullable final Handler<Throwable, R, ? super Callback<R>> errorHandler) {
     return new DefaultDeferredPromise<I, R>(mPromise.then(outputHandler, errorHandler), mLogger,
         mState);
   }
@@ -95,11 +103,6 @@ class DefaultDeferredPromise<I, O> implements DeferredPromise<I, O> {
   @NotNull
   public <R> DeferredPromise<I, R> then(@NotNull final Processor<O, R> processor) {
     return new DefaultDeferredPromise<I, R>(mPromise.then(processor), mLogger, mState);
-  }
-
-  @NotNull
-  public DeferredPromise<I, O> catchAny(@NotNull final Mapper<Throwable, O> mapper) {
-    return new DefaultDeferredPromise<I, O>(mPromise.catchAny(mapper), mLogger, mState);
   }
 
   @NotNull
@@ -237,8 +240,7 @@ class DefaultDeferredPromise<I, O> implements DeferredPromise<I, O> {
     }
   }
 
-  private static class StateHolder<I>
-      implements Mapper<Callback<I>, Observer<Callback<I>>>, Observer<Callback<I>>, Serializable {
+  private static class StateHolder<I> implements Observer<Callback<I>>, Serializable {
 
     private final ArrayList<Callback<I>> mCallbacks = new ArrayList<Callback<I>>();
 
@@ -363,10 +365,6 @@ class DefaultDeferredPromise<I, O> implements DeferredPromise<I, O> {
       public void accept(final Callback<I> callback) {
         callback.resolve(mInput);
       }
-    }
-
-    public Observer<Callback<I>> apply(final Callback<I> callback) {
-      return mState.apply(callback);
     }
   }
 }

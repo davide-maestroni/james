@@ -52,7 +52,7 @@ class DefaultPromise<O> implements Promise<O> {
 
   private final Object mMutex;
 
-  private final Observer<? extends Callback<?>> mObserver;
+  private final Observer<Callback<?>> mObserver;
 
   private final PropagationType mPropagationType;
 
@@ -62,10 +62,11 @@ class DefaultPromise<O> implements Promise<O> {
 
   private PromiseState mState = PromiseState.Pending;
 
-  DefaultPromise(@NotNull final Observer<Callback<O>> observer,
+  @SuppressWarnings("unchecked")
+  DefaultPromise(@NotNull final Observer<? super Callback<O>> observer,
       @Nullable final PropagationType propagationType, @Nullable final Log log,
       @Nullable final Level level) {
-    mObserver = ConstantConditions.notNull("observer", observer);
+    mObserver = (Observer<Callback<?>>) ConstantConditions.notNull("observer", observer);
     mLogger = Logger.newLogger(log, level, this);
     mPropagationType = (propagationType != null) ? propagationType : PropagationType.LOOP;
     final ChainHead<O> head = new ChainHead<O>();
@@ -84,7 +85,7 @@ class DefaultPromise<O> implements Promise<O> {
   }
 
   @SuppressWarnings("unchecked")
-  private DefaultPromise(@NotNull final Observer<? extends Callback<?>> observer,
+  private DefaultPromise(@NotNull final Observer<Callback<?>> observer,
       @NotNull final PropagationType propagationType, @Nullable final Log log,
       @Nullable final Level level, @NotNull final ChainHead<?> head,
       @NotNull final PromiseChain<?, O> tail) {
@@ -104,7 +105,7 @@ class DefaultPromise<O> implements Promise<O> {
 
     chain.setLogger(mLogger);
     try {
-      ((Observer<Callback<?>>) observer).accept(head);
+      observer.accept(head);
 
     } catch (final Throwable t) {
       InterruptedExecutionException.throwIfInterrupt(t);
@@ -113,7 +114,7 @@ class DefaultPromise<O> implements Promise<O> {
   }
 
   @SuppressWarnings("unchecked")
-  private DefaultPromise(@NotNull final Observer<? extends Callback<?>> observer,
+  private DefaultPromise(@NotNull final Observer<Callback<?>> observer,
       @NotNull final PropagationType propagationType, @NotNull final Logger logger,
       @NotNull final ChainHead<?> head, @NotNull final PromiseChain<?, ?> tail,
       @NotNull final PromiseChain<?, O> chain) {
@@ -129,7 +130,7 @@ class DefaultPromise<O> implements Promise<O> {
   }
 
   @SuppressWarnings("unchecked")
-  private DefaultPromise(@NotNull final Observer<? extends Callback<?>> observer,
+  private DefaultPromise(@NotNull final Observer<Callback<?>> observer,
       @NotNull final PropagationType propagationType, @NotNull final Logger logger,
       @NotNull final ChainHead<?> head, @NotNull final PromiseChain<?, O> tail) {
     // copy
@@ -141,7 +142,7 @@ class DefaultPromise<O> implements Promise<O> {
     mTail = tail;
     tail.setNext(new ChainTail());
     try {
-      ((Observer<Callback<?>>) observer).accept(head);
+      observer.accept(head);
 
     } catch (final Throwable t) {
       InterruptedExecutionException.throwIfInterrupt(t);
@@ -305,8 +306,8 @@ class DefaultPromise<O> implements Promise<O> {
   }
 
   @NotNull
-  public <R> Promise<R> then(@Nullable final Handler<O, R, Callback<R>> outputHandler,
-      @Nullable final Handler<Throwable, R, Callback<R>> errorHandler) {
+  public <R> Promise<R> then(@Nullable final Handler<O, R, ? super Callback<R>> outputHandler,
+      @Nullable final Handler<Throwable, R, ? super Callback<R>> errorHandler) {
     return then(new ProcessorHandle<O, R>(outputHandler, errorHandler));
   }
 
@@ -810,11 +811,13 @@ class DefaultPromise<O> implements Promise<O> {
 
     private final Handler<O, R, Callback<R>> mOutputHandler;
 
-    private ProcessorHandle(@Nullable final Handler<O, R, Callback<R>> outputHandler,
-        @Nullable final Handler<Throwable, R, Callback<R>> errorHandler) {
-      mOutputHandler =
-          (outputHandler != null) ? outputHandler : new PassThroughOutputHandler<O, R>();
-      mErrorHandler = (errorHandler != null) ? errorHandler : new PassThroughErrorHandler<R>();
+    @SuppressWarnings("unchecked")
+    private ProcessorHandle(@Nullable final Handler<O, R, ? super Callback<R>> outputHandler,
+        @Nullable final Handler<Throwable, R, ? super Callback<R>> errorHandler) {
+      mOutputHandler = (outputHandler != null) ? (Handler<O, R, Callback<R>>) outputHandler
+          : new PassThroughOutputHandler<O, R>();
+      mErrorHandler = (errorHandler != null) ? (Handler<Throwable, R, Callback<R>>) errorHandler
+          : new PassThroughErrorHandler<R>();
     }
 
     private Object writeReplace() throws ObjectStreamException {
@@ -1088,7 +1091,7 @@ class DefaultPromise<O> implements Promise<O> {
           tail = chain;
         }
 
-        return new DefaultPromise<Object>((Observer<Callback<Object>>) args[0],
+        return new DefaultPromise<Object>((Observer<Callback<?>>) args[0],
             (PropagationType) args[1], (Log) args[2], (Level) args[3], head,
             (PromiseChain<?, Object>) tail);
 

@@ -29,8 +29,9 @@ import java.util.concurrent.TimeUnit;
 public interface PromiseIterable<O> extends Promise<Iterable<O>>, Iterable<O> {
 
   @NotNull
-  <R> PromiseIterable<R> all(@Nullable Handler<Iterable<O>, R, CallbackIterable<R>> outputHandler,
-      @Nullable Handler<Throwable, R, CallbackIterable<R>> errorHandler);
+  <R> PromiseIterable<R> all(
+      @Nullable Handler<Iterable<O>, R, ? super CallbackIterable<R>> outputHandler,
+      @Nullable Handler<Throwable, R, ? super CallbackIterable<R>> errorHandler);
 
   @NotNull
   <R> PromiseIterable<R> all(@NotNull Mapper<Iterable<O>, Iterable<R>> mapper);
@@ -40,15 +41,15 @@ public interface PromiseIterable<O> extends Promise<Iterable<O>>, Iterable<O> {
 
   @NotNull
   <R> PromiseIterable<R> allSorted(
-      @Nullable Handler<Iterable<O>, R, CallbackIterable<R>> outputHandler,
-      @Nullable Handler<Throwable, R, CallbackIterable<R>> errorHandler);
+      @Nullable Handler<Iterable<O>, R, ? super CallbackIterable<R>> outputHandler,
+      @Nullable Handler<Throwable, R, ? super CallbackIterable<R>> errorHandler);
 
   @NotNull
   <R> PromiseIterable<R> allSorted(@NotNull StatelessProcessor<Iterable<O>, R> processor);
 
   @NotNull
-  <R> PromiseIterable<R> any(@Nullable Handler<O, R, CallbackIterable<R>> outputHandler,
-      @Nullable Handler<Throwable, R, CallbackIterable<R>> errorHandler);
+  <R> PromiseIterable<R> any(@Nullable Handler<O, R, ? super CallbackIterable<R>> outputHandler,
+      @Nullable Handler<Throwable, R, ? super CallbackIterable<R>> errorHandler);
 
   @NotNull
   <R> PromiseIterable<R> any(@NotNull Mapper<O, R> mapper);
@@ -57,8 +58,9 @@ public interface PromiseIterable<O> extends Promise<Iterable<O>>, Iterable<O> {
   <R> PromiseIterable<R> any(@NotNull StatelessProcessor<O, R> processor);
 
   @NotNull
-  <R> PromiseIterable<R> anySorted(@Nullable Handler<O, R, CallbackIterable<R>> outputHandler,
-      @Nullable Handler<Throwable, R, CallbackIterable<R>> errorHandler);
+  <R> PromiseIterable<R> anySorted(
+      @Nullable Handler<O, R, ? super CallbackIterable<R>> outputHandler,
+      @Nullable Handler<Throwable, R, ? super CallbackIterable<R>> errorHandler);
 
   @NotNull
   <R> PromiseIterable<R> anySorted(@NotNull StatelessProcessor<O, R> processor);
@@ -88,8 +90,8 @@ public interface PromiseIterable<O> extends Promise<Iterable<O>>, Iterable<O> {
   PromiseIterable<O> catchEach(@NotNull Mapper<Throwable, O> mapper);
 
   @NotNull
-  <R> PromiseIterable<R> each(@Nullable Handler<O, R, CallbackIterable<R>> outputHandler,
-      @Nullable Handler<Throwable, R, CallbackIterable<R>> errorHandler);
+  <R> PromiseIterable<R> each(@Nullable Handler<O, R, ? super CallbackIterable<R>> outputHandler,
+      @Nullable Handler<Throwable, R, ? super CallbackIterable<R>> errorHandler);
 
   @NotNull
   <R> PromiseIterable<R> each(@NotNull Mapper<O, R> mapper);
@@ -98,8 +100,9 @@ public interface PromiseIterable<O> extends Promise<Iterable<O>>, Iterable<O> {
   <R> PromiseIterable<R> each(@NotNull StatelessProcessor<O, R> processor);
 
   @NotNull
-  <R> PromiseIterable<R> eachSorted(@Nullable Handler<O, R, CallbackIterable<R>> outputHandler,
-      @Nullable Handler<Throwable, R, CallbackIterable<R>> errorHandler);
+  <R> PromiseIterable<R> eachSorted(
+      @Nullable Handler<O, R, ? super CallbackIterable<R>> outputHandler,
+      @Nullable Handler<Throwable, R, ? super CallbackIterable<R>> errorHandler);
 
   @NotNull
   <R> PromiseIterable<R> eachSorted(@NotNull StatelessProcessor<O, R> processor);
@@ -167,8 +170,6 @@ public interface PromiseIterable<O> extends Promise<Iterable<O>>, Iterable<O> {
     void addAllDeferred(@NotNull Promise<? extends Iterable<O>> promise);
 
     void addDeferred(@NotNull Promise<O> promise);
-
-    void resolve();
   }
 
   interface StatefulProcessor<I, O, S> {

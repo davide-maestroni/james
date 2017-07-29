@@ -14,18 +14,28 @@
  * limitations under the License.
  */
 
-package dm.james.promise;
+package dm.james;
 
 import org.jetbrains.annotations.Nullable;
 
+import java.io.Serializable;
+
+import dm.james.promise.Observer;
+import dm.james.promise.PromiseIterable.CallbackIterable;
+
 /**
- * Created by davide-maestroni on 07/22/2017.
+ * Created by davide-maestroni on 07/27/2017.
  */
-public interface ResolvableIterable<I> extends Resolvable<I> {
+class ResolvedIterableObserver<O> implements Observer<CallbackIterable<O>>, Serializable {
 
-  void add(I output);
+  private final Iterable<O> mOutputs;
 
-  void addAll(@Nullable Iterable<I> outputs);
+  ResolvedIterableObserver(@Nullable final Iterable<O> outputs) {
+    mOutputs = outputs;
+  }
 
-  void resolve();
+  public void accept(final CallbackIterable<O> callback) {
+    callback.addAll(mOutputs);
+    callback.resolve();
+  }
 }

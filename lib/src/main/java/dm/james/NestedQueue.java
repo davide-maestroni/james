@@ -115,6 +115,7 @@ class NestedQueue<E> {
 
   // TODO: 29/07/2017 javadoc
   boolean isClosed() {
+    // TODO: 29/07/2017 iterate
     return mClosed;
   }
 
