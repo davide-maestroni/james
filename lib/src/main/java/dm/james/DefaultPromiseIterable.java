@@ -24,8 +24,10 @@ import java.io.ObjectStreamException;
 import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.ConcurrentModificationException;
 import java.util.Iterator;
 import java.util.List;
+import java.util.NoSuchElementException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 
@@ -247,13 +249,13 @@ class DefaultPromiseIterable<O> implements PromiseIterable<O>, Serializable {
   }
 
   @NotNull
-  public List<O> getAll() {
-    return getAll(-1, TimeUnit.MILLISECONDS);
+  public List<O> get(final int maxSize) {
+    return get(maxSize, -1, TimeUnit.MILLISECONDS);
   }
 
   @NotNull
   @SuppressWarnings("unchecked")
-  public List<O> getAll(final long timeout, @NotNull final TimeUnit timeUnit) {
+  public List<O> get(final int maxSize, final long timeout, @NotNull final TimeUnit timeUnit) {
     final ChainHead<?> head = mHead;
     synchronized (mMutex) {
       try {
@@ -261,10 +263,11 @@ class DefaultPromiseIterable<O> implements PromiseIterable<O>, Serializable {
 
           public boolean isTrue() {
             checkBound();
-            return head.getState().isResolved();
+            return ((head.getOutputs().size() >= maxSize) || head.getState().isResolved());
           }
         }, timeout, timeUnit)) {
-          return new ArrayList<O>((List<O>) head.getOutputs());
+          final List<O> outputs = (List<O>) head.getOutputs();
+          return new ArrayList<O>(outputs.subList(0, Math.min(maxSize, outputs.size())));
         }
 
       } catch (final InterruptedException e) {
@@ -277,9 +280,18 @@ class DefaultPromiseIterable<O> implements PromiseIterable<O>, Serializable {
   }
 
   @NotNull
+  public List<O> getAll() {
+    return getAll(-1, TimeUnit.MILLISECONDS);
+  }
+
+  @NotNull
+  public List<O> getAll(final long timeout, @NotNull final TimeUnit timeUnit) {
+    return get(Integer.MAX_VALUE, timeout, timeUnit);
+  }
+
+  @NotNull
   public Iterator<O> iterator(final long timeout, @NotNull final TimeUnit timeUnit) {
-    // TODO: 28/07/2017 implement
-    return null;
+    return new PromiseIterator(timeout, timeUnit);
   }
 
   public O remove() {
@@ -295,7 +307,7 @@ class DefaultPromiseIterable<O> implements PromiseIterable<O>, Serializable {
 
           public boolean isTrue() {
             checkBound();
-            return !head.getOutputs().isEmpty();
+            return (!head.getOutputs().isEmpty() || head.getState().isResolved());
           }
         }, timeout, timeUnit)) {
           return ((List<O>) head.getOutputs()).remove(0);
@@ -319,34 +331,31 @@ class DefaultPromiseIterable<O> implements PromiseIterable<O>, Serializable {
   @SuppressWarnings("unchecked")
   public List<O> remove(final int maxSize, final long timeout, @NotNull final TimeUnit timeUnit) {
     final ChainHead<?> head = mHead;
-    final ArrayList<O> outputs = new ArrayList<O>();
     synchronized (mMutex) {
-      final TimeUnit waitUnit =
-          ((timeUnit.toNanos(timeout) % TimeUnit.MILLISECONDS.toNanos(1)) == 0)
-              ? TimeUnit.MILLISECONDS : TimeUnit.NANOSECONDS;
-      final long waitEndTime = (timeout < 0) ? -1
-          : TimeUtils.currentTimeIn(waitUnit) + waitUnit.convert(timeout, timeUnit);
-      while (outputs.size() < maxSize) {
-        try {
-          final long waitTime =
-              (waitEndTime < 0) ? -1 : waitEndTime - TimeUtils.currentTimeIn(waitUnit);
-          if (TimeUtils.waitUntil(mMutex, new Condition() {
+      try {
+        if (TimeUtils.waitUntil(mMutex, new Condition() {
 
-            public boolean isTrue() {
-              checkBound();
-              return !head.getOutputs().isEmpty();
-            }
-          }, waitTime, waitUnit)) {
-            outputs.add(((List<O>) head.getOutputs()).remove(0));
+          public boolean isTrue() {
+            checkBound();
+            return ((head.getOutputs().size() >= maxSize) || head.getState().isResolved());
+          }
+        }, timeout, timeUnit)) {
+          final List<O> outputs = (List<O>) head.getOutputs();
+          final ArrayList<O> removed = new ArrayList<O>();
+          for (int i = 0; (i < maxSize) && !outputs.isEmpty(); --i) {
+            removed.add(outputs.remove(0));
           }
 
-        } catch (final InterruptedException e) {
-          throw new InterruptedExecutionException(e);
+          return removed;
         }
+
+      } catch (final InterruptedException e) {
+        throw new InterruptedExecutionException(e);
       }
     }
 
-    return outputs;
+    throw new TimeoutException(
+        "timeout while waiting for promise resolution [" + timeout + " " + timeUnit + "]");
   }
 
   @NotNull
@@ -368,7 +377,7 @@ class DefaultPromiseIterable<O> implements PromiseIterable<O>, Serializable {
 
           public boolean isTrue() {
             checkBound();
-            return !head.getOutputs().isEmpty();
+            return (!head.getOutputs().isEmpty() || head.getState().isResolved());
           }
         }, timeout, timeUnit)) {
           return ((List<O>) head.getOutputs()).remove(0);
@@ -439,7 +448,7 @@ class DefaultPromiseIterable<O> implements PromiseIterable<O>, Serializable {
 
   @SuppressWarnings("unchecked")
   public Iterable<O> get(final long timeout, @NotNull final TimeUnit timeUnit) {
-    final ChainHead<?> head = mHead;
+    @SuppressWarnings("UnnecessaryLocalVariable") final ChainHead<?> head = mHead;
     synchronized (mMutex) {
       try {
         if (TimeUtils.waitUntil(mMutex, new Condition() {
@@ -449,7 +458,7 @@ class DefaultPromiseIterable<O> implements PromiseIterable<O>, Serializable {
             return head.getState().isResolved();
           }
         }, timeout, timeUnit)) {
-          return new ResolutionIterable<O>((List<O>) head.getOutputs());
+          return new ResolutionIterable<O>(this);
         }
 
       } catch (final InterruptedException e) {
@@ -516,7 +525,7 @@ class DefaultPromiseIterable<O> implements PromiseIterable<O>, Serializable {
   @SuppressWarnings("unchecked")
   public Iterable<O> getOr(final Iterable<O> other, final long timeout,
       @NotNull final TimeUnit timeUnit) {
-    final ChainHead<?> head = mHead;
+    @SuppressWarnings("UnnecessaryLocalVariable") final ChainHead<?> head = mHead;
     synchronized (mMutex) {
       try {
         if (TimeUtils.waitUntil(mMutex, new Condition() {
@@ -526,7 +535,7 @@ class DefaultPromiseIterable<O> implements PromiseIterable<O>, Serializable {
             return head.getState().isResolved();
           }
         }, timeout, timeUnit)) {
-          return new ResolutionIterable<O>((List<O>) head.getOutputs());
+          return new ResolutionIterable<O>(this);
         }
 
       } catch (final InterruptedException e) {
@@ -624,6 +633,7 @@ class DefaultPromiseIterable<O> implements PromiseIterable<O>, Serializable {
         isBound = false;
         chain.setLogger(logger);
         mIsBound = true;
+        mMutex.notifyAll();
       }
     }
 
@@ -2316,7 +2326,12 @@ class DefaultPromiseIterable<O> implements PromiseIterable<O>, Serializable {
           final PromiseChain<O, ?> bond = mBond;
           if (bond == null) {
             synchronized (mMutex) {
-              mHead.innerAdd(input);
+              try {
+                mHead.innerAdd(input);
+
+              } finally {
+                mMutex.notifyAll();
+              }
             }
 
           } else {
@@ -2334,9 +2349,14 @@ class DefaultPromiseIterable<O> implements PromiseIterable<O>, Serializable {
           final PromiseChain<O, ?> bond = mBond;
           if (bond == null) {
             synchronized (mMutex) {
-              @SuppressWarnings("UnnecessaryLocalVariable") final ChainHead<O> head = mHead;
-              for (final O input : inputs) {
-                head.innerAdd(input);
+              try {
+                @SuppressWarnings("UnnecessaryLocalVariable") final ChainHead<O> head = mHead;
+                for (final O input : inputs) {
+                  head.innerAdd(input);
+                }
+
+              } finally {
+                mMutex.notifyAll();
               }
             }
 
@@ -2411,4 +2431,133 @@ class DefaultPromiseIterable<O> implements PromiseIterable<O>, Serializable {
     }
   }
 
+  private class PromiseIterator implements Iterator<O> {
+
+    private final TimeUnit mOriginalTimeUnit;
+
+    private final long mOriginalTimeout;
+
+    private final TimeUnit mTimeUnit;
+
+    private final long mTimeout;
+
+    private int mIndex;
+
+    private boolean mIsRemoved;
+
+    private PromiseIterator(final long timeout, @NotNull final TimeUnit timeUnit) {
+      mOriginalTimeout = timeout;
+      mOriginalTimeUnit = timeUnit;
+      mTimeUnit = ((timeUnit.toNanos(timeout) % TimeUnit.MILLISECONDS.toNanos(1)) == 0)
+          ? TimeUnit.MILLISECONDS : TimeUnit.NANOSECONDS;
+      mTimeout = mTimeUnit.convert(timeout, timeUnit) + TimeUtils.currentTimeIn(mTimeUnit);
+    }
+
+    @SuppressWarnings("unchecked")
+    public boolean hasNext() {
+      final ChainHead<?> head = mHead;
+      final long timeout = remainingTime();
+      synchronized (mMutex) {
+        final int index = mIndex;
+        try {
+          if (TimeUtils.waitUntil(mMutex, new Condition() {
+
+            public boolean isTrue() {
+              checkBound();
+              return ((head.getOutputs().size() > index) || head.getState().isResolved());
+            }
+          }, timeout, mTimeUnit)) {
+            final List<O> outputs = (List<O>) head.getOutputs();
+            return (outputs.size() > index);
+          }
+
+        } catch (final InterruptedException e) {
+          throw new InterruptedExecutionException(e);
+        }
+      }
+
+      throw timeoutException();
+    }
+
+    @SuppressWarnings("unchecked")
+    public O next() {
+      final ChainHead<?> head = mHead;
+      final long timeout = remainingTime();
+      synchronized (mMutex) {
+        final int index = mIndex;
+        try {
+          if (TimeUtils.waitUntil(mMutex, new Condition() {
+
+            public boolean isTrue() {
+              checkBound();
+              return ((head.getOutputs().size() > index) || head.getState().isResolved());
+            }
+          }, timeout, mTimeUnit)) {
+            final List<O> outputs = (List<O>) head.getOutputs();
+            if (outputs.size() <= index) {
+              throw new NoSuchElementException();
+            }
+
+            if (mIndex != index) {
+              throw new ConcurrentModificationException();
+            }
+
+            ++mIndex;
+            mIsRemoved = false;
+            return outputs.get(index);
+          }
+
+        } catch (final InterruptedException e) {
+          throw new InterruptedExecutionException(e);
+        }
+      }
+
+      throw timeoutException();
+    }
+
+    @SuppressWarnings("unchecked")
+    public void remove() {
+      synchronized (mMutex) {
+        checkBound();
+        if (mIsRemoved) {
+          throw new IllegalStateException("already removed");
+        }
+
+        final int index = mIndex;
+        if (index == 0) {
+          throw new IllegalStateException("next() not called yet");
+        }
+
+        final List<O> outputs = (List<O>) mHead.getOutputs();
+        if (outputs.size() <= index) {
+          throw new ConcurrentModificationException();
+        }
+
+        outputs.remove(index);
+        mIsRemoved = true;
+        --mIndex;
+      }
+    }
+
+    private long remainingTime() {
+      final long timeout = mTimeout;
+      if (timeout < 0) {
+        return -1;
+      }
+
+      final long remainingTime = timeout - TimeUtils.currentTimeIn(mTimeUnit);
+      if (remainingTime < 0) {
+        throw timeoutException();
+      }
+
+      return remainingTime;
+    }
+
+    @NotNull
+    private TimeoutException timeoutException() {
+      return new TimeoutException(
+          "timeout while iterating promise resolutions [" + mOriginalTimeout + " "
+              + mOriginalTimeUnit + "]");
+    }
+  }
 }

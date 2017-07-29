@@ -75,6 +75,12 @@ public interface PromiseIterable<O> extends Promise<Iterable<O>>, Iterable<O> {
   <R> PromiseIterable<R> each(@NotNull StatelessProcessor<O, R> processor);
 
   @NotNull
+  List<O> get(int maxSize);
+
+  @NotNull
+  List<O> get(int maxSize, long timeout, @NotNull TimeUnit timeUnit);
+
+  @NotNull
   List<O> getAll();
 
   @NotNull

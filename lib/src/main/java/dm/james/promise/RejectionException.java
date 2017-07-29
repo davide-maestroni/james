@@ -16,6 +16,9 @@
 
 package dm.james.promise;
 
+import java.io.PrintStream;
+import java.io.PrintWriter;
+
 /**
  * Created by davide-maestroni on 07/04/2017.
  */
@@ -26,5 +29,73 @@ public class RejectionException extends RuntimeException {
 
   public RejectionException(final Throwable throwable) {
     super(throwable);
+  }
+
+  @Override
+  public String getMessage() {
+    final Throwable cause = getCause();
+    return (cause != null) ? cause.getMessage() : super.getMessage();
+  }
+
+  @Override
+  public String getLocalizedMessage() {
+    final Throwable cause = getCause();
+    return (cause != null) ? cause.getLocalizedMessage() : super.getLocalizedMessage();
+  }
+
+  @Override
+  public void printStackTrace() {
+    final Throwable cause = getCause();
+    if (cause != null) {
+      cause.printStackTrace();
+
+    } else {
+      super.printStackTrace();
+    }
+  }
+
+  @Override
+  public void printStackTrace(final PrintStream printStream) {
+    final Throwable cause = getCause();
+    if (cause != null) {
+      cause.printStackTrace(printStream);
+
+    } else {
+      super.printStackTrace(printStream);
+    }
+  }
+
+  @Override
+  public void printStackTrace(final PrintWriter printWriter) {
+    final Throwable cause = getCause();
+    if (cause != null) {
+      cause.printStackTrace(printWriter);
+
+    } else {
+      super.printStackTrace(printWriter);
+    }
+  }
+
+  @Override
+  public synchronized Throwable fillInStackTrace() {
+    final Throwable cause = getCause();
+    return (cause != null) ? cause.fillInStackTrace() : super.fillInStackTrace();
+  }
+
+  @Override
+  public StackTraceElement[] getStackTrace() {
+    final Throwable cause = getCause();
+    return (cause != null) ? cause.getStackTrace() : super.getStackTrace();
+  }
+
+  @Override
+  public void setStackTrace(final StackTraceElement[] stackTraceElements) {
+    final Throwable cause = getCause();
+    if (cause != null) {
+      cause.setStackTrace(stackTraceElements);
+
+    } else {
+      super.setStackTrace(stackTraceElements);
+    }
   }
 }
