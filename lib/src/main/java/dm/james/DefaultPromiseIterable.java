@@ -187,6 +187,19 @@ class DefaultPromiseIterable<O> implements PromiseIterable<O>, Serializable {
   }
 
   @NotNull
+  public <R> PromiseIterable<R> allSorted(
+      @Nullable final Handler<Iterable<O>, R, CallbackIterable<R>> outputHandler,
+      @Nullable final Handler<Throwable, R, CallbackIterable<R>> errorHandler) {
+    return allSorted(new ProcessorHandle<Iterable<O>, R>(outputHandler, errorHandler));
+  }
+
+  @NotNull
+  public <R> PromiseIterable<R> allSorted(
+      @NotNull final StatelessProcessor<Iterable<O>, R> processor) {
+    return thenSorted(new ProcessorAll<O, R>(processor));
+  }
+
+  @NotNull
   public <R> PromiseIterable<R> any(
       @Nullable final Handler<O, R, CallbackIterable<R>> outputHandler,
       @Nullable final Handler<Throwable, R, CallbackIterable<R>> errorHandler) {
@@ -201,6 +214,18 @@ class DefaultPromiseIterable<O> implements PromiseIterable<O>, Serializable {
   @NotNull
   public <R> PromiseIterable<R> any(@NotNull final StatelessProcessor<O, R> processor) {
     return then(new ProcessorAny<O, R>(processor));
+  }
+
+  @NotNull
+  public <R> PromiseIterable<R> anySorted(
+      @Nullable final Handler<O, R, CallbackIterable<R>> outputHandler,
+      @Nullable final Handler<Throwable, R, CallbackIterable<R>> errorHandler) {
+    return anySorted(new ProcessorHandle<O, R>(outputHandler, errorHandler));
+  }
+
+  @NotNull
+  public <R> PromiseIterable<R> anySorted(@NotNull final StatelessProcessor<O, R> processor) {
+    return thenSorted(new ProcessorAny<O, R>(processor));
   }
 
   @NotNull
@@ -273,6 +298,18 @@ class DefaultPromiseIterable<O> implements PromiseIterable<O>, Serializable {
   }
 
   @NotNull
+  public <R> PromiseIterable<R> eachSorted(
+      @Nullable final Handler<O, R, CallbackIterable<R>> outputHandler,
+      @Nullable final Handler<Throwable, R, CallbackIterable<R>> errorHandler) {
+    return eachSorted(new ProcessorHandle<O, R>(outputHandler, errorHandler));
+  }
+
+  @NotNull
+  public <R> PromiseIterable<R> eachSorted(@NotNull final StatelessProcessor<O, R> processor) {
+    return chain(new ChainStatelessSorted<O, R>(mPropagationType, processor));
+  }
+
+  @NotNull
   public List<O> get(final int maxSize) {
     return get(maxSize, -1, TimeUnit.MILLISECONDS);
   }
@@ -311,6 +348,57 @@ class DefaultPromiseIterable<O> implements PromiseIterable<O>, Serializable {
   @NotNull
   public List<O> getAll(final long timeout, @NotNull final TimeUnit timeUnit) {
     return get(Integer.MAX_VALUE, timeout, timeUnit);
+  }
+
+  public O getAny() {
+    return getAny(-1, TimeUnit.MILLISECONDS);
+  }
+
+  @SuppressWarnings("unchecked")
+  public O getAny(final long timeout, @NotNull final TimeUnit timeUnit) {
+    final ChainHead<?> head = mHead;
+    synchronized (mMutex) {
+      try {
+        if (TimeUtils.waitUntil(mMutex, new Condition() {
+
+          public boolean isTrue() {
+            checkBound();
+            return (!head.getOutputs().isEmpty() || head.getState().isResolved());
+          }
+        }, timeout, timeUnit)) {
+          return ((List<O>) head.getOutputs()).get(0);
+        }
+
+      } catch (final InterruptedException e) {
+        throw new InterruptedExecutionException(e);
+      }
+    }
+
+    throw new TimeoutException(
+        "timeout while waiting for promise resolution [" + timeout + " " + timeUnit + "]");
+  }
+
+  @SuppressWarnings("unchecked")
+  public O getAnyOr(final O other, final long timeout, @NotNull final TimeUnit timeUnit) {
+    final ChainHead<?> head = mHead;
+    synchronized (mMutex) {
+      try {
+        if (TimeUtils.waitUntil(mMutex, new Condition() {
+
+          public boolean isTrue() {
+            checkBound();
+            return (!head.getOutputs().isEmpty() || head.getState().isResolved());
+          }
+        }, timeout, timeUnit)) {
+          return ((List<O>) head.getOutputs()).get(0);
+        }
+
+      } catch (final InterruptedException e) {
+        throw new InterruptedExecutionException(e);
+      }
+    }
+
+    return other;
   }
 
   @NotNull
@@ -418,6 +506,11 @@ class DefaultPromiseIterable<O> implements PromiseIterable<O>, Serializable {
   @NotNull
   public <R, S> PromiseIterable<R> then(@NotNull final StatefulProcessor<O, R, S> processor) {
     return chain(new ChainStateful<O, R, S>(mPropagationType, processor));
+  }
+
+  @NotNull
+  public <R, S> PromiseIterable<R> thenSorted(@NotNull final StatefulProcessor<O, R, S> processor) {
+    return chain(new ChainStatefulSorted<O, R, S>(mPropagationType, processor));
   }
 
   public void waitCompleted() {
@@ -1149,6 +1242,423 @@ class DefaultPromiseIterable<O> implements PromiseIterable<O>, Serializable {
     }
   }
 
+  private static class ChainStatefulSorted<O, R, S> extends PromiseChain<O, R> {
+
+    private final ScheduledExecutor mExecutor;
+
+    private final Object mMutex = new Object();
+
+    private final StatefulProcessor<O, R, S> mProcessor;
+
+    private final PropagationType mPropagationType;
+
+    private final NestedQueue<Resolution<R>> mQueue = new NestedQueue<Resolution<R>>();
+
+    private boolean mIsCreated;
+
+    private boolean mIsFailed;
+
+    private boolean mIsRejected;
+
+    private S mState;
+
+    private ChainStatefulSorted(@NotNull final PropagationType propagationType,
+        @NotNull final StatefulProcessor<O, R, S> processor) {
+      mProcessor = ConstantConditions.notNull("processor", processor);
+      mPropagationType = propagationType;
+      mExecutor = ScheduledExecutors.throttlingExecutor(propagationType.executor(), 1);
+    }
+
+    private void flushQueue(final PromiseChain<R, ?> next) {
+      Resolution<R> resolution = removeFirst();
+      while (resolution != null) {
+        resolution.consume(next);
+      }
+
+      final boolean closed;
+      synchronized (mMutex) {
+        final NestedQueue<Resolution<R>> queue = mQueue;
+        closed = queue.isEmpty() && queue.isClosed();
+      }
+
+      if (closed) {
+        next.resolve();
+      }
+    }
+
+    private Resolution<R> removeFirst() {
+      synchronized (mMutex) {
+        if (mQueue.isEmpty()) {
+          return null;
+        }
+
+        return mQueue.removeFirst();
+      }
+    }
+
+    private Object writeReplace() throws ObjectStreamException {
+      return new ChainProxy<O, R, S>(mPropagationType, mProcessor);
+    }
+
+    private static class ChainProxy<O, R, S> extends SerializableProxy {
+
+      private ChainProxy(final PropagationType propagationType,
+          final StatefulProcessor<O, R, S> processor) {
+        super(propagationType, processor);
+      }
+
+      @SuppressWarnings("unchecked")
+      Object readResolve() throws ObjectStreamException {
+        try {
+          final Object[] args = deserializeArgs();
+          return new ChainStatefulSorted<O, R, S>((PropagationType) args[0],
+              (StatefulProcessor<O, R, S>) args[1]);
+
+        } catch (final Throwable t) {
+          throw new InvalidObjectException(t.getMessage());
+        }
+      }
+    }
+
+    private class ChainCallback implements CallbackIterable<R> {
+
+      private final PromiseChain<R, ?> mNext;
+
+      private ChainCallback(final PromiseChain<R, ?> next) {
+        mNext = next;
+      }
+
+      public void add(final R output) {
+        synchronized (mMutex) {
+          mQueue.add(new ResolutionResolved<R>(output));
+        }
+
+        flushQueue(mNext);
+      }
+
+      @SuppressWarnings("unchecked")
+      public void addAllDeferred(@NotNull final Promise<? extends Iterable<R>> promise) {
+        final NestedQueue<Resolution<R>> queue;
+        synchronized (mMutex) {
+          queue = mQueue.addNested();
+        }
+
+        if (promise instanceof PromiseIterable) {
+          ((PromiseIterable<R>) promise).then(new ChainStatefulProcessor(mNext, queue));
+
+        } else {
+          ((Promise<Iterable<R>>) promise).then(new ChainProcessorIterable(mNext, queue));
+        }
+      }
+
+      public void defer(@NotNull final Promise<R> promise) {
+        addDeferred(promise);
+        resolve();
+      }
+
+      public void reject(final Throwable reason) {
+        synchronized (mMutex) {
+          mQueue.add(new ResolutionRejected<R>(reason));
+        }
+
+        flushQueue(mNext);
+      }
+
+      public void addAll(@Nullable final Iterable<R> outputs) {
+        synchronized (mMutex) {
+          mQueue.add(new ResolutionFulfilled<R>(outputs));
+        }
+
+        flushQueue(mNext);
+      }
+
+      public void addDeferred(@NotNull final Promise<R> promise) {
+        final NestedQueue<Resolution<R>> queue;
+        synchronized (mMutex) {
+          queue = mQueue.addNested();
+        }
+
+        promise.then(new ChainProcessor(mNext, queue));
+      }
+
+      public void resolve() {
+        synchronized (mMutex) {
+          mQueue.close();
+        }
+
+        flushQueue(mNext);
+      }
+
+      public void resolve(final R output) {
+        synchronized (mMutex) {
+          final NestedQueue<Resolution<R>> queue = mQueue;
+          queue.add(new ResolutionResolved<R>(output));
+          queue.close();
+        }
+
+        flushQueue(mNext);
+      }
+    }
+
+    private class ChainProcessor implements Processor<R, Void> {
+
+      private final PromiseChain<R, ?> mNext;
+
+      private final NestedQueue<Resolution<R>> mQueue;
+
+      private ChainProcessor(final PromiseChain<R, ?> next,
+          final NestedQueue<Resolution<R>> queue) {
+        mNext = next;
+        mQueue = queue;
+      }
+
+      public void reject(final Throwable reason, @NotNull final Callback<Void> callback) {
+        synchronized (mMutex) {
+          final NestedQueue<Resolution<R>> queue = mQueue;
+          queue.add(new ResolutionRejected<R>(reason));
+          queue.close();
+        }
+
+        flushQueue(mNext);
+      }
+
+      public void resolve(final R input, @NotNull final Callback<Void> callback) {
+        synchronized (mMutex) {
+          final NestedQueue<Resolution<R>> queue = mQueue;
+          queue.add(new ResolutionResolved<R>(input));
+          queue.close();
+        }
+
+        flushQueue(mNext);
+      }
+    }
+
+    private class ChainProcessorIterable implements Processor<Iterable<R>, Void> {
+
+      private final PromiseChain<R, ?> mNext;
+
+      private final NestedQueue<Resolution<R>> mQueue;
+
+      private ChainProcessorIterable(final PromiseChain<R, ?> next,
+          final NestedQueue<Resolution<R>> queue) {
+        mNext = next;
+        mQueue = queue;
+      }
+
+      public void reject(final Throwable reason, @NotNull final Callback<Void> callback) {
+        synchronized (mMutex) {
+          final NestedQueue<Resolution<R>> queue = mQueue;
+          queue.add(new ResolutionRejected<R>(reason));
+          queue.close();
+        }
+
+        flushQueue(mNext);
+      }
+
+      public void resolve(final Iterable<R> input, @NotNull final Callback<Void> callback) {
+        synchronized (mMutex) {
+          final NestedQueue<Resolution<R>> queue = mQueue;
+          queue.add(new ResolutionFulfilled<R>(input));
+          queue.close();
+        }
+
+        flushQueue(mNext);
+      }
+    }
+
+    private class ChainStatefulProcessor implements StatefulProcessor<R, Void, Void> {
+
+      private final PromiseChain<R, ?> mNext;
+
+      private final NestedQueue<Resolution<R>> mQueue;
+
+      private ChainStatefulProcessor(final PromiseChain<R, ?> next,
+          final NestedQueue<Resolution<R>> queue) {
+        mNext = next;
+        mQueue = queue;
+      }
+
+      public Void create(@NotNull final CallbackIterable<Void> callback) {
+        return null;
+      }
+
+      public Void process(final Void state, final R input,
+          @NotNull final CallbackIterable<Void> callback) {
+        synchronized (mMutex) {
+          mQueue.add(new ResolutionResolved<R>(input));
+        }
+
+        flushQueue(mNext);
+        return null;
+      }
+
+      public void reject(final Void state, final Throwable reason,
+          @NotNull final CallbackIterable<Void> callback) {
+        synchronized (mMutex) {
+          mQueue.add(new ResolutionRejected<R>(reason));
+        }
+
+        flushQueue(mNext);
+      }
+
+      public void resolve(final Void state, @NotNull final CallbackIterable<Void> callback) {
+        synchronized (mMutex) {
+          mQueue.close();
+        }
+
+        flushQueue(mNext);
+      }
+    }
+
+    @Override
+    void add(final PromiseChain<R, ?> next, final O input) {
+      mExecutor.execute(new Runnable() {
+
+        public void run() {
+          if (mIsRejected) {
+            return;
+          }
+
+          try {
+            final ChainCallback callback = new ChainCallback(next);
+            final StatefulProcessor<O, R, S> processor = mProcessor;
+            if (!mIsCreated) {
+              mIsCreated = true;
+              try {
+                mState = processor.create(callback);
+
+              } catch (final Throwable t) {
+                mIsFailed = true;
+                throw t;
+              }
+            }
+
+            mState = processor.process(mState, input, callback);
+
+          } catch (final Throwable t) {
+            InterruptedExecutionException.throwIfInterrupt(t);
+            getLogger().err(t, "Error while processing input: %s", input);
+            mIsRejected = true;
+            reject(t);
+          }
+        }
+      });
+    }
+
+    @Override
+    void addAll(final PromiseChain<R, ?> next, final Iterable<O> inputs) {
+      mExecutor.execute(new Runnable() {
+
+        public void run() {
+          if (mIsRejected) {
+            return;
+          }
+
+          try {
+            final ChainCallback callback = new ChainCallback(next);
+            final StatefulProcessor<O, R, S> processor = mProcessor;
+            if (!mIsCreated) {
+              mIsCreated = true;
+              try {
+                mState = processor.create(callback);
+
+              } catch (final Throwable t) {
+                mIsFailed = true;
+                throw t;
+              }
+            }
+
+            for (final O input : inputs) {
+              mState = processor.process(mState, input, callback);
+            }
+
+          } catch (final Throwable t) {
+            InterruptedExecutionException.throwIfInterrupt(t);
+            getLogger().err(t, "Error while processing input: %s", inputs);
+            mIsRejected = true;
+            reject(t);
+          }
+        }
+      });
+    }
+
+    @NotNull
+    @Override
+    PromiseChain<O, R> copy() {
+      return new ChainStateful<O, R, S>(mPropagationType, mProcessor);
+    }
+
+    @Override
+    void reject(final PromiseChain<R, ?> next, final Throwable reason) {
+      mExecutor.execute(new Runnable() {
+
+        public void run() {
+          if (mIsFailed) {
+            next.reject(reason);
+            return;
+          }
+
+          try {
+            final ChainCallback callback = new ChainCallback(next);
+            final StatefulProcessor<O, R, S> processor = mProcessor;
+            if (!mIsCreated) {
+              mIsCreated = true;
+              try {
+                mState = processor.create(callback);
+
+              } catch (final Throwable t) {
+                mIsFailed = true;
+                throw t;
+              }
+            }
+
+            processor.reject(mState, reason, callback);
+
+          } catch (final Throwable t) {
+            InterruptedExecutionException.throwIfInterrupt(t);
+            getLogger().err(t, "Error while processing rejection with reason: %s", reason);
+            next.reject(t);
+          }
+        }
+      });
+    }
+
+    @Override
+    void resolve(final PromiseChain<R, ?> next) {
+      mExecutor.execute(new Runnable() {
+
+        public void run() {
+          if (mIsRejected) {
+            return;
+          }
+
+          try {
+            final ChainCallback callback = new ChainCallback(next);
+            final StatefulProcessor<O, R, S> processor = mProcessor;
+            if (!mIsCreated) {
+              mIsCreated = true;
+              try {
+                mState = processor.create(callback);
+
+              } catch (final Throwable t) {
+                mIsFailed = true;
+                throw t;
+              }
+            }
+
+            processor.resolve(mState, callback);
+
+          } catch (final Throwable t) {
+            InterruptedExecutionException.throwIfInterrupt(t);
+            getLogger().err(t, "Error while processing resolution");
+            mIsRejected = true;
+            reject(t);
+          }
+        }
+      });
+    }
+  }
+
   private static class ChainStateless<O, R> extends PromiseChain<O, R> {
 
     private final AtomicLong mCallbackCount = new AtomicLong(1);
@@ -1314,6 +1824,384 @@ class DefaultPromiseIterable<O> implements PromiseIterable<O>, Serializable {
 
       public void resolve(final Void state, @NotNull final CallbackIterable<Void> callback) {
         innerResolve(mNext);
+      }
+    }
+
+    @Override
+    void add(final PromiseChain<R, ?> next, final O input) {
+      final ChainCallback callback = new ChainCallback(next);
+      mPropagationType.execute(new Runnable() {
+
+        public void run() {
+          try {
+            mProcessor.resolve(input, callback);
+
+          } catch (final Throwable t) {
+            InterruptedExecutionException.throwIfInterrupt(t);
+            getLogger().err(t, "Error while processing input: %s", input);
+            callback.reject(t);
+          }
+        }
+      });
+    }
+
+    @Override
+    void addAll(final PromiseChain<R, ?> next, final Iterable<O> inputs) {
+      final ArrayList<ChainCallback> callbacks = new ArrayList<ChainCallback>();
+      for (final O ignored : inputs) {
+        callbacks.add(new ChainCallback(next));
+      }
+
+      mPropagationType.execute(new Runnable() {
+
+        public void run() {
+          int i = 0;
+          for (final O input : inputs) {
+            final ChainCallback callback = callbacks.get(i++);
+            try {
+              mProcessor.resolve(input, callback);
+
+            } catch (final Throwable t) {
+              InterruptedExecutionException.throwIfInterrupt(t);
+              getLogger().err(t, "Error while processing input: %s", input);
+              callback.reject(t);
+            }
+          }
+        }
+      });
+    }
+
+    @NotNull
+    @Override
+    PromiseChain<O, R> copy() {
+      return new ChainStateless<O, R>(mPropagationType, mProcessor);
+    }
+
+    @Override
+    void addRejection(final PromiseChain<R, ?> next, final Throwable reason) {
+      reject(next, reason);
+    }
+
+    @Override
+    void reject(final PromiseChain<R, ?> next, final Throwable reason) {
+      final ChainCallback callback = new ChainCallback(next);
+      mPropagationType.execute(new Runnable() {
+
+        public void run() {
+          try {
+            mProcessor.reject(reason, callback);
+
+          } catch (final Throwable t) {
+            InterruptedExecutionException.throwIfInterrupt(t);
+            getLogger().err(t, "Error while processing rejection with reason: %s", reason);
+            callback.reject(t);
+          }
+        }
+      });
+    }
+
+    @Override
+    void resolve(final PromiseChain<R, ?> next) {
+      mPropagationType.execute(new Runnable() {
+
+        public void run() {
+          innerResolve(next);
+        }
+      });
+    }
+  }
+
+  private static class ChainStatelessSorted<O, R> extends PromiseChain<O, R> {
+
+    private final AtomicLong mCallbackCount = new AtomicLong(1);
+
+    private final Object mMutex = new Object();
+
+    private final StatelessProcessor<O, R> mProcessor;
+
+    private final PropagationType mPropagationType;
+
+    private final NestedQueue<Resolution<R>> mQueue = new NestedQueue<Resolution<R>>();
+
+    private ChainStatelessSorted(@NotNull final PropagationType propagationType,
+        @NotNull final StatelessProcessor<O, R> processor) {
+      mProcessor = ConstantConditions.notNull("processor", processor);
+      mPropagationType = propagationType;
+    }
+
+    private void flushQueue(final PromiseChain<R, ?> next) {
+      Resolution<R> resolution = removeFirst();
+      while (resolution != null) {
+        resolution.consume(next);
+      }
+
+      final boolean closed;
+      synchronized (mMutex) {
+        final NestedQueue<Resolution<R>> queue = mQueue;
+        closed = queue.isEmpty() && queue.isClosed();
+      }
+
+      if (closed) {
+        next.resolve();
+      }
+    }
+
+    private void innerReject(final PromiseChain<R, ?> next, final Throwable reason) {
+      next.addRejection(reason);
+      if (mCallbackCount.decrementAndGet() <= 0) {
+        next.resolve();
+      }
+    }
+
+    private void innerResolve(final PromiseChain<R, ?> next) {
+      if (mCallbackCount.decrementAndGet() <= 0) {
+        next.resolve();
+      }
+    }
+
+    private Resolution<R> removeFirst() {
+      synchronized (mMutex) {
+        if (mQueue.isEmpty()) {
+          return null;
+        }
+
+        return mQueue.removeFirst();
+      }
+    }
+
+    private Object writeReplace() throws ObjectStreamException {
+      return new ChainProxy<O, R>(mPropagationType, mProcessor);
+    }
+
+    private static class ChainProxy<O, R> extends SerializableProxy {
+
+      private ChainProxy(final PropagationType propagationType,
+          final StatelessProcessor<O, R> processor) {
+        super(propagationType, processor);
+      }
+
+      @SuppressWarnings("unchecked")
+      Object readResolve() throws ObjectStreamException {
+        try {
+          final Object[] args = deserializeArgs();
+          return new ChainStateless<O, R>((PropagationType) args[0],
+              (StatelessProcessor<O, R>) args[1]);
+
+        } catch (final Throwable t) {
+          throw new InvalidObjectException(t.getMessage());
+        }
+      }
+    }
+
+    private class ChainCallback implements CallbackIterable<R> {
+
+      private final PromiseChain<R, ?> mNext;
+
+      private ChainCallback(final PromiseChain<R, ?> next) {
+        mCallbackCount.incrementAndGet();
+        mNext = next;
+      }
+
+      public void add(final R output) {
+        synchronized (mMutex) {
+          mQueue.add(new ResolutionResolved<R>(output));
+        }
+
+        flushQueue(mNext);
+      }
+
+      @SuppressWarnings("unchecked")
+      public void addAllDeferred(@NotNull final Promise<? extends Iterable<R>> promise) {
+        final NestedQueue<Resolution<R>> queue;
+        synchronized (mMutex) {
+          queue = mQueue.addNested();
+        }
+
+        if (promise instanceof PromiseIterable) {
+          ((PromiseIterable<R>) promise).then(new ChainStatefulProcessor(mNext, queue));
+
+        } else {
+          ((Promise<Iterable<R>>) promise).then(new ChainProcessorIterable(mNext, queue));
+        }
+      }
+
+      public void defer(@NotNull final Promise<R> promise) {
+        addDeferred(promise);
+        resolve();
+      }
+
+      public void reject(final Throwable reason) {
+        synchronized (mMutex) {
+          mQueue.add(new ResolutionRejected<R>(reason));
+        }
+
+        final PromiseChain<R, ?> next = mNext;
+        flushQueue(next);
+        innerResolve(next);
+      }
+
+      public void addAll(@Nullable final Iterable<R> outputs) {
+        synchronized (mMutex) {
+          mQueue.add(new ResolutionFulfilled<R>(outputs));
+        }
+
+        flushQueue(mNext);
+      }
+
+      public void addDeferred(@NotNull final Promise<R> promise) {
+        final NestedQueue<Resolution<R>> queue;
+        synchronized (mMutex) {
+          queue = mQueue.addNested();
+        }
+
+        promise.then(new ChainProcessor(mNext, queue));
+      }
+
+      public void resolve() {
+        synchronized (mMutex) {
+          mQueue.close();
+        }
+
+        final PromiseChain<R, ?> next = mNext;
+        flushQueue(next);
+        innerResolve(next);
+      }
+
+      public void resolve(final R output) {
+        synchronized (mMutex) {
+          final NestedQueue<Resolution<R>> queue = mQueue;
+          queue.add(new ResolutionResolved<R>(output));
+          queue.close();
+        }
+
+        final PromiseChain<R, ?> next = mNext;
+        flushQueue(next);
+        innerResolve(next);
+      }
+    }
+
+    private class ChainProcessor implements Processor<R, Void> {
+
+      private final PromiseChain<R, ?> mNext;
+
+      private final NestedQueue<Resolution<R>> mQueue;
+
+      private ChainProcessor(final PromiseChain<R, ?> next,
+          final NestedQueue<Resolution<R>> queue) {
+        mCallbackCount.incrementAndGet();
+        mNext = next;
+        mQueue = queue;
+      }
+
+      public void reject(final Throwable reason, @NotNull final Callback<Void> callback) {
+        synchronized (mMutex) {
+          final NestedQueue<Resolution<R>> queue = mQueue;
+          queue.add(new ResolutionRejected<R>(reason));
+          queue.close();
+        }
+
+        final PromiseChain<R, ?> next = mNext;
+        flushQueue(next);
+        innerResolve(next);
+      }
+
+      public void resolve(final R input, @NotNull final Callback<Void> callback) {
+        synchronized (mMutex) {
+          final NestedQueue<Resolution<R>> queue = mQueue;
+          queue.add(new ResolutionResolved<R>(input));
+          queue.close();
+        }
+
+        final PromiseChain<R, ?> next = mNext;
+        flushQueue(next);
+        innerResolve(next);
+      }
+    }
+
+    private class ChainProcessorIterable implements Processor<Iterable<R>, Void> {
+
+      private final PromiseChain<R, ?> mNext;
+
+      private final NestedQueue<Resolution<R>> mQueue;
+
+      private ChainProcessorIterable(final PromiseChain<R, ?> next,
+          final NestedQueue<Resolution<R>> queue) {
+        mCallbackCount.incrementAndGet();
+        mNext = next;
+        mQueue = queue;
+      }
+
+      public void reject(final Throwable reason, @NotNull final Callback<Void> callback) {
+        synchronized (mMutex) {
+          final NestedQueue<Resolution<R>> queue = mQueue;
+          queue.add(new ResolutionRejected<R>(reason));
+          queue.close();
+        }
+
+        final PromiseChain<R, ?> next = mNext;
+        flushQueue(next);
+        innerResolve(next);
+      }
+
+      public void resolve(final Iterable<R> input, @NotNull final Callback<Void> callback) {
+        synchronized (mMutex) {
+          final NestedQueue<Resolution<R>> queue = mQueue;
+          queue.add(new ResolutionFulfilled<R>(input));
+          queue.close();
+        }
+
+        final PromiseChain<R, ?> next = mNext;
+        flushQueue(next);
+        innerResolve(next);
+      }
+    }
+
+    private class ChainStatefulProcessor implements StatefulProcessor<R, Void, Void> {
+
+      private final PromiseChain<R, ?> mNext;
+
+      private final NestedQueue<Resolution<R>> mQueue;
+
+      private ChainStatefulProcessor(final PromiseChain<R, ?> next,
+          final NestedQueue<Resolution<R>> queue) {
+        mCallbackCount.incrementAndGet();
+        mNext = next;
+        mQueue = queue;
+      }
+
+      public Void create(@NotNull final CallbackIterable<Void> callback) {
+        return null;
+      }
+
+      public Void process(final Void state, final R input,
+          @NotNull final CallbackIterable<Void> callback) {
+        synchronized (mMutex) {
+          mQueue.add(new ResolutionResolved<R>(input));
+        }
+
+        flushQueue(mNext);
+        return null;
+      }
+
+      public void reject(final Void state, final Throwable reason,
+          @NotNull final CallbackIterable<Void> callback) {
+        synchronized (mMutex) {
+          mQueue.add(new ResolutionRejected<R>(reason));
+        }
+
+        final PromiseChain<R, ?> next = mNext;
+        flushQueue(next);
+        innerResolve(next);
+      }
+
+      public void resolve(final Void state, @NotNull final CallbackIterable<Void> callback) {
+        synchronized (mMutex) {
+          mQueue.close();
+        }
+
+        final PromiseChain<R, ?> next = mNext;
+        flushQueue(next);
+        innerResolve(next);
       }
     }
 
@@ -2295,6 +3183,18 @@ class DefaultPromiseIterable<O> implements PromiseIterable<O>, Serializable {
 
     private final ArrayList<O> mOutputs = new ArrayList<O>();
 
+    private ResolutionFulfilled() {
+    }
+
+    private ResolutionFulfilled(final Iterable<O> inputs) {
+      @SuppressWarnings("UnnecessaryLocalVariable") final ArrayList<O> outputs = mOutputs;
+      if (inputs != null) {
+        for (final O input : inputs) {
+          outputs.add(input);
+        }
+      }
+    }
+
     public void consume(@NotNull final PromiseChain<O, ?> chain) {
       chain.addAll(mOutputs);
     }
@@ -2354,6 +3254,32 @@ class DefaultPromiseIterable<O> implements PromiseIterable<O>, Serializable {
 
     public void throwError() {
       throw getError();
+    }
+  }
+
+  private static class ResolutionResolved<O> implements Resolution<O> {
+
+    private final O mOutput;
+
+    private ResolutionResolved(final O output) {
+      mOutput = output;
+    }
+
+    public void consume(@NotNull final PromiseChain<O, ?> chain) {
+      chain.add(mOutput);
+    }
+
+    @Nullable
+    public RejectionException getError() {
+      return null;
+    }
+
+    @NotNull
+    public List<O> getOutputs() {
+      return Collections.singletonList(mOutput);
+    }
+
+    public void throwError() {
     }
   }
 

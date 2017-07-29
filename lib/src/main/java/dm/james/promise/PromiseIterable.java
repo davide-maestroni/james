@@ -39,6 +39,14 @@ public interface PromiseIterable<O> extends Promise<Iterable<O>>, Iterable<O> {
   <R> PromiseIterable<R> all(@NotNull StatelessProcessor<Iterable<O>, R> processor);
 
   @NotNull
+  <R> PromiseIterable<R> allSorted(
+      @Nullable Handler<Iterable<O>, R, CallbackIterable<R>> outputHandler,
+      @Nullable Handler<Throwable, R, CallbackIterable<R>> errorHandler);
+
+  @NotNull
+  <R> PromiseIterable<R> allSorted(@NotNull StatelessProcessor<Iterable<O>, R> processor);
+
+  @NotNull
   <R> PromiseIterable<R> any(@Nullable Handler<O, R, CallbackIterable<R>> outputHandler,
       @Nullable Handler<Throwable, R, CallbackIterable<R>> errorHandler);
 
@@ -47,6 +55,13 @@ public interface PromiseIterable<O> extends Promise<Iterable<O>>, Iterable<O> {
 
   @NotNull
   <R> PromiseIterable<R> any(@NotNull StatelessProcessor<O, R> processor);
+
+  @NotNull
+  <R> PromiseIterable<R> anySorted(@Nullable Handler<O, R, CallbackIterable<R>> outputHandler,
+      @Nullable Handler<Throwable, R, CallbackIterable<R>> errorHandler);
+
+  @NotNull
+  <R> PromiseIterable<R> anySorted(@NotNull StatelessProcessor<O, R> processor);
 
   @NotNull
   <R> PromiseIterable<R> applyAll(@NotNull Mapper<PromiseIterable<O>, PromiseIterable<R>> mapper);
@@ -83,6 +98,13 @@ public interface PromiseIterable<O> extends Promise<Iterable<O>>, Iterable<O> {
   <R> PromiseIterable<R> each(@NotNull StatelessProcessor<O, R> processor);
 
   @NotNull
+  <R> PromiseIterable<R> eachSorted(@Nullable Handler<O, R, CallbackIterable<R>> outputHandler,
+      @Nullable Handler<Throwable, R, CallbackIterable<R>> errorHandler);
+
+  @NotNull
+  <R> PromiseIterable<R> eachSorted(@NotNull StatelessProcessor<O, R> processor);
+
+  @NotNull
   List<O> get(int maxSize);
 
   @NotNull
@@ -93,6 +115,12 @@ public interface PromiseIterable<O> extends Promise<Iterable<O>>, Iterable<O> {
 
   @NotNull
   List<O> getAll(long timeout, @NotNull TimeUnit timeUnit);
+
+  O getAny();
+
+  O getAny(long timeout, @NotNull TimeUnit timeUnit);
+
+  O getAnyOr(O other, long timeout, @NotNull TimeUnit timeUnit);
 
   @NotNull
   Iterator<O> iterator(long timeout, @NotNull TimeUnit timeUnit);
@@ -117,6 +145,9 @@ public interface PromiseIterable<O> extends Promise<Iterable<O>>, Iterable<O> {
 
   @NotNull
   <R, S> PromiseIterable<R> then(@NotNull StatefulProcessor<O, R, S> processor);
+
+  @NotNull
+  <R, S> PromiseIterable<R> thenSorted(@NotNull StatefulProcessor<O, R, S> processor);
 
   void waitCompleted();
 
