@@ -29,7 +29,6 @@ import java.util.concurrent.TimeUnit;
 public interface PromiseIterable<O> extends Promise<Iterable<O>>, Iterable<O> {
 
   @NotNull
-    // TODO: 27/07/2017 all?
   <R> PromiseIterable<R> all(@Nullable Handler<Iterable<O>, R, CallbackIterable<R>> outputHandler,
       @Nullable Handler<Throwable, R, CallbackIterable<R>> errorHandler);
 
@@ -40,7 +39,20 @@ public interface PromiseIterable<O> extends Promise<Iterable<O>>, Iterable<O> {
   <R> PromiseIterable<R> all(@NotNull StatelessProcessor<Iterable<O>, R> processor);
 
   @NotNull
+  <R> PromiseIterable<R> any(@Nullable Handler<O, R, CallbackIterable<R>> outputHandler,
+      @Nullable Handler<Throwable, R, CallbackIterable<R>> errorHandler);
+
+  @NotNull
+  <R> PromiseIterable<R> any(@NotNull Mapper<O, R> mapper);
+
+  @NotNull
+  <R> PromiseIterable<R> any(@NotNull StatelessProcessor<O, R> processor);
+
+  @NotNull
   <R> PromiseIterable<R> applyAll(@NotNull Mapper<PromiseIterable<O>, PromiseIterable<R>> mapper);
+
+  @NotNull
+  <R> PromiseIterable<R> applyAny(@NotNull Mapper<Promise<O>, Promise<R>> mapper);
 
   @NotNull
   <R> PromiseIterable<R> applyEach(@NotNull Mapper<Promise<O>, Promise<R>> mapper);
@@ -56,10 +68,6 @@ public interface PromiseIterable<O> extends Promise<Iterable<O>>, Iterable<O> {
 
   @NotNull
   PromiseIterable<O> whenResolved(@NotNull Action action);
-
-  // TODO: 27/07/2017 any? same methods as 'each' but implementation as 'all'
-  // any(Handler, Handler), any(Mapper), any(StatelessProcessor), whenFulfilledAny(Observer)
-  // applyAny(Mapper)
 
   @NotNull
   PromiseIterable<O> catchEach(@NotNull Mapper<Throwable, O> mapper);
@@ -113,6 +121,9 @@ public interface PromiseIterable<O> extends Promise<Iterable<O>>, Iterable<O> {
   void waitCompleted();
 
   boolean waitCompleted(long timeout, @NotNull TimeUnit timeUnit);
+
+  @NotNull
+  PromiseIterable<O> whenFulfilledAny(@NotNull Observer<O> observer);
 
   @NotNull
   PromiseIterable<O> whenFulfilledEach(@NotNull Observer<O> observer);

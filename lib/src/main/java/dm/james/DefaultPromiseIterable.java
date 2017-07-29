@@ -187,6 +187,23 @@ class DefaultPromiseIterable<O> implements PromiseIterable<O>, Serializable {
   }
 
   @NotNull
+  public <R> PromiseIterable<R> any(
+      @Nullable final Handler<O, R, CallbackIterable<R>> outputHandler,
+      @Nullable final Handler<Throwable, R, CallbackIterable<R>> errorHandler) {
+    return any(new ProcessorHandle<O, R>(outputHandler, errorHandler));
+  }
+
+  @NotNull
+  public <R> PromiseIterable<R> any(@NotNull final Mapper<O, R> mapper) {
+    return any(new ProcessorMapEach<O, R>(mapper));
+  }
+
+  @NotNull
+  public <R> PromiseIterable<R> any(@NotNull final StatelessProcessor<O, R> processor) {
+    return then(new ProcessorAny<O, R>(processor));
+  }
+
+  @NotNull
   public <R> PromiseIterable<R> applyAll(
       @NotNull final Mapper<PromiseIterable<O>, PromiseIterable<R>> mapper) {
     try {
@@ -197,6 +214,13 @@ class DefaultPromiseIterable<O> implements PromiseIterable<O>, Serializable {
       mLogger.err(t, "Error while applying promise transformation");
       throw wrapException(t);
     }
+  }
+
+  @NotNull
+  public <R> PromiseIterable<R> applyAny(@NotNull final Mapper<Promise<O>, Promise<R>> mapper) {
+    final Logger logger = mLogger;
+    return any(new ProcessorApplyEach<O, R>(mapper, mPropagationType, logger.getLog(),
+        logger.getLogLevel()));
   }
 
   @NotNull
@@ -213,17 +237,17 @@ class DefaultPromiseIterable<O> implements PromiseIterable<O>, Serializable {
 
   @NotNull
   public PromiseIterable<O> whenFulfilled(@NotNull final Observer<Iterable<O>> observer) {
-    return all(new ProcessorFulfilled<O>(observer));
+    return all(new ProcessorFulfilledAll<O>(observer));
   }
 
   @NotNull
   public PromiseIterable<O> whenRejected(@NotNull final Observer<Throwable> observer) {
-    return all(new ProcessorRejected<O>(observer));
+    return all(new ProcessorRejectedAll<O>(observer));
   }
 
   @NotNull
   public PromiseIterable<O> whenResolved(@NotNull final Action action) {
-    return all(new ProcessorResolved<O>(action));
+    return all(new ProcessorResolvedAll<O>(action));
   }
 
   @NotNull
@@ -418,6 +442,11 @@ class DefaultPromiseIterable<O> implements PromiseIterable<O>, Serializable {
     }
 
     return false;
+  }
+
+  @NotNull
+  public PromiseIterable<O> whenFulfilledAny(@NotNull final Observer<O> observer) {
+    return any(new ProcessorFulfilledEach<O>(observer));
   }
 
   @NotNull
@@ -1429,12 +1458,12 @@ class DefaultPromiseIterable<O> implements PromiseIterable<O>, Serializable {
     }
 
     private Object writeReplace() throws ObjectStreamException {
-      return new ChainProxy<O, R>(mProcessor);
+      return new ProcessorProxy<O, R>(mProcessor);
     }
 
-    private static class ChainProxy<O, R> extends SerializableProxy {
+    private static class ProcessorProxy<O, R> extends SerializableProxy {
 
-      private ChainProxy(final StatelessProcessor<Iterable<O>, R> processor) {
+      private ProcessorProxy(final StatelessProcessor<Iterable<O>, R> processor) {
         super(processor);
       }
 
@@ -1471,6 +1500,60 @@ class DefaultPromiseIterable<O> implements PromiseIterable<O>, Serializable {
     }
   }
 
+  private static class ProcessorAny<O, R>
+      implements StatefulProcessor<O, R, Boolean>, Serializable {
+
+    private final StatelessProcessor<O, R> mProcessor;
+
+    private ProcessorAny(@NotNull final StatelessProcessor<O, R> processor) {
+      mProcessor = ConstantConditions.notNull("processor", processor);
+    }
+
+    private Object writeReplace() throws ObjectStreamException {
+      return new ProcessorProxy<O, R>(mProcessor);
+    }
+
+    private static class ProcessorProxy<O, R> extends SerializableProxy {
+
+      private ProcessorProxy(final StatelessProcessor<O, R> processor) {
+        super(processor);
+      }
+
+      @SuppressWarnings("unchecked")
+      Object readResolve() throws ObjectStreamException {
+        try {
+          final Object[] args = deserializeArgs();
+          return new ProcessorAny<O, R>((StatelessProcessor<O, R>) args[0]);
+
+        } catch (final Throwable t) {
+          throw new InvalidObjectException(t.getMessage());
+        }
+      }
+    }
+
+    public Boolean create(@NotNull final CallbackIterable<R> callback) {
+      return Boolean.TRUE;
+    }
+
+    public Boolean process(final Boolean state, final O input,
+        @NotNull final CallbackIterable<R> callback) throws Exception {
+      if (state) {
+        mProcessor.resolve(input, callback);
+        return Boolean.FALSE;
+      }
+
+      return state;
+    }
+
+    public void reject(final Boolean state, final Throwable reason,
+        @NotNull final CallbackIterable<R> callback) throws Exception {
+      mProcessor.reject(reason, callback);
+    }
+
+    public void resolve(final Boolean state, @NotNull final CallbackIterable<R> callback) {
+    }
+  }
+
   private static class ProcessorApplyEach<O, R> implements StatelessProcessor<O, R>, Serializable {
 
     private final Log mLog;
@@ -1490,12 +1573,12 @@ class DefaultPromiseIterable<O> implements PromiseIterable<O>, Serializable {
     }
 
     private Object writeReplace() throws ObjectStreamException {
-      return new ChainProxy<O, R>(mMapper, mPropagationType, mLog, mLogLevel);
+      return new ProcessorProxy<O, R>(mMapper, mPropagationType, mLog, mLogLevel);
     }
 
-    private static class ChainProxy<O, R> extends SerializableProxy {
+    private static class ProcessorProxy<O, R> extends SerializableProxy {
 
-      private ChainProxy(final Mapper<Promise<O>, Promise<R>> mapper,
+      private ProcessorProxy(final Mapper<Promise<O>, Promise<R>> mapper,
           final PropagationType propagationType, final Log log, final Level logLevel) {
         super(mapper, propagationType, log, logLevel);
       }
@@ -1545,12 +1628,12 @@ class DefaultPromiseIterable<O> implements PromiseIterable<O>, Serializable {
     }
 
     private Object writeReplace() throws ObjectStreamException {
-      return new ChainProxy<O>(mMapper);
+      return new ProcessorProxy<O>(mMapper);
     }
 
-    private static class ChainProxy<O> extends SerializableProxy {
+    private static class ProcessorProxy<O> extends SerializableProxy {
 
-      private ChainProxy(final Mapper<Throwable, Iterable<O>> mapper) {
+      private ProcessorProxy(final Mapper<Throwable, Iterable<O>> mapper) {
         super(mapper);
       }
 
@@ -1565,7 +1648,6 @@ class DefaultPromiseIterable<O> implements PromiseIterable<O>, Serializable {
         }
       }
     }
-
   }
 
   private static class ProcessorCatchEach<O> extends DefaultStatelessProcessor<O, O>
@@ -1584,12 +1666,12 @@ class DefaultPromiseIterable<O> implements PromiseIterable<O>, Serializable {
     }
 
     private Object writeReplace() throws ObjectStreamException {
-      return new ChainProxy<O>(mMapper);
+      return new ProcessorProxy<O>(mMapper);
     }
 
-    private static class ChainProxy<O> extends SerializableProxy {
+    private static class ProcessorProxy<O> extends SerializableProxy {
 
-      private ChainProxy(final Mapper<Throwable, O> mapper) {
+      private ProcessorProxy(final Mapper<Throwable, O> mapper) {
         super(mapper);
       }
 
@@ -1606,22 +1688,22 @@ class DefaultPromiseIterable<O> implements PromiseIterable<O>, Serializable {
     }
   }
 
-  private static class ProcessorFulfilled<O> extends IterableStatelessProcessor<Iterable<O>, O>
+  private static class ProcessorFulfilledAll<O> extends IterableStatelessProcessor<Iterable<O>, O>
       implements Serializable {
 
     private final Observer<Iterable<O>> mObserver;
 
-    private ProcessorFulfilled(@NotNull final Observer<Iterable<O>> observer) {
+    private ProcessorFulfilledAll(@NotNull final Observer<Iterable<O>> observer) {
       mObserver = ConstantConditions.notNull("observer", observer);
     }
 
     private Object writeReplace() throws ObjectStreamException {
-      return new ChainProxy<O>(mObserver);
+      return new ProcessorProxy<O>(mObserver);
     }
 
-    private static class ChainProxy<O> extends SerializableProxy {
+    private static class ProcessorProxy<O> extends SerializableProxy {
 
-      private ChainProxy(final Observer<Iterable<O>> observer) {
+      private ProcessorProxy(final Observer<Iterable<O>> observer) {
         super(observer);
       }
 
@@ -1629,7 +1711,7 @@ class DefaultPromiseIterable<O> implements PromiseIterable<O>, Serializable {
       Object readResolve() throws ObjectStreamException {
         try {
           final Object[] args = deserializeArgs();
-          return new ProcessorFulfilled<O>((Observer<Iterable<O>>) args[0]);
+          return new ProcessorFulfilledAll<O>((Observer<Iterable<O>>) args[0]);
 
         } catch (final Throwable t) {
           throw new InvalidObjectException(t.getMessage());
@@ -1655,12 +1737,12 @@ class DefaultPromiseIterable<O> implements PromiseIterable<O>, Serializable {
     }
 
     private Object writeReplace() throws ObjectStreamException {
-      return new ChainProxy<O>(mObserver);
+      return new ProcessorProxy<O>(mObserver);
     }
 
-    private static class ChainProxy<O> extends SerializableProxy {
+    private static class ProcessorProxy<O> extends SerializableProxy {
 
-      private ChainProxy(final Observer<O> observer) {
+      private ProcessorProxy(final Observer<O> observer) {
         super(observer);
       }
 
@@ -1698,12 +1780,12 @@ class DefaultPromiseIterable<O> implements PromiseIterable<O>, Serializable {
     }
 
     private Object writeReplace() throws ObjectStreamException {
-      return new ChainProxy<O, R>(mOutputHandler, mErrorHandler);
+      return new ProcessorProxy<O, R>(mOutputHandler, mErrorHandler);
     }
 
-    private static class ChainProxy<O, R> extends SerializableProxy {
+    private static class ProcessorProxy<O, R> extends SerializableProxy {
 
-      private ChainProxy(final Handler<O, R, CallbackIterable<R>> outputHandler,
+      private ProcessorProxy(final Handler<O, R, CallbackIterable<R>> outputHandler,
           final Handler<Throwable, R, CallbackIterable<R>> errorHandler) {
         super(outputHandler, errorHandler);
       }
@@ -1742,12 +1824,12 @@ class DefaultPromiseIterable<O> implements PromiseIterable<O>, Serializable {
     }
 
     private Object writeReplace() throws ObjectStreamException {
-      return new ChainProxy<O, R>(mMapper);
+      return new ProcessorProxy<O, R>(mMapper);
     }
 
-    private static class ChainProxy<O, R> extends SerializableProxy {
+    private static class ProcessorProxy<O, R> extends SerializableProxy {
 
-      private ChainProxy(final Mapper<Iterable<O>, Iterable<R>> mapper) {
+      private ProcessorProxy(final Mapper<Iterable<O>, Iterable<R>> mapper) {
         super(mapper);
       }
 
@@ -1780,12 +1862,12 @@ class DefaultPromiseIterable<O> implements PromiseIterable<O>, Serializable {
     }
 
     private Object writeReplace() throws ObjectStreamException {
-      return new ChainProxy<O, R>(mMapper);
+      return new ProcessorProxy<O, R>(mMapper);
     }
 
-    private static class ChainProxy<O, R> extends SerializableProxy {
+    private static class ProcessorProxy<O, R> extends SerializableProxy {
 
-      private ChainProxy(final Mapper<O, R> mapper) {
+      private ProcessorProxy(final Mapper<O, R> mapper) {
         super(mapper);
       }
 
@@ -1808,22 +1890,22 @@ class DefaultPromiseIterable<O> implements PromiseIterable<O>, Serializable {
     }
   }
 
-  private static class ProcessorRejected<O> extends IterableStatelessProcessor<Iterable<O>, O>
+  private static class ProcessorRejectedAll<O> extends IterableStatelessProcessor<Iterable<O>, O>
       implements Serializable {
 
     private final Observer<Throwable> mObserver;
 
-    private ProcessorRejected(@NotNull final Observer<Throwable> observer) {
+    private ProcessorRejectedAll(@NotNull final Observer<Throwable> observer) {
       mObserver = ConstantConditions.notNull("observer", observer);
     }
 
     private Object writeReplace() throws ObjectStreamException {
-      return new ChainProxy<O>(mObserver);
+      return new ProcessorProxy<O>(mObserver);
     }
 
-    private static class ChainProxy<O> extends SerializableProxy {
+    private static class ProcessorProxy<O> extends SerializableProxy {
 
-      private ChainProxy(final Observer<Throwable> observer) {
+      private ProcessorProxy(final Observer<Throwable> observer) {
         super(observer);
       }
 
@@ -1831,7 +1913,7 @@ class DefaultPromiseIterable<O> implements PromiseIterable<O>, Serializable {
       Object readResolve() throws ObjectStreamException {
         try {
           final Object[] args = deserializeArgs();
-          return new ProcessorRejected<O>((Observer<Throwable>) args[0]);
+          return new ProcessorRejectedAll<O>((Observer<Throwable>) args[0]);
 
         } catch (final Throwable t) {
           throw new InvalidObjectException(t.getMessage());
@@ -1845,7 +1927,6 @@ class DefaultPromiseIterable<O> implements PromiseIterable<O>, Serializable {
       mObserver.accept(reason);
       super.reject(reason, callback);
     }
-
   }
 
   private static class ProcessorRejectedEach<O> extends DefaultStatelessProcessor<O, O>
@@ -1858,12 +1939,12 @@ class DefaultPromiseIterable<O> implements PromiseIterable<O>, Serializable {
     }
 
     private Object writeReplace() throws ObjectStreamException {
-      return new ChainProxy<O>(mObserver);
+      return new ProcessorProxy<O>(mObserver);
     }
 
-    private static class ChainProxy<O> extends SerializableProxy {
+    private static class ProcessorProxy<O> extends SerializableProxy {
 
-      private ChainProxy(final Observer<Throwable> observer) {
+      private ProcessorProxy(final Observer<Throwable> observer) {
         super(observer);
       }
 
@@ -1887,22 +1968,22 @@ class DefaultPromiseIterable<O> implements PromiseIterable<O>, Serializable {
     }
   }
 
-  private static class ProcessorResolved<O>
+  private static class ProcessorResolvedAll<O>
       implements StatelessProcessor<Iterable<O>, O>, Serializable {
 
     private final Action mAction;
 
-    private ProcessorResolved(@NotNull final Action action) {
+    private ProcessorResolvedAll(@NotNull final Action action) {
       mAction = ConstantConditions.notNull("action", action);
     }
 
     private Object writeReplace() throws ObjectStreamException {
-      return new ChainProxy<O>(mAction);
+      return new ProcessorProxy<O>(mAction);
     }
 
-    private static class ChainProxy<O> extends SerializableProxy {
+    private static class ProcessorProxy<O> extends SerializableProxy {
 
-      private ChainProxy(final Action action) {
+      private ProcessorProxy(final Action action) {
         super(action);
       }
 
@@ -1910,7 +1991,7 @@ class DefaultPromiseIterable<O> implements PromiseIterable<O>, Serializable {
       Object readResolve() throws ObjectStreamException {
         try {
           final Object[] args = deserializeArgs();
-          return new ProcessorResolved<O>((Action) args[0]);
+          return new ProcessorResolvedAll<O>((Action) args[0]);
 
         } catch (final Throwable t) {
           throw new InvalidObjectException(t.getMessage());
