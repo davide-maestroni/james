@@ -23,12 +23,13 @@ import java.io.InvalidObjectException;
 import java.io.ObjectStreamException;
 import java.io.Serializable;
 import java.util.ArrayList;
-import java.util.Collections;
+import java.util.Collection;
 import java.util.ConcurrentModificationException;
 import java.util.Iterator;
 import java.util.List;
 import java.util.NoSuchElementException;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 
 import dm.james.executor.InterruptedExecutionException;
@@ -46,6 +47,7 @@ import dm.james.promise.RejectionException;
 import dm.james.promise.TimeoutException;
 import dm.james.util.ConstantConditions;
 import dm.james.util.SerializableProxy;
+import dm.james.util.SimpleQueue;
 import dm.james.util.TimeUtils;
 import dm.james.util.TimeUtils.Condition;
 
@@ -73,8 +75,6 @@ class DefaultPromiseIterable<O> implements PromiseIterable<O>, Serializable {
   private boolean mIsBound;
 
   private PromiseState mState = PromiseState.Pending;
-
-  // TODO: 29/07/2017 ? super CallbackIterable
 
   @SuppressWarnings("unchecked")
   DefaultPromiseIterable(@NotNull final Observer<? super CallbackIterable<O>> observer,
@@ -292,6 +292,7 @@ class DefaultPromiseIterable<O> implements PromiseIterable<O>, Serializable {
 
   @NotNull
   public <R> PromiseIterable<R> each(@NotNull final Mapper<O, R> mapper) {
+    // TODO: 30/07/2017 chain()
     return each(new ProcessorMapEach<O, R>(mapper));
   }
 
@@ -330,8 +331,14 @@ class DefaultPromiseIterable<O> implements PromiseIterable<O>, Serializable {
             return ((head.getOutputs().size() >= maxSize) || head.getState().isResolved());
           }
         }, timeout, timeUnit)) {
-          final List<O> outputs = (List<O>) head.getOutputs();
-          return new ArrayList<O>(outputs.subList(0, Math.min(maxSize, outputs.size())));
+          final SimpleQueue<O> outputs = (SimpleQueue<O>) head.getOutputs();
+          final Iterator<O> iterator = outputs.iterator();
+          final ArrayList<O> result = new ArrayList<O>();
+          for (int i = 0; (i < maxSize) && iterator.hasNext(); ++i) {
+            result.add(iterator.next());
+          }
+
+          return result;
         }
 
       } catch (final InterruptedException e) {
@@ -369,7 +376,7 @@ class DefaultPromiseIterable<O> implements PromiseIterable<O>, Serializable {
             return (!head.getOutputs().isEmpty() || head.getState().isResolved());
           }
         }, timeout, timeUnit)) {
-          return ((List<O>) head.getOutputs()).get(0);
+          return ((SimpleQueue<O>) head.getOutputs()).peekFirst();
         }
 
       } catch (final InterruptedException e) {
@@ -393,7 +400,7 @@ class DefaultPromiseIterable<O> implements PromiseIterable<O>, Serializable {
             return (!head.getOutputs().isEmpty() || head.getState().isResolved());
           }
         }, timeout, timeUnit)) {
-          return ((List<O>) head.getOutputs()).get(0);
+          return ((SimpleQueue<O>) head.getOutputs()).peekFirst();
         }
 
       } catch (final InterruptedException e) {
@@ -425,7 +432,7 @@ class DefaultPromiseIterable<O> implements PromiseIterable<O>, Serializable {
             return (!head.getOutputs().isEmpty() || head.getState().isResolved());
           }
         }, timeout, timeUnit)) {
-          return ((List<O>) head.getOutputs()).remove(0);
+          return ((SimpleQueue<O>) head.getOutputs()).removeFirst();
         }
 
       } catch (final InterruptedException e) {
@@ -455,10 +462,10 @@ class DefaultPromiseIterable<O> implements PromiseIterable<O>, Serializable {
             return ((head.getOutputs().size() >= maxSize) || head.getState().isResolved());
           }
         }, timeout, timeUnit)) {
-          final List<O> outputs = (List<O>) head.getOutputs();
+          final SimpleQueue<O> outputs = (SimpleQueue<O>) head.getOutputs();
           final ArrayList<O> removed = new ArrayList<O>();
           for (int i = 0; (i < maxSize) && !outputs.isEmpty(); --i) {
-            removed.add(outputs.remove(0));
+            removed.add(outputs.removeFirst());
           }
 
           return removed;
@@ -495,7 +502,7 @@ class DefaultPromiseIterable<O> implements PromiseIterable<O>, Serializable {
             return (!head.getOutputs().isEmpty() || head.getState().isResolved());
           }
         }, timeout, timeUnit)) {
-          return ((List<O>) head.getOutputs()).remove(0);
+          return ((SimpleQueue<O>) head.getOutputs()).removeFirst();
         }
 
       } catch (final InterruptedException e) {
@@ -750,6 +757,7 @@ class DefaultPromiseIterable<O> implements PromiseIterable<O>, Serializable {
   @SuppressWarnings("unchecked")
   private <R> PromiseIterable<R> chain(@NotNull final PromiseChain<O, R> chain) {
     final Logger logger = mLogger;
+    final ChainHead<?> head = mHead;
     final boolean isBound;
     synchronized (mMutex) {
       if (mIsBound) {
@@ -758,6 +766,7 @@ class DefaultPromiseIterable<O> implements PromiseIterable<O>, Serializable {
       } else {
         isBound = false;
         chain.setLogger(logger);
+        head.bind();
         mIsBound = true;
         mMutex.notifyAll();
       }
@@ -768,7 +777,7 @@ class DefaultPromiseIterable<O> implements PromiseIterable<O>, Serializable {
     }
 
     final DefaultPromiseIterable<R> promise =
-        new DefaultPromiseIterable<R>(mObserver, mPropagationType, mExecutor, logger, mHead, chain);
+        new DefaultPromiseIterable<R>(mObserver, mPropagationType, mExecutor, logger, head, chain);
     final PromiseChain<?, O> tail = mTail;
     ((ChainTail) tail.mNext).bind(tail, chain);
     return promise;
@@ -851,7 +860,7 @@ class DefaultPromiseIterable<O> implements PromiseIterable<O>, Serializable {
     RejectionException getError();
 
     @NotNull
-    List<O> getOutputs();
+    SimpleQueue<O> getOutputs();
 
     void throwError();
   }
@@ -868,6 +877,10 @@ class DefaultPromiseIterable<O> implements PromiseIterable<O>, Serializable {
 
     private PromiseState mState = PromiseState.Pending;
 
+    private ChainHead() {
+      mOutputs.add(mResolution);
+    }
+
     @Nullable
     public RejectionException getException() {
       return mInnerState.getException();
@@ -878,9 +891,16 @@ class DefaultPromiseIterable<O> implements PromiseIterable<O>, Serializable {
       next.add(input);
     }
 
+    void bind() {
+      mInnerState = new StatePending();
+      mState = PromiseState.Pending;
+    }
+
     ArrayList<Resolution<O>> consumeOutputs() {
       final ArrayList<Resolution<O>> outputs = mOutputs;
       mOutputs = new ArrayList<Resolution<O>>();
+      mResolution = new ResolutionFulfilled<O>();
+      mOutputs.add(mResolution);
       return outputs;
     }
 
@@ -890,7 +910,7 @@ class DefaultPromiseIterable<O> implements PromiseIterable<O>, Serializable {
     }
 
     @NotNull
-    List<O> getOutputs() {
+    SimpleQueue<O> getOutputs() {
       return mInnerState.getOutputs();
     }
 
@@ -909,9 +929,9 @@ class DefaultPromiseIterable<O> implements PromiseIterable<O>, Serializable {
       getLogger().dbg("Rejecting promise with reason [%s => %s]: %s", PromiseState.Pending,
           PromiseState.Rejected, reason);
       final ArrayList<Resolution<O>> outputs = mOutputs;
-      outputs.add(mResolution);
       outputs.add(new ResolutionRejected<O>(reason));
       mResolution = new ResolutionFulfilled<O>();
+      outputs.add(mResolution);
       mState = PromiseState.Rejected;
     }
 
@@ -942,7 +962,7 @@ class DefaultPromiseIterable<O> implements PromiseIterable<O>, Serializable {
       }
 
       @NotNull
-      List<O> getOutputs() {
+      SimpleQueue<O> getOutputs() {
         final ArrayList<Resolution<O>> outputs = mOutputs;
         final int size = outputs.size();
         if (size == 1) {
@@ -954,7 +974,7 @@ class DefaultPromiseIterable<O> implements PromiseIterable<O>, Serializable {
           }
         }
 
-        return Collections.emptyList();
+        return new SimpleQueue<O>();
       }
 
       void innerReject(@Nullable final Throwable reason) {
@@ -990,12 +1010,12 @@ class DefaultPromiseIterable<O> implements PromiseIterable<O>, Serializable {
 
       @NotNull
       @Override
-      List<O> getOutputs() {
+      SimpleQueue<O> getOutputs() {
         for (final Resolution<O> output : mOutputs) {
           output.throwError();
         }
 
-        return Collections.emptyList();
+        return new SimpleQueue<O>();
       }
 
       @Override
@@ -1051,6 +1071,154 @@ class DefaultPromiseIterable<O> implements PromiseIterable<O>, Serializable {
     @Override
     void resolve(final PromiseChain<O, ?> next) {
       next.resolve();
+    }
+  }
+
+  private static class ChainMap<O, R> extends PromiseChain<O, R> {
+
+    private final Mapper<Throwable, R> mErrorMapper;
+
+    private final ScheduledExecutor mExecutor;
+
+    private final int mMaxBatchSize;
+
+    private final Mapper<O, R> mOutputMapper;
+
+    private final PropagationType mPropagationType;
+
+    @SuppressWarnings("unchecked")
+    private ChainMap(@NotNull final PropagationType propagationType,
+        @Nullable final Mapper<O, R> outputMapper, @Nullable final Mapper<Throwable, R> errorMapper,
+        final int maxBatchSize) {
+      mMaxBatchSize = ConstantConditions.positive("max batch size", maxBatchSize);
+      mOutputMapper =
+          (outputMapper != null) ? outputMapper : (Mapper<O, R>) IdentityMapper.instance();
+      mErrorMapper = (errorMapper != null) ? errorMapper : RethrowMapper.<R>instance();
+      mPropagationType = propagationType;
+      mExecutor = propagationType.executor();
+    }
+
+    private Object writeReplace() throws ObjectStreamException {
+      return new ChainProxy<O, R>(mPropagationType, mOutputMapper, mErrorMapper, mMaxBatchSize);
+    }
+
+    private static class ChainProxy<O, R> extends SerializableProxy {
+
+      private ChainProxy(final PropagationType propagationType, final Mapper<O, R> outputMapper,
+          final Mapper<Throwable, R> errorMapper, final int maxBatchSize) {
+        super(propagationType, outputMapper, errorMapper, maxBatchSize);
+      }
+
+      @SuppressWarnings("unchecked")
+      Object readResolve() throws ObjectStreamException {
+        try {
+          final Object[] args = deserializeArgs();
+          return new ChainMap<O, R>((PropagationType) args[0], (Mapper<O, R>) args[1],
+              (Mapper<Throwable, R>) args[2], (Integer) args[3]);
+
+        } catch (final Throwable t) {
+          throw new InvalidObjectException(t.getMessage());
+        }
+      }
+    }
+
+    @Override
+    void add(final PromiseChain<R, ?> next, final O input) {
+      mExecutor.execute(new Runnable() {
+
+        public void run() {
+          try {
+            next.add(mOutputMapper.apply(input));
+
+          } catch (final Throwable t) {
+            InterruptedExecutionException.throwIfInterrupt(t);
+            getLogger().err(t, "Error while processing input: %s", input);
+            next.addRejection(t);
+          }
+        }
+      });
+    }
+
+    @Override
+    void addAll(final PromiseChain<R, ?> next, final Iterable<O> inputs) {
+      mExecutor.execute(new Runnable() {
+
+        @SuppressWarnings("WhileLoopReplaceableByForEach")
+        public void run() {
+          ArrayList<R> outputs = new ArrayList<R>();
+          final Iterator<O> iterator = inputs.iterator();
+          @SuppressWarnings("UnnecessaryLocalVariable") final int maxBatchSize = mMaxBatchSize;
+          while (iterator.hasNext()) {
+            try {
+              for (int i = 0; i < maxBatchSize; ++i) {
+                outputs.add(mOutputMapper.apply(iterator.next()));
+              }
+
+              next.addAll(outputs);
+              outputs = new ArrayList<R>();
+
+            } catch (final Throwable t) {
+              InterruptedExecutionException.throwIfInterrupt(t);
+              getLogger().err(t, "Error while processing input: %s", inputs);
+              next.addAll(outputs);
+              outputs = new ArrayList<R>();
+              next.addRejection(t);
+            }
+          }
+        }
+      });
+    }
+
+    @NotNull
+    @Override
+    PromiseChain<O, R> copy() {
+      return new ChainMap<O, R>(mPropagationType, mOutputMapper, mErrorMapper, mMaxBatchSize);
+    }
+
+    @Override
+    void addRejection(final PromiseChain<R, ?> next, final Throwable reason) {
+      mExecutor.execute(new Runnable() {
+
+        public void run() {
+          try {
+            next.add(mErrorMapper.apply(reason));
+
+          } catch (final Throwable t) {
+            InterruptedExecutionException.throwIfInterrupt(t);
+            getLogger().err(t, "Error while processing rejection with reason: %s", reason);
+            next.addRejection(t);
+          }
+        }
+      });
+    }
+
+    @Override
+    void reject(final PromiseChain<R, ?> next, final Throwable reason) {
+      mExecutor.execute(new Runnable() {
+
+        public void run() {
+          try {
+            next.add(mErrorMapper.apply(reason));
+
+          } catch (final Throwable t) {
+            InterruptedExecutionException.throwIfInterrupt(t);
+            getLogger().err(t, "Error while processing rejection with reason: %s", reason);
+            next.addRejection(t);
+          }
+
+          next.resolve();
+        }
+      });
+    }
+
+    @Override
+    void resolve(final PromiseChain<R, ?> next) {
+      mExecutor.execute(new Runnable() {
+
+        public void run() {
+          next.resolve();
+        }
+      });
     }
   }
 
@@ -1250,6 +1418,8 @@ class DefaultPromiseIterable<O> implements PromiseIterable<O>, Serializable {
 
     private final ScheduledExecutor mExecutor;
 
+    private final AtomicBoolean mIsResolved = new AtomicBoolean(false);
+
     private final Object mMutex = new Object();
 
     private final StatefulProcessor<O, R, S> mProcessor;
@@ -1285,7 +1455,7 @@ class DefaultPromiseIterable<O> implements PromiseIterable<O>, Serializable {
         closed = queue.isEmpty() && queue.isClosed();
       }
 
-      if (closed) {
+      if (closed && !mIsResolved.getAndSet(true)) {
         next.resolve();
       }
     }
@@ -1724,6 +1894,11 @@ class DefaultPromiseIterable<O> implements PromiseIterable<O>, Serializable {
         mNext = next;
       }
 
+      private ChainCallback(final PromiseChain<R, ?> next, final int count) {
+        mCallbackCount.addAndGet(count);
+        mNext = next;
+      }
+
       public void add(final R output) {
         mNext.add(output);
       }
@@ -1852,17 +2027,23 @@ class DefaultPromiseIterable<O> implements PromiseIterable<O>, Serializable {
 
     @Override
     void addAll(final PromiseChain<R, ?> next, final Iterable<O> inputs) {
-      final ArrayList<ChainCallback> callbacks = new ArrayList<ChainCallback>();
-      for (final O ignored : inputs) {
-        callbacks.add(new ChainCallback(next));
+      int size;
+      if (inputs instanceof Collection) {
+        size = ((Collection) inputs).size();
+
+      } else {
+        size = 0;
+        for (final O ignored : inputs) {
+          ++size;
+        }
       }
 
+      final ChainCallback callback = new ChainCallback(next, size);
       mPropagationType.execute(new Runnable() {
 
         public void run() {
           int i = 0;
           for (final O input : inputs) {
-            final ChainCallback callback = callbacks.get(i++);
             try {
               mProcessor.resolve(input, callback);
 
@@ -1988,6 +2169,11 @@ class DefaultPromiseIterable<O> implements PromiseIterable<O>, Serializable {
 
       private ChainCallback(final PromiseChain<R, ?> next) {
         mCallbackCount.incrementAndGet();
+        mNext = next;
+      }
+
+      private ChainCallback(final PromiseChain<R, ?> next, final int count) {
+        mCallbackCount.addAndGet(count);
         mNext = next;
       }
 
@@ -2214,17 +2400,23 @@ class DefaultPromiseIterable<O> implements PromiseIterable<O>, Serializable {
 
     @Override
     void addAll(final PromiseChain<R, ?> next, final Iterable<O> inputs) {
-      final ArrayList<ChainCallback> callbacks = new ArrayList<ChainCallback>();
-      for (final O ignored : inputs) {
-        callbacks.add(new ChainCallback(next));
+      int size;
+      if (inputs instanceof Collection) {
+        size = ((Collection) inputs).size();
+
+      } else {
+        size = 0;
+        for (final O ignored : inputs) {
+          ++size;
+        }
       }
 
+      final ChainCallback callback = new ChainCallback(next, size);
       mPropagationType.execute(new Runnable() {
 
         public void run() {
           int i = 0;
           for (final O input : inputs) {
-            final ChainCallback callback = callbacks.get(i++);
             try {
               mProcessor.resolve(input, callback);
 
@@ -2428,6 +2620,9 @@ class DefaultPromiseIterable<O> implements PromiseIterable<O>, Serializable {
     }
 
     public void resolve(final Boolean state, @NotNull final CallbackIterable<R> callback) {
+      if (state) {
+        callback.resolve();
+      }
     }
   }
 
@@ -2730,6 +2925,7 @@ class DefaultPromiseIterable<O> implements PromiseIterable<O>, Serializable {
     public void resolve(final Iterable<O> input, @NotNull final CallbackIterable<R> callback) throws
         Exception {
       callback.addAll(mMapper.apply(input));
+      callback.resolve();
     }
   }
 
@@ -3174,13 +3370,13 @@ class DefaultPromiseIterable<O> implements PromiseIterable<O>, Serializable {
 
   private static class ResolutionFulfilled<O> implements Resolution<O> {
 
-    private final ArrayList<O> mOutputs = new ArrayList<O>();
+    private final SimpleQueue<O> mOutputs = new SimpleQueue<O>();
 
     private ResolutionFulfilled() {
     }
 
     private ResolutionFulfilled(final Iterable<O> inputs) {
-      @SuppressWarnings("UnnecessaryLocalVariable") final ArrayList<O> outputs = mOutputs;
+      @SuppressWarnings("UnnecessaryLocalVariable") final SimpleQueue<O> outputs = mOutputs;
       if (inputs != null) {
         for (final O input : inputs) {
           outputs.add(input);
@@ -3202,7 +3398,7 @@ class DefaultPromiseIterable<O> implements PromiseIterable<O>, Serializable {
     }
 
     @NotNull
-    public List<O> getOutputs() {
+    public SimpleQueue<O> getOutputs() {
       return mOutputs;
     }
 
@@ -3241,7 +3437,7 @@ class DefaultPromiseIterable<O> implements PromiseIterable<O>, Serializable {
     }
 
     @NotNull
-    public List<O> getOutputs() {
+    public SimpleQueue<O> getOutputs() {
       throw getError();
     }
 
@@ -3268,8 +3464,10 @@ class DefaultPromiseIterable<O> implements PromiseIterable<O>, Serializable {
     }
 
     @NotNull
-    public List<O> getOutputs() {
-      return Collections.singletonList(mOutput);
+    public SimpleQueue<O> getOutputs() {
+      final SimpleQueue<O> outputs = new SimpleQueue<O>();
+      outputs.add(mOutput);
+      return outputs;
     }
 
     public void throwError() {
@@ -3294,9 +3492,11 @@ class DefaultPromiseIterable<O> implements PromiseIterable<O>, Serializable {
 
         public void run() {
           mBond = bond;
+          final PromiseState state;
           final ArrayList<Resolution<O>> outputs;
           synchronized (mMutex) {
             outputs = mHead.consumeOutputs();
+            state = mState;
           }
 
           try {
@@ -3304,7 +3504,6 @@ class DefaultPromiseIterable<O> implements PromiseIterable<O>, Serializable {
               output.consume(bond);
             }
 
-            final PromiseState state = mState;
             if (state.isResolved()) {
               bond.resolve();
             }

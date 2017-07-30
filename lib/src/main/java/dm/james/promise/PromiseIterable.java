@@ -73,6 +73,7 @@ public interface PromiseIterable<O> extends Promise<Iterable<O>>, Iterable<O> {
 
   @NotNull
   <R> PromiseIterable<R> applyEach(@NotNull Mapper<Promise<O>, Promise<R>> mapper);
+  // TODO: 30/07/2017 applyEachSorted(Mapper) ??
 
   @NotNull
   PromiseIterable<O> catchAny(@NotNull Mapper<Throwable, Iterable<O>> mapper);
@@ -88,6 +89,7 @@ public interface PromiseIterable<O> extends Promise<Iterable<O>>, Iterable<O> {
 
   @NotNull
   PromiseIterable<O> catchEach(@NotNull Mapper<Throwable, O> mapper);
+  // TODO: 30/07/2017 catchEach(Mapper, maxBatchSize)
 
   @NotNull
   <R> PromiseIterable<R> each(@Nullable Handler<O, R, ? super CallbackIterable<R>> outputHandler,
@@ -95,6 +97,7 @@ public interface PromiseIterable<O> extends Promise<Iterable<O>>, Iterable<O> {
 
   @NotNull
   <R> PromiseIterable<R> each(@NotNull Mapper<O, R> mapper);
+  // TODO: 30/07/2017 each(Mapper, maxBatchSize)
 
   @NotNull
   <R> PromiseIterable<R> each(@NotNull StatelessProcessor<O, R> processor);

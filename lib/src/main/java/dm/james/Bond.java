@@ -24,7 +24,10 @@ import java.io.IOException;
 import java.io.InvalidObjectException;
 import java.io.ObjectStreamException;
 import java.io.Serializable;
+import java.util.concurrent.Callable;
+import java.util.concurrent.Future;
 
+import dm.james.executor.ScheduledExecutor;
 import dm.james.log.Log;
 import dm.james.log.Log.Level;
 import dm.james.promise.DeferredPromise;
@@ -106,8 +109,104 @@ public class Bond implements Serializable {
   }
 
   @NotNull
-  public <O> Promise<O> promise(@NotNull final Observer<Callback<O>> observer) {
+  public <O> Promise<O> promise(@NotNull final Observer<? super Callback<O>> observer) {
     return new DefaultPromise<O>(observer, mPropagationType, mLog, mLogLevel);
+  }
+
+  @NotNull
+  public <O> Promise<O> promisify(@NotNull final Future<O> future) {
+    return null;
+  }
+
+  @NotNull
+  public <O> Promise<O> promisify(@NotNull final Callable<O> callable) {
+    return null;
+  }
+
+  @NotNull
+  public <O> Promise<O> promisify(@NotNull final Provider<O> provider) {
+    return null;
+  }
+
+  @NotNull
+  public <I, O> Promise<O> promisify(@NotNull final Mapper<I, O> mapper, final I input) {
+    return null;
+  }
+
+  @NotNull
+  public <I1, I2, O> Promise<O> promisify(@NotNull final Func2<I1, I2, O> function, final I1 input1,
+      final I2 input2) {
+    return null;
+  }
+
+  @NotNull
+  public <I1, I2, I3, O> Promise<O> promisify(@NotNull final Func3<I1, I2, I3, O> function,
+      final I1 input1, final I2 input2, final I3 input3) {
+    return null;
+  }
+
+  @NotNull
+  public <I1, I2, I3, I4, O> Promise<O> promisify(@NotNull final Func4<I1, I2, I3, I4, O> function,
+      final I1 input1, final I2 input2, final I3 input3, final I4 input4) {
+    return null;
+  }
+
+  @NotNull
+  public <I1, I2, I3, I4, I5, O> Promise<O> promisify(
+      @NotNull final Func5<I1, I2, I3, I4, I5, O> function, final I1 input1, final I2 input2,
+      final I3 input3, final I4 input4, final I5 input5) {
+    return null;
+  }
+
+  @NotNull
+  public <O> Promise<O> promisify(@NotNull final ScheduledExecutor executor,
+      @NotNull final Future<O> future) {
+    return null;
+  }
+
+  @NotNull
+  public <O> Promise<O> promisify(@NotNull final ScheduledExecutor executor,
+      @NotNull final Callable<O> callable) {
+    return null;
+  }
+
+  @NotNull
+  public <O> Promise<O> promisify(@NotNull final ScheduledExecutor executor,
+      @NotNull final Provider<O> provider) {
+    return null;
+  }
+
+  @NotNull
+  public <I, O> Promise<O> promisify(@NotNull final ScheduledExecutor executor,
+      @NotNull final Mapper<I, O> mapper, final I input) {
+    return null;
+  }
+
+  @NotNull
+  public <I1, I2, O> Promise<O> promisify(@NotNull final ScheduledExecutor executor,
+      @NotNull final Func2<I1, I2, O> function, final I1 input1, final I2 input2) {
+    return null;
+  }
+
+  @NotNull
+  public <I1, I2, I3, O> Promise<O> promisify(@NotNull final ScheduledExecutor executor,
+      @NotNull final Func3<I1, I2, I3, O> function, final I1 input1, final I2 input2,
+      final I3 input3) {
+    return null;
+  }
+
+  @NotNull
+  public <I1, I2, I3, I4, O> Promise<O> promisify(@NotNull final ScheduledExecutor executor,
+      @NotNull final Func4<I1, I2, I3, I4, O> function, final I1 input1, final I2 input2,
+      final I3 input3, final I4 input4) {
+    return null;
+  }
+
+  @NotNull
+  public <I1, I2, I3, I4, I5, O> Promise<O> promisify(@NotNull final ScheduledExecutor executor,
+      @NotNull final Func5<I1, I2, I3, I4, I5, O> function, final I1 input1, final I2 input2,
+      final I3 input3, final I4 input4, final I5 input5) {
+    return null;
   }
 
   @NotNull
@@ -164,6 +263,26 @@ public class Bond implements Serializable {
     }
 
     return proxy;
+  }
+
+  public interface Func2<I1, I2, O> {
+
+    O apply(I1 input1, I2 input2) throws Exception;
+  }
+
+  public interface Func3<I1, I2, I3, O> {
+
+    O apply(I1 input1, I2 input2, I3 input3) throws Exception;
+  }
+
+  public interface Func4<I1, I2, I3, I4, O> {
+
+    O apply(I1 input1, I2 input2, I3 input3, I4 input4) throws Exception;
+  }
+
+  public interface Func5<I1, I2, I3, I4, I5, O> {
+
+    O apply(I1 input1, I2 input2, I3 input3, I4 input4, I5 input5) throws Exception;
   }
 
   private static class APlusMapper implements Mapper<Promise<?>, Promise<?>>, Serializable {

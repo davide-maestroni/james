@@ -233,6 +233,17 @@ public class SimpleQueue<E> extends AbstractCollection<E> implements Queue<E> {
     return (E) mData[(mLast - 1) & mask];
   }
 
+  // TODO: 30/07/2017 javadoc
+  public void remove(final int index) {
+    final int first = mFirst;
+    final int last = mLast;
+    if ((first <= last) ? (index < first) || (index >= last) : (index < first) && (index >= last)) {
+      throw new IndexOutOfBoundsException();
+    }
+
+    removeElement(index);
+  }
+
   /**
    * Removes the first element of the queue.
    *
@@ -379,6 +390,46 @@ public class SimpleQueue<E> extends AbstractCollection<E> implements Queue<E> {
     mMask = newSize - 1;
   }
 
+  private boolean removeElement(final int index) {
+    final int first = mFirst;
+    final int last = mLast;
+    final Object[] data = mData;
+    final int mask = mMask;
+    final int front = (index - first) & mask;
+    final int back = (last - index) & mask;
+    final boolean isForward;
+    if (front <= back) {
+      if (first <= index) {
+        System.arraycopy(data, first, data, first + 1, front);
+
+      } else {
+        System.arraycopy(data, 0, data, 1, index);
+        data[0] = data[mask];
+        System.arraycopy(data, first, data, first + 1, mask - first);
+      }
+
+      mData[first] = null;
+      mFirst = (first + 1) & mask;
+      isForward = true;
+
+    } else {
+      if (index < last) {
+        System.arraycopy(data, index + 1, data, index, back);
+
+      } else {
+        System.arraycopy(data, index + 1, data, index, mask - index);
+        data[mask] = data[0];
+        System.arraycopy(data, 1, data, 0, last);
+      }
+
+      mLast = (last - 1) & mask;
+      isForward = false;
+    }
+
+    --mSize;
+    return isForward;
+  }
+
   /**
    * Queue iterator implementation.
    */
@@ -437,45 +488,20 @@ public class SimpleQueue<E> extends AbstractCollection<E> implements Queue<E> {
       }
 
       final SimpleQueue<E> queue = mQueue;
-      final int first = queue.mFirst;
-      final int last = queue.mLast;
-      if ((first != originalFirst) || (last != mOriginalLast)) {
+      if ((queue.mFirst != originalFirst) || (queue.mLast != mOriginalLast)) {
         throw new ConcurrentModificationException();
       }
 
-      final Object[] data = queue.mData;
       final int mask = queue.mMask;
       final int index = (pointer - 1) & mask;
-      final int front = (index - first) & mask;
-      final int back = (last - index) & mask;
-      if (front <= back) {
-        if (first <= index) {
-          System.arraycopy(data, first, data, first + 1, front);
-
-        } else {
-          System.arraycopy(data, 0, data, 1, index);
-          data[0] = data[mask];
-          System.arraycopy(data, first, data, first + 1, mask - first);
-        }
-
-        queue.mData[first] = null;
-        queue.mFirst = mOriginalFirst = (first + 1) & queue.mMask;
+      if (queue.removeElement(index)) {
+        mOriginalFirst = queue.mFirst;
 
       } else {
-        if (index < last) {
-          System.arraycopy(data, index + 1, data, index, back);
-
-        } else {
-          System.arraycopy(data, index + 1, data, index, mask - index);
-          data[mask] = data[0];
-          System.arraycopy(data, 1, data, 0, last);
-        }
-
-        queue.mLast = mOriginalLast = (last - 1) & mask;
+        mOriginalLast = queue.mLast;
         mPointer = (mPointer - 1) & mask;
       }
 
-      --queue.mSize;
       mIsRemoved = true;
     }
   }

@@ -115,8 +115,7 @@ class NestedQueue<E> {
 
   // TODO: 29/07/2017 javadoc
   boolean isClosed() {
-    // TODO: 29/07/2017 iterate
-    return mClosed;
+    return mQueueManager.isClosed();
   }
 
   /**
@@ -177,6 +176,9 @@ class NestedQueue<E> {
    * @param <E> the element data type.
    */
   private interface QueueManager<E> {
+
+    // TODO: 30/07/2017 javadoc
+    boolean isClosed();
 
     /**
      * Check if the queue does not contain any element.
@@ -299,6 +301,23 @@ class NestedQueue<E> {
    */
   private class NestedQueueManager implements QueueManager<E> {
 
+    public boolean isClosed() {
+      if (!mClosed) {
+        return false;
+      }
+
+      final SimpleQueue<Object> queue = mQueue;
+      for (final Object element : queue) {
+        if (element instanceof InnerNestedQueue) {
+          if (!((InnerNestedQueue) element).isClosed()) {
+            return false;
+          }
+        }
+      }
+
+      return true;
+    }
+
     @SuppressWarnings("unchecked")
     public boolean isEmpty() {
       final SimpleQueue<Object> queue = mQueue;
@@ -407,6 +426,10 @@ class NestedQueue<E> {
    * Simple queue manager implementation.
    */
   private class SimpleQueueManager implements QueueManager<E> {
+
+    public boolean isClosed() {
+      return mClosed;
+    }
 
     public boolean isEmpty() {
       return mQueue.isEmpty();
