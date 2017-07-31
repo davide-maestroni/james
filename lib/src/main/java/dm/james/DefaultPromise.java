@@ -151,11 +151,6 @@ class DefaultPromise<O> implements Promise<O> {
   }
 
   @NotNull
-  private static RejectionException wrapException(@Nullable final Throwable t) {
-    return (t instanceof RejectionException) ? (RejectionException) t : new RejectionException(t);
-  }
-
-  @NotNull
   public <R> Promise<R> apply(@NotNull final Mapper<Promise<O>, Promise<R>> mapper) {
     try {
       return ConstantConditions.notNull("promise", mapper.apply(this));
@@ -163,7 +158,7 @@ class DefaultPromise<O> implements Promise<O> {
     } catch (final Throwable t) {
       InterruptedExecutionException.throwIfInterrupt(t);
       mLogger.err(t, "Error while applying promise transformation");
-      throw wrapException(t);
+      throw RejectionException.wrapIfNotRejectionException(t);
     }
   }
 
@@ -565,7 +560,7 @@ class DefaultPromise<O> implements Promise<O> {
       @Nullable
       @Override
       RejectionException getException() {
-        return wrapException(mException);
+        return RejectionException.wrapIfNotRejectionException(mException);
       }
 
       @Override
@@ -1044,7 +1039,7 @@ class DefaultPromise<O> implements Promise<O> {
       void resolve() {
         final Throwable reason = mReason;
         mLogger.wrn("Chain has been already rejected with reason: %s", reason);
-        throw wrapException(reason);
+        throw RejectionException.wrapIfNotRejectionException(reason);
       }
     }
 
@@ -1053,7 +1048,7 @@ class DefaultPromise<O> implements Promise<O> {
       @Override
       void resolve() {
         mLogger.wrn("Chain has been already resolved");
-        throw wrapException(new IllegalStateException("chain has been already resolved"));
+        throw new IllegalStateException("chain has been already resolved");
       }
 
       @Override

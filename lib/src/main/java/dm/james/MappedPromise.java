@@ -45,7 +45,7 @@ class MappedPromise<O> implements Promise<O> {
       mPromise = (Promise<O>) mapper.apply(promise);
 
     } catch (final Exception e) {
-      throw (e instanceof RejectionException) ? (RejectionException) e : new RejectionException(e);
+      throw RejectionException.wrapIfNotRejectionException(e);
     }
   }
 

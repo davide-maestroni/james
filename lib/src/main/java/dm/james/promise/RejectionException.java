@@ -16,6 +16,9 @@
 
 package dm.james.promise;
 
+import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
+
 import java.io.PrintStream;
 import java.io.PrintWriter;
 
@@ -29,6 +32,21 @@ public class RejectionException extends RuntimeException {
 
   public RejectionException(final Throwable throwable) {
     super(throwable);
+  }
+
+  @NotNull
+  public static RuntimeException wrapIfNot(@NotNull final Class<? extends RuntimeException> type,
+      @Nullable final Throwable t) {
+    if ((t == null) || !type.isInstance(t)) {
+      return new RejectionException(t);
+    }
+
+    return (RuntimeException) t;
+  }
+
+  @NotNull
+  public static RejectionException wrapIfNotRejectionException(@Nullable final Throwable t) {
+    return (RejectionException) wrapIfNot(RejectionException.class, t);
   }
 
   @Override

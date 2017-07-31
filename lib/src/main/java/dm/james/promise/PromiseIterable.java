@@ -37,6 +37,9 @@ public interface PromiseIterable<O> extends Promise<Iterable<O>>, Iterable<O> {
   <R> PromiseIterable<R> all(@NotNull Mapper<Iterable<O>, Iterable<R>> mapper);
 
   @NotNull
+  <R> PromiseIterable<R> all(@NotNull Processor<Iterable<O>, Iterable<R>> processor);
+
+  @NotNull
   <R> PromiseIterable<R> all(@NotNull StatelessProcessor<Iterable<O>, R> processor);
 
   @NotNull
@@ -53,6 +56,9 @@ public interface PromiseIterable<O> extends Promise<Iterable<O>>, Iterable<O> {
 
   @NotNull
   <R> PromiseIterable<R> any(@NotNull Mapper<O, R> mapper);
+
+  @NotNull
+  <R> PromiseIterable<R> any(@NotNull Processor<O, R> processor);
 
   @NotNull
   <R> PromiseIterable<R> any(@NotNull StatelessProcessor<O, R> processor);
@@ -73,7 +79,9 @@ public interface PromiseIterable<O> extends Promise<Iterable<O>>, Iterable<O> {
 
   @NotNull
   <R> PromiseIterable<R> applyEach(@NotNull Mapper<Promise<O>, Promise<R>> mapper);
-  // TODO: 30/07/2017 applyEachSorted(Mapper) ??
+
+  @NotNull
+  <R> PromiseIterable<R> applyEachSorted(@NotNull Mapper<Promise<O>, Promise<R>> mapper);
 
   @NotNull
   PromiseIterable<O> catchAny(@NotNull Mapper<Throwable, Iterable<O>> mapper);
@@ -89,7 +97,9 @@ public interface PromiseIterable<O> extends Promise<Iterable<O>>, Iterable<O> {
 
   @NotNull
   PromiseIterable<O> catchEach(@NotNull Mapper<Throwable, O> mapper);
-  // TODO: 30/07/2017 catchEach(Mapper, maxBatchSize)
+
+  @NotNull
+  PromiseIterable<O> catchEach(@NotNull Mapper<Throwable, O> mapper, int maxBatchSize);
 
   @NotNull
   <R> PromiseIterable<R> each(@Nullable Handler<O, R, ? super CallbackIterable<R>> outputHandler,
@@ -97,7 +107,12 @@ public interface PromiseIterable<O> extends Promise<Iterable<O>>, Iterable<O> {
 
   @NotNull
   <R> PromiseIterable<R> each(@NotNull Mapper<O, R> mapper);
-  // TODO: 30/07/2017 each(Mapper, maxBatchSize)
+
+  @NotNull
+  <R> PromiseIterable<R> each(@NotNull Mapper<O, R> mapper, int maxBatchSize);
+
+  @NotNull
+  <R> PromiseIterable<R> each(@NotNull Processor<O, R> processor);
 
   @NotNull
   <R> PromiseIterable<R> each(@NotNull StatelessProcessor<O, R> processor);
@@ -179,9 +194,9 @@ public interface PromiseIterable<O> extends Promise<Iterable<O>>, Iterable<O> {
 
     S create(@NotNull CallbackIterable<O> callback) throws Exception;
 
-    S process(S state, I input, @NotNull CallbackIterable<O> callback) throws Exception;
+    S fulfill(S state, I input, @NotNull CallbackIterable<O> callback) throws Exception;
 
-    void reject(S state, Throwable reason, @NotNull CallbackIterable<O> callback) throws Exception;
+    S reject(S state, Throwable reason, @NotNull CallbackIterable<O> callback) throws Exception;
 
     void resolve(S state, @NotNull CallbackIterable<O> callback) throws Exception;
   }
