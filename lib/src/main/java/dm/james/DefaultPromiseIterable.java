@@ -58,8 +58,6 @@ class DefaultPromiseIterable<O> implements PromiseIterable<O>, Serializable {
 
   // TODO: 26/07/2017 test rejection propagation
 
-  private final ScheduledExecutor mExecutor;
-
   private final ChainHead<?> mHead;
 
   private final Logger mLogger;
@@ -72,7 +70,7 @@ class DefaultPromiseIterable<O> implements PromiseIterable<O>, Serializable {
 
   private final PromiseChain<?, O> mTail;
 
-  private boolean mIsBound;
+  private PromiseChain<O, ?> mBond;
 
   private PromiseState mState = PromiseState.Pending;
 
@@ -83,10 +81,9 @@ class DefaultPromiseIterable<O> implements PromiseIterable<O>, Serializable {
     mObserver = (Observer<CallbackIterable<?>>) ConstantConditions.notNull("observer", observer);
     mLogger = Logger.newLogger(log, level, this);
     mPropagationType = (propagationType != null) ? propagationType : PropagationType.LOOP;
-    mExecutor = ScheduledExecutors.throttlingExecutor(mPropagationType.executor(), 1);
     final ChainHead<O> head = new ChainHead<O>();
     head.setLogger(mLogger);
-    head.setNext(new ChainTail(mExecutor, head));
+    head.setNext(new ChainTail(head));
     mMutex = head.getMutex();
     mHead = head;
     mTail = head;
@@ -107,12 +104,11 @@ class DefaultPromiseIterable<O> implements PromiseIterable<O>, Serializable {
     // serialization
     mObserver = observer;
     mPropagationType = propagationType;
-    mExecutor = ScheduledExecutors.throttlingExecutor(propagationType.executor(), 1);
     mLogger = Logger.newLogger(log, level, this);
     mMutex = head.getMutex();
     mHead = head;
     mTail = tail;
-    tail.setNext(new ChainTail(mExecutor, (ChainHead<O>) head));
+    tail.setNext(new ChainTail((ChainHead<O>) head));
     PromiseChain<?, ?> chain = head;
     while (chain != tail) {
       chain.setLogger(mLogger);
@@ -131,39 +127,25 @@ class DefaultPromiseIterable<O> implements PromiseIterable<O>, Serializable {
 
   @SuppressWarnings("unchecked")
   private DefaultPromiseIterable(@NotNull final Observer<CallbackIterable<?>> observer,
-      @NotNull final PropagationType propagationType, @NotNull final ScheduledExecutor executor,
-      @NotNull final Logger logger, @NotNull final ChainHead<?> head,
-      @NotNull final PromiseChain<?, O> chain) {
-    // bind
-    mObserver = observer;
-    mPropagationType = propagationType;
-    mExecutor = executor;
-    mLogger = logger;
-    mMutex = head.getMutex();
-    mHead = head;
-    mTail = chain;
-    chain.setNext(new ChainTail(mExecutor, (ChainHead<O>) head));
-  }
-
-  @SuppressWarnings("unchecked")
-  private DefaultPromiseIterable(@NotNull final Observer<CallbackIterable<?>> observer,
       @NotNull final PropagationType propagationType, @NotNull final Logger logger,
-      @NotNull final ChainHead<?> head, @NotNull final PromiseChain<?, O> tail) {
-    // copy
+      @NotNull final ChainHead<?> head, @NotNull final PromiseChain<?, O> tail,
+      final boolean observe) {
+    // copy/bind
     mObserver = observer;
     mPropagationType = propagationType;
-    mExecutor = ScheduledExecutors.throttlingExecutor(propagationType.executor(), 1);
     mLogger = logger;
     mMutex = head.getMutex();
     mHead = head;
     mTail = tail;
-    tail.setNext(new ChainTail(mExecutor, (ChainHead<O>) head));
-    try {
-      observer.accept(head);
+    tail.setNext(new ChainTail((ChainHead<O>) head));
+    if (observe) {
+      try {
+        observer.accept(head);
 
-    } catch (final Throwable t) {
-      InterruptedExecutionException.throwIfInterrupt(t);
-      head.reject(t);
+      } catch (final Throwable t) {
+        InterruptedExecutionException.throwIfInterrupt(t);
+        head.reject(t);
+      }
     }
   }
 
@@ -194,6 +176,12 @@ class DefaultPromiseIterable<O> implements PromiseIterable<O>, Serializable {
       @Nullable final Handler<Iterable<O>, R, ? super CallbackIterable<R>> outputHandler,
       @Nullable final Handler<Throwable, R, ? super CallbackIterable<R>> errorHandler) {
     return allSorted(new ProcessorHandle<Iterable<O>, R>(outputHandler, errorHandler));
+  }
+
+  @NotNull
+  public <R> PromiseIterable<R> allSorted(
+      @NotNull final Processor<Iterable<O>, Iterable<R>> processor) {
+    return allSorted(new ProcessorStatelessIterable<O, R>(processor));
   }
 
   @NotNull
@@ -229,6 +217,11 @@ class DefaultPromiseIterable<O> implements PromiseIterable<O>, Serializable {
       @Nullable final Handler<O, R, ? super CallbackIterable<R>> outputHandler,
       @Nullable final Handler<Throwable, R, ? super CallbackIterable<R>> errorHandler) {
     return anySorted(new ProcessorHandle<O, R>(outputHandler, errorHandler));
+  }
+
+  @NotNull
+  public <R> PromiseIterable<R> anySorted(@NotNull final Processor<O, R> processor) {
+    return anySorted(new ProcessorStateless<O, R>(processor));
   }
 
   @NotNull
@@ -334,6 +327,11 @@ class DefaultPromiseIterable<O> implements PromiseIterable<O>, Serializable {
       @Nullable final Handler<O, R, ? super CallbackIterable<R>> outputHandler,
       @Nullable final Handler<Throwable, R, ? super CallbackIterable<R>> errorHandler) {
     return eachSorted(new ProcessorHandle<O, R>(outputHandler, errorHandler));
+  }
+
+  @NotNull
+  public <R> PromiseIterable<R> eachSorted(@NotNull final Processor<O, R> processor) {
+    return eachSorted(new ProcessorStateless<O, R>(processor));
   }
 
   @NotNull
@@ -551,17 +549,17 @@ class DefaultPromiseIterable<O> implements PromiseIterable<O>, Serializable {
     return chain(new ChainStatefulSorted<O, R, S>(mPropagationType, processor));
   }
 
-  public void waitCompleted() {
-    waitCompleted(-1, TimeUnit.MILLISECONDS);
+  public void waitComplete() {
+    waitComplete(-1, TimeUnit.MILLISECONDS);
   }
 
-  public boolean waitCompleted(final long timeout, @NotNull final TimeUnit timeUnit) {
+  public boolean waitComplete(final long timeout, @NotNull final TimeUnit timeUnit) {
     synchronized (mMutex) {
       try {
         if (TimeUtils.waitUntil(mMutex, new Condition() {
 
           public boolean isTrue() {
-            return mHead.isCompleted();
+            return mHead.isComplete();
           }
         }, timeout, timeUnit)) {
           return true;
@@ -708,7 +706,7 @@ class DefaultPromiseIterable<O> implements PromiseIterable<O>, Serializable {
 
   public boolean isBound() {
     synchronized (mMutex) {
-      return mIsBound;
+      return (mBond != null);
     }
   }
 
@@ -787,16 +785,22 @@ class DefaultPromiseIterable<O> implements PromiseIterable<O>, Serializable {
     final Logger logger = mLogger;
     final ChainHead<?> head = mHead;
     final boolean isBound;
+    final Runnable binding;
+    final PromiseIterable<R> promise;
     synchronized (mMutex) {
-      if (mIsBound) {
+      if (mBond != null) {
         isBound = true;
+        promise = null;
+        binding = null;
 
       } else {
         isBound = false;
         chain.setLogger(logger);
-        head.bind();
-        mIsBound = true;
+        binding = ((ChainHead<O>) head).bind(chain);
+        mBond = chain;
         mMutex.notifyAll();
+        promise =
+            new DefaultPromiseIterable<R>(mObserver, mPropagationType, logger, head, chain, false);
       }
     }
 
@@ -804,15 +808,16 @@ class DefaultPromiseIterable<O> implements PromiseIterable<O>, Serializable {
       return copy().chain(chain);
     }
 
-    final DefaultPromiseIterable<R> promise =
-        new DefaultPromiseIterable<R>(mObserver, mPropagationType, mExecutor, logger, head, chain);
-    final PromiseChain<?, O> tail = mTail;
-    ((ChainTail) tail.mNext).bind(tail, chain);
+    if (binding != null) {
+      binding.run();
+    }
+
+    ((PromiseChain<?, Object>) mTail).setNext((PromiseChain<Object, O>) chain);
     return promise;
   }
 
   private void checkBound() {
-    if (mIsBound) {
+    if (mBond != null) {
       throw new IllegalStateException("the promise has been bound");
     }
   }
@@ -834,7 +839,7 @@ class DefaultPromiseIterable<O> implements PromiseIterable<O>, Serializable {
     }
 
     return new DefaultPromiseIterable<O>(mObserver, mPropagationType, logger, newHead,
-        (PromiseChain<?, O>) newTail);
+        (PromiseChain<?, O>) newTail, true);
   }
 
   @NotNull
@@ -926,11 +931,15 @@ class DefaultPromiseIterable<O> implements PromiseIterable<O>, Serializable {
       next.add(input);
     }
 
-    void bind() {
+    @Nullable
+    Runnable bind(final PromiseChain<O, ?> chain) {
+      final Runnable binding = mInnerState.bind(chain);
       mInnerState = new StatePending();
       mState = PromiseState.Pending;
+      return binding;
     }
 
+    @NotNull
     ArrayList<Resolution<O>> consumeOutputs() {
       final ArrayList<Resolution<O>> outputs = mOutputs;
       mOutputs = new ArrayList<Resolution<O>>();
@@ -986,11 +995,21 @@ class DefaultPromiseIterable<O> implements PromiseIterable<O>, Serializable {
       mState = PromiseState.Fulfilled;
     }
 
-    boolean isCompleted() {
-      return mInnerState.isCompleted();
+    boolean isComplete() {
+      return mInnerState.isComplete();
     }
 
     private class StatePending {
+
+      @Nullable
+      Runnable bind(final PromiseChain<O, ?> chain) {
+        return new Runnable() {
+
+          public void run() {
+            chain.prepend(consumeOutputs());
+          }
+        };
+      }
 
       @NotNull
       IllegalStateException exception(@NotNull final PromiseState state) {
@@ -1003,12 +1022,24 @@ class DefaultPromiseIterable<O> implements PromiseIterable<O>, Serializable {
         mInnerState = new StateResolved();
       }
 
-      boolean isCompleted() {
+      boolean isComplete() {
         return false;
       }
     }
 
     private class StateResolved extends StatePending {
+
+      @Nullable
+      @Override
+      Runnable bind(final PromiseChain<O, ?> chain) {
+        return new Runnable() {
+
+          public void run() {
+            chain.prepend(consumeOutputs());
+            chain.resolve();
+          }
+        };
+      }
 
       @Override
       void innerResolve() {
@@ -1016,7 +1047,7 @@ class DefaultPromiseIterable<O> implements PromiseIterable<O>, Serializable {
       }
 
       @Override
-      boolean isCompleted() {
+      boolean isComplete() {
         return true;
       }
     }
@@ -1364,10 +1395,12 @@ class DefaultPromiseIterable<O> implements PromiseIterable<O>, Serializable {
       mExecutor = ScheduledExecutors.throttlingExecutor(propagationType.executor(), 1);
     }
 
+    // TODO: 31/07/2017 find tradeoff and switch between transferTo and removeFirst
     private void flushQueue(final PromiseChain<R, ?> next) {
       Resolution<R> resolution = removeFirst();
       while (resolution != null) {
         resolution.consume(next);
+        resolution = removeFirst();
       }
 
       final boolean closed;
@@ -2006,10 +2039,12 @@ class DefaultPromiseIterable<O> implements PromiseIterable<O>, Serializable {
       mPropagationType = propagationType;
     }
 
+    // TODO: 31/07/2017 find tradeoff and switch between transferTo and removeFirst
     private void flushQueue(final PromiseChain<R, ?> next) {
       Resolution<R> resolution = removeFirst();
       while (resolution != null) {
         resolution.consume(next);
+        resolution = removeFirst();
       }
     }
 
@@ -2098,9 +2133,7 @@ class DefaultPromiseIterable<O> implements PromiseIterable<O>, Serializable {
 
       public void reject(final Throwable reason) {
         synchronized (mMutex) {
-          final NestedQueue<Resolution<R>> queue = mQueue;
-          queue.add(new ResolutionRejected<R>(reason));
-          queue.close();
+          mQueue.add(new ResolutionRejected<R>(reason));
         }
 
         final PromiseChain<R, ?> next = mNext;
@@ -2126,10 +2159,6 @@ class DefaultPromiseIterable<O> implements PromiseIterable<O>, Serializable {
       }
 
       public void resolve() {
-        synchronized (mMutex) {
-          mQueue.close();
-        }
-
         final PromiseChain<R, ?> next = mNext;
         flushQueue(next);
         innerResolve(next);
@@ -2137,9 +2166,7 @@ class DefaultPromiseIterable<O> implements PromiseIterable<O>, Serializable {
 
       public void resolve(final R output) {
         synchronized (mMutex) {
-          final NestedQueue<Resolution<R>> queue = mQueue;
-          queue.add(new ResolutionResolved<R>(output));
-          queue.close();
+          mQueue.add(new ResolutionResolved<R>(output));
         }
 
         final PromiseChain<R, ?> next = mNext;
@@ -2294,7 +2321,7 @@ class DefaultPromiseIterable<O> implements PromiseIterable<O>, Serializable {
     void addAll(final PromiseChain<R, ?> next, final Iterable<O> inputs) {
       int size;
       if (inputs instanceof Collection) {
-        size = ((Collection) inputs).size();
+        size = ((Collection<?>) inputs).size();
 
       } else {
         size = 0;
@@ -3090,6 +3117,10 @@ class DefaultPromiseIterable<O> implements PromiseIterable<O>, Serializable {
       mLogger = logger.subContextLogger(this);
     }
 
+    void prepend(@NotNull final List<Resolution<I>> resolutions) {
+      mInnerState = new StatePrepending(resolutions);
+    }
+
     abstract void resolve(PromiseChain<O, ?> next);
 
     void setNext(@NotNull PromiseChain<O, ?> next) {
@@ -3109,16 +3140,71 @@ class DefaultPromiseIterable<O> implements PromiseIterable<O>, Serializable {
 
     private class StatePending {
 
-      void add() {
+      @Nullable
+      Runnable add() {
+        return null;
       }
 
-      boolean reject(final Throwable reason) {
+      @Nullable
+      Runnable reject(final Throwable reason) {
         mInnerState = new StateRejected(reason);
-        return true;
+        return null;
       }
 
-      void resolve() {
+      @Nullable
+      Runnable resolve() {
         mInnerState = new StateResolved();
+        return null;
+      }
+    }
+
+    private class StatePrepending extends StatePending implements Runnable {
+
+      private final List<Resolution<I>> mResolutions;
+
+      private StatePrepending(@NotNull final List<Resolution<I>> resolutions) {
+        mResolutions = resolutions;
+      }
+
+      @Nullable
+      @Override
+      Runnable add() {
+        mInnerState = new StatePending();
+        return this;
+      }
+
+      public void run() {
+        for (final Resolution<I> resolution : mResolutions) {
+          resolution.consume(PromiseChain.this);
+        }
+      }
+
+      @Nullable
+      @Override
+      Runnable reject(final Throwable reason) {
+        return new Runnable() {
+
+          public void run() {
+            StatePrepending.this.run();
+            synchronized (mMutex) {
+              mInnerState = new StateRejected(reason);
+            }
+          }
+        };
+      }
+
+      @Nullable
+      @Override
+      Runnable resolve() {
+        return new Runnable() {
+
+          public void run() {
+            StatePrepending.this.run();
+            synchronized (mMutex) {
+              mInnerState = new StateResolved();
+            }
+          }
+        };
       }
     }
 
@@ -3130,21 +3216,24 @@ class DefaultPromiseIterable<O> implements PromiseIterable<O>, Serializable {
         mReason = reason;
       }
 
+      @Nullable
       @Override
-      void add() {
+      Runnable add() {
         final Throwable reason = mReason;
         mLogger.wrn("Chain has been already rejected with reason: %s", reason);
         throw RejectionException.wrapIfNotRejectionException(reason);
       }
 
+      @Nullable
       @Override
-      boolean reject(final Throwable reason) {
+      Runnable reject(final Throwable reason) {
         mLogger.wrn("Suppressed rejection with reason: %s", reason);
-        return false;
+        return null;
       }
 
+      @Nullable
       @Override
-      void resolve() {
+      Runnable resolve() {
         final Throwable reason = mReason;
         mLogger.wrn("Chain has been already rejected with reason: %s", reason);
         throw RejectionException.wrapIfNotRejectionException(reason);
@@ -3153,36 +3242,42 @@ class DefaultPromiseIterable<O> implements PromiseIterable<O>, Serializable {
 
     private class StateResolved extends StatePending {
 
+      @Nullable
       @Override
-      void add() {
+      Runnable add() {
         mLogger.wrn("Chain has been already resolved");
         throw new IllegalStateException("chain has been already resolved");
       }
 
+      @Nullable
       @Override
-      void resolve() {
+      Runnable resolve() {
         mLogger.wrn("Chain has been already resolved");
         throw new IllegalStateException("chain has been already resolved");
-      }
-
-      @Override
-      boolean reject(final Throwable reason) {
-        mInnerState = new StateRejected(reason);
-        return true;
       }
     }
 
     public final void add(final I output) {
+      final Runnable command;
       synchronized (mMutex) {
-        mInnerState.add();
+        command = mInnerState.add();
+      }
+
+      if (command != null) {
+        command.run();
       }
 
       add(mNext, output);
     }
 
     public final void addAll(@Nullable final Iterable<I> outputs) {
+      final Runnable command;
       synchronized (mMutex) {
-        mInnerState.add();
+        command = mInnerState.add();
+      }
+
+      if (command != null) {
+        command.run();
       }
 
       if (outputs != null) {
@@ -3192,9 +3287,14 @@ class DefaultPromiseIterable<O> implements PromiseIterable<O>, Serializable {
 
     @SuppressWarnings("unchecked")
     public final void addAllDeferred(@NotNull final Promise<? extends Iterable<I>> promise) {
+      final Runnable command;
       synchronized (mMutex) {
-        mInnerState.add();
+        command = mInnerState.add();
         ++mDeferredCount;
+      }
+
+      if (command != null) {
+        command.run();
       }
 
       if (promise instanceof PromiseIterable) {
@@ -3240,9 +3340,14 @@ class DefaultPromiseIterable<O> implements PromiseIterable<O>, Serializable {
     }
 
     public final void addDeferred(@NotNull final Promise<I> promise) {
+      final Runnable command;
       synchronized (mMutex) {
-        mInnerState.add();
+        command = mInnerState.add();
         ++mDeferredCount;
+      }
+
+      if (command != null) {
+        command.run();
       }
 
       promise.then(new Processor<I, Void>() {
@@ -3260,18 +3365,27 @@ class DefaultPromiseIterable<O> implements PromiseIterable<O>, Serializable {
     }
 
     public final void resolve() {
+      final Runnable command;
       synchronized (mMutex) {
-        mInnerState.resolve();
+        command = mInnerState.resolve();
+      }
+
+      if (command != null) {
+        command.run();
       }
 
       innerResolve();
     }
 
     public final void defer(@NotNull final Promise<I> promise) {
+      final Runnable command;
       synchronized (mMutex) {
-        mInnerState.add();
+        command = mInnerState.add();
         ++mDeferredCount;
-        mInnerState.resolve();
+      }
+
+      if (command != null) {
+        command.run();
       }
 
       promise.then(new Processor<I, Void>() {
@@ -3287,12 +3401,17 @@ class DefaultPromiseIterable<O> implements PromiseIterable<O>, Serializable {
         }
       });
 
-      innerResolve();
+      resolve();
     }
 
     public final void reject(final Throwable reason) {
+      final Runnable command;
       synchronized (mMutex) {
-        mInnerState.reject(reason);
+        command = mInnerState.reject(reason);
+      }
+
+      if (command != null) {
+        command.run();
       }
 
       addRejection(mNext, reason);
@@ -3300,8 +3419,13 @@ class DefaultPromiseIterable<O> implements PromiseIterable<O>, Serializable {
     }
 
     public final void resolve(final I output) {
+      final Runnable command;
       synchronized (mMutex) {
-        mInnerState.resolve();
+        command = mInnerState.resolve();
+      }
+
+      if (command != null) {
+        command.run();
       }
 
       add(mNext, output);
@@ -3446,94 +3570,52 @@ class DefaultPromiseIterable<O> implements PromiseIterable<O>, Serializable {
 
   private class ChainTail extends PromiseChain<O, Object> {
 
-    private final ScheduledExecutor mExecutor;
-
     private final ChainHead<O> mHead;
 
-    private PromiseChain<O, ?> mBond;
-
-    private ChainTail(@NotNull final ScheduledExecutor executor, @NotNull final ChainHead<O> head) {
-      mExecutor = executor;
+    private ChainTail(@NotNull final ChainHead<O> head) {
       mHead = head;
-    }
-
-    void bind(@NotNull final PromiseChain<?, O> tail, @NotNull final PromiseChain<O, ?> bond) {
-      mExecutor.execute(new Runnable() {
-
-        public void run() {
-          mBond = bond;
-          final PromiseState state;
-          final ArrayList<Resolution<O>> outputs;
-          synchronized (mMutex) {
-            outputs = mHead.consumeOutputs();
-            state = mState;
-          }
-
-          try {
-            for (final Resolution<O> output : outputs) {
-              output.consume(bond);
-            }
-
-            if (state.isResolved()) {
-              bond.resolve();
-            }
-
-          } catch (final Throwable t) {
-            InterruptedExecutionException.throwIfInterrupt(t);
-          }
-
-          tail.setNext(bond);
-        }
-      });
     }
 
     @Override
     void add(final PromiseChain<Object, ?> next, final O input) {
-      mExecutor.execute(new Runnable() {
-
-        public void run() {
-          final PromiseChain<O, ?> bond = mBond;
-          if (bond == null) {
-            synchronized (mMutex) {
-              try {
-                mHead.innerAdd(input);
-
-              } finally {
-                mMutex.notifyAll();
-              }
-            }
-
-          } else {
-            bond.add(input);
+      final PromiseChain<O, ?> bond;
+      synchronized (mMutex) {
+        try {
+          mState = PromiseState.Fulfilled;
+          if ((bond = mBond) == null) {
+            mHead.innerAdd(input);
+            return;
           }
+
+        } finally {
+          mMutex.notifyAll();
         }
-      });
+      }
+
+      bond.add(input);
     }
 
     @Override
     void addAll(final PromiseChain<Object, ?> next, final Iterable<O> inputs) {
-      mExecutor.execute(new Runnable() {
-
-        public void run() {
-          final PromiseChain<O, ?> bond = mBond;
-          if (bond == null) {
-            synchronized (mMutex) {
-              try {
-                @SuppressWarnings("UnnecessaryLocalVariable") final ChainHead<O> head = mHead;
-                for (final O input : inputs) {
-                  head.innerAdd(input);
-                }
-
-              } finally {
-                mMutex.notifyAll();
-              }
+      final PromiseChain<O, ?> bond;
+      synchronized (mMutex) {
+        try {
+          mState = PromiseState.Fulfilled;
+          if ((bond = mBond) == null) {
+            @SuppressWarnings("UnnecessaryLocalVariable") final ChainHead<O> head = mHead;
+            for (final O input : inputs) {
+              head.innerAdd(input);
             }
 
-          } else {
-            bond.addAll(inputs);
+            return;
           }
+
+        } finally {
+          mMutex.notifyAll();
         }
-      });
+      }
+
+      bond.addAll(inputs);
     }
 
     @NotNull

@@ -48,6 +48,9 @@ public interface PromiseIterable<O> extends Promise<Iterable<O>>, Iterable<O> {
       @Nullable Handler<Throwable, R, ? super CallbackIterable<R>> errorHandler);
 
   @NotNull
+  <R> PromiseIterable<R> allSorted(@NotNull Processor<Iterable<O>, Iterable<R>> processor);
+
+  @NotNull
   <R> PromiseIterable<R> allSorted(@NotNull StatelessProcessor<Iterable<O>, R> processor);
 
   @NotNull
@@ -67,6 +70,9 @@ public interface PromiseIterable<O> extends Promise<Iterable<O>>, Iterable<O> {
   <R> PromiseIterable<R> anySorted(
       @Nullable Handler<O, R, ? super CallbackIterable<R>> outputHandler,
       @Nullable Handler<Throwable, R, ? super CallbackIterable<R>> errorHandler);
+
+  @NotNull
+  <R> PromiseIterable<R> anySorted(@NotNull Processor<O, R> processor);
 
   @NotNull
   <R> PromiseIterable<R> anySorted(@NotNull StatelessProcessor<O, R> processor);
@@ -123,6 +129,9 @@ public interface PromiseIterable<O> extends Promise<Iterable<O>>, Iterable<O> {
       @Nullable Handler<Throwable, R, ? super CallbackIterable<R>> errorHandler);
 
   @NotNull
+  <R> PromiseIterable<R> eachSorted(@NotNull Processor<O, R> processor);
+
+  @NotNull
   <R> PromiseIterable<R> eachSorted(@NotNull StatelessProcessor<O, R> processor);
 
   @NotNull
@@ -170,9 +179,9 @@ public interface PromiseIterable<O> extends Promise<Iterable<O>>, Iterable<O> {
   @NotNull
   <R, S> PromiseIterable<R> thenSorted(@NotNull StatefulProcessor<O, R, S> processor);
 
-  void waitCompleted();
+  void waitComplete();
 
-  boolean waitCompleted(long timeout, @NotNull TimeUnit timeUnit);
+  boolean waitComplete(long timeout, @NotNull TimeUnit timeUnit);
 
   @NotNull
   PromiseIterable<O> whenFulfilledAny(@NotNull Observer<O> observer);

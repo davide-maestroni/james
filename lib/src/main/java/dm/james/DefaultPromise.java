@@ -504,6 +504,40 @@ class DefaultPromise<O> implements Promise<O> {
       mState = PromiseState.Fulfilled;
     }
 
+    private class StateFulfilled extends StatePending {
+
+      @Nullable
+      @Override
+      Runnable bind(@NotNull final PromiseChain<?, ?> bond) {
+        getLogger().dbg("Binding promise [%s => %s]", PromiseState.Fulfilled, PromiseState.Pending);
+        final Object output = mOutput;
+        mOutput = null;
+        mInnerState = new StatePending();
+        return new Runnable() {
+
+          @SuppressWarnings("unchecked")
+          public void run() {
+            ((PromiseChain<Object, ?>) bond).resolve(output);
+          }
+        };
+      }
+
+      @Override
+      Object getOutput() {
+        return mOutput;
+      }
+
+      @Override
+      void innerReject(@Nullable final Throwable reason) {
+        throw exception(PromiseState.Fulfilled);
+      }
+
+      @Override
+      void innerResolve(final Object output) {
+        throw exception(PromiseState.Fulfilled);
+      }
+    }
+
     private class StatePending {
 
       @Nullable
@@ -536,7 +570,7 @@ class DefaultPromise<O> implements Promise<O> {
         getLogger().dbg("Resolving promise with resolution [%s => %s]: %s", PromiseState.Pending,
             PromiseState.Fulfilled, output);
         mOutput = output;
-        mInnerState = new StateResolved();
+        mInnerState = new StateFulfilled();
       }
     }
 
@@ -571,40 +605,6 @@ class DefaultPromise<O> implements Promise<O> {
       @Override
       void innerResolve(final Object output) {
         throw exception(PromiseState.Rejected);
-      }
-    }
-
-    private class StateResolved extends StatePending {
-
-      @Override
-      Object getOutput() {
-        return mOutput;
-      }
-
-      @Override
-      void innerReject(@Nullable final Throwable reason) {
-        throw exception(PromiseState.Fulfilled);
-      }
-
-      @Override
-      void innerResolve(final Object output) {
-        throw exception(PromiseState.Fulfilled);
-      }
-
-      @Nullable
-      @Override
-      Runnable bind(@NotNull final PromiseChain<?, ?> bond) {
-        getLogger().dbg("Binding promise [%s => %s]", PromiseState.Fulfilled, PromiseState.Pending);
-        final Object output = mOutput;
-        mOutput = null;
-        mInnerState = new StatePending();
-        return new Runnable() {
-
-          @SuppressWarnings("unchecked")
-          public void run() {
-            ((PromiseChain<Object, ?>) bond).resolve(output);
-          }
-        };
       }
     }
 
