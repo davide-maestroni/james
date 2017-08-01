@@ -59,6 +59,7 @@ public interface Promise<O> extends Serializable {
 
   boolean isResolved();
 
+  // TODO: 01/08/2017 remove??
   @NotNull
   <R> Promise<R> then(@Nullable Handler<O, R, ? super Callback<R>> outputHandler,
       @Nullable Handler<Throwable, R, ? super Callback<R>> errorHandler);
@@ -82,9 +83,13 @@ public interface Promise<O> extends Serializable {
   @NotNull
   Promise<O> whenResolved(@NotNull Action action);
 
-  interface Callback<O> extends Resolvable<O> {
+  interface Callback<O> {
 
     void defer(@NotNull Promise<O> promise);
+
+    void reject(Throwable reason);
+
+    void resolve(O output);
   }
 
   interface Handler<I, O, C extends Callback<O>> {

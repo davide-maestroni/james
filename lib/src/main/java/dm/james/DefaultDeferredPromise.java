@@ -44,8 +44,6 @@ class DefaultDeferredPromise<I, O> implements DeferredPromise<I, O> {
 
   private final Logger mLogger;
 
-  private final Object mMutex;
-
   private final Promise<O> mPromise;
 
   private final StateHolder<I> mState;
@@ -55,7 +53,6 @@ class DefaultDeferredPromise<I, O> implements DeferredPromise<I, O> {
       @Nullable final Level level) {
     mLogger = Logger.newLogger(log, level, this);
     mState = new StateHolder<I>();
-    mMutex = mState.getMutex();
     mPromise = (DefaultPromise<O>) new DefaultPromise<I>(mState, propagationType, log, level);
   }
 
@@ -64,7 +61,6 @@ class DefaultDeferredPromise<I, O> implements DeferredPromise<I, O> {
     // serialization
     mPromise = promise;
     mLogger = Logger.newLogger(log, level, this);
-    mMutex = state.getMutex();
     mState = state;
   }
 
@@ -73,7 +69,6 @@ class DefaultDeferredPromise<I, O> implements DeferredPromise<I, O> {
     // copy
     mPromise = promise;
     mLogger = logger;
-    mMutex = state.getMutex();
     mState = state;
   }
 
@@ -189,11 +184,7 @@ class DefaultDeferredPromise<I, O> implements DeferredPromise<I, O> {
 
   public void reject(final Throwable reason) {
     mLogger.dbg("Rejecting deferred promise with reason: %s", reason);
-    final List<Callback<I>> callbacks;
-    synchronized (mMutex) {
-      callbacks = mState.reject(reason);
-    }
-
+    final List<Callback<I>> callbacks = mState.reject(reason);
     if (callbacks != null) {
       for (final Callback<I> callback : callbacks) {
         callback.reject(reason);
@@ -203,11 +194,7 @@ class DefaultDeferredPromise<I, O> implements DeferredPromise<I, O> {
 
   public void resolve(final I output) {
     mLogger.dbg("Resolving deferred promise with resolution: %s", output);
-    final List<Callback<I>> callbacks;
-    synchronized (mMutex) {
-      callbacks = mState.resolve(output);
-    }
-
+    final List<Callback<I>> callbacks = mState.resolve(output);
     if (callbacks != null) {
       for (final Callback<I> callback : callbacks) {
         callback.resolve(output);
@@ -259,17 +246,18 @@ class DefaultDeferredPromise<I, O> implements DeferredPromise<I, O> {
       }
     }
 
-    @NotNull
-    Object getMutex() {
-      return mMutex;
-    }
-
+    @Nullable
     List<Callback<I>> reject(final Throwable reason) {
-      return mState.reject(reason);
+      synchronized (mMutex) {
+        return mState.reject(reason);
+      }
     }
 
+    @Nullable
     List<Callback<I>> resolve(final I input) {
-      return mState.resolve(input);
+      synchronized (mMutex) {
+        return mState.resolve(input);
+      }
     }
 
     private Object writeReplace() throws ObjectStreamException {
@@ -290,11 +278,13 @@ class DefaultDeferredPromise<I, O> implements DeferredPromise<I, O> {
         return null;
       }
 
+      @Nullable
       List<Callback<I>> reject(final Throwable reason) {
         mState = new StateRejected(reason);
         return mCallbacks;
       }
 
+      @Nullable
       List<Callback<I>> resolve(final I input) {
         mState = new StateResolved(input);
         return mCallbacks;
@@ -319,11 +309,13 @@ class DefaultDeferredPromise<I, O> implements DeferredPromise<I, O> {
         return new IllegalStateException("promise already rejected");
       }
 
+      @Nullable
       @Override
       List<Callback<I>> resolve(final I input) {
         throw exception();
       }
 
+      @Nullable
       @Override
       List<Callback<I>> reject(final Throwable reason) {
         throw exception();
@@ -352,11 +344,13 @@ class DefaultDeferredPromise<I, O> implements DeferredPromise<I, O> {
         return this;
       }
 
+      @Nullable
       @Override
       List<Callback<I>> resolve(final I input) {
         throw exception();
       }
 
+      @Nullable
       @Override
       List<Callback<I>> reject(final Throwable reason) {
         throw exception();

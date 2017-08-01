@@ -192,11 +192,19 @@ public interface PromiseIterable<O> extends Promise<Iterable<O>>, Iterable<O> {
   @NotNull
   PromiseIterable<O> whenRejectedEach(@NotNull Observer<Throwable> observer);
 
-  interface CallbackIterable<O> extends Callback<O>, ResolvableIterable<O> {
+  interface CallbackIterable<O> extends Callback<O> {
+
+    // TODO: 01/08/2017 return CallbackIterable<O>?
+
+    void add(O output);
+
+    void addAll(@Nullable Iterable<O> outputs);
 
     void addAllDeferred(@NotNull Promise<? extends Iterable<O>> promise);
 
     void addDeferred(@NotNull Promise<O> promise);
+
+    void resolve();
   }
 
   interface StatefulProcessor<I, O, S> {

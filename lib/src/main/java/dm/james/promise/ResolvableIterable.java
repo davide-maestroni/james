@@ -21,7 +21,7 @@ import org.jetbrains.annotations.Nullable;
 /**
  * Created by davide-maestroni on 07/22/2017.
  */
-public interface ResolvableIterable<I> extends Resolvable<I> {
+public interface ResolvableIterable<I> extends Resolvable<Iterable<I>> {
 
   void add(I output);
 
