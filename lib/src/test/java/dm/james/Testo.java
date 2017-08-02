@@ -33,7 +33,7 @@ import dm.james.promise.Mapper;
 import dm.james.promise.Observer;
 import dm.james.promise.Promise;
 import dm.james.promise.Promise.Callback;
-import dm.james.promise.Promise.Processor;
+import dm.james.promise.Promise.Handler;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -77,7 +77,7 @@ public class Testo {
       public String apply(final String input) {
         return input.toUpperCase();
       }
-    }).then(new Processor<String, String>() {
+    }).then(new Handler<String, String>() {
 
       public void reject(@Nullable final Throwable reason,
           @NotNull final Callback<String> callback) {
@@ -108,7 +108,7 @@ public class Testo {
       public void accept(final Callback<String> callback) {
         callback.resolve("test");
       }
-    }).then(new Processor<String, String>() {
+    }).then(new Handler<String, String>() {
 
       public void resolve(final String input, @NotNull final Callback<String> callback) {
         ScheduledExecutors.defaultExecutor().execute(new Runnable() {

@@ -164,7 +164,7 @@ class DefaultPromise<O> implements Promise<O> {
 
   @NotNull
   public Promise<O> catchAny(@NotNull final Mapper<Throwable, O> mapper) {
-    return then(new ProcessorCatch<O>(mapper));
+    return then(new HandlerCatch<O>(mapper));
   }
 
   public O get() {
@@ -301,19 +301,13 @@ class DefaultPromise<O> implements Promise<O> {
   }
 
   @NotNull
-  public <R> Promise<R> then(@Nullable final Handler<O, R, ? super Callback<R>> outputHandler,
-      @Nullable final Handler<Throwable, R, ? super Callback<R>> errorHandler) {
-    return then(new ProcessorHandle<O, R>(outputHandler, errorHandler));
-  }
-
-  @NotNull
   public <R> Promise<R> then(@NotNull final Mapper<O, R> mapper) {
-    return then(new ProcessorMap<O, R>(mapper));
+    return then(new HandlerMap<O, R>(mapper));
   }
 
   @NotNull
-  public <R> Promise<R> then(@NotNull final Processor<O, R> processor) {
-    return chain(new ChainProcessor<O, R>(mPropagationType, processor));
+  public <R> Promise<R> then(@NotNull final Handler<O, R> handler) {
+    return chain(new ChainHandler<O, R>(mPropagationType, handler));
   }
 
   public void waitResolved() {
@@ -342,17 +336,17 @@ class DefaultPromise<O> implements Promise<O> {
 
   @NotNull
   public Promise<O> whenFulfilled(@NotNull final Observer<O> observer) {
-    return then(new ProcessorFulfilled<O>(observer));
+    return then(new HandlerFulfilled<O>(observer));
   }
 
   @NotNull
   public Promise<O> whenRejected(@NotNull final Observer<Throwable> observer) {
-    return then(new ProcessorRejected<O>(observer));
+    return then(new HandlerRejected<O>(observer));
   }
 
   @NotNull
   public Promise<O> whenResolved(@NotNull final Action action) {
-    return then(new ProcessorResolved<O>(action));
+    return then(new HandlerResolved<O>(action));
   }
 
   @NotNull
@@ -451,6 +445,82 @@ class DefaultPromise<O> implements Promise<O> {
     }
   }
 
+  private static class ChainHandler<O, R> extends PromiseChain<O, R> {
+
+    private final Handler<O, R> mHandler;
+
+    private final PropagationType mPropagationType;
+
+    private ChainHandler(@NotNull final PropagationType propagationType,
+        @NotNull final Handler<O, R> handler) {
+      mHandler = ConstantConditions.notNull("handler", handler);
+      mPropagationType = propagationType;
+    }
+
+    @NotNull
+    PromiseChain<O, R> copy() {
+      return new ChainHandler<O, R>(mPropagationType, mHandler);
+    }
+
+    private Object writeReplace() throws ObjectStreamException {
+      return new ChainProxy<O, R>(mPropagationType, mHandler);
+    }
+
+    private static class ChainProxy<O, R> extends SerializableProxy {
+
+      private ChainProxy(final PropagationType propagationType, final Handler<O, R> handler) {
+        super(propagationType, handler);
+      }
+
+      @SuppressWarnings("unchecked")
+      Object readResolve() throws ObjectStreamException {
+        try {
+          final Object[] args = deserializeArgs();
+          return new ChainHandler<O, R>((PropagationType) args[0], (Handler<O, R>) args[1]);
+
+        } catch (final Throwable t) {
+          throw new InvalidObjectException(t.getMessage());
+        }
+      }
+    }
+
+    @Override
+    void reject(final PromiseChain<R, ?> next, final Throwable reason) {
+      mPropagationType.execute(new Runnable() {
+
+        public void run() {
+          try {
+            getLogger().dbg("Processing rejection with reason: %s", reason);
+            mHandler.reject(reason, next);
+
+          } catch (final Throwable t) {
+            InterruptedExecutionException.throwIfInterrupt(t);
+            getLogger().err(t, "Error while processing rejection with reason: %s", reason);
+            next.reject(t);
+          }
+        }
+      });
+    }
+
+    @Override
+    void resolve(final PromiseChain<R, ?> next, final O input) {
+      mPropagationType.execute(new Runnable() {
+
+        public void run() {
+          try {
+            getLogger().dbg("Processing resolution: %s", input);
+            mHandler.resolve(input, next);
+
+          } catch (final Throwable t) {
+            InterruptedExecutionException.throwIfInterrupt(t);
+            getLogger().err(t, "Error while processing resolution: %s", input);
+            next.reject(t);
+          }
+        }
+      });
+    }
+  }
+
   private static class ChainHead<O> extends PromiseChain<O, O> {
 
     private final Object mMutex = new Object();
@@ -468,11 +538,6 @@ class DefaultPromise<O> implements Promise<O> {
       final Runnable binding = mInnerState.bind(bond);
       mState = PromiseState.Pending;
       return binding;
-    }
-
-    @NotNull
-    ChainHead<O> copy() {
-      return new ChainHead<O>();
     }
 
     @Nullable
@@ -608,6 +673,11 @@ class DefaultPromise<O> implements Promise<O> {
       }
     }
 
+    @NotNull
+    ChainHead<O> copy() {
+      return new ChainHead<O>();
+    }
+
     @Override
     public void resolve(final PromiseChain<O, ?> next, final O input) {
       next.resolve(input);
@@ -619,83 +689,7 @@ class DefaultPromise<O> implements Promise<O> {
     }
   }
 
-  private static class ChainProcessor<O, R> extends PromiseChain<O, R> {
-
-    private final Processor<O, R> mProcessor;
-
-    private final PropagationType mPropagationType;
-
-    private ChainProcessor(@NotNull final PropagationType propagationType,
-        @NotNull final Processor<O, R> processor) {
-      mProcessor = ConstantConditions.notNull("processor", processor);
-      mPropagationType = propagationType;
-    }
-
-    private Object writeReplace() throws ObjectStreamException {
-      return new ChainProxy<O, R>(mPropagationType, mProcessor);
-    }
-
-    private static class ChainProxy<O, R> extends SerializableProxy {
-
-      private ChainProxy(final PropagationType propagationType, final Processor<O, R> processor) {
-        super(propagationType, processor);
-      }
-
-      @SuppressWarnings("unchecked")
-      Object readResolve() throws ObjectStreamException {
-        try {
-          final Object[] args = deserializeArgs();
-          return new ChainProcessor<O, R>((PropagationType) args[0], (Processor<O, R>) args[1]);
-
-        } catch (final Throwable t) {
-          throw new InvalidObjectException(t.getMessage());
-        }
-      }
-    }
-
-    @NotNull
-    PromiseChain<O, R> copy() {
-      return new ChainProcessor<O, R>(mPropagationType, mProcessor);
-    }
-
-    @Override
-    void reject(final PromiseChain<R, ?> next, final Throwable reason) {
-      mPropagationType.execute(new Runnable() {
-
-        public void run() {
-          try {
-            getLogger().dbg("Processing rejection with reason: %s", reason);
-            mProcessor.reject(reason, next);
-
-          } catch (final Throwable t) {
-            InterruptedExecutionException.throwIfInterrupt(t);
-            getLogger().err(t, "Error while processing rejection with reason: %s", reason);
-            next.reject(t);
-          }
-        }
-      });
-    }
-
-    @Override
-    void resolve(final PromiseChain<R, ?> next, final O input) {
-      mPropagationType.execute(new Runnable() {
-
-        public void run() {
-          try {
-            getLogger().dbg("Processing resolution: %s", input);
-            mProcessor.resolve(input, next);
-
-          } catch (final Throwable t) {
-            InterruptedExecutionException.throwIfInterrupt(t);
-            getLogger().err(t, "Error while processing resolution: %s", input);
-            next.reject(t);
-          }
-        }
-      });
-    }
-  }
-
-  private static class DefaultProcessor<I, O> implements Processor<I, O> {
+  private static class DefaultHandler<I, O> implements Handler<I, O> {
 
     public void reject(final Throwable reason, @NotNull final Callback<O> callback) throws
         Exception {
@@ -708,28 +702,11 @@ class DefaultPromise<O> implements Promise<O> {
     }
   }
 
-  private static class PassThroughErrorHandler<R>
-      implements Handler<Throwable, R, Callback<R>>, Serializable {
-
-    public void accept(final Throwable input, @NotNull final Callback<R> callback) {
-      callback.reject(input);
-    }
-  }
-
-  private static class PassThroughOutputHandler<O, R>
-      implements Handler<O, R, Callback<R>>, Serializable {
-
-    @SuppressWarnings("unchecked")
-    public void accept(final O input, @NotNull final Callback<R> callback) {
-      callback.resolve((R) input);
-    }
-  }
-
-  private static class ProcessorCatch<O> extends DefaultProcessor<O, O> implements Serializable {
+  private static class HandlerCatch<O> extends DefaultHandler<O, O> implements Serializable {
 
     private final Mapper<Throwable, O> mMapper;
 
-    private ProcessorCatch(@NotNull final Mapper<Throwable, O> mapper) {
+    private HandlerCatch(@NotNull final Mapper<Throwable, O> mapper) {
       mMapper = ConstantConditions.notNull("mapper", mapper);
     }
 
@@ -753,7 +730,7 @@ class DefaultPromise<O> implements Promise<O> {
       Object readResolve() throws ObjectStreamException {
         try {
           final Object[] args = deserializeArgs();
-          return new ProcessorCatch<O>((Mapper<Throwable, O>) args[0]);
+          return new HandlerCatch<O>((Mapper<Throwable, O>) args[0]);
 
         } catch (final Throwable t) {
           throw new InvalidObjectException(t.getMessage());
@@ -762,12 +739,11 @@ class DefaultPromise<O> implements Promise<O> {
     }
   }
 
-  private static class ProcessorFulfilled<O> extends DefaultProcessor<O, O>
-      implements Serializable {
+  private static class HandlerFulfilled<O> extends DefaultHandler<O, O> implements Serializable {
 
     private final Observer<O> mObserver;
 
-    private ProcessorFulfilled(@NotNull final Observer<O> observer) {
+    private HandlerFulfilled(@NotNull final Observer<O> observer) {
       mObserver = ConstantConditions.notNull("observer", observer);
     }
 
@@ -785,7 +761,7 @@ class DefaultPromise<O> implements Promise<O> {
       Object readResolve() throws ObjectStreamException {
         try {
           final Object[] args = deserializeArgs();
-          return new ProcessorFulfilled<O>((Observer<O>) args[0]);
+          return new HandlerFulfilled<O>((Observer<O>) args[0]);
 
         } catch (final Throwable t) {
           throw new InvalidObjectException(t.getMessage());
@@ -800,60 +776,11 @@ class DefaultPromise<O> implements Promise<O> {
     }
   }
 
-  private static class ProcessorHandle<O, R> implements Processor<O, R>, Serializable {
-
-    private final Handler<Throwable, R, Callback<R>> mErrorHandler;
-
-    private final Handler<O, R, Callback<R>> mOutputHandler;
-
-    @SuppressWarnings("unchecked")
-    private ProcessorHandle(@Nullable final Handler<O, R, ? super Callback<R>> outputHandler,
-        @Nullable final Handler<Throwable, R, ? super Callback<R>> errorHandler) {
-      mOutputHandler = (outputHandler != null) ? (Handler<O, R, Callback<R>>) outputHandler
-          : new PassThroughOutputHandler<O, R>();
-      mErrorHandler = (errorHandler != null) ? (Handler<Throwable, R, Callback<R>>) errorHandler
-          : new PassThroughErrorHandler<R>();
-    }
-
-    private Object writeReplace() throws ObjectStreamException {
-      return new ChainProxy<O, R>(mOutputHandler, mErrorHandler);
-    }
-
-    private static class ChainProxy<O, R> extends SerializableProxy {
-
-      private ChainProxy(final Handler<O, R, Callback<R>> outputHandler,
-          final Handler<Throwable, R, Callback<R>> errorHandler) {
-        super(outputHandler, errorHandler);
-      }
-
-      @SuppressWarnings("unchecked")
-      Object readResolve() throws ObjectStreamException {
-        try {
-          final Object[] args = deserializeArgs();
-          return new ProcessorHandle<O, R>((Handler<O, R, Callback<R>>) args[0],
-              (Handler<Throwable, R, Callback<R>>) args[1]);
-
-        } catch (final Throwable t) {
-          throw new InvalidObjectException(t.getMessage());
-        }
-      }
-    }
-
-    public void reject(final Throwable reason, @NotNull final Callback<R> callback) throws
-        Exception {
-      mErrorHandler.accept(reason, callback);
-    }
-
-    public void resolve(final O input, @NotNull final Callback<R> callback) throws Exception {
-      mOutputHandler.accept(input, callback);
-    }
-  }
-
-  private static class ProcessorMap<O, R> extends DefaultProcessor<O, R> implements Serializable {
+  private static class HandlerMap<O, R> extends DefaultHandler<O, R> implements Serializable {
 
     private final Mapper<O, R> mMapper;
 
-    private ProcessorMap(final Mapper<O, R> mapper) {
+    private HandlerMap(final Mapper<O, R> mapper) {
       mMapper = ConstantConditions.notNull("mapper", mapper);
     }
 
@@ -871,7 +798,7 @@ class DefaultPromise<O> implements Promise<O> {
       Object readResolve() throws ObjectStreamException {
         try {
           final Object[] args = deserializeArgs();
-          return new ProcessorMap<O, R>((Mapper<O, R>) args[0]);
+          return new HandlerMap<O, R>((Mapper<O, R>) args[0]);
 
         } catch (final Throwable t) {
           throw new InvalidObjectException(t.getMessage());
@@ -885,11 +812,11 @@ class DefaultPromise<O> implements Promise<O> {
     }
   }
 
-  private static class ProcessorRejected<O> extends DefaultProcessor<O, O> implements Serializable {
+  private static class HandlerRejected<O> extends DefaultHandler<O, O> implements Serializable {
 
     private final Observer<Throwable> mObserver;
 
-    private ProcessorRejected(@NotNull final Observer<Throwable> observer) {
+    private HandlerRejected(@NotNull final Observer<Throwable> observer) {
       mObserver = ConstantConditions.notNull("observer", observer);
     }
 
@@ -907,7 +834,7 @@ class DefaultPromise<O> implements Promise<O> {
       Object readResolve() throws ObjectStreamException {
         try {
           final Object[] args = deserializeArgs();
-          return new ProcessorRejected<O>((Observer<Throwable>) args[0]);
+          return new HandlerRejected<O>((Observer<Throwable>) args[0]);
 
         } catch (final Throwable t) {
           throw new InvalidObjectException(t.getMessage());
@@ -923,11 +850,11 @@ class DefaultPromise<O> implements Promise<O> {
     }
   }
 
-  private static class ProcessorResolved<O> implements Processor<O, O>, Serializable {
+  private static class HandlerResolved<O> implements Handler<O, O>, Serializable {
 
     private final Action mAction;
 
-    private ProcessorResolved(@NotNull final Action action) {
+    private HandlerResolved(@NotNull final Action action) {
       mAction = ConstantConditions.notNull("action", action);
     }
 
@@ -945,7 +872,7 @@ class DefaultPromise<O> implements Promise<O> {
       Object readResolve() throws ObjectStreamException {
         try {
           final Object[] args = deserializeArgs();
-          return new ProcessorResolved<O>((Action) args[0]);
+          return new HandlerResolved<O>((Action) args[0]);
 
         } catch (final Throwable t) {
           throw new InvalidObjectException(t.getMessage());
@@ -966,7 +893,7 @@ class DefaultPromise<O> implements Promise<O> {
   }
 
   private static abstract class PromiseChain<I, O>
-      implements Processor<I, Void>, Callback<I>, Serializable {
+      implements Handler<I, Void>, Callback<I>, Serializable {
 
     private transient volatile StatePending mInnerState = new StatePending();
 

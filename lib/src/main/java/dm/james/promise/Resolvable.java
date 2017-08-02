@@ -19,9 +19,9 @@ package dm.james.promise;
 /**
  * Created by davide-maestroni on 07/20/2017.
  */
-public interface Resolvable<O> {
+public interface Resolvable<I> {
 
   void reject(Throwable reason);
 
-  void resolve(O output);
+  void resolve(I input);
 }

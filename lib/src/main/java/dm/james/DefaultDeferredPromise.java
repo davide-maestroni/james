@@ -83,21 +83,13 @@ class DefaultDeferredPromise<I, O> implements DeferredPromise<I, O> {
   }
 
   @NotNull
-  public <R> DeferredPromise<I, R> then(
-      @Nullable final Handler<O, R, ? super Callback<R>> outputHandler,
-      @Nullable final Handler<Throwable, R, ? super Callback<R>> errorHandler) {
-    return new DefaultDeferredPromise<I, R>(mPromise.then(outputHandler, errorHandler), mLogger,
-        mState);
-  }
-
-  @NotNull
   public <R> DeferredPromise<I, R> then(@NotNull final Mapper<O, R> mapper) {
     return new DefaultDeferredPromise<I, R>(mPromise.then(mapper), mLogger, mState);
   }
 
   @NotNull
-  public <R> DeferredPromise<I, R> then(@NotNull final Processor<O, R> processor) {
-    return new DefaultDeferredPromise<I, R>(mPromise.then(processor), mLogger, mState);
+  public <R> DeferredPromise<I, R> then(@NotNull final Handler<O, R> handler) {
+    return new DefaultDeferredPromise<I, R>(mPromise.then(handler), mLogger, mState);
   }
 
   @NotNull
@@ -192,12 +184,12 @@ class DefaultDeferredPromise<I, O> implements DeferredPromise<I, O> {
     }
   }
 
-  public void resolve(final I output) {
-    mLogger.dbg("Resolving deferred promise with resolution: %s", output);
-    final List<Callback<I>> callbacks = mState.resolve(output);
+  public void resolve(final I input) {
+    mLogger.dbg("Resolving deferred promise with resolution: %s", input);
+    final List<Callback<I>> callbacks = mState.resolve(input);
     if (callbacks != null) {
       for (final Callback<I> callback : callbacks) {
-        callback.resolve(output);
+        callback.resolve(input);
       }
     }
   }

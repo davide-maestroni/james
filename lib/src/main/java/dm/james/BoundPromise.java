@@ -34,36 +34,36 @@ import dm.james.util.ConstantConditions;
 /**
  * Created by davide-maestroni on 07/21/2017.
  */
-class BondPromise<I, O> implements Promise<O> {
+class BoundPromise<I, O> implements Promise<O> {
 
   private final DeferredPromise<I, O> mDeferred;
 
   private final Promise<I> mPromise;
 
-  private BondPromise(@NotNull final Promise<I> promise,
+  private BoundPromise(@NotNull final Promise<I> promise,
       @NotNull final DeferredPromise<I, O> deferred) {
     mPromise = promise;
     mDeferred = deferred;
   }
 
   @NotNull
-  static <I, O> BondPromise<I, O> create(@NotNull final Promise<I> promise,
+  static <I, O> BoundPromise<I, O> create(@NotNull final Promise<I> promise,
       @NotNull final DeferredPromise<I, O> deferred) {
-    final BondPromise<I, O> bondPromise =
-        new BondPromise<I, O>(ConstantConditions.notNull("promise", promise),
+    final BoundPromise<I, O> boundPromise =
+        new BoundPromise<I, O>(ConstantConditions.notNull("promise", promise),
             ConstantConditions.notNull("deferred", deferred));
-    promise.then(new DeferredProcessor<I>(deferred));
-    return bondPromise;
+    promise.then(new DeferredHandler<I>(deferred));
+    return boundPromise;
   }
 
   @NotNull
   public <R> Promise<R> apply(@NotNull final Mapper<Promise<O>, Promise<R>> mapper) {
-    return new BondPromise<I, R>(mPromise, mDeferred.apply(mapper));
+    return new BoundPromise<I, R>(mPromise, mDeferred.apply(mapper));
   }
 
   @NotNull
   public Promise<O> catchAny(@NotNull final Mapper<Throwable, O> mapper) {
-    return new BondPromise<I, O>(mPromise, mDeferred.catchAny(mapper));
+    return new BoundPromise<I, O>(mPromise, mDeferred.catchAny(mapper));
   }
 
   public O get() {
@@ -114,19 +114,13 @@ class BondPromise<I, O> implements Promise<O> {
   }
 
   @NotNull
-  public <R> Promise<R> then(@Nullable final Handler<O, R, ? super Callback<R>> outputHandler,
-      @Nullable final Handler<Throwable, R, ? super Callback<R>> errorHandler) {
-    return new BondPromise<I, R>(mPromise, mDeferred.then(outputHandler, errorHandler));
-  }
-
-  @NotNull
   public <R> Promise<R> then(@NotNull final Mapper<O, R> mapper) {
-    return new BondPromise<I, R>(mPromise, mDeferred.then(mapper));
+    return new BoundPromise<I, R>(mPromise, mDeferred.then(mapper));
   }
 
   @NotNull
-  public <R> Promise<R> then(@NotNull final Processor<O, R> processor) {
-    return new BondPromise<I, R>(mPromise, mDeferred.then(processor));
+  public <R> Promise<R> then(@NotNull final Handler<O, R> handler) {
+    return new BoundPromise<I, R>(mPromise, mDeferred.then(handler));
   }
 
   public void waitResolved() {
@@ -139,28 +133,28 @@ class BondPromise<I, O> implements Promise<O> {
 
   @NotNull
   public Promise<O> whenFulfilled(@NotNull final Observer<O> observer) {
-    return new BondPromise<I, O>(mPromise, mDeferred.whenFulfilled(observer));
+    return new BoundPromise<I, O>(mPromise, mDeferred.whenFulfilled(observer));
   }
 
   @NotNull
   public Promise<O> whenRejected(@NotNull final Observer<Throwable> observer) {
-    return new BondPromise<I, O>(mPromise, mDeferred.whenRejected(observer));
+    return new BoundPromise<I, O>(mPromise, mDeferred.whenRejected(observer));
   }
 
   @NotNull
   public Promise<O> whenResolved(@NotNull final Action action) {
-    return new BondPromise<I, O>(mPromise, mDeferred.whenResolved(action));
+    return new BoundPromise<I, O>(mPromise, mDeferred.whenResolved(action));
   }
 
   private Object writeReplace() throws ObjectStreamException {
     return new PromiseProxy<I, O>(mPromise, mDeferred);
   }
 
-  private static class DeferredProcessor<O> implements Processor<O, O>, Serializable {
+  private static class DeferredHandler<O> implements Handler<O, O>, Serializable {
 
     private final DeferredPromise<O, ?> mDeferred;
 
-    private DeferredProcessor(@NotNull final DeferredPromise<O, ?> deferred) {
+    private DeferredHandler(@NotNull final DeferredPromise<O, ?> deferred) {
       mDeferred = deferred;
     }
 
@@ -186,7 +180,7 @@ class BondPromise<I, O> implements Promise<O> {
     }
 
     Object readResolve() throws ObjectStreamException {
-      return BondPromise.create(mPromise, mDeferred);
+      return BoundPromise.create(mPromise, mDeferred);
     }
   }
 }

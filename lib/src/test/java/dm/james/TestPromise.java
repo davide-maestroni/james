@@ -27,7 +27,7 @@ import java.io.ObjectOutputStream;
 import java.util.Random;
 import java.util.concurrent.TimeUnit;
 
-import dm.james.processor.Processors;
+import dm.james.handler.Handlers;
 import dm.james.promise.Mapper;
 import dm.james.promise.Observer;
 import dm.james.promise.Promise;
@@ -147,7 +147,7 @@ public class TestPromise {
         callback.resolve("test");
       }
     })
-                         .then(Processors.<String>scheduleOn(defaultExecutor()).delayed(100,
+                         .then(Handlers.<String>scheduleOn(defaultExecutor()).delayed(100,
                              TimeUnit.MILLISECONDS))
                          .get()).isEqualTo("test");
   }

@@ -14,27 +14,38 @@
  * limitations under the License.
  */
 
-package dm.james.processor;
+package dm.james.handler;
 
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 
 import dm.james.executor.ScheduledExecutor;
+import dm.james.promise.ObserverHandler;
+import dm.james.promise.Promise.Callback;
+import dm.james.promise.Promise.Handler;
 import dm.james.util.ConstantConditions;
 
 /**
  * Created by davide-maestroni on 07/21/2017.
  */
-public class Processors {
+public class Handlers {
 
   /**
    * Avoid explicit instantiation.
    */
-  protected Processors() {
+  protected Handlers() {
     ConstantConditions.avoid();
   }
 
   @NotNull
-  public static <I> ScheduleProcessor<I> scheduleOn(@NotNull final ScheduledExecutor executor) {
-    return new ScheduleProcessor<I>(executor);
+  public static <I, O> Handler<I, O> handle(
+      @Nullable final ObserverHandler<I, O, ? super Callback<O>> outputHandler,
+      @Nullable final ObserverHandler<Throwable, O, ? super Callback<O>> errorHandler) {
+    return new HandlesHandler<I, O>(outputHandler, errorHandler);
+  }
+
+  @NotNull
+  public static <I> ScheduleHandler<I> scheduleOn(@NotNull final ScheduledExecutor executor) {
+    return new ScheduleHandler<I>(executor);
   }
 }

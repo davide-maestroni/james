@@ -27,7 +27,7 @@ import java.util.concurrent.TimeUnit;
  */
 public interface Promise<O> extends Serializable {
 
-  // TODO: 18/07/2017 float timeout??
+  // TODO: 18/07/2017 float timeout?? TimeUtils method?
 
   @NotNull
   <R> Promise<R> apply(@NotNull Mapper<Promise<O>, Promise<R>> mapper);
@@ -59,16 +59,11 @@ public interface Promise<O> extends Serializable {
 
   boolean isResolved();
 
-  // TODO: 01/08/2017 remove??
-  @NotNull
-  <R> Promise<R> then(@Nullable Handler<O, R, ? super Callback<R>> outputHandler,
-      @Nullable Handler<Throwable, R, ? super Callback<R>> errorHandler);
-
   @NotNull
   <R> Promise<R> then(@NotNull Mapper<O, R> mapper);
 
   @NotNull
-  <R> Promise<R> then(@NotNull Processor<O, R> processor);
+  <R> Promise<R> then(@NotNull Handler<O, R> handler);
 
   void waitResolved();
 
@@ -92,12 +87,7 @@ public interface Promise<O> extends Serializable {
     void resolve(O output);
   }
 
-  interface Handler<I, O, C extends Callback<O>> {
-
-    void accept(I input, @NotNull C callback) throws Exception;
-  }
-
-  interface Processor<I, O> {
+  interface Handler<I, O> {
 
     void reject(Throwable reason, @NotNull Callback<O> callback) throws Exception;
 

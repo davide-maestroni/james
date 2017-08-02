@@ -107,19 +107,13 @@ class MappedPromise<O> implements Promise<O> {
   }
 
   @NotNull
-  public <R> Promise<R> then(@Nullable final Handler<O, R, ? super Callback<R>> outputHandler,
-      @Nullable final Handler<Throwable, R, ? super Callback<R>> errorHandler) {
-    return new MappedPromise<R>(mMapper, mPromise.then(outputHandler, errorHandler));
-  }
-
-  @NotNull
   public <R> Promise<R> then(@NotNull final Mapper<O, R> mapper) {
     return new MappedPromise<R>(mMapper, mPromise.then(mapper));
   }
 
   @NotNull
-  public <R> Promise<R> then(@NotNull final Processor<O, R> processor) {
-    return new MappedPromise<R>(mMapper, mPromise.then(processor));
+  public <R> Promise<R> then(@NotNull final Handler<O, R> handler) {
+    return new MappedPromise<R>(mMapper, mPromise.then(handler));
   }
 
   public void waitResolved() {

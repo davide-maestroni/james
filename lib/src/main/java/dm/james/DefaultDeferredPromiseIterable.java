@@ -84,16 +84,20 @@ class DefaultDeferredPromiseIterable<I, O> implements DeferredPromiseIterable<I,
     mState = state;
   }
 
-  public void add(final I output) {
-    mState.add(output);
+  public void add(final I input) {
+    mState.add(input);
   }
 
   @NotNull
-  public <R> DeferredPromiseIterable<I, R> all(
-      @Nullable final Handler<Iterable<O>, R, ? super CallbackIterable<R>> outputHandler,
-      @Nullable final Handler<Throwable, R, ? super CallbackIterable<R>> errorHandler) {
-    return new DefaultDeferredPromiseIterable<I, R>(mPromise.all(outputHandler, errorHandler),
-        mLogger, mState);
+  public DeferredPromiseIterable<I, O> added(final I input) {
+    add(input);
+    return this;
+  }
+
+  @NotNull
+  public DeferredPromiseIterable<I, O> addedAll(final Iterable<I> input) {
+    addAll(input);
+    return this;
   }
 
   @NotNull
@@ -104,42 +108,26 @@ class DefaultDeferredPromiseIterable<I, O> implements DeferredPromiseIterable<I,
 
   @NotNull
   public <R> DeferredPromiseIterable<I, R> all(
-      @NotNull final Processor<Iterable<O>, Iterable<R>> processor) {
-    return new DefaultDeferredPromiseIterable<I, R>(mPromise.all(processor), mLogger, mState);
+      @NotNull final Handler<Iterable<O>, Iterable<R>> handler) {
+    return new DefaultDeferredPromiseIterable<I, R>(mPromise.all(handler), mLogger, mState);
   }
 
   @NotNull
   public <R> DeferredPromiseIterable<I, R> all(
-      @NotNull final StatelessProcessor<Iterable<O>, R> processor) {
-    return new DefaultDeferredPromiseIterable<I, R>(mPromise.all(processor), mLogger, mState);
+      @NotNull final StatelessHandler<Iterable<O>, R> handler) {
+    return new DefaultDeferredPromiseIterable<I, R>(mPromise.all(handler), mLogger, mState);
   }
 
   @NotNull
   public <R> DeferredPromiseIterable<I, R> allSorted(
-      @Nullable final Handler<Iterable<O>, R, ? super CallbackIterable<R>> outputHandler,
-      @Nullable final Handler<Throwable, R, ? super CallbackIterable<R>> errorHandler) {
-    return new DefaultDeferredPromiseIterable<I, R>(mPromise.allSorted(outputHandler, errorHandler),
-        mLogger, mState);
+      @NotNull final Handler<Iterable<O>, Iterable<R>> handler) {
+    return new DefaultDeferredPromiseIterable<I, R>(mPromise.allSorted(handler), mLogger, mState);
   }
 
   @NotNull
   public <R> DeferredPromiseIterable<I, R> allSorted(
-      @NotNull final Processor<Iterable<O>, Iterable<R>> processor) {
-    return new DefaultDeferredPromiseIterable<I, R>(mPromise.allSorted(processor), mLogger, mState);
-  }
-
-  @NotNull
-  public <R> DeferredPromiseIterable<I, R> allSorted(
-      @NotNull final StatelessProcessor<Iterable<O>, R> processor) {
-    return new DefaultDeferredPromiseIterable<I, R>(mPromise.allSorted(processor), mLogger, mState);
-  }
-
-  @NotNull
-  public <R> DeferredPromiseIterable<I, R> any(
-      @Nullable final Handler<O, R, ? super CallbackIterable<R>> outputHandler,
-      @Nullable final Handler<Throwable, R, ? super CallbackIterable<R>> errorHandler) {
-    return new DefaultDeferredPromiseIterable<I, R>(mPromise.any(outputHandler, errorHandler),
-        mLogger, mState);
+      @NotNull final StatelessHandler<Iterable<O>, R> handler) {
+    return new DefaultDeferredPromiseIterable<I, R>(mPromise.allSorted(handler), mLogger, mState);
   }
 
   @NotNull
@@ -148,32 +136,24 @@ class DefaultDeferredPromiseIterable<I, O> implements DeferredPromiseIterable<I,
   }
 
   @NotNull
-  public <R> DeferredPromiseIterable<I, R> any(@NotNull final Processor<O, R> processor) {
-    return new DefaultDeferredPromiseIterable<I, R>(mPromise.any(processor), mLogger, mState);
+  public <R> DeferredPromiseIterable<I, R> any(@NotNull final Handler<O, R> handler) {
+    return new DefaultDeferredPromiseIterable<I, R>(mPromise.any(handler), mLogger, mState);
   }
 
   @NotNull
-  public <R> DeferredPromiseIterable<I, R> any(@NotNull final StatelessProcessor<O, R> processor) {
-    return new DefaultDeferredPromiseIterable<I, R>(mPromise.any(processor), mLogger, mState);
+  public <R> DeferredPromiseIterable<I, R> any(@NotNull final StatelessHandler<O, R> handler) {
+    return new DefaultDeferredPromiseIterable<I, R>(mPromise.any(handler), mLogger, mState);
   }
 
   @NotNull
-  public <R> DeferredPromiseIterable<I, R> anySorted(
-      @Nullable final Handler<O, R, ? super CallbackIterable<R>> outputHandler,
-      @Nullable final Handler<Throwable, R, ? super CallbackIterable<R>> errorHandler) {
-    return new DefaultDeferredPromiseIterable<I, R>(mPromise.anySorted(outputHandler, errorHandler),
-        mLogger, mState);
-  }
-
-  @NotNull
-  public <R> DeferredPromiseIterable<I, R> anySorted(@NotNull final Processor<O, R> processor) {
-    return new DefaultDeferredPromiseIterable<I, R>(mPromise.anySorted(processor), mLogger, mState);
+  public <R> DeferredPromiseIterable<I, R> anySorted(@NotNull final Handler<O, R> handler) {
+    return new DefaultDeferredPromiseIterable<I, R>(mPromise.anySorted(handler), mLogger, mState);
   }
 
   @NotNull
   public <R> DeferredPromiseIterable<I, R> anySorted(
-      @NotNull final StatelessProcessor<O, R> processor) {
-    return new DefaultDeferredPromiseIterable<I, R>(mPromise.anySorted(processor), mLogger, mState);
+      @NotNull final StatelessHandler<O, R> handler) {
+    return new DefaultDeferredPromiseIterable<I, R>(mPromise.anySorted(handler), mLogger, mState);
   }
 
   @NotNull
@@ -238,14 +218,6 @@ class DefaultDeferredPromiseIterable<I, O> implements DeferredPromiseIterable<I,
   }
 
   @NotNull
-  public <R> DeferredPromiseIterable<I, R> each(
-      @Nullable final Handler<O, R, ? super CallbackIterable<R>> outputHandler,
-      @Nullable final Handler<Throwable, R, ? super CallbackIterable<R>> errorHandler) {
-    return new DefaultDeferredPromiseIterable<I, R>(mPromise.each(outputHandler, errorHandler),
-        mLogger, mState);
-  }
-
-  @NotNull
   public <R> DeferredPromiseIterable<I, R> each(@NotNull final Mapper<O, R> mapper) {
     return new DefaultDeferredPromiseIterable<I, R>(mPromise.each(mapper), mLogger, mState);
   }
@@ -258,47 +230,36 @@ class DefaultDeferredPromiseIterable<I, O> implements DeferredPromiseIterable<I,
   }
 
   @NotNull
-  public <R> DeferredPromiseIterable<I, R> each(@NotNull final Processor<O, R> processor) {
-    return new DefaultDeferredPromiseIterable<I, R>(mPromise.each(processor), mLogger, mState);
+  public <R> DeferredPromiseIterable<I, R> each(@NotNull final Handler<O, R> handler) {
+    return new DefaultDeferredPromiseIterable<I, R>(mPromise.each(handler), mLogger, mState);
   }
 
   @NotNull
-  public <R> DeferredPromiseIterable<I, R> each(@NotNull final StatelessProcessor<O, R> processor) {
-    return new DefaultDeferredPromiseIterable<I, R>(mPromise.each(processor), mLogger, mState);
+  public <R> DeferredPromiseIterable<I, R> each(@NotNull final StatelessHandler<O, R> handler) {
+    return new DefaultDeferredPromiseIterable<I, R>(mPromise.each(handler), mLogger, mState);
   }
 
   @NotNull
-  public <R> DeferredPromiseIterable<I, R> eachSorted(
-      @Nullable final Handler<O, R, ? super CallbackIterable<R>> outputHandler,
-      @Nullable final Handler<Throwable, R, ? super CallbackIterable<R>> errorHandler) {
-    return new DefaultDeferredPromiseIterable<I, R>(
-        mPromise.eachSorted(outputHandler, errorHandler), mLogger, mState);
-  }
-
-  @NotNull
-  public <R> DeferredPromiseIterable<I, R> eachSorted(@NotNull final Processor<O, R> processor) {
-    return new DefaultDeferredPromiseIterable<I, R>(mPromise.eachSorted(processor), mLogger,
-        mState);
+  public <R> DeferredPromiseIterable<I, R> eachSorted(@NotNull final Handler<O, R> handler) {
+    return new DefaultDeferredPromiseIterable<I, R>(mPromise.eachSorted(handler), mLogger, mState);
   }
 
   @NotNull
   public <R> DeferredPromiseIterable<I, R> eachSorted(
-      @NotNull final StatelessProcessor<O, R> processor) {
-    return new DefaultDeferredPromiseIterable<I, R>(mPromise.eachSorted(processor), mLogger,
-        mState);
+      @NotNull final StatelessHandler<O, R> handler) {
+    return new DefaultDeferredPromiseIterable<I, R>(mPromise.eachSorted(handler), mLogger, mState);
   }
 
   @NotNull
   public <R, S> DeferredPromiseIterable<I, R> then(
-      @NotNull final StatefulProcessor<O, R, S> processor) {
-    return new DefaultDeferredPromiseIterable<I, R>(mPromise.then(processor), mLogger, mState);
+      @NotNull final StatefulHandler<O, R, S> handler) {
+    return new DefaultDeferredPromiseIterable<I, R>(mPromise.then(handler), mLogger, mState);
   }
 
   @NotNull
   public <R, S> DeferredPromiseIterable<I, R> thenSorted(
-      @NotNull final StatefulProcessor<O, R, S> processor) {
-    return new DefaultDeferredPromiseIterable<I, R>(mPromise.thenSorted(processor), mLogger,
-        mState);
+      @NotNull final StatefulHandler<O, R, S> handler) {
+    return new DefaultDeferredPromiseIterable<I, R>(mPromise.thenSorted(handler), mLogger, mState);
   }
 
   @NotNull
@@ -333,22 +294,13 @@ class DefaultDeferredPromiseIterable<I, O> implements DeferredPromiseIterable<I,
   }
 
   @NotNull
-  public <R> DeferredPromise<Iterable<I>, R> then(
-      @Nullable final Handler<Iterable<O>, R, ? super Callback<R>> outputHandler,
-      @Nullable final Handler<Throwable, R, ? super Callback<R>> errorHandler) {
-    return new WrappingDeferredPromise<Iterable<I>, R>(this,
-        mPromise.then(outputHandler, errorHandler));
-  }
-
-  @NotNull
   public <R> DeferredPromise<Iterable<I>, R> then(@NotNull final Mapper<Iterable<O>, R> mapper) {
     return new WrappingDeferredPromise<Iterable<I>, R>(this, mPromise.then(mapper));
   }
 
   @NotNull
-  public <R> DeferredPromise<Iterable<I>, R> then(
-      @NotNull final Processor<Iterable<O>, R> processor) {
-    return new WrappingDeferredPromise<Iterable<I>, R>(this, mPromise.then(processor));
+  public <R> DeferredPromise<Iterable<I>, R> then(@NotNull final Handler<Iterable<O>, R> handler) {
+    return new WrappingDeferredPromise<Iterable<I>, R>(this, mPromise.then(handler));
   }
 
   @NotNull
@@ -835,21 +787,21 @@ class DefaultDeferredPromiseIterable<I, O> implements DeferredPromiseIterable<I,
       mStateExecutor.run();
     }
 
-    public void resolve(final Iterable<I> outputs) {
+    public void resolve(final Iterable<I> inputs) {
       synchronized (mMutex) {
-        mState.resolve(outputs);
+        mState.resolve(inputs);
       }
 
       mStateExecutor.run();
     }
   }
 
-  public void resolve(final Iterable<I> outputs) {
-    mState.resolve(outputs);
+  public void resolve(final Iterable<I> inputs) {
+    mState.resolve(inputs);
   }
 
-  public void addAll(@Nullable final Iterable<I> outputs) {
-    mState.addAll(outputs);
+  public void addAll(@Nullable final Iterable<I> inputs) {
+    mState.addAll(inputs);
   }
 
   public void resolve() {

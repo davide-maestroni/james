@@ -17,7 +17,6 @@
 package dm.james.promise;
 
 import org.jetbrains.annotations.NotNull;
-import org.jetbrains.annotations.Nullable;
 
 /**
  * Created by davide-maestroni on 08/01/2017.
@@ -25,59 +24,41 @@ import org.jetbrains.annotations.Nullable;
 public interface DeferredPromiseIterable<I, O>
     extends PromiseIterable<O>, ResolvableIterable<I>, DeferredPromise<Iterable<I>, Iterable<O>> {
 
-  // TODO: 01/08/2017 added, addedAll
+  @NotNull
+  DeferredPromiseIterable<I, O> added(I input);
 
   @NotNull
-  <R> DeferredPromiseIterable<I, R> all(
-      @Nullable Handler<Iterable<O>, R, ? super CallbackIterable<R>> outputHandler,
-      @Nullable Handler<Throwable, R, ? super CallbackIterable<R>> errorHandler);
+  DeferredPromiseIterable<I, O> addedAll(Iterable<I> input);
 
   @NotNull
   <R> DeferredPromiseIterable<I, R> all(@NotNull Mapper<Iterable<O>, Iterable<R>> mapper);
 
   @NotNull
-  <R> DeferredPromiseIterable<I, R> all(@NotNull Processor<Iterable<O>, Iterable<R>> processor);
+  <R> DeferredPromiseIterable<I, R> all(@NotNull Handler<Iterable<O>, Iterable<R>> handler);
 
   @NotNull
-  <R> DeferredPromiseIterable<I, R> all(@NotNull StatelessProcessor<Iterable<O>, R> processor);
+  <R> DeferredPromiseIterable<I, R> all(@NotNull StatelessHandler<Iterable<O>, R> handler);
 
   @NotNull
-  <R> DeferredPromiseIterable<I, R> allSorted(
-      @Nullable Handler<Iterable<O>, R, ? super CallbackIterable<R>> outputHandler,
-      @Nullable Handler<Throwable, R, ? super CallbackIterable<R>> errorHandler);
+  <R> DeferredPromiseIterable<I, R> allSorted(@NotNull Handler<Iterable<O>, Iterable<R>> handler);
 
   @NotNull
-  <R> DeferredPromiseIterable<I, R> allSorted(
-      @NotNull Processor<Iterable<O>, Iterable<R>> processor);
-
-  @NotNull
-  <R> DeferredPromiseIterable<I, R> allSorted(
-      @NotNull StatelessProcessor<Iterable<O>, R> processor);
-
-  @NotNull
-  <R> DeferredPromiseIterable<I, R> any(
-      @Nullable Handler<O, R, ? super CallbackIterable<R>> outputHandler,
-      @Nullable Handler<Throwable, R, ? super CallbackIterable<R>> errorHandler);
+  <R> DeferredPromiseIterable<I, R> allSorted(@NotNull StatelessHandler<Iterable<O>, R> handler);
 
   @NotNull
   <R> DeferredPromiseIterable<I, R> any(@NotNull Mapper<O, R> mapper);
 
   @NotNull
-  <R> DeferredPromiseIterable<I, R> any(@NotNull Processor<O, R> processor);
+  <R> DeferredPromiseIterable<I, R> any(@NotNull Handler<O, R> handler);
 
   @NotNull
-  <R> DeferredPromiseIterable<I, R> any(@NotNull StatelessProcessor<O, R> processor);
+  <R> DeferredPromiseIterable<I, R> any(@NotNull StatelessHandler<O, R> handler);
 
   @NotNull
-  <R> DeferredPromiseIterable<I, R> anySorted(
-      @Nullable Handler<O, R, ? super CallbackIterable<R>> outputHandler,
-      @Nullable Handler<Throwable, R, ? super CallbackIterable<R>> errorHandler);
+  <R> DeferredPromiseIterable<I, R> anySorted(@NotNull Handler<O, R> handler);
 
   @NotNull
-  <R> DeferredPromiseIterable<I, R> anySorted(@NotNull Processor<O, R> processor);
-
-  @NotNull
-  <R> DeferredPromiseIterable<I, R> anySorted(@NotNull StatelessProcessor<O, R> processor);
+  <R> DeferredPromiseIterable<I, R> anySorted(@NotNull StatelessHandler<O, R> handler);
 
   @NotNull
   <R> DeferredPromiseIterable<I, R> applyAll(
@@ -111,38 +92,28 @@ public interface DeferredPromiseIterable<I, O>
   DeferredPromiseIterable<I, O> catchEach(@NotNull Mapper<Throwable, O> mapper, int maxBatchSize);
 
   @NotNull
-  <R> DeferredPromiseIterable<I, R> each(
-      @Nullable Handler<O, R, ? super CallbackIterable<R>> outputHandler,
-      @Nullable Handler<Throwable, R, ? super CallbackIterable<R>> errorHandler);
-
-  @NotNull
   <R> DeferredPromiseIterable<I, R> each(@NotNull Mapper<O, R> mapper);
 
   @NotNull
   <R> DeferredPromiseIterable<I, R> each(@NotNull Mapper<O, R> mapper, int maxBatchSize);
 
   @NotNull
-  <R> DeferredPromiseIterable<I, R> each(@NotNull Processor<O, R> processor);
+  <R> DeferredPromiseIterable<I, R> each(@NotNull Handler<O, R> handler);
 
   @NotNull
-  <R> DeferredPromiseIterable<I, R> each(@NotNull StatelessProcessor<O, R> processor);
+  <R> DeferredPromiseIterable<I, R> each(@NotNull StatelessHandler<O, R> handler);
 
   @NotNull
-  <R> DeferredPromiseIterable<I, R> eachSorted(
-      @Nullable Handler<O, R, ? super CallbackIterable<R>> outputHandler,
-      @Nullable Handler<Throwable, R, ? super CallbackIterable<R>> errorHandler);
+  <R> DeferredPromiseIterable<I, R> eachSorted(@NotNull Handler<O, R> handler);
 
   @NotNull
-  <R> DeferredPromiseIterable<I, R> eachSorted(@NotNull Processor<O, R> processor);
+  <R> DeferredPromiseIterable<I, R> eachSorted(@NotNull StatelessHandler<O, R> handler);
 
   @NotNull
-  <R> DeferredPromiseIterable<I, R> eachSorted(@NotNull StatelessProcessor<O, R> processor);
+  <R, S> DeferredPromiseIterable<I, R> then(@NotNull StatefulHandler<O, R, S> handler);
 
   @NotNull
-  <R, S> DeferredPromiseIterable<I, R> then(@NotNull StatefulProcessor<O, R, S> processor);
-
-  @NotNull
-  <R, S> DeferredPromiseIterable<I, R> thenSorted(@NotNull StatefulProcessor<O, R, S> processor);
+  <R, S> DeferredPromiseIterable<I, R> thenSorted(@NotNull StatefulHandler<O, R, S> handler);
 
   @NotNull
   DeferredPromiseIterable<I, O> whenFulfilledAny(@NotNull Observer<O> observer);
@@ -157,16 +128,11 @@ public interface DeferredPromiseIterable<I, O>
   DeferredPromiseIterable<I, O> rejected(Throwable reason);
 
   @NotNull
-  DeferredPromiseIterable<I, O> resolved(Iterable<I> input);
-
-  @NotNull
-  <R> DeferredPromise<Iterable<I>, R> then(
-      @Nullable Handler<Iterable<O>, R, ? super Callback<R>> outputHandler,
-      @Nullable Handler<Throwable, R, ? super Callback<R>> errorHandler);
+  DeferredPromiseIterable<I, O> resolved(Iterable<I> inputs);
 
   @NotNull
   <R> DeferredPromise<Iterable<I>, R> then(@NotNull Mapper<Iterable<O>, R> mapper);
 
   @NotNull
-  <R> DeferredPromise<Iterable<I>, R> then(@NotNull Processor<Iterable<O>, R> processor);
+  <R> DeferredPromise<Iterable<I>, R> then(@NotNull Handler<Iterable<O>, R> handler);
 }

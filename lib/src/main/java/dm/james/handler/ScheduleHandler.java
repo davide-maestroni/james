@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package dm.james.processor;
+package dm.james.handler;
 
 import org.jetbrains.annotations.NotNull;
 
@@ -25,26 +25,26 @@ import java.util.concurrent.TimeUnit;
 
 import dm.james.executor.ScheduledExecutor;
 import dm.james.promise.Promise.Callback;
-import dm.james.promise.Promise.Processor;
+import dm.james.promise.Promise.Handler;
 import dm.james.util.ConstantConditions;
 import dm.james.util.SerializableProxy;
 
 /**
  * Created by davide-maestroni on 07/21/2017.
  */
-public class ScheduleProcessor<I> implements Processor<I, I>, Serializable {
+public class ScheduleHandler<I> implements Handler<I, I>, Serializable {
 
   // TODO: 21/07/2017 delay, backoff to ScheduledExecutors
 
   private final ScheduledExecutor mExecutor;
 
-  ScheduleProcessor(@NotNull final ScheduledExecutor executor) {
+  ScheduleHandler(@NotNull final ScheduledExecutor executor) {
     mExecutor = ConstantConditions.notNull("executor", executor);
   }
 
   @NotNull
-  public ScheduleProcessor<I> delayed(final long delay, @NotNull final TimeUnit timeUnit) {
-    return new DelayedProcessor<I>(mExecutor, delay, timeUnit);
+  public ScheduleHandler<I> delayed(final long delay, @NotNull final TimeUnit timeUnit) {
+    return new DelayedHandler<I>(mExecutor, delay, timeUnit);
   }
 
   public void reject(final Throwable reason, @NotNull final Callback<I> callback) {
@@ -66,10 +66,10 @@ public class ScheduleProcessor<I> implements Processor<I, I>, Serializable {
   }
 
   private Object writeReplace() throws ObjectStreamException {
-    return new ProcessorProxy<I>(mExecutor);
+    return new HandlerProxy(mExecutor);
   }
 
-  private static class DelayedProcessor<I> extends ScheduleProcessor<I> {
+  private static class DelayedHandler<I> extends ScheduleHandler<I> {
 
     private final long mDelay;
 
@@ -77,7 +77,7 @@ public class ScheduleProcessor<I> implements Processor<I, I>, Serializable {
 
     private final TimeUnit mTimeUnit;
 
-    private DelayedProcessor(@NotNull final ScheduledExecutor executor, final long delay,
+    private DelayedHandler(@NotNull final ScheduledExecutor executor, final long delay,
         @NotNull final TimeUnit timeUnit) {
       super(executor);
       mExecutor = executor;
@@ -87,7 +87,7 @@ public class ScheduleProcessor<I> implements Processor<I, I>, Serializable {
 
     @NotNull
     @Override
-    public ScheduleProcessor<I> delayed(final long delay, @NotNull final TimeUnit timeUnit) {
+    public ScheduleHandler<I> delayed(final long delay, @NotNull final TimeUnit timeUnit) {
       ConstantConditions.notNegative("delay", delay);
       final TimeUnit currentUnit = mTimeUnit;
       final long newDelay;
@@ -101,7 +101,7 @@ public class ScheduleProcessor<I> implements Processor<I, I>, Serializable {
         newUnit = currentUnit;
       }
 
-      return new DelayedProcessor<I>(mExecutor, newDelay, newUnit);
+      return new DelayedHandler<I>(mExecutor, newDelay, newUnit);
     }
 
     public void reject(final Throwable reason, @NotNull final Callback<I> callback) {
@@ -123,12 +123,12 @@ public class ScheduleProcessor<I> implements Processor<I, I>, Serializable {
     }
 
     private Object writeReplace() throws ObjectStreamException {
-      return new ProcessorProxy<I>(mExecutor, mDelay, mTimeUnit);
+      return new HandlerProxy<I>(mExecutor, mDelay, mTimeUnit);
     }
 
-    private static class ProcessorProxy<I> extends SerializableProxy {
+    private static class HandlerProxy<I> extends SerializableProxy {
 
-      private ProcessorProxy(final ScheduledExecutor executor, final long delay,
+      private HandlerProxy(final ScheduledExecutor executor, final long delay,
           final TimeUnit timeUnit) {
         super(executor, delay, timeUnit);
       }
@@ -137,7 +137,7 @@ public class ScheduleProcessor<I> implements Processor<I, I>, Serializable {
       Object readResolve() throws ObjectStreamException {
         try {
           final Object[] args = deserializeArgs();
-          return new DelayedProcessor<I>((ScheduledExecutor) args[0], (Long) args[1],
+          return new DelayedHandler<I>((ScheduledExecutor) args[0], (Long) args[1],
               (TimeUnit) args[2]);
 
         } catch (final Throwable t) {
@@ -147,9 +147,9 @@ public class ScheduleProcessor<I> implements Processor<I, I>, Serializable {
     }
   }
 
-  private static class ProcessorProxy<I> extends SerializableProxy {
+  private static class HandlerProxy<I> extends SerializableProxy {
 
-    private ProcessorProxy(final ScheduledExecutor executor) {
+    private HandlerProxy(final ScheduledExecutor executor) {
       super(executor);
     }
 
@@ -157,7 +157,7 @@ public class ScheduleProcessor<I> implements Processor<I, I>, Serializable {
     Object readResolve() throws ObjectStreamException {
       try {
         final Object[] args = deserializeArgs();
-        return new ScheduleProcessor<I>((ScheduledExecutor) args[0]);
+        return new ScheduleHandler<I>((ScheduledExecutor) args[0]);
 
       } catch (final Throwable t) {
         throw new InvalidObjectException(t.getMessage());

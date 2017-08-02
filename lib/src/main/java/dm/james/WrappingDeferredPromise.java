@@ -56,20 +56,13 @@ class WrappingDeferredPromise<I, O> implements DeferredPromise<I, O>, Serializab
   }
 
   @NotNull
-  public <R> DeferredPromise<I, R> then(
-      @Nullable final Handler<O, R, ? super Callback<R>> outputHandler,
-      @Nullable final Handler<Throwable, R, ? super Callback<R>> errorHandler) {
-    return new WrappingDeferredPromise<I, R>(mDeferred, mPromise.then(outputHandler, errorHandler));
-  }
-
-  @NotNull
   public <R> DeferredPromise<I, R> then(@NotNull final Mapper<O, R> mapper) {
     return new WrappingDeferredPromise<I, R>(mDeferred, mPromise.then(mapper));
   }
 
   @NotNull
-  public <R> DeferredPromise<I, R> then(@NotNull final Processor<O, R> processor) {
-    return new WrappingDeferredPromise<I, R>(mDeferred, mPromise.then(processor));
+  public <R> DeferredPromise<I, R> then(@NotNull final Handler<O, R> handler) {
+    return new WrappingDeferredPromise<I, R>(mDeferred, mPromise.then(handler));
   }
 
   @NotNull
@@ -158,7 +151,7 @@ class WrappingDeferredPromise<I, O> implements DeferredPromise<I, O>, Serializab
     mDeferred.reject(reason);
   }
 
-  public void resolve(final I output) {
-    mDeferred.resolve(output);
+  public void resolve(final I input) {
+    mDeferred.resolve(input);
   }
 }

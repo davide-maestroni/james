@@ -14,33 +14,16 @@
  * limitations under the License.
  */
 
-package dm.james.util;
+package dm.james.promise;
+
+import org.jetbrains.annotations.NotNull;
+
+import dm.james.promise.Promise.Callback;
 
 /**
- * Created by davide-maestroni on 07/25/2017.
+ * Created by davide-maestroni on 08/02/2017.
  */
-public class IdentityReference<T> {
+public interface ObserverHandler<I, O, C extends Callback<O>> {
 
-  // TODO: 02/08/2017 remove??
-
-  private final T mObject;
-
-  public IdentityReference(final T object) {
-    mObject = object;
-  }
-
-  public T get() {
-    return mObject;
-  }
-
-  @Override
-  public int hashCode() {
-    return mObject != null ? mObject.hashCode() : 0;
-  }
-
-  @Override
-  public boolean equals(final Object o) {
-    return (this == o) || ((o instanceof IdentityReference) && (mObject
-        == ((IdentityReference<?>) o).mObject));
-  }
+  void accept(I input, @NotNull C callback) throws Exception;
 }
