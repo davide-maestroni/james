@@ -51,6 +51,8 @@ import dm.james.util.WeakIdentityHashMap;
  */
 public abstract class ScheduledExecutor implements Executor {
 
+  // TODO: 03/08/2017 make interface, remove everything but execute, stop and isExecutionThread
+
   private static final Object sMutex = new Object();
 
   private static volatile WeakIdentityHashMap<ThreadManager, Void> sManagers =

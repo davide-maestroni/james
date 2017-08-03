@@ -20,7 +20,7 @@ import org.jetbrains.annotations.NotNull;
 
 import java.io.InvalidObjectException;
 import java.io.ObjectStreamException;
-import java.lang.ref.WeakReference;
+import java.io.Serializable;
 import java.util.WeakHashMap;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
@@ -35,10 +35,7 @@ import dm.james.util.WeakIdentityHashMap;
  * <p>
  * Created by davide-maestroni on 10/14/2014.
  */
-class ServiceExecutor extends AsyncExecutor {
-
-  private static final WeakHashMap<ScheduledExecutorService, WeakReference<ServiceExecutor>>
-      sExecutors = new WeakHashMap<ScheduledExecutorService, WeakReference<ServiceExecutor>>();
+class ServiceExecutor extends AsyncExecutor implements Serializable {
 
   private final WeakIdentityHashMap<Runnable, WeakHashMap<ScheduledFuture<?>, Void>> mFutures =
       new WeakIdentityHashMap<Runnable, WeakHashMap<ScheduledFuture<?>, Void>>();
@@ -63,19 +60,7 @@ class ServiceExecutor extends AsyncExecutor {
    */
   @NotNull
   static ServiceExecutor of(@NotNull final ScheduledExecutorService service) {
-    ServiceExecutor serviceExecutor;
-    synchronized (sExecutors) {
-      final WeakHashMap<ScheduledExecutorService, WeakReference<ServiceExecutor>> executors =
-          sExecutors;
-      final WeakReference<ServiceExecutor> executor = executors.get(service);
-      serviceExecutor = (executor != null) ? executor.get() : null;
-      if (serviceExecutor == null) {
-        serviceExecutor = new ServiceExecutor(service);
-        executors.put(service, new WeakReference<ServiceExecutor>(serviceExecutor));
-      }
-    }
-
-    return serviceExecutor;
+    return new ServiceExecutor(service);
   }
 
   /**
