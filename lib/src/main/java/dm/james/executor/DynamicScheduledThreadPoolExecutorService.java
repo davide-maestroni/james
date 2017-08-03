@@ -18,10 +18,15 @@ package dm.james.executor;
 
 import org.jetbrains.annotations.NotNull;
 
+import java.io.InvalidObjectException;
+import java.io.ObjectStreamException;
+import java.io.Serializable;
 import java.util.concurrent.SynchronousQueue;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
+
+import dm.james.util.SerializableProxy;
 
 /**
  * Scheduled thread pool executor implementing a dynamic allocation of threads.
@@ -31,7 +36,18 @@ import java.util.concurrent.TimeUnit;
  * <p>
  * Created by davide-maestroni on 01/23/2015.
  */
-class DynamicScheduledThreadPoolExecutorService extends ScheduledThreadPoolExecutorService {
+class DynamicScheduledThreadPoolExecutorService extends ScheduledThreadPoolExecutorService
+    implements Serializable {
+
+  private final int mCorePoolSize;
+
+  private final long mKeepAliveTime;
+
+  private final TimeUnit mKeepAliveUnit;
+
+  private final int mMaxPoolSize;
+
+  private final ThreadFactory mThreadFactory;
 
   /**
    * Constructor.
@@ -51,6 +67,11 @@ class DynamicScheduledThreadPoolExecutorService extends ScheduledThreadPoolExecu
       final long keepAliveTime, @NotNull final TimeUnit keepAliveUnit) {
     super(new ThreadPoolExecutor(corePoolSize, maximumPoolSize, keepAliveTime, keepAliveUnit,
         new NonRejectingQueue()));
+    mCorePoolSize = corePoolSize;
+    mMaxPoolSize = maximumPoolSize;
+    mKeepAliveTime = keepAliveTime;
+    mKeepAliveUnit = keepAliveUnit;
+    mThreadFactory = null;
   }
 
   /**
@@ -73,6 +94,36 @@ class DynamicScheduledThreadPoolExecutorService extends ScheduledThreadPoolExecu
       @NotNull final ThreadFactory threadFactory) {
     super(new ThreadPoolExecutor(corePoolSize, maximumPoolSize, keepAliveTime, keepAliveUnit,
         new NonRejectingQueue(), threadFactory));
+    mCorePoolSize = corePoolSize;
+    mMaxPoolSize = maximumPoolSize;
+    mKeepAliveTime = keepAliveTime;
+    mKeepAliveUnit = keepAliveUnit;
+    mThreadFactory = threadFactory;
+  }
+
+  private Object writeReplace() throws ObjectStreamException {
+    return new ExecutorProxy(mCorePoolSize, mMaxPoolSize, mKeepAliveTime, mKeepAliveUnit,
+        mThreadFactory);
+  }
+
+  private static class ExecutorProxy extends SerializableProxy {
+
+    private ExecutorProxy(final int corePoolSize, final int maximumPoolSize,
+        final long keepAliveTime, final TimeUnit keepAliveUnit, final ThreadFactory threadFactory) {
+      super(corePoolSize, maximumPoolSize, keepAliveTime, keepAliveUnit, threadFactory);
+    }
+
+    @SuppressWarnings("unchecked")
+    Object readResolve() throws ObjectStreamException {
+      try {
+        final Object[] args = deserializeArgs();
+        return new DynamicScheduledThreadPoolExecutorService((Integer) args[0], (Integer) args[1],
+            (Long) args[2], (TimeUnit) args[3], (ThreadFactory) args[4]);
+
+      } catch (final Throwable t) {
+        throw new InvalidObjectException(t.getMessage());
+      }
+    }
   }
 
   /**

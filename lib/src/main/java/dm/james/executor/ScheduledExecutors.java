@@ -18,6 +18,7 @@ package dm.james.executor;
 
 import org.jetbrains.annotations.NotNull;
 
+import java.io.Serializable;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
@@ -34,19 +35,30 @@ import dm.james.util.ConstantConditions;
 @SuppressWarnings("WeakerAccess")
 public class ScheduledExecutors {
 
-  private static final ImmediateExecutor sImmediateExecutor = new ImmediateExecutor();
-
-  private static final LoopExecutor sLoopExecutor = new LoopExecutor();
-
   private static final Object sMutex = new Object();
 
+  private static ScheduledExecutor sBackgroundExecutor;
+
   private static ScheduledExecutor sDefaultExecutor;
+
+  private static ScheduledExecutor sForegroundExecutor;
 
   /**
    * Avoid explicit instantiation.
    */
   protected ScheduledExecutors() {
     ConstantConditions.avoid();
+  }
+
+  @NotNull
+  public static ScheduledExecutor backgroundExecutor() {
+    synchronized (sMutex) {
+      if (sBackgroundExecutor == null) {
+        sBackgroundExecutor = optimizedExecutor(Thread.MIN_PRIORITY);
+      }
+
+      return sBackgroundExecutor;
+    }
   }
 
   /**
@@ -58,14 +70,60 @@ public class ScheduledExecutors {
   public static ScheduledExecutor defaultExecutor() {
     synchronized (sMutex) {
       if (sDefaultExecutor == null) {
-        final int processors = Runtime.getRuntime().availableProcessors();
-        sDefaultExecutor = ServiceExecutor.executorOf(
-            new DynamicScheduledThreadPoolExecutorService(Math.max(2, processors >> 1),
-                Math.max(2, (processors << 2) - 1), 10L, TimeUnit.SECONDS));
+        sDefaultExecutor = optimizedExecutor(Thread.NORM_PRIORITY);
       }
 
       return sDefaultExecutor;
     }
+  }
+
+  @NotNull
+  public static ScheduledExecutor foregroundExecutor() {
+    synchronized (sMutex) {
+      if (sForegroundExecutor == null) {
+        sForegroundExecutor = optimizedExecutor(Thread.MAX_PRIORITY);
+      }
+
+      return sForegroundExecutor;
+    }
+  }
+
+  /**
+   * Returns the shared instance of an immediate executor.
+   * <p>
+   * The returned executor will immediately run any passed command.
+   * <p>
+   * Be careful when employing the returned executor, since it may lead to recursive calls, thus
+   * causing the invocation lifecycle to be not strictly honored. In fact, it might happen, for
+   * example, that the abortion method is called in the middle of the execution of another
+   * invocation method.
+   *
+   * @return the executor instance.
+   */
+  @NotNull
+  public static ScheduledExecutor immediateExecutor() {
+    return ImmediateExecutor.instance();
+  }
+
+  /**
+   * Returns the shared instance of a synchronous loop executor.
+   * <p>
+   * The returned executor maintains an internal buffer of executions that are consumed only when
+   * the last one completes, thus avoiding overflowing the call stack because of nested calls to
+   * other routines.
+   *
+   * @return the executor instance.
+   */
+  @NotNull
+  public static ScheduledExecutor loopExecutor() {
+    return LoopExecutor.instance();
+  }
+
+  // TODO: 03/08/2017 cached pool
+  @NotNull
+  public static ScheduledExecutor newCachedPoolExecutor() {
+    return ServiceExecutor.ofStoppable(
+        new ScheduledThreadPoolExecutorService(Executors.newCachedThreadPool()));
   }
 
   /**
@@ -88,9 +146,9 @@ public class ScheduledExecutors {
    *                                  <li>{@code keepAliveTime < 0}</li></ul>
    */
   @NotNull
-  public static ScheduledExecutor dynamicPoolExecutor(final int corePoolSize,
+  public static ScheduledExecutor newDynamicPoolExecutor(final int corePoolSize,
       final int maximumPoolSize, final long keepAliveTime, @NotNull final TimeUnit keepAliveUnit) {
-    return ServiceExecutor.executorOfStoppable(
+    return ServiceExecutor.ofStoppable(
         new DynamicScheduledThreadPoolExecutorService(corePoolSize, maximumPoolSize, keepAliveTime,
             keepAliveUnit));
   }
@@ -116,43 +174,12 @@ public class ScheduledExecutors {
    *                                  <li>{@code keepAliveTime < 0}</li></ul>
    */
   @NotNull
-  public static ScheduledExecutor dynamicPoolExecutor(final int corePoolSize,
+  public static ScheduledExecutor newDynamicPoolExecutor(final int corePoolSize,
       final int maximumPoolSize, final long keepAliveTime, @NotNull final TimeUnit keepAliveUnit,
       @NotNull final ThreadFactory threadFactory) {
-    return ServiceExecutor.executorOfStoppable(
+    return ServiceExecutor.ofStoppable(
         new DynamicScheduledThreadPoolExecutorService(corePoolSize, maximumPoolSize, keepAliveTime,
             keepAliveUnit, threadFactory));
-  }
-
-  /**
-   * Returns the shared instance of an immediate executor.
-   * <p>
-   * The returned executor will immediately run any passed command.
-   * <p>
-   * Be careful when employing the returned executor, since it may lead to recursive calls, thus
-   * causing the invocation lifecycle to be not strictly honored. In fact, it might happen, for
-   * example, that the abortion method is called in the middle of the execution of another
-   * invocation method.
-   *
-   * @return the executor instance.
-   */
-  @NotNull
-  public static ScheduledExecutor immediateExecutor() {
-    return sImmediateExecutor;
-  }
-
-  /**
-   * Returns the shared instance of a synchronous loop executor.
-   * <p>
-   * The returned executor maintains an internal buffer of executions that are consumed only when
-   * the last one completes, thus avoiding overflowing the call stack because of nested calls to
-   * other routines.
-   *
-   * @return the executor instance.
-   */
-  @NotNull
-  public static ScheduledExecutor loopExecutor() {
-    return sLoopExecutor;
   }
 
   /**
@@ -161,8 +188,8 @@ public class ScheduledExecutors {
    * @return the executor instance.
    */
   @NotNull
-  public static ScheduledExecutor poolExecutor() {
-    return poolExecutor((Runtime.getRuntime().availableProcessors() << 1) - 1);
+  public static ScheduledExecutor newPoolExecutor() {
+    return newPoolExecutor((Runtime.getRuntime().availableProcessors() << 1) - 1);
   }
 
   /**
@@ -173,23 +200,8 @@ public class ScheduledExecutors {
    * @throws IllegalArgumentException if the pool size is less than 1.
    */
   @NotNull
-  public static ScheduledExecutor poolExecutor(final int poolSize) {
-    return ServiceExecutor.executorOfStoppable(Executors.newScheduledThreadPool(poolSize));
-  }
-
-  /**
-   * Returns an executor providing ordering of executions based on priority.
-   * <p>
-   * Note that applying a priority to a synchronous executor might make command invocations happen
-   * in different threads than the calling one, thus causing the results to be not immediately
-   * available.
-   *
-   * @param wrapped the wrapped executor instance.
-   * @return the executor instance.
-   */
-  @NotNull
-  public static PriorityExecutor priorityExecutor(@NotNull final ScheduledExecutor wrapped) {
-    return PriorityExecutor.executor(wrapped);
+  public static ScheduledExecutor newPoolExecutor(final int poolSize) {
+    return ServiceExecutor.ofStoppable(Executors.newScheduledThreadPool(poolSize));
   }
 
   /**
@@ -208,7 +220,7 @@ public class ScheduledExecutors {
    */
   @NotNull
   public static ScheduledExecutor serviceExecutor(@NotNull final ScheduledExecutorService service) {
-    return ServiceExecutor.executorOf(service);
+    return ServiceExecutor.of(service);
   }
 
   /**
@@ -230,6 +242,40 @@ public class ScheduledExecutors {
     return serviceExecutor(new ScheduledThreadPoolExecutorService(service));
   }
 
+  @NotNull
+  public static ScheduledExecutor withDelay(@NotNull final ScheduledExecutor executor,
+      final long delay, @NotNull final TimeUnit timeUnit) {
+    if (ConstantConditions.notNegative("delay", delay) == 0) {
+      return executor;
+    }
+
+    return DelayedExecutor.of(executor, delay, timeUnit);
+  }
+
+  /**
+   * Returns an executor providing ordering of executions based on priority.
+   * <p>
+   * Each enqueued command will age every time an higher priority one takes the precedence, so that
+   * older commands slowly increases their priority. Such mechanism has been implemented to avoid
+   * starvation of low priority commands. Hence, when assigning priority to different executors, it
+   * is important to keep in mind that the difference between two priorities corresponds to the
+   * maximum age the lower priority command will have, before getting precedence over the higher
+   * priority one.
+   * <p>
+   * Note that applying a priority to a synchronous executor might make command invocations happen
+   * in different threads than the calling one, thus causing the results to be not immediately
+   * available.
+   *
+   * @param wrapped  the wrapped executor instance.
+   * @param priority the commands priority.
+   * @return the executor instance.
+   */
+  @NotNull
+  public static ScheduledExecutor withPriority(@NotNull final ScheduledExecutor wrapped,
+      final int priority) {
+    return PriorityExecutor.of(wrapped, priority);
+  }
+
   /**
    * Returns an executor throttling the number of running executions so to keep it under the
    * specified limit.
@@ -244,9 +290,9 @@ public class ScheduledExecutors {
    * @throws IllegalArgumentException if the specified max number is less than 1.
    */
   @NotNull
-  public static ScheduledExecutor throttlingExecutor(@NotNull final ScheduledExecutor wrapped,
+  public static ScheduledExecutor withThrottling(@NotNull final ScheduledExecutor wrapped,
       final int maxExecutions) {
-    return ThrottlingExecutor.executorOf(wrapped, maxExecutions);
+    return ThrottlingExecutor.of(wrapped, maxExecutions);
   }
 
   /**
@@ -257,11 +303,20 @@ public class ScheduledExecutors {
    * @return the executor instance.
    */
   @NotNull
-  public static ScheduledExecutor zeroDelayExecutor(@NotNull final ScheduledExecutor wrapped) {
-    return ZeroDelayExecutor.executorOf(wrapped);
+  public static ScheduledExecutor withZeroDelay(@NotNull final ScheduledExecutor wrapped) {
+    return ZeroDelayExecutor.of(wrapped);
   }
 
-  private static class ExecutorThreadFactory implements ThreadFactory {
+  @NotNull
+  private static ScheduledExecutor optimizedExecutor(final int threadPriority) {
+    final int processors = Runtime.getRuntime().availableProcessors();
+    return ServiceExecutor.of(
+        new DynamicScheduledThreadPoolExecutorService(Math.max(2, processors >> 1),
+            Math.max(2, (processors << 1) - 1), 10L, TimeUnit.SECONDS,
+            new ExecutorThreadFactory(threadPriority)));
+  }
+
+  private static class ExecutorThreadFactory implements ThreadFactory, Serializable {
 
     private final int mPriority;
 

@@ -18,6 +18,8 @@ package dm.james.executor;
 
 import org.jetbrains.annotations.NotNull;
 
+import java.io.ObjectStreamException;
+import java.io.Serializable;
 import java.util.concurrent.TimeUnit;
 
 import dm.james.util.TimeUtils;
@@ -34,7 +36,20 @@ import dm.james.util.TimeUtils;
  * <p>
  * Created by davide-maestroni on 05/13/2016.
  */
-class ImmediateExecutor extends SyncExecutor {
+class ImmediateExecutor extends SyncExecutor implements Serializable {
+
+  private static final ImmediateExecutor sInstance = new ImmediateExecutor();
+
+  /**
+   * Avoid explicit instantiation.
+   */
+  private ImmediateExecutor() {
+  }
+
+  @NotNull
+  static ImmediateExecutor instance() {
+    return sInstance;
+  }
 
   @Override
   public void execute(@NotNull final Runnable command) {
@@ -54,5 +69,9 @@ class ImmediateExecutor extends SyncExecutor {
     }
 
     command.run();
+  }
+
+  Object readResolve() throws ObjectStreamException {
+    return sInstance;
   }
 }

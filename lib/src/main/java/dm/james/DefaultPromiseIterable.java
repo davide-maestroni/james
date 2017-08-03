@@ -878,7 +878,14 @@ class DefaultPromiseIterable<O> implements PromiseIterable<O>, Serializable {
 
     @Override
     void add(final PromiseChain<O, ?> next, final O input) {
-      next.add(input);
+      try {
+        next.add(input);
+
+      } catch (final Throwable t) {
+        InterruptedExecutionException.throwIfInterrupt(t);
+        getLogger().err(t, "Error while propagating resolution: %s", input);
+        next.reject(t);
+      }
     }
 
     @Nullable
@@ -1004,7 +1011,14 @@ class DefaultPromiseIterable<O> implements PromiseIterable<O>, Serializable {
 
     @Override
     void addAll(final PromiseChain<O, ?> next, final Iterable<O> inputs) {
-      next.addAll(inputs);
+      try {
+        next.addAll(inputs);
+
+      } catch (final Throwable t) {
+        InterruptedExecutionException.throwIfInterrupt(t);
+        getLogger().err(t, "Error while propagating resolutions: %s", inputs);
+        next.reject(t);
+      }
     }
 
     @NotNull
@@ -1020,7 +1034,14 @@ class DefaultPromiseIterable<O> implements PromiseIterable<O>, Serializable {
 
     @Override
     void resolve(final PromiseChain<O, ?> next) {
-      next.resolve();
+      try {
+        next.resolve();
+
+      } catch (final Throwable t) {
+        InterruptedExecutionException.throwIfInterrupt(t);
+        getLogger().err(t, "Error while propagating resolution");
+        next.reject(t);
+      }
     }
   }
 
@@ -1110,8 +1131,14 @@ class DefaultPromiseIterable<O> implements PromiseIterable<O>, Serializable {
             } catch (final Throwable t) {
               InterruptedExecutionException.throwIfInterrupt(t);
               getLogger().err(t, "Error while processing input: %s", inputs);
-              next.addAll(outputs);
-              outputs = new ArrayList<R>();
+              try {
+                next.addAll(outputs);
+
+              } catch (final Throwable reason) {
+                InterruptedExecutionException.throwIfInterrupt(t);
+                getLogger().wrn("Suppressed rejection with reason: %s", reason);
+              }
+
               next.addRejection(t);
             }
           }
@@ -1147,7 +1174,14 @@ class DefaultPromiseIterable<O> implements PromiseIterable<O>, Serializable {
       mExecutor.execute(new Runnable() {
 
         public void run() {
-          next.resolve();
+          try {
+            next.resolve();
+
+          } catch (final Throwable t) {
+            InterruptedExecutionException.throwIfInterrupt(t);
+            getLogger().err(t, "Error while propagating resolution");
+            next.reject(t);
+          }
         }
       });
     }
@@ -1171,7 +1205,7 @@ class DefaultPromiseIterable<O> implements PromiseIterable<O>, Serializable {
         @NotNull final StatefulHandler<O, R, S> handler) {
       mHandler = ConstantConditions.notNull("handler", handler);
       mPropagationType = propagationType;
-      mExecutor = ScheduledExecutors.throttlingExecutor(propagationType.executor(), 1);
+      mExecutor = ScheduledExecutors.withThrottling(propagationType.executor(), 1);
     }
 
     private Object writeReplace() throws ObjectStreamException {
@@ -1264,6 +1298,7 @@ class DefaultPromiseIterable<O> implements PromiseIterable<O>, Serializable {
 
     @Override
     void addRejection(final PromiseChain<R, ?> next, final Throwable reason) {
+      innerReject(reason);
       mExecutor.execute(new Runnable() {
 
         public void run() {
@@ -1342,15 +1377,25 @@ class DefaultPromiseIterable<O> implements PromiseIterable<O>, Serializable {
         @NotNull final StatefulHandler<O, R, S> handler) {
       mHandler = ConstantConditions.notNull("handler", handler);
       mPropagationType = propagationType;
-      mExecutor = ScheduledExecutors.throttlingExecutor(propagationType.executor(), 1);
+      mExecutor = ScheduledExecutors.withThrottling(propagationType.executor(), 1);
     }
 
     // TODO: 31/07/2017 find tradeoff and switch between transferTo and removeFirst
     private void flushQueue(final PromiseChain<R, ?> next) {
       Resolution<R> resolution = removeFirst();
-      while (resolution != null) {
-        resolution.consume(next);
-        resolution = removeFirst();
+      try {
+        while (resolution != null) {
+          resolution.consume(next);
+          resolution = removeFirst();
+        }
+
+      } catch (final Throwable t) {
+        InterruptedExecutionException.throwIfInterrupt(t);
+        getLogger().err(t, "Error while propagating resolutions");
+        next.reject(t);
+        synchronized (mMutex) {
+          mQueue.clear();
+        }
       }
 
       final boolean closed;
@@ -1360,7 +1405,14 @@ class DefaultPromiseIterable<O> implements PromiseIterable<O>, Serializable {
       }
 
       if (closed && !mIsResolved.getAndSet(true)) {
-        next.resolve();
+        try {
+          next.resolve();
+
+        } catch (final Throwable t) {
+          InterruptedExecutionException.throwIfInterrupt(t);
+          getLogger().err(t, "Error while propagating resolution");
+          next.reject(t);
+        }
       }
     }
 
@@ -1659,6 +1711,7 @@ class DefaultPromiseIterable<O> implements PromiseIterable<O>, Serializable {
 
     @Override
     void addRejection(final PromiseChain<R, ?> next, final Throwable reason) {
+      innerReject(reason);
       mExecutor.execute(new Runnable() {
 
         public void run() {
@@ -1732,7 +1785,14 @@ class DefaultPromiseIterable<O> implements PromiseIterable<O>, Serializable {
 
     private void innerResolve(final PromiseChain<R, ?> next) {
       if (mCallbackCount.decrementAndGet() <= 0) {
-        next.resolve();
+        try {
+          next.resolve();
+
+        } catch (final Throwable t) {
+          InterruptedExecutionException.throwIfInterrupt(t);
+          getLogger().err(t, "Error while propagating resolution");
+          next.reject(t);
+        }
       }
     }
 
@@ -1775,7 +1835,14 @@ class DefaultPromiseIterable<O> implements PromiseIterable<O>, Serializable {
       }
 
       public void add(final R output) {
-        mNext.add(output);
+        try {
+          mNext.add(output);
+
+        } catch (final Throwable t) {
+          InterruptedExecutionException.throwIfInterrupt(t);
+          getLogger().err(t, "Error while propagating resolution: %s", output);
+          mNext.reject(t);
+        }
       }
 
       @SuppressWarnings("unchecked")
@@ -1811,7 +1878,7 @@ class DefaultPromiseIterable<O> implements PromiseIterable<O>, Serializable {
       }
 
       public void resolve(final R output) {
-        mNext.add(output);
+        add(output);
         innerResolve(mNext);
       }
     }
@@ -1831,7 +1898,15 @@ class DefaultPromiseIterable<O> implements PromiseIterable<O>, Serializable {
       }
 
       public void resolve(final R input, @NotNull final Callback<Void> callback) {
-        mNext.add(input);
+        try {
+          mNext.add(input);
+
+        } catch (final Throwable t) {
+          InterruptedExecutionException.throwIfInterrupt(t);
+          getLogger().err(t, "Error while propagating resolution: %s", input);
+          mNext.reject(t);
+        }
+
         innerResolve(mNext);
       }
     }
@@ -1850,8 +1925,16 @@ class DefaultPromiseIterable<O> implements PromiseIterable<O>, Serializable {
         innerResolve(mNext);
       }
 
-      public void resolve(final Iterable<R> input, @NotNull final Callback<Void> callback) {
-        mNext.addAll(input);
+      public void resolve(final Iterable<R> inputs, @NotNull final Callback<Void> callback) {
+        try {
+          mNext.addAll(inputs);
+
+        } catch (final Throwable t) {
+          InterruptedExecutionException.throwIfInterrupt(t);
+          getLogger().err(t, "Error while propagating resolutions: %s", inputs);
+          mNext.reject(t);
+        }
+
         innerResolve(mNext);
       }
     }
@@ -1871,7 +1954,15 @@ class DefaultPromiseIterable<O> implements PromiseIterable<O>, Serializable {
 
       public Void fulfill(final Void state, final R input,
           @NotNull final CallbackIterable<Void> callback) {
-        mNext.add(input);
+        try {
+          mNext.add(input);
+
+        } catch (final Throwable t) {
+          InterruptedExecutionException.throwIfInterrupt(t);
+          getLogger().err(t, "Error while propagating resolution: %s", input);
+          mNext.reject(t);
+        }
+
         return null;
       }
 
@@ -1991,16 +2082,33 @@ class DefaultPromiseIterable<O> implements PromiseIterable<O>, Serializable {
     // TODO: 31/07/2017 find tradeoff and switch between transferTo and removeFirst
     private void flushQueue(final PromiseChain<R, ?> next) {
       Resolution<R> resolution = removeFirst();
-      while (resolution != null) {
-        resolution.consume(next);
-        resolution = removeFirst();
+      try {
+        while (resolution != null) {
+          resolution.consume(next);
+          resolution = removeFirst();
+        }
+
+      } catch (final Throwable t) {
+        InterruptedExecutionException.throwIfInterrupt(t);
+        getLogger().err(t, "Error while propagating resolutions");
+        next.reject(t);
+        synchronized (mMutex) {
+          mQueue.clear();
+        }
       }
     }
 
     private void innerResolve(final PromiseChain<R, ?> next) {
       if (mCallbackCount.decrementAndGet() <= 0) {
-        flushQueue(next);
-        next.resolve();
+        try {
+          flushQueue(next);
+          next.resolve();
+
+        } catch (final Throwable t) {
+          InterruptedExecutionException.throwIfInterrupt(t);
+          getLogger().err(t, "Error while propagating resolution");
+          next.reject(t);
+        }
       }
     }
 
@@ -2993,6 +3101,19 @@ class DefaultPromiseIterable<O> implements PromiseIterable<O>, Serializable {
       mLogger = logger.subContextLogger(this);
     }
 
+    void innerReject(final Throwable reason) {
+      final Runnable command;
+      synchronized (mMutex) {
+        command = mInnerState.reject(reason);
+      }
+
+      if (command != null) {
+        command.run();
+      }
+
+      innerResolve();
+    }
+
     void prepend(@NotNull final List<Resolution<I>> resolutions) {
       mInnerState = new StatePrepending(resolutions);
     }
@@ -3050,8 +3171,15 @@ class DefaultPromiseIterable<O> implements PromiseIterable<O>, Serializable {
       }
 
       public void run() {
-        for (final Resolution<I> resolution : mResolutions) {
-          resolution.consume(PromiseChain.this);
+        try {
+          for (final Resolution<I> resolution : mResolutions) {
+            resolution.consume(PromiseChain.this);
+          }
+
+        } catch (final Throwable t) {
+          InterruptedExecutionException.throwIfInterrupt(t);
+          getLogger().err(t, "Error while propagating resolutions");
+          reject(t);
         }
       }
 

@@ -18,6 +18,8 @@ package dm.james.executor;
 
 import org.jetbrains.annotations.NotNull;
 
+import java.io.InvalidObjectException;
+import java.io.ObjectStreamException;
 import java.io.Serializable;
 import java.lang.ref.WeakReference;
 import java.util.Collections;
@@ -30,6 +32,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 
 import dm.james.util.ConstantConditions;
+import dm.james.util.SerializableProxy;
 import dm.james.util.WeakIdentityHashMap;
 
 /**
@@ -51,7 +54,7 @@ import dm.james.util.WeakIdentityHashMap;
  * <p>
  * Created by davide-maestroni on 04/28/2015.
  */
-public class PriorityExecutor {
+class PriorityExecutor {
 
   private static final PriorityCommandComparator PRIORITY_COMMAND_COMPARATOR =
       new PriorityCommandComparator();
@@ -92,11 +95,21 @@ public class PriorityExecutor {
    * <p>
    * Note that wrapping a synchronous executor may lead to unpredictable results.
    *
-   * @param wrapped the wrapped instance.
+   * @param wrapped  the wrapped instance.
+   * @param priority the commands priority.
    * @return the priority executor.
    */
   @NotNull
-  static PriorityExecutor executor(@NotNull final ScheduledExecutor wrapped) {
+  static ScheduledExecutor of(@NotNull final ScheduledExecutor wrapped, final int priority) {
+    return new SerializableExecutor(wrapped, priority);
+  }
+
+  private static int compareLong(final long l1, final long l2) {
+    return (l1 < l2) ? -1 : ((l1 == l2) ? 0 : 1);
+  }
+
+  @NotNull
+  private static PriorityExecutor executor(@NotNull final ScheduledExecutor wrapped) {
     if (wrapped instanceof QueuingExecutor) {
       return ((QueuingExecutor) wrapped).enclosingExecutor();
     }
@@ -115,18 +128,8 @@ public class PriorityExecutor {
     }
   }
 
-  private static int compareLong(final long l1, final long l2) {
-    return (l1 < l2) ? -1 : ((l1 == l2) ? 0 : 1);
-  }
-
-  /**
-   * Returns an executor enqueuing commands with the specified priority.
-   *
-   * @param priority the command priority.
-   * @return the executor instance.
-   */
   @NotNull
-  public ScheduledExecutor ofPriority(final int priority) {
+  private ScheduledExecutor ofPriority(final int priority) {
     synchronized (mExecutors) {
       final WeakHashMap<QueuingExecutor, Void> executors = mExecutors;
       for (final QueuingExecutor executor : executors.keySet()) {
@@ -157,6 +160,42 @@ public class PriorityExecutor {
       final long thatAge = e2.mAge;
       final int compare = compareLong(thatAge + thatPriority, thisAge + thisPriority);
       return (compare == 0) ? compareLong(thatAge, thisAge) : compare;
+    }
+  }
+
+  private static class SerializableExecutor extends ScheduledExecutorDecorator
+      implements Serializable {
+
+    private final ScheduledExecutor mExecutor;
+
+    private final int mPriority;
+
+    private SerializableExecutor(@NotNull final ScheduledExecutor wrapped, final int priority) {
+      super(executor(wrapped).ofPriority(priority));
+      mExecutor = wrapped;
+      mPriority = priority;
+    }
+
+    private Object writeReplace() throws ObjectStreamException {
+      return new ExecutorProxy(mExecutor, mPriority);
+    }
+
+    private static class ExecutorProxy extends SerializableProxy {
+
+      private ExecutorProxy(final ScheduledExecutor wrapped, final int priority) {
+        super(wrapped, priority);
+      }
+
+      @SuppressWarnings("unchecked")
+      Object readResolve() throws ObjectStreamException {
+        try {
+          final Object[] args = deserializeArgs();
+          return new SerializableExecutor((ScheduledExecutor) args[0], (Integer) args[1]);
+
+        } catch (final Throwable t) {
+          throw new InvalidObjectException(t.getMessage());
+        }
+      }
     }
   }
 
@@ -281,9 +320,12 @@ public class PriorityExecutor {
       }
 
       if (priorityCommands != null) {
-        final PriorityBlockingQueue<PriorityCommand> queue = mQueue;
-        final Map<PriorityCommand, ImmediateCommand> immediateCommands = mImmediateCommands;
-        final Map<PriorityCommand, DelayedCommand> delayedCommands = mDelayedCommands;
+        @SuppressWarnings("UnnecessaryLocalVariable") final PriorityBlockingQueue<PriorityCommand>
+            queue = mQueue;
+        @SuppressWarnings("UnnecessaryLocalVariable") final Map<PriorityCommand, ImmediateCommand>
+            immediateCommands = mImmediateCommands;
+        @SuppressWarnings("UnnecessaryLocalVariable") final Map<PriorityCommand, DelayedCommand>
+            delayedCommands = mDelayedCommands;
         for (final PriorityCommand priorityCommand : priorityCommands.keySet()) {
           if (queue.remove(priorityCommand)) {
             final ImmediateCommand immediateCommand = immediateCommands.remove(priorityCommand);

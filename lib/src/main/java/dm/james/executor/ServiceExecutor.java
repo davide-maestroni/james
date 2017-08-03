@@ -18,6 +18,8 @@ package dm.james.executor;
 
 import org.jetbrains.annotations.NotNull;
 
+import java.io.InvalidObjectException;
+import java.io.ObjectStreamException;
 import java.lang.ref.WeakReference;
 import java.util.WeakHashMap;
 import java.util.concurrent.ScheduledExecutorService;
@@ -25,6 +27,7 @@ import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 
 import dm.james.util.ConstantConditions;
+import dm.james.util.SerializableProxy;
 import dm.james.util.WeakIdentityHashMap;
 
 /**
@@ -59,7 +62,7 @@ class ServiceExecutor extends AsyncExecutor {
    * @return the executor.
    */
   @NotNull
-  static ServiceExecutor executorOf(@NotNull final ScheduledExecutorService service) {
+  static ServiceExecutor of(@NotNull final ScheduledExecutorService service) {
     ServiceExecutor serviceExecutor;
     synchronized (sExecutors) {
       final WeakHashMap<ScheduledExecutorService, WeakReference<ServiceExecutor>> executors =
@@ -84,7 +87,7 @@ class ServiceExecutor extends AsyncExecutor {
    * @return the executor.
    */
   @NotNull
-  static ServiceExecutor executorOfStoppable(@NotNull final ScheduledExecutorService service) {
+  static ServiceExecutor ofStoppable(@NotNull final ScheduledExecutorService service) {
     return new StoppableServiceExecutor(service);
   }
 
@@ -123,6 +126,28 @@ class ServiceExecutor extends AsyncExecutor {
   @Override
   protected ScheduledThreadManager getThreadManager() {
     return (ScheduledThreadManager) super.getThreadManager();
+  }
+
+  private Object writeReplace() throws ObjectStreamException {
+    return new ExecutorProxy(mService);
+  }
+
+  private static class ExecutorProxy extends SerializableProxy {
+
+    private ExecutorProxy(final ScheduledExecutorService service) {
+      super(service);
+    }
+
+    @SuppressWarnings("unchecked")
+    Object readResolve() throws ObjectStreamException {
+      try {
+        final Object[] args = deserializeArgs();
+        return new ServiceExecutor((ScheduledExecutorService) args[0]);
+
+      } catch (final Throwable t) {
+        throw new InvalidObjectException(t.getMessage());
+      }
+    }
   }
 
   /**

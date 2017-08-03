@@ -18,11 +18,15 @@ package dm.james.executor;
 
 import org.jetbrains.annotations.NotNull;
 
+import java.io.InvalidObjectException;
+import java.io.ObjectStreamException;
+import java.io.Serializable;
 import java.lang.ref.WeakReference;
 import java.util.Iterator;
 import java.util.concurrent.TimeUnit;
 
 import dm.james.util.ConstantConditions;
+import dm.james.util.SerializableProxy;
 import dm.james.util.SimpleQueue;
 import dm.james.util.WeakIdentityHashMap;
 
@@ -36,10 +40,12 @@ import dm.james.util.WeakIdentityHashMap;
  * <p>
  * Created by davide-maestroni on 07/18/2015.
  */
-class ThrottlingExecutor extends ScheduledExecutorDecorator {
+class ThrottlingExecutor extends ScheduledExecutorDecorator implements Serializable {
 
   private final WeakIdentityHashMap<Runnable, WeakReference<ThrottlingCommand>> mCommands =
       new WeakIdentityHashMap<Runnable, WeakReference<ThrottlingCommand>>();
+
+  private final ScheduledExecutor mExecutor;
 
   private final int mMaxRunning;
 
@@ -58,6 +64,7 @@ class ThrottlingExecutor extends ScheduledExecutorDecorator {
    */
   private ThrottlingExecutor(@NotNull final ScheduledExecutor wrapped, final int maxCommands) {
     super(wrapped);
+    mExecutor = wrapped;
     mMaxRunning = ConstantConditions.positive("maximum number of running commands", maxCommands);
   }
 
@@ -70,8 +77,7 @@ class ThrottlingExecutor extends ScheduledExecutorDecorator {
    * @throws IllegalArgumentException if the specified max number is less than 1.
    */
   @NotNull
-  static ThrottlingExecutor executorOf(@NotNull final ScheduledExecutor wrapped,
-      final int maxCommands) {
+  static ThrottlingExecutor of(@NotNull final ScheduledExecutor wrapped, final int maxCommands) {
     return new ThrottlingExecutor(wrapped, maxCommands);
   }
 
@@ -143,6 +149,28 @@ class ThrottlingExecutor extends ScheduledExecutorDecorator {
     }
 
     return throttlingCommand;
+  }
+
+  private Object writeReplace() throws ObjectStreamException {
+    return new ExecutorProxy(mExecutor, mMaxRunning);
+  }
+
+  private static class ExecutorProxy extends SerializableProxy {
+
+    private ExecutorProxy(final ScheduledExecutor wrapped, final int maxCommands) {
+      super(wrapped, maxCommands);
+    }
+
+    @SuppressWarnings("unchecked")
+    Object readResolve() throws ObjectStreamException {
+      try {
+        final Object[] args = deserializeArgs();
+        return new ThrottlingExecutor((ScheduledExecutor) args[0], (Integer) args[1]);
+
+      } catch (final Throwable t) {
+        throw new InvalidObjectException(t.getMessage());
+      }
+    }
   }
 
   /**

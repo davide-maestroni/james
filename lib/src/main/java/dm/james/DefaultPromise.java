@@ -680,7 +680,14 @@ class DefaultPromise<O> implements Promise<O> {
 
     @Override
     public void resolve(final PromiseChain<O, ?> next, final O input) {
-      next.resolve(input);
+      try {
+        next.resolve(input);
+
+      } catch (final Throwable t) {
+        InterruptedExecutionException.throwIfInterrupt(t);
+        getLogger().err(t, "Error while propagating resolution: %s", input);
+        next.reject(t);
+      }
     }
 
     @Override

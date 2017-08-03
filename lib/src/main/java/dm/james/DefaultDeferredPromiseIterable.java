@@ -533,7 +533,7 @@ class DefaultDeferredPromiseIterable<I, O> implements DeferredPromiseIterable<I,
 
     private StateHolder() {
       mStateExecutor = new StateExecutor(mMutex);
-      mExecutor = ScheduledExecutors.throttlingExecutor(mStateExecutor, 1);
+      mExecutor = ScheduledExecutors.withThrottling(mStateExecutor, 1);
     }
 
     public void accept(final CallbackIterable<I> callback) throws Exception {

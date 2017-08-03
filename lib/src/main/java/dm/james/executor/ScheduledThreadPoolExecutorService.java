@@ -18,6 +18,9 @@ package dm.james.executor;
 
 import org.jetbrains.annotations.NotNull;
 
+import java.io.InvalidObjectException;
+import java.io.ObjectStreamException;
+import java.io.Serializable;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.ScheduledFuture;
@@ -25,13 +28,15 @@ import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 
 import dm.james.util.ConstantConditions;
+import dm.james.util.SerializableProxy;
 
 /**
  * Scheduled thread pool executor wrapping an executor service.
  * <p>
  * Created by davide-maestroni on 05/24/2016.
  */
-class ScheduledThreadPoolExecutorService extends ScheduledThreadPoolExecutor {
+class ScheduledThreadPoolExecutorService extends ScheduledThreadPoolExecutor
+    implements Serializable {
 
   private final ExecutorService mExecutor;
 
@@ -94,6 +99,10 @@ class ScheduledThreadPoolExecutorService extends ScheduledThreadPoolExecutor {
         delay, unit);
   }
 
+  private Object writeReplace() throws ObjectStreamException {
+    return new ExecutorProxy(mExecutor);
+  }
+
   /**
    * Runnable executing another runnable.
    */
@@ -117,6 +126,24 @@ class ScheduledThreadPoolExecutorService extends ScheduledThreadPoolExecutor {
 
     public void run() {
       mService.execute(mCommand);
+    }
+  }
+
+  private static class ExecutorProxy extends SerializableProxy {
+
+    private ExecutorProxy(final ExecutorService service) {
+      super(service);
+    }
+
+    @SuppressWarnings("unchecked")
+    Object readResolve() throws ObjectStreamException {
+      try {
+        final Object[] args = deserializeArgs();
+        return new ScheduledThreadPoolExecutorService((ExecutorService) args[0]);
+
+      } catch (final Throwable t) {
+        throw new InvalidObjectException(t.getMessage());
+      }
     }
   }
 }

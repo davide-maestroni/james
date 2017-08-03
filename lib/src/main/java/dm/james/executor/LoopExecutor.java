@@ -18,6 +18,8 @@ package dm.james.executor;
 
 import org.jetbrains.annotations.NotNull;
 
+import java.io.ObjectStreamException;
+import java.io.Serializable;
 import java.util.concurrent.TimeUnit;
 
 /**
@@ -28,7 +30,20 @@ import java.util.concurrent.TimeUnit;
  * <p>
  * Created by davide-maestroni on 09/18/2014.
  */
-class LoopExecutor extends SyncExecutor {
+class LoopExecutor extends SyncExecutor implements Serializable {
+
+  private static final LoopExecutor sInstance = new LoopExecutor();
+
+  /**
+   * Avoid explicit instantiation.
+   */
+  private LoopExecutor() {
+  }
+
+  @NotNull
+  static LoopExecutor instance() {
+    return sInstance;
+  }
 
   @Override
   public void cancel(@NotNull final Runnable command) {
@@ -44,5 +59,9 @@ class LoopExecutor extends SyncExecutor {
   public void execute(@NotNull final Runnable command, final long delay,
       @NotNull final TimeUnit timeUnit) {
     LocalExecutor.run(command, delay, timeUnit);
+  }
+
+  Object readResolve() throws ObjectStreamException {
+    return sInstance;
   }
 }

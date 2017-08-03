@@ -18,9 +18,13 @@ package dm.james.executor;
 
 import org.jetbrains.annotations.NotNull;
 
+import java.io.InvalidObjectException;
+import java.io.ObjectStreamException;
+import java.io.Serializable;
 import java.lang.ref.WeakReference;
 import java.util.concurrent.TimeUnit;
 
+import dm.james.util.SerializableProxy;
 import dm.james.util.WeakIdentityHashMap;
 
 /**
@@ -29,15 +33,17 @@ import dm.james.util.WeakIdentityHashMap;
  * <p>
  * Created by davide-maestroni on 04/09/2016.
  */
-class ZeroDelayExecutor extends ScheduledExecutorDecorator {
+class ZeroDelayExecutor extends ScheduledExecutorDecorator implements Serializable {
 
   private static final WeakIdentityHashMap<ScheduledExecutor, WeakReference<ZeroDelayExecutor>>
       sExecutors = new WeakIdentityHashMap<ScheduledExecutor, WeakReference<ZeroDelayExecutor>>();
 
-  private static final LoopExecutor sSyncExecutor = new LoopExecutor();
+  private static final LoopExecutor sSyncExecutor = LoopExecutor.instance();
 
   private final WeakIdentityHashMap<Runnable, WeakReference<RunnableDecorator>> mCommands =
       new WeakIdentityHashMap<Runnable, WeakReference<RunnableDecorator>>();
+
+  private final ScheduledExecutor mExecutor;
 
   /**
    * Constructor.
@@ -46,6 +52,7 @@ class ZeroDelayExecutor extends ScheduledExecutorDecorator {
    */
   private ZeroDelayExecutor(@NotNull final ScheduledExecutor wrapped) {
     super(wrapped);
+    mExecutor = wrapped;
   }
 
   /**
@@ -55,7 +62,7 @@ class ZeroDelayExecutor extends ScheduledExecutorDecorator {
    * @return the zero delay executor.
    */
   @NotNull
-  static ZeroDelayExecutor executorOf(@NotNull final ScheduledExecutor wrapped) {
+  static ZeroDelayExecutor of(@NotNull final ScheduledExecutor wrapped) {
     if (wrapped instanceof ZeroDelayExecutor) {
       return (ZeroDelayExecutor) wrapped;
     }
@@ -125,5 +132,27 @@ class ZeroDelayExecutor extends ScheduledExecutorDecorator {
     }
 
     return decorator;
+  }
+
+  private Object writeReplace() throws ObjectStreamException {
+    return new ExecutorProxy(mExecutor);
+  }
+
+  private static class ExecutorProxy extends SerializableProxy {
+
+    private ExecutorProxy(final ScheduledExecutor wrapped) {
+      super(wrapped);
+    }
+
+    @SuppressWarnings("unchecked")
+    Object readResolve() throws ObjectStreamException {
+      try {
+        final Object[] args = deserializeArgs();
+        return new ZeroDelayExecutor((ScheduledExecutor) args[0]);
+
+      } catch (final Throwable t) {
+        throw new InvalidObjectException(t.getMessage());
+      }
+    }
   }
 }

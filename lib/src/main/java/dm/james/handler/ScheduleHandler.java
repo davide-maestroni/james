@@ -21,7 +21,6 @@ import org.jetbrains.annotations.NotNull;
 import java.io.InvalidObjectException;
 import java.io.ObjectStreamException;
 import java.io.Serializable;
-import java.util.concurrent.TimeUnit;
 
 import dm.james.executor.ScheduledExecutor;
 import dm.james.promise.Promise.Callback;
@@ -40,11 +39,6 @@ public class ScheduleHandler<I> implements Handler<I, I>, Serializable {
 
   ScheduleHandler(@NotNull final ScheduledExecutor executor) {
     mExecutor = ConstantConditions.notNull("executor", executor);
-  }
-
-  @NotNull
-  public ScheduleHandler<I> delayed(final long delay, @NotNull final TimeUnit timeUnit) {
-    return new DelayedHandler<I>(mExecutor, delay, timeUnit);
   }
 
   public void reject(final Throwable reason, @NotNull final Callback<I> callback) {
@@ -67,84 +61,6 @@ public class ScheduleHandler<I> implements Handler<I, I>, Serializable {
 
   private Object writeReplace() throws ObjectStreamException {
     return new HandlerProxy(mExecutor);
-  }
-
-  private static class DelayedHandler<I> extends ScheduleHandler<I> {
-
-    private final long mDelay;
-
-    private final ScheduledExecutor mExecutor;
-
-    private final TimeUnit mTimeUnit;
-
-    private DelayedHandler(@NotNull final ScheduledExecutor executor, final long delay,
-        @NotNull final TimeUnit timeUnit) {
-      super(executor);
-      mExecutor = executor;
-      mTimeUnit = ConstantConditions.notNull("time unit", timeUnit);
-      mDelay = ConstantConditions.notNegative("delay", delay);
-    }
-
-    @NotNull
-    @Override
-    public ScheduleHandler<I> delayed(final long delay, @NotNull final TimeUnit timeUnit) {
-      ConstantConditions.notNegative("delay", delay);
-      final TimeUnit currentUnit = mTimeUnit;
-      final long newDelay;
-      final TimeUnit newUnit;
-      if (currentUnit.compareTo(timeUnit) > 0) {
-        newDelay = timeUnit.convert(mDelay, currentUnit) + delay;
-        newUnit = timeUnit;
-
-      } else {
-        newDelay = mDelay + currentUnit.convert(delay, timeUnit);
-        newUnit = currentUnit;
-      }
-
-      return new DelayedHandler<I>(mExecutor, newDelay, newUnit);
-    }
-
-    public void reject(final Throwable reason, @NotNull final Callback<I> callback) {
-      mExecutor.execute(new Runnable() {
-
-        public void run() {
-          callback.reject(reason);
-        }
-      }, mDelay, mTimeUnit);
-    }
-
-    public void resolve(final I input, @NotNull final Callback<I> callback) {
-      mExecutor.execute(new Runnable() {
-
-        public void run() {
-          callback.resolve(input);
-        }
-      }, mDelay, mTimeUnit);
-    }
-
-    private Object writeReplace() throws ObjectStreamException {
-      return new HandlerProxy<I>(mExecutor, mDelay, mTimeUnit);
-    }
-
-    private static class HandlerProxy<I> extends SerializableProxy {
-
-      private HandlerProxy(final ScheduledExecutor executor, final long delay,
-          final TimeUnit timeUnit) {
-        super(executor, delay, timeUnit);
-      }
-
-      @SuppressWarnings("unchecked")
-      Object readResolve() throws ObjectStreamException {
-        try {
-          final Object[] args = deserializeArgs();
-          return new DelayedHandler<I>((ScheduledExecutor) args[0], (Long) args[1],
-              (TimeUnit) args[2]);
-
-        } catch (final Throwable t) {
-          throw new InvalidObjectException(t.getMessage());
-        }
-      }
-    }
   }
 
   private static class HandlerProxy<I> extends SerializableProxy {

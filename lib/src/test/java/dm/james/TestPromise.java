@@ -34,6 +34,7 @@ import dm.james.promise.Promise;
 import dm.james.promise.Promise.Callback;
 
 import static dm.james.executor.ScheduledExecutors.defaultExecutor;
+import static dm.james.executor.ScheduledExecutors.withDelay;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
@@ -144,11 +145,26 @@ public class TestPromise {
     assertThat(new Bond().promise(new Observer<Callback<String>>() {
 
       public void accept(final Callback<String> callback) {
+        defaultExecutor().execute(new Runnable() {
+
+          public void run() {
+            callback.resolve("test");
+          }
+        }, 100, TimeUnit.MILLISECONDS);
+      }
+    }).get()).isEqualTo("test");
+  }
+
+  @Test
+  public void testGetDelayedPropagation() {
+    assertThat(new Bond().promise(new Observer<Callback<String>>() {
+
+      public void accept(final Callback<String> callback) {
         callback.resolve("test");
       }
     })
-                         .then(Handlers.<String>scheduleOn(defaultExecutor()).delayed(100,
-                             TimeUnit.MILLISECONDS))
+                         .then(Handlers.<String>scheduleOn(
+                             withDelay(defaultExecutor(), 100, TimeUnit.MILLISECONDS)))
                          .get()).isEqualTo("test");
   }
 

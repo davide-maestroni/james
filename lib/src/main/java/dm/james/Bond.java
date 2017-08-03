@@ -34,7 +34,6 @@ import dm.james.promise.DeferredPromise;
 import dm.james.promise.DeferredPromiseIterable;
 import dm.james.promise.Mapper;
 import dm.james.promise.Observer;
-import dm.james.promise.ObserverHandler;
 import dm.james.promise.Promise;
 import dm.james.promise.Promise.Callback;
 import dm.james.promise.Promise.Handler;
@@ -42,6 +41,7 @@ import dm.james.promise.PromiseIterable;
 import dm.james.promise.PromiseIterable.CallbackIterable;
 import dm.james.promise.PromiseIterable.StatelessHandler;
 import dm.james.promise.Provider;
+import dm.james.promise.RejectionException;
 import dm.james.util.ConstantConditions;
 import dm.james.util.ReflectionUtils;
 import dm.james.util.SerializableProxy;
@@ -79,35 +79,23 @@ public class Bond implements Serializable {
   }
 
   @NotNull
-  public <O> PromiseIterable<O> all(@NotNull final Iterable<? extends Promise<O>> promises) {
+  public <O> PromiseIterable<O> all(@NotNull final Iterable<? extends Promise<?>> promises) {
     return this.<O>resolvedIterable(null).allSorted(new PromisesHandler<O>(promises));
   }
 
   @NotNull
-  public <O> PromiseIterable<O> all(@NotNull final Promise<? extends Iterable<O>> promises) {
-    return each(promises).all(IdentityMapper.<Iterable<O>>instance());
+  public <O> PromiseIterable<O> all(@NotNull final Promise<? extends Iterable<O>> promise) {
+    return each(promise).all(IdentityMapper.<Iterable<O>>instance());
   }
 
   @NotNull
-  public <O> PromiseIterable<O> allIterable(
-      @NotNull final Iterable<? extends PromiseIterable<O>> promises) {
-    return this.<O>resolvedIterable(null).allSorted(new PromiseIterablesHandler<O>(promises));
-  }
-
-  @NotNull
-  public <O> PromiseIterable<O> any(@NotNull final Iterable<? extends Promise<O>> promises) {
-    return each(promises).any(IdentityMapper.<O>instance());
+  public <O> PromiseIterable<O> any(@NotNull final Iterable<? extends Promise<?>> promises) {
+    return this.<O>each(promises).any(IdentityMapper.<O>instance());
   }
 
   @NotNull
   public <O> PromiseIterable<O> any(@NotNull final Promise<? extends Iterable<O>> promise) {
     return each(promise).any(IdentityMapper.<O>instance());
-  }
-
-  @NotNull
-  public <O> PromiseIterable<O> anyIterable(
-      @NotNull final Iterable<? extends PromiseIterable<O>> promises) {
-    return eachIterable(promises).any(IdentityMapper.<O>instance());
   }
 
   @NotNull
@@ -126,19 +114,13 @@ public class Bond implements Serializable {
   }
 
   @NotNull
-  public <O> PromiseIterable<O> each(@NotNull final Iterable<? extends Promise<O>> promises) {
-    return iterable(new PromisesObserver<O>(promises));
+  public <O> PromiseIterable<O> each(@NotNull final Iterable<? extends Promise<?>> promises) {
+    return iterable(new PromisesHandler<O>(promises));
   }
 
   @NotNull
   public <O> PromiseIterable<O> each(@NotNull final Promise<? extends Iterable<O>> promise) {
     return iterable(new IterableObserver<O>(promise));
-  }
-
-  @NotNull
-  public <O> PromiseIterable<O> eachIterable(
-      @NotNull final Iterable<? extends PromiseIterable<O>> promises) {
-    return iterable(new PromiseIterablesObserver<O>(promises));
   }
 
   @NotNull
@@ -270,7 +252,8 @@ public class Bond implements Serializable {
 
   @NotNull
   public <I extends Closeable, O> Promise<O> tryUsing(@NotNull final Provider<I> provider,
-      @NotNull final ObserverHandler<I, O, Callback<O>> handler) {
+      @NotNull final ObserverHandler<I, O, ? super Callback<O>> handler) {
+    // TODO: 02/08/2017 re-factor: does not work with executors
     return promise(new CloseableObserver<I, O>(provider, handler));
   }
 
@@ -324,6 +307,14 @@ public class Bond implements Serializable {
   public interface Func5<I1, I2, I3, I4, I5, O> {
 
     O apply(I1 input1, I2 input2, I3 input3, I4 input4, I5 input5) throws Exception;
+  }
+
+  /**
+   * Created by davide-maestroni on 08/02/2017.
+   */
+  public interface ObserverHandler<I, O, C extends Callback<O>> {
+
+    void accept(I input, @NotNull C callback) throws Exception;
   }
 
   private static class APlusMapper implements Mapper<Promise<?>, Promise<?>>, Serializable {
@@ -439,6 +430,7 @@ public class Bond implements Serializable {
 
         } catch (final IOException ignored) {
           // suppressed
+          // TODO: 02/08/2017 suppressed
         }
       }
     }
@@ -469,19 +461,32 @@ public class Bond implements Serializable {
   private static class CloseableObserver<I extends Closeable, O>
       implements Observer<Callback<O>>, Serializable {
 
-    private final ObserverHandler<I, O, Callback<O>> mHandler;
+    private final ObserverHandler<I, O, ? super Callback<O>> mHandler;
 
     private final Provider<I> mProvider;
 
     private CloseableObserver(@NotNull final Provider<I> provider,
-        @NotNull final ObserverHandler<I, O, Callback<O>> handler) {
+        @NotNull final ObserverHandler<I, O, ? super Callback<O>> handler) {
       mProvider = ConstantConditions.notNull("provider", provider);
       mHandler = ConstantConditions.notNull("handler", handler);
     }
 
     public void accept(final Callback<O> callback) throws Exception {
       final I closeable = mProvider.get();
-      mHandler.accept(closeable, new CloseableCallback<O>(closeable, callback));
+      try {
+        mHandler.accept(closeable, new CloseableCallback<O>(closeable, callback));
+
+      } catch (final Throwable t) {
+        try {
+          closeable.close();
+
+        } catch (final IOException ignored) {
+          // suppressed
+          // TODO: 02/08/2017 suppressed
+        }
+
+        throw RejectionException.wrapIfNot(RuntimeException.class, t);
+      }
     }
 
     private Object writeReplace() throws ObjectStreamException {
@@ -491,7 +496,7 @@ public class Bond implements Serializable {
     private static class ObserverProxy<I extends Closeable, O> extends SerializableProxy {
 
       private ObserverProxy(final Provider<I> provider,
-          final ObserverHandler<I, O, Callback<O>> handler) {
+          final ObserverHandler<I, O, ? super Callback<O>> handler) {
         super(provider, handler);
       }
 
@@ -500,7 +505,7 @@ public class Bond implements Serializable {
         try {
           final Object[] args = deserializeArgs();
           return new CloseableObserver<I, O>((Provider<I>) args[0],
-              (ObserverHandler<I, O, Callback<O>>) args[1]);
+              (ObserverHandler<I, O, ? super Callback<O>>) args[1]);
 
         } catch (final Throwable t) {
           throw new InvalidObjectException(t.getMessage());
@@ -524,50 +529,12 @@ public class Bond implements Serializable {
     }
   }
 
-  private static class PromiseIterablesHandler<O>
-      implements StatelessHandler<Iterable<O>, O>, Serializable {
-
-    private final Iterable<? extends PromiseIterable<O>> mPromises;
-
-    private PromiseIterablesHandler(
-        @NotNull final Iterable<? extends PromiseIterable<O>> promises) {
-      mPromises = ConstantConditions.notNull("promises", promises);
-    }
-
-    public void reject(final Throwable reason, @NotNull final CallbackIterable<O> callback) {
-      callback.reject(reason);
-    }
-
-    public void resolve(final Iterable<O> input, @NotNull final CallbackIterable<O> callback) {
-      for (final PromiseIterable<O> promise : mPromises) {
-        callback.addAllDeferred(promise);
-      }
-    }
-  }
-
-  private static class PromiseIterablesObserver<O>
-      implements Observer<CallbackIterable<O>>, Serializable {
-
-    private final Iterable<? extends PromiseIterable<O>> mPromises;
-
-    private PromiseIterablesObserver(
-        @NotNull final Iterable<? extends PromiseIterable<O>> promises) {
-      mPromises = ConstantConditions.notNull("promises", promises);
-    }
-
-    public void accept(final CallbackIterable<O> callback) {
-      for (final PromiseIterable<O> promise : mPromises) {
-        callback.addAllDeferred(promise);
-      }
-    }
-  }
-
   private static class PromisesHandler<O>
-      implements StatelessHandler<Iterable<O>, O>, Serializable {
+      implements StatelessHandler<Iterable<O>, O>, Observer<CallbackIterable<O>>, Serializable {
 
-    private final Iterable<? extends Promise<O>> mPromises;
+    private final Iterable<? extends Promise<?>> mPromises;
 
-    private PromisesHandler(@NotNull final Iterable<? extends Promise<O>> promises) {
+    private PromisesHandler(@NotNull final Iterable<? extends Promise<?>> promises) {
       mPromises = ConstantConditions.notNull("promises", promises);
     }
 
@@ -575,25 +542,29 @@ public class Bond implements Serializable {
       callback.reject(reason);
     }
 
+    @SuppressWarnings("unchecked")
     public void resolve(final Iterable<O> input, @NotNull final CallbackIterable<O> callback) {
-      for (final Promise<O> promise : mPromises) {
-        callback.addDeferred(promise);
+      for (final Promise<?> promise : mPromises) {
+        if (promise instanceof PromiseIterable) {
+          callback.addAllDeferred((PromiseIterable<O>) promise);
+
+        } else {
+          callback.addDeferred((Promise<O>) promise);
+        }
       }
     }
-  }
 
-  private static class PromisesObserver<O> implements Observer<CallbackIterable<O>>, Serializable {
-
-    private final Iterable<? extends Promise<O>> mPromises;
-
-    private PromisesObserver(@NotNull final Iterable<? extends Promise<O>> promises) {
-      mPromises = ConstantConditions.notNull("promises", promises);
-    }
-
+    @SuppressWarnings("unchecked")
     public void accept(final CallbackIterable<O> callback) {
-      for (final Promise<O> promise : mPromises) {
-        callback.addDeferred(promise);
+      for (final Promise<?> promise : mPromises) {
+        if (promise instanceof PromiseIterable) {
+          callback.addAllDeferred((PromiseIterable<O>) promise);
+
+        } else {
+          callback.addDeferred((Promise<O>) promise);
+        }
       }
     }
+
   }
 }
