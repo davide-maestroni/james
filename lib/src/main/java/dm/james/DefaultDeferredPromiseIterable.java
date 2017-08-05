@@ -62,7 +62,7 @@ class DefaultDeferredPromiseIterable<I, O> implements DeferredPromiseIterable<I,
   DefaultDeferredPromiseIterable(@Nullable final PropagationType propagationType,
       @Nullable final Log log, @Nullable final Level level) {
     mLogger = Logger.newLogger(log, level, this);
-    mState = new StateHolder<I>();
+    mState = new StateHolder<I>(log, level);
     mPromise =
         (DefaultPromiseIterable<O>) new DefaultPromiseIterable<I>(mState, propagationType, log,
             level);
@@ -97,6 +97,12 @@ class DefaultDeferredPromiseIterable<I, O> implements DeferredPromiseIterable<I,
   @NotNull
   public DeferredPromiseIterable<I, O> addedAll(final Iterable<I> input) {
     addAll(input);
+    return this;
+  }
+
+  @NotNull
+  public DeferredPromiseIterable<I, O> addedRejection(final Throwable reason) {
+    addRejection(reason);
     return this;
   }
 
@@ -513,15 +519,18 @@ class DefaultDeferredPromiseIterable<I, O> implements DeferredPromiseIterable<I,
 
     private final ScheduledExecutor mExecutor;
 
+    private final Logger mLogger;
+
     private final Object mMutex = new Object();
 
     private final StateExecutor mStateExecutor;
 
     private StatePending mState = new StatePending();
 
-    private StateHolder() {
+    private StateHolder(@Nullable final Log log, @Nullable final Level level) {
       mStateExecutor = new StateExecutor(mMutex);
       mExecutor = ScheduledExecutors.withThrottling(mStateExecutor, 1);
+      mLogger = Logger.newLogger(log, level, this);
     }
 
     public void accept(final CallbackIterable<I> callback) throws Exception {
@@ -533,13 +542,24 @@ class DefaultDeferredPromiseIterable<I, O> implements DeferredPromiseIterable<I,
     }
 
     private Object writeReplace() throws ObjectStreamException {
-      return new StateProxy<I>();
+      final Logger logger = mLogger;
+      return new StateProxy<I>(logger.getLog(), logger.getLogLevel());
     }
 
-    private static class StateProxy<I> implements Serializable {
+    private static class StateProxy<I> extends SerializableProxy {
+
+      private StateProxy(final Log log, final Level level) {
+        super(log, level);
+      }
 
       Object readResolve() throws ObjectStreamException {
-        return new StateHolder<I>();
+        try {
+          final Object[] args = deserializeArgs();
+          return new StateHolder<I>((Log) args[0], (Level) args[1]);
+
+        } catch (final Throwable t) {
+          throw new InvalidObjectException(t.getMessage());
+        }
       }
     }
 
@@ -584,6 +604,17 @@ class DefaultDeferredPromiseIterable<I, O> implements DeferredPromiseIterable<I,
 
             for (final CallbackIterable<I> callback : mCallbacks) {
               callback.addAll(inputs);
+            }
+          }
+        });
+      }
+
+      public void addRejection(final Throwable reason) {
+        mExecutor.execute(new Runnable() {
+
+          public void run() {
+            for (final CallbackIterable<I> callback : mCallbacks) {
+              callback.addRejection(reason);
             }
           }
         });
@@ -670,8 +701,13 @@ class DefaultDeferredPromiseIterable<I, O> implements DeferredPromiseIterable<I,
       }
 
       @Override
+      public void addRejection(final Throwable reason) {
+        mLogger.wrn(reason, "Suppressed rejection");
+      }
+
+      @Override
       public void reject(final Throwable reason) {
-        // TODO: 01/08/2017 suppressed
+        mLogger.wrn(reason, "Suppressed rejection");
       }
 
       @Override
@@ -720,6 +756,11 @@ class DefaultDeferredPromiseIterable<I, O> implements DeferredPromiseIterable<I,
       }
 
       @Override
+      public void addRejection(final Throwable reason) {
+        throw exception();
+      }
+
+      @Override
       public void reject(final Throwable reason) {
         mState = new StateRejected(mOutputs, reason);
         mExecutor.execute(new Runnable() {
@@ -759,6 +800,14 @@ class DefaultDeferredPromiseIterable<I, O> implements DeferredPromiseIterable<I,
       mStateExecutor.run();
     }
 
+    public void addRejection(final Throwable reason) {
+      synchronized (mMutex) {
+        mState.addRejection(reason);
+      }
+
+      mStateExecutor.run();
+    }
+
     public void resolve() {
       synchronized (mMutex) {
         mState.resolve();
@@ -790,6 +839,10 @@ class DefaultDeferredPromiseIterable<I, O> implements DeferredPromiseIterable<I,
 
   public void addAll(@Nullable final Iterable<I> inputs) {
     mState.addAll(inputs);
+  }
+
+  public void addRejection(final Throwable reason) {
+    mState.addRejection(reason);
   }
 
   public void resolve() {

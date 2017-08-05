@@ -31,4 +31,8 @@ public abstract class SyncExecutor implements ScheduledExecutor {
 
   public void stop() {
   }
+
+  public boolean isOwnedThread() {
+    return false;
+  }
 }

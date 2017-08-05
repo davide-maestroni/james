@@ -69,7 +69,7 @@ class UsingObserver<I extends Closeable, O> implements Observer<Callback<O>>, Se
       closeable.close();
 
     } catch (final IOException e) {
-      logger.wrn(e, "suppressed exception");
+      logger.wrn(e, "Suppressed exception");
     }
   }
 

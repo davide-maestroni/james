@@ -31,6 +31,9 @@ public interface DeferredPromiseIterable<I, O>
   DeferredPromiseIterable<I, O> addedAll(Iterable<I> input);
 
   @NotNull
+  DeferredPromiseIterable<I, O> addedRejection(Throwable reason);
+
+  @NotNull
   <R> DeferredPromiseIterable<I, R> all(@NotNull Mapper<Iterable<O>, Iterable<R>> mapper);
 
   @NotNull

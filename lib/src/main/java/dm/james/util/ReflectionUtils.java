@@ -33,6 +33,9 @@ public class ReflectionUtils {
    */
   public static final Object[] NO_ARGS = new Object[0];
 
+  private ReflectionUtils() {
+  }
+
   /**
    * Returns the specified objects as an array of arguments.
    *

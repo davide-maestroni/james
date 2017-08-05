@@ -41,7 +41,7 @@ import dm.james.util.TimeUtils.Condition;
 /**
  * Created by davide-maestroni on 08/03/2017.
  */
-class BackoffHandler<I> implements StatefulHandler<I, I, BackoffInputs>, Serializable {
+class BackoffHandler<I> implements StatefulHandler<I, I, BackoffInputs<I>>, Serializable {
 
   private final Backoff<ScheduledInputs<I>> mBackoff;
 
@@ -56,11 +56,11 @@ class BackoffHandler<I> implements StatefulHandler<I, I, BackoffInputs>, Seriali
     mBackoff = ConstantConditions.notNull("backoff", backoff);
   }
 
-  public BackoffInputs create(@NotNull final CallbackIterable<I> callback) {
-    return new BackoffInputs();
+  public BackoffInputs<I> create(@NotNull final CallbackIterable<I> callback) {
+    return new BackoffInputs<I>();
   }
 
-  public BackoffInputs fulfill(final BackoffInputs state, final I input,
+  public BackoffInputs<I> fulfill(final BackoffInputs<I> state, final I input,
       @NotNull final CallbackIterable<I> callback) throws Exception {
     state.inputs().add(input);
     applyBackoff(state);
@@ -82,7 +82,7 @@ class BackoffHandler<I> implements StatefulHandler<I, I, BackoffInputs>, Seriali
     return state;
   }
 
-  public BackoffInputs reject(final BackoffInputs state, final Throwable reason,
+  public BackoffInputs<I> reject(final BackoffInputs<I> state, final Throwable reason,
       @NotNull final CallbackIterable<I> callback) throws Exception {
     final List<I> inputs = state.resetInputs();
     mExecutor.execute(new Runnable() {
@@ -90,8 +90,7 @@ class BackoffHandler<I> implements StatefulHandler<I, I, BackoffInputs>, Seriali
       public void run() {
         try {
           callback.addAll(inputs);
-          // TODO: 05/08/2017 what if another rejection comes? callback.addRejection()?
-          callback.reject(reason);
+          callback.addRejection(reason);
 
         } finally {
           state.decrementPending();
@@ -102,8 +101,8 @@ class BackoffHandler<I> implements StatefulHandler<I, I, BackoffInputs>, Seriali
     return state;
   }
 
-  public void resolve(final BackoffInputs state, @NotNull final CallbackIterable<I> callback) throws
-      Exception {
+  public void resolve(final BackoffInputs<I> state,
+      @NotNull final CallbackIterable<I> callback) throws Exception {
     applyBackoff(state);
     final List<I> inputs = state.resetInputs();
     mExecutor.execute(new Runnable() {
@@ -121,7 +120,7 @@ class BackoffHandler<I> implements StatefulHandler<I, I, BackoffInputs>, Seriali
   }
 
   @SuppressWarnings("SynchronizationOnLocalVariableOrMethodParameter")
-  private void applyBackoff(@NotNull final BackoffInputs inputs) throws Exception {
+  private void applyBackoff(@NotNull final BackoffInputs<I> inputs) throws Exception {
     final ScheduledExecutor executor = mExecutor;
     if (executor.isExecutionThread()) {
       throw new RejectedExecutionException(
@@ -152,25 +151,7 @@ class BackoffHandler<I> implements StatefulHandler<I, I, BackoffInputs>, Seriali
     return new ExecutorProxy(mExecutor, mBackoff);
   }
 
-  private static class ExecutorProxy extends SerializableProxy {
-
-    private ExecutorProxy(final ScheduledExecutor wrapped, final Backoff backoff) {
-      super(wrapped, backoff);
-    }
-
-    @SuppressWarnings("unchecked")
-    Object readResolve() throws ObjectStreamException {
-      try {
-        final Object[] args = deserializeArgs();
-        return new BackoffHandler((ScheduledExecutor) args[0], (Backoff) args[1]);
-
-      } catch (final Throwable t) {
-        throw new InvalidObjectException(t.getMessage());
-      }
-    }
-  }
-
-  class BackoffInputs implements ScheduledInputs<I> {
+  static class BackoffInputs<I> implements ScheduledInputs<I> {
 
     private final ArrayList<I> mInputs = new ArrayList<I>();
 
@@ -227,6 +208,24 @@ class BackoffHandler<I> implements StatefulHandler<I, I, BackoffInputs>, Seriali
       final boolean isRetain = mIsRetain;
       mIsRetain = false;
       return isRetain;
+    }
+  }
+
+  private static class ExecutorProxy extends SerializableProxy {
+
+    private ExecutorProxy(final ScheduledExecutor wrapped, final Backoff backoff) {
+      super(wrapped, backoff);
+    }
+
+    @SuppressWarnings("unchecked")
+    Object readResolve() throws ObjectStreamException {
+      try {
+        final Object[] args = deserializeArgs();
+        return new BackoffHandler((ScheduledExecutor) args[0], (Backoff) args[1]);
+
+      } catch (final Throwable t) {
+        throw new InvalidObjectException(t.getMessage());
+      }
     }
   }
 }

@@ -20,7 +20,6 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 import java.io.Closeable;
-import java.io.IOException;
 import java.io.InvalidObjectException;
 import java.io.ObjectStreamException;
 import java.io.Serializable;
@@ -37,15 +36,12 @@ import dm.james.promise.Mapper;
 import dm.james.promise.Observer;
 import dm.james.promise.Promise;
 import dm.james.promise.Promise.Callback;
-import dm.james.promise.Promise.Handler;
 import dm.james.promise.PromiseIterable;
 import dm.james.promise.PromiseIterable.CallbackIterable;
 import dm.james.promise.PromiseIterable.StatelessHandler;
 import dm.james.promise.Provider;
-import dm.james.promise.RejectionException;
 import dm.james.util.ConstantConditions;
 import dm.james.util.ReflectionUtils;
-import dm.james.util.SerializableProxy;
 
 /**
  * Created by davide-maestroni on 06/30/2017.
@@ -410,116 +406,6 @@ public class Bond implements Serializable {
     }
   }
 
-  private static class CloseableCallback<O> implements Callback<O>, Handler<O, Object> {
-
-    private final Callback<O> mCallback;
-
-    private final Closeable mCloseable;
-
-    private CloseableCallback(@NotNull final Closeable closeable,
-        @NotNull final Callback<O> callback) {
-      mCloseable = ConstantConditions.notNull("closeable", closeable);
-      mCallback = callback;
-    }
-
-    public void defer(@NotNull final Promise<O> promise) {
-      promise.then(this);
-    }
-
-    public void reject(final Throwable reason) {
-      try {
-        mCallback.reject(reason);
-
-      } finally {
-        try {
-          mCloseable.close();
-
-        } catch (final IOException ignored) {
-          // suppressed
-          // TODO: 02/08/2017 suppressed
-        }
-      }
-    }
-
-    public void resolve(final O output) {
-      try {
-        mCallback.resolve(output);
-
-      } finally {
-        try {
-          mCloseable.close();
-
-        } catch (final IOException e) {
-          mCallback.reject(e);
-        }
-      }
-    }
-
-    public void reject(final Throwable reason, @NotNull final Callback<Object> callback) {
-      reject(reason);
-    }
-
-    public void resolve(final O input, @NotNull final Callback<Object> callback) {
-      resolve(input);
-    }
-  }
-
-  private static class CloseableObserver<I extends Closeable, O>
-      implements Observer<Callback<O>>, Serializable {
-
-    private final ObserverHandler<I, O, ? super Callback<O>> mHandler;
-
-    private final Provider<I> mProvider;
-
-    private CloseableObserver(@NotNull final Provider<I> provider,
-        @NotNull final ObserverHandler<I, O, ? super Callback<O>> handler) {
-      mProvider = ConstantConditions.notNull("provider", provider);
-      mHandler = ConstantConditions.notNull("handler", handler);
-    }
-
-    public void accept(final Callback<O> callback) throws Exception {
-      final I closeable = mProvider.get();
-      try {
-        mHandler.accept(closeable, new CloseableCallback<O>(closeable, callback));
-
-      } catch (final Throwable t) {
-        try {
-          closeable.close();
-
-        } catch (final IOException ignored) {
-          // suppressed
-          // TODO: 02/08/2017 suppressed
-        }
-
-        throw RejectionException.wrapIfNot(RuntimeException.class, t);
-      }
-    }
-
-    private Object writeReplace() throws ObjectStreamException {
-      return new ObserverProxy<I, O>(mProvider, mHandler);
-    }
-
-    private static class ObserverProxy<I extends Closeable, O> extends SerializableProxy {
-
-      private ObserverProxy(final Provider<I> provider,
-          final ObserverHandler<I, O, ? super Callback<O>> handler) {
-        super(provider, handler);
-      }
-
-      @SuppressWarnings("unchecked")
-      Object readResolve() throws ObjectStreamException {
-        try {
-          final Object[] args = deserializeArgs();
-          return new CloseableObserver<I, O>((Provider<I>) args[0],
-              (ObserverHandler<I, O, ? super Callback<O>>) args[1]);
-
-        } catch (final Throwable t) {
-          throw new InvalidObjectException(t.getMessage());
-        }
-      }
-    }
-  }
-
   private static class IterableObserver<O> implements Observer<CallbackIterable<O>>, Serializable {
 
     private final Promise<? extends Iterable<O>> mPromise;
@@ -557,6 +443,8 @@ public class Bond implements Serializable {
           callback.addDeferred((Promise<O>) promise);
         }
       }
+
+      callback.resolve();
     }
 
     @SuppressWarnings("unchecked")
@@ -569,7 +457,8 @@ public class Bond implements Serializable {
           callback.addDeferred((Promise<O>) promise);
         }
       }
-    }
 
+      callback.resolve();
+    }
   }
 }

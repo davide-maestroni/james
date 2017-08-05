@@ -122,13 +122,6 @@ public class ScheduledExecutors {
     return LoopExecutor.instance();
   }
 
-  // TODO: 03/08/2017 cached pool
-  @NotNull
-  public static ScheduledExecutor newCachedPoolExecutor() {
-    return ServiceExecutor.ofStoppable(
-        new ScheduledThreadPoolExecutorService(Executors.newCachedThreadPool()));
-  }
-
   /**
    * Returns an executor employing a dynamic pool of threads.
    * <br>
@@ -151,7 +144,7 @@ public class ScheduledExecutors {
   @NotNull
   public static ScheduledExecutor newDynamicPoolExecutor(final int corePoolSize,
       final int maximumPoolSize, final long keepAliveTime, @NotNull final TimeUnit keepAliveUnit) {
-    return ServiceExecutor.ofStoppable(
+    return newStoppableServiceExecutor(
         new DynamicScheduledThreadPoolExecutorService(corePoolSize, maximumPoolSize, keepAliveTime,
             keepAliveUnit));
   }
@@ -180,7 +173,7 @@ public class ScheduledExecutors {
   public static ScheduledExecutor newDynamicPoolExecutor(final int corePoolSize,
       final int maximumPoolSize, final long keepAliveTime, @NotNull final TimeUnit keepAliveUnit,
       @NotNull final ThreadFactory threadFactory) {
-    return ServiceExecutor.ofStoppable(
+    return newStoppableServiceExecutor(
         new DynamicScheduledThreadPoolExecutorService(corePoolSize, maximumPoolSize, keepAliveTime,
             keepAliveUnit, threadFactory));
   }
@@ -204,7 +197,7 @@ public class ScheduledExecutors {
    */
   @NotNull
   public static ScheduledExecutor newPoolExecutor(final int poolSize) {
-    return ServiceExecutor.ofStoppable(Executors.newScheduledThreadPool(poolSize));
+    return newStoppableServiceExecutor(Executors.newScheduledThreadPool(poolSize));
   }
 
   /**
@@ -244,6 +237,18 @@ public class ScheduledExecutors {
   @NotNull
   public static ScheduledExecutor newServiceExecutor(@NotNull final ExecutorService service) {
     return newServiceExecutor(new ScheduledThreadPoolExecutorService(service));
+  }
+
+  @NotNull
+  public static ScheduledExecutor newStoppableServiceExecutor(
+      @NotNull final ScheduledExecutorService service) {
+    return ServiceExecutor.ofStoppable(service);
+  }
+
+  @NotNull
+  public static ScheduledExecutor newStoppableServiceExecutor(
+      @NotNull final ExecutorService service) {
+    return newStoppableServiceExecutor(new ScheduledThreadPoolExecutorService(service));
   }
 
   @NotNull
@@ -314,7 +319,7 @@ public class ScheduledExecutors {
   @NotNull
   private static ScheduledExecutor optimizedExecutor(final int threadPriority) {
     final int processors = Runtime.getRuntime().availableProcessors();
-    return ServiceExecutor.of(
+    return newServiceExecutor(
         new DynamicScheduledThreadPoolExecutorService(Math.max(2, processors >> 1),
             Math.max(2, (processors << 1) - 1), 10L, TimeUnit.SECONDS,
             new ExecutorThreadFactory(threadPriority)));

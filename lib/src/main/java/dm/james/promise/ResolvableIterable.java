@@ -27,5 +27,7 @@ public interface ResolvableIterable<I> extends Resolvable<Iterable<I>> {
 
   void addAll(@Nullable Iterable<I> outputs);
 
+  void addRejection(Throwable reason);
+
   void resolve();
 }

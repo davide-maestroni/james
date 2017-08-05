@@ -33,6 +33,10 @@ public abstract class AsyncExecutor implements ScheduledExecutor {
     execute(command, 0, TimeUnit.MILLISECONDS);
   }
 
+  public boolean isExecutionThread() {
+    return isOwnedThread();
+  }
+
   public void stop() {
   }
 }

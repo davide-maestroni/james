@@ -965,7 +965,7 @@ class DefaultPromise<O> implements Promise<O> {
 
       @Override
       boolean reject(final Throwable reason) {
-        mLogger.wrn("Suppressed rejection with reason: %s", reason);
+        mLogger.wrn(reason, "Suppressed rejection");
         return false;
       }
 

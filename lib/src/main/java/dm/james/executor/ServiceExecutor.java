@@ -21,11 +21,13 @@ import org.jetbrains.annotations.NotNull;
 import java.io.InvalidObjectException;
 import java.io.ObjectStreamException;
 import java.io.Serializable;
+import java.util.WeakHashMap;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 
 import dm.james.util.ConstantConditions;
 import dm.james.util.SerializableProxy;
+import dm.james.util.ThreadUtils;
 
 /**
  * Class implementing an executor employing an executor service.
@@ -33,6 +35,9 @@ import dm.james.util.SerializableProxy;
  * Created by davide-maestroni on 10/14/2014.
  */
 class ServiceExecutor extends AsyncExecutor implements Serializable {
+
+  private static final WeakHashMap<ScheduledExecutorService, Boolean> mOwners =
+      new WeakHashMap<ScheduledExecutorService, Boolean>();
 
   private final ThreadLocal<Boolean> mIsManaged = new ThreadLocal<Boolean>();
 
@@ -55,7 +60,15 @@ class ServiceExecutor extends AsyncExecutor implements Serializable {
    */
   @NotNull
   static ServiceExecutor of(@NotNull final ScheduledExecutorService service) {
-    return new ServiceExecutor(service);
+    final ServiceExecutor executor = new ServiceExecutor(service);
+    synchronized (mOwners) {
+      if (!Boolean.TRUE.equals(mOwners.put(service, Boolean.TRUE))) {
+        // TODO: 05/08/2017 ???
+        ThreadUtils.register(executor);
+      }
+    }
+
+    return executor;
   }
 
   /**
@@ -68,7 +81,15 @@ class ServiceExecutor extends AsyncExecutor implements Serializable {
    */
   @NotNull
   static ServiceExecutor ofStoppable(@NotNull final ScheduledExecutorService service) {
-    return new StoppableServiceExecutor(service);
+    final StoppableServiceExecutor executor = new StoppableServiceExecutor(service);
+    synchronized (mOwners) {
+      if (!Boolean.TRUE.equals(mOwners.put(service, Boolean.TRUE))) {
+        // TODO: 05/08/2017 ???
+        ThreadUtils.register(executor);
+      }
+    }
+
+    return executor;
   }
 
   public void execute(@NotNull final Runnable command, final long delay,
@@ -76,7 +97,7 @@ class ServiceExecutor extends AsyncExecutor implements Serializable {
     mService.schedule(new RunnableWrapper(command), delay, timeUnit);
   }
 
-  public boolean isExecutionThread() {
+  public boolean isOwnedThread() {
     return Boolean.TRUE.equals(mIsManaged.get());
   }
 

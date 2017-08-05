@@ -1448,7 +1448,10 @@ class DefaultPromiseIterable<O> implements PromiseIterable<O>, Serializable {
         mNext = next;
       }
 
-      public void add(final R output) {
+      public void defer(@NotNull final Promise<R> promise) {
+        addDeferred(promise);
+        resolve();
+      }      public void add(final R output) {
         synchronized (mMutex) {
           mQueue.add(new ResolutionResolved<R>(output));
         }
@@ -1456,9 +1459,14 @@ class DefaultPromiseIterable<O> implements PromiseIterable<O>, Serializable {
         flushQueue(mNext);
       }
 
-      public void defer(@NotNull final Promise<R> promise) {
-        addDeferred(promise);
-        resolve();
+      public void reject(final Throwable reason) {
+        synchronized (mMutex) {
+          final NestedQueue<Resolution<R>> queue = mQueue;
+          queue.add(new ResolutionRejected<R>(reason));
+          queue.close();
+        }
+
+        flushQueue(mNext);
       }
 
       @SuppressWarnings("unchecked")
@@ -1476,15 +1484,7 @@ class DefaultPromiseIterable<O> implements PromiseIterable<O>, Serializable {
         }
       }
 
-      public void reject(final Throwable reason) {
-        synchronized (mMutex) {
-          final NestedQueue<Resolution<R>> queue = mQueue;
-          queue.add(new ResolutionRejected<R>(reason));
-          queue.close();
-        }
 
-        flushQueue(mNext);
-      }
 
       public void addAll(@Nullable final Iterable<R> outputs) {
         synchronized (mMutex) {
@@ -1501,6 +1501,14 @@ class DefaultPromiseIterable<O> implements PromiseIterable<O>, Serializable {
         }
 
         promise.then(new ChainHandler(mNext, queue));
+      }
+
+      public void addRejection(final Throwable reason) {
+        synchronized (mMutex) {
+          mQueue.add(new ResolutionRejected<R>(reason));
+        }
+
+        flushQueue(mNext);
       }
 
       public void resolve() {
@@ -1850,7 +1858,7 @@ class DefaultPromiseIterable<O> implements PromiseIterable<O>, Serializable {
       }
 
       public void reject(final Throwable reason) {
-        mNext.addRejection(reason);
+        addRejection(reason);
         innerResolve(mNext);
       }
 
@@ -1860,6 +1868,17 @@ class DefaultPromiseIterable<O> implements PromiseIterable<O>, Serializable {
 
       public void addDeferred(@NotNull final Promise<R> promise) {
         promise.then(new ChainHandler(mNext));
+      }
+
+      public void addRejection(final Throwable reason) {
+        try {
+          mNext.addRejection(reason);
+
+        } catch (final Throwable t) {
+          InterruptedExecutionException.throwIfInterrupt(t);
+          getLogger().err(t, "Error while propagating rejection with reason: %s", reason);
+          mNext.reject(t);
+        }
       }
 
       public void resolve() {
@@ -2178,13 +2197,8 @@ class DefaultPromiseIterable<O> implements PromiseIterable<O>, Serializable {
       }
 
       public void reject(final Throwable reason) {
-        synchronized (mMutex) {
-          mQueue.add(new ResolutionRejected<R>(reason));
-        }
-
-        final PromiseChain<R, ?> next = mNext;
-        flushQueue(next);
-        innerResolve(next);
+        addRejection(reason);
+        innerResolve(mNext);
       }
 
       public void addAll(@Nullable final Iterable<R> outputs) {
@@ -2204,6 +2218,14 @@ class DefaultPromiseIterable<O> implements PromiseIterable<O>, Serializable {
         promise.then(new ChainHandler(mNext, queue));
       }
 
+      public void addRejection(final Throwable reason) {
+        synchronized (mMutex) {
+          mQueue.add(new ResolutionRejected<R>(reason));
+        }
+
+        flushQueue(mNext);
+      }
+
       public void resolve() {
         final PromiseChain<R, ?> next = mNext;
         flushQueue(next);
@@ -2211,13 +2233,8 @@ class DefaultPromiseIterable<O> implements PromiseIterable<O>, Serializable {
       }
 
       public void resolve(final R output) {
-        synchronized (mMutex) {
-          mQueue.add(new ResolutionResolved<R>(output));
-        }
-
-        final PromiseChain<R, ?> next = mNext;
-        flushQueue(next);
-        innerResolve(next);
+        add(output);
+        innerResolve(mNext);
       }
     }
 
@@ -3075,10 +3092,6 @@ class DefaultPromiseIterable<O> implements PromiseIterable<O>, Serializable {
 
     abstract void addRejection(PromiseChain<O, ?> next, Throwable reason);
 
-    final void addRejection(final Throwable reason) {
-      addRejection(mNext, reason);
-    }
-
     @NotNull
     abstract PromiseChain<I, O> copy();
 
@@ -3220,7 +3233,7 @@ class DefaultPromiseIterable<O> implements PromiseIterable<O>, Serializable {
       @Nullable
       @Override
       Runnable reject(final Throwable reason) {
-        mLogger.wrn("Suppressed rejection with reason: %s", reason);
+        mLogger.wrn(reason, "Suppressed rejection");
         return null;
       }
 
@@ -3248,6 +3261,19 @@ class DefaultPromiseIterable<O> implements PromiseIterable<O>, Serializable {
         mLogger.wrn("Chain has been already resolved");
         throw new IllegalStateException("chain has been already resolved");
       }
+    }
+
+    public final void addRejection(final Throwable reason) {
+      final Runnable command;
+      synchronized (mMutex) {
+        command = mInnerState.add();
+      }
+
+      if (command != null) {
+        command.run();
+      }
+
+      addRejection(mNext, reason);
     }
 
     public final void add(final I output) {

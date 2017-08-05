@@ -56,4 +56,8 @@ public class ScheduledExecutorDecorator implements ScheduledExecutor {
   public void stop() {
     mExecutor.stop();
   }
+
+  public boolean isOwnedThread() {
+    return mExecutor.isOwnedThread();
+  }
 }

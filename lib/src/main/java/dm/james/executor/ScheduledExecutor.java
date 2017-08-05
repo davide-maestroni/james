@@ -21,6 +21,8 @@ import org.jetbrains.annotations.NotNull;
 import java.util.concurrent.Executor;
 import java.util.concurrent.TimeUnit;
 
+import dm.james.util.ThreadUtils.ThreadOwner;
+
 /**
  * The executor class defines an object responsible for executing routine invocations inside
  * specifically managed threads.
@@ -46,7 +48,7 @@ import java.util.concurrent.TimeUnit;
  * <p>
  * Created by davide-maestroni on 09/07/2014.
  */
-public interface ScheduledExecutor extends Executor {
+public interface ScheduledExecutor extends Executor, ThreadOwner {
 
   /**
    * Executes the specified command (that is, it calls the {@link Runnable#run()} method inside

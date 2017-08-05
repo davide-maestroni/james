@@ -162,6 +162,8 @@ public interface PromiseIterable<O> extends Promise<Iterable<O>>, Iterable<O> {
 
     // TODO: 01/08/2017 return CallbackIterable<O>?
 
+    void reject(Throwable reason);
+
     void add(O output);
 
     void addAll(@Nullable Iterable<O> outputs);
@@ -169,6 +171,8 @@ public interface PromiseIterable<O> extends Promise<Iterable<O>>, Iterable<O> {
     void addAllDeferred(@NotNull Promise<? extends Iterable<O>> promise);
 
     void addDeferred(@NotNull Promise<O> promise);
+
+    void addRejection(Throwable reason);
 
     void resolve();
   }
