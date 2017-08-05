@@ -126,6 +126,7 @@ class UsingIterableObserver<I extends Closeable, O>
 
     public Void reject(final Void state, final Throwable reason,
         @NotNull final CallbackIterable<O> callback) {
+      // TODO: 05/08/2017 fix it
       callback.reject(reason);
       return null;
     }

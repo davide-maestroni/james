@@ -44,16 +44,18 @@ public class Handlers {
   }
 
   @NotNull
-  public static <I> StatefulHandler<I, I, Backoff<I>> scheduleOn(
-      @NotNull final ScheduledExecutor executor,
+  public static <I> StatefulHandler<I, I, ?> scheduleOn(@NotNull final ScheduledExecutor executor,
       @NotNull final Backoff<ScheduledInputs<I>> backoff) {
-    return null;
+    return new BackoffHandler<I>(executor, backoff);
   }
 
-  abstract class ScheduledInputs<I> extends Number {
+  public interface ScheduledInputs<I> {
 
-    abstract List<I> inputs();
+    @NotNull
+    List<I> inputs();
 
-    abstract void retain();
+    int pending();
+
+    void retain();
   }
 }

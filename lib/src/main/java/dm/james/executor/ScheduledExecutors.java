@@ -26,7 +26,6 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
 
-import dm.james.util.Backoff;
 import dm.james.util.ConstantConditions;
 
 /**
@@ -245,12 +244,6 @@ public class ScheduledExecutors {
   @NotNull
   public static ScheduledExecutor newServiceExecutor(@NotNull final ExecutorService service) {
     return newServiceExecutor(new ScheduledThreadPoolExecutorService(service));
-  }
-
-  @NotNull
-  public static ScheduledExecutor withBackoff(@NotNull final ScheduledExecutor wrapped,
-      @NotNull final Backoff<Integer> backoff) {
-    return BackoffExecutor.of(wrapped, backoff);
   }
 
   @NotNull
