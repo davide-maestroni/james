@@ -120,12 +120,6 @@ class DefaultDeferredPromiseIterable<I, O> implements DeferredPromiseIterable<I,
 
   @NotNull
   public <R> DeferredPromiseIterable<I, R> allSorted(
-      @NotNull final Handler<Iterable<O>, Iterable<R>> handler) {
-    return new DefaultDeferredPromiseIterable<I, R>(mPromise.allSorted(handler), mLogger, mState);
-  }
-
-  @NotNull
-  public <R> DeferredPromiseIterable<I, R> allSorted(
       @NotNull final StatelessHandler<Iterable<O>, R> handler) {
     return new DefaultDeferredPromiseIterable<I, R>(mPromise.allSorted(handler), mLogger, mState);
   }
@@ -143,11 +137,6 @@ class DefaultDeferredPromiseIterable<I, O> implements DeferredPromiseIterable<I,
   @NotNull
   public <R> DeferredPromiseIterable<I, R> any(@NotNull final StatelessHandler<O, R> handler) {
     return new DefaultDeferredPromiseIterable<I, R>(mPromise.any(handler), mLogger, mState);
-  }
-
-  @NotNull
-  public <R> DeferredPromiseIterable<I, R> anySorted(@NotNull final Handler<O, R> handler) {
-    return new DefaultDeferredPromiseIterable<I, R>(mPromise.anySorted(handler), mLogger, mState);
   }
 
   @NotNull

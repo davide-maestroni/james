@@ -40,9 +40,6 @@ public interface DeferredPromiseIterable<I, O>
   <R> DeferredPromiseIterable<I, R> all(@NotNull StatelessHandler<Iterable<O>, R> handler);
 
   @NotNull
-  <R> DeferredPromiseIterable<I, R> allSorted(@NotNull Handler<Iterable<O>, Iterable<R>> handler);
-
-  @NotNull
   <R> DeferredPromiseIterable<I, R> allSorted(@NotNull StatelessHandler<Iterable<O>, R> handler);
 
   @NotNull
@@ -53,9 +50,6 @@ public interface DeferredPromiseIterable<I, O>
 
   @NotNull
   <R> DeferredPromiseIterable<I, R> any(@NotNull StatelessHandler<O, R> handler);
-
-  @NotNull
-  <R> DeferredPromiseIterable<I, R> anySorted(@NotNull Handler<O, R> handler);
 
   @NotNull
   <R> DeferredPromiseIterable<I, R> anySorted(@NotNull StatelessHandler<O, R> handler);
