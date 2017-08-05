@@ -18,6 +18,8 @@ package dm.james.executor;
 
 import org.jetbrains.annotations.NotNull;
 
+import java.util.concurrent.TimeUnit;
+
 /**
  * Base abstract implementation of an asynchronous executor.
  * <br>
@@ -25,32 +27,12 @@ import org.jetbrains.annotations.NotNull;
  * <p>
  * Created by davide-maestroni on 06/06/2016.
  */
-public abstract class AsyncExecutor extends ScheduledExecutor {
+public abstract class AsyncExecutor implements ScheduledExecutor {
 
-  /**
-   * Constructor.
-   *
-   * @param manager the manager of threads.
-   */
-  protected AsyncExecutor(@NotNull final ThreadManager manager) {
-    super(manager);
+  public void execute(@NotNull final Runnable command) {
+    execute(command, 0, TimeUnit.MILLISECONDS);
   }
 
-  @Override
-  public void cancel(@NotNull final Runnable command) {
-  }
-
-  @Override
-  public boolean isExecutionThread() {
-    return getThreadManager().isManagedThread();
-  }
-
-  @Override
-  public boolean isSynchronous() {
-    return false;
-  }
-
-  @Override
   public void stop() {
   }
 }

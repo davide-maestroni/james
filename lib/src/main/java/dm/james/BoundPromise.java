@@ -17,137 +17,45 @@
 package dm.james;
 
 import org.jetbrains.annotations.NotNull;
-import org.jetbrains.annotations.Nullable;
 
 import java.io.ObjectStreamException;
 import java.io.Serializable;
-import java.util.concurrent.TimeUnit;
 
-import dm.james.promise.Action;
 import dm.james.promise.DeferredPromise;
-import dm.james.promise.Mapper;
-import dm.james.promise.Observer;
 import dm.james.promise.Promise;
-import dm.james.promise.RejectionException;
 import dm.james.util.ConstantConditions;
 
 /**
  * Created by davide-maestroni on 07/21/2017.
  */
-class BoundPromise<I, O> implements Promise<O> {
-
-  private final DeferredPromise<I, O> mDeferred;
+class BoundPromise<I, O> extends PromiseWrapper<O> implements Serializable {
 
   private final Promise<I> mPromise;
 
   private BoundPromise(@NotNull final Promise<I> promise,
       @NotNull final DeferredPromise<I, O> deferred) {
+    super(deferred);
     mPromise = promise;
-    mDeferred = deferred;
   }
 
   @NotNull
   static <I, O> BoundPromise<I, O> create(@NotNull final Promise<I> promise,
       @NotNull final DeferredPromise<I, O> deferred) {
     final BoundPromise<I, O> boundPromise =
-        new BoundPromise<I, O>(ConstantConditions.notNull("promise", promise),
-            ConstantConditions.notNull("deferred", deferred));
+        new BoundPromise<I, O>(ConstantConditions.notNull("promise", promise), deferred);
     promise.then(new DeferredHandler<I>(deferred));
     return boundPromise;
   }
 
   @NotNull
-  public <R> Promise<R> apply(@NotNull final Mapper<Promise<O>, Promise<R>> mapper) {
-    return new BoundPromise<I, R>(mPromise, mDeferred.apply(mapper));
+  @SuppressWarnings("unchecked")
+  protected <R> Promise<R> newInstance(@NotNull final Promise<R> promise) {
+    return new BoundPromise<I, R>(mPromise, (DeferredPromise<I, R>) promise);
   }
 
-  @NotNull
-  public Promise<O> catchAny(@NotNull final Mapper<Throwable, O> mapper) {
-    return new BoundPromise<I, O>(mPromise, mDeferred.catchAny(mapper));
-  }
-
-  public O get() {
-    return mDeferred.get();
-  }
-
-  public O get(final long timeout, @NotNull final TimeUnit timeUnit) {
-    return mDeferred.get(timeout, timeUnit);
-  }
-
-  @Nullable
-  public RejectionException getError() {
-    return mDeferred.getError();
-  }
-
-  @Nullable
-  public RejectionException getError(final long timeout, @NotNull final TimeUnit timeUnit) {
-    return mDeferred.getError(timeout, timeUnit);
-  }
-
-  public RejectionException getErrorOr(final RejectionException other, final long timeout,
-      @NotNull final TimeUnit timeUnit) {
-    return mDeferred.getErrorOr(other, timeout, timeUnit);
-  }
-
-  public O getOr(final O other, final long timeout, @NotNull final TimeUnit timeUnit) {
-    return mDeferred.getOr(other, timeout, timeUnit);
-  }
-
-  public boolean isBound() {
-    return mDeferred.isBound();
-  }
-
-  public boolean isFulfilled() {
-    return mDeferred.isFulfilled();
-  }
-
-  public boolean isPending() {
-    return mDeferred.isPending();
-  }
-
-  public boolean isRejected() {
-    return mDeferred.isRejected();
-  }
-
-  public boolean isResolved() {
-    return mDeferred.isResolved();
-  }
-
-  @NotNull
-  public <R> Promise<R> then(@NotNull final Mapper<O, R> mapper) {
-    return new BoundPromise<I, R>(mPromise, mDeferred.then(mapper));
-  }
-
-  @NotNull
-  public <R> Promise<R> then(@NotNull final Handler<O, R> handler) {
-    return new BoundPromise<I, R>(mPromise, mDeferred.then(handler));
-  }
-
-  public void waitResolved() {
-    mDeferred.waitResolved();
-  }
-
-  public boolean waitResolved(final long timeout, @NotNull final TimeUnit timeUnit) {
-    return mDeferred.waitResolved(timeout, timeUnit);
-  }
-
-  @NotNull
-  public Promise<O> whenFulfilled(@NotNull final Observer<O> observer) {
-    return new BoundPromise<I, O>(mPromise, mDeferred.whenFulfilled(observer));
-  }
-
-  @NotNull
-  public Promise<O> whenRejected(@NotNull final Observer<Throwable> observer) {
-    return new BoundPromise<I, O>(mPromise, mDeferred.whenRejected(observer));
-  }
-
-  @NotNull
-  public Promise<O> whenResolved(@NotNull final Action action) {
-    return new BoundPromise<I, O>(mPromise, mDeferred.whenResolved(action));
-  }
-
+  @SuppressWarnings("unchecked")
   private Object writeReplace() throws ObjectStreamException {
-    return new PromiseProxy<I, O>(mPromise, mDeferred);
+    return new PromiseProxy<I, O>(mPromise, (DeferredPromise<I, O>) wrapped());
   }
 
   private static class DeferredHandler<O> implements Handler<O, O>, Serializable {

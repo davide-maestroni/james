@@ -50,20 +50,6 @@ public class Backoffs {
   }
 
   /**
-   * Caps this backoff policy to the specified maximum delay.
-   *
-   * @param value the delay value.
-   * @param unit  the delay unit.
-   * @return the capped backoff policy.
-   * @throws IllegalArgumentException if the delay is negative.
-   */
-  @NotNull
-  public static <T> Backoff<T> cappedTo(@NotNull final Backoff<T> wrapped, final long value,
-      @NotNull final TimeUnit unit) {
-    return new CappedBackoff<T>(wrapped, unit.toMillis(value));
-  }
-
-  /**
    * Returns a constant backoff.
    * <br>
    * The backoff will always return the specified delay.
@@ -155,6 +141,20 @@ public class Backoffs {
   public static <T> Backoff<T> sum(@NotNull final Backoff<T> first,
       @NotNull final Backoff<T> second) {
     return new SummedBackoff<T>(first, second);
+  }
+
+  /**
+   * Caps this backoff policy to the specified maximum delay.
+   *
+   * @param value the delay value.
+   * @param unit  the delay unit.
+   * @return the capped backoff policy.
+   * @throws IllegalArgumentException if the delay is negative.
+   */
+  @NotNull
+  public static <T> Backoff<T> withCap(@NotNull final Backoff<T> wrapped, final long value,
+      @NotNull final TimeUnit unit) {
+    return new CappedBackoff<T>(wrapped, unit.toMillis(value));
   }
 
   /**

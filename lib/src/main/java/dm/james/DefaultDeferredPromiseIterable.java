@@ -485,7 +485,6 @@ class DefaultDeferredPromiseIterable<I, O> implements DeferredPromiseIterable<I,
       mMutex = mutex;
     }
 
-    @Override
     public void execute(@NotNull final Runnable command) {
       synchronized (mMutex) {
         mCommands.add(command);

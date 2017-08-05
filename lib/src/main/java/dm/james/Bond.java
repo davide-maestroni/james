@@ -24,6 +24,7 @@ import java.io.IOException;
 import java.io.InvalidObjectException;
 import java.io.ObjectStreamException;
 import java.io.Serializable;
+import java.util.List;
 import java.util.concurrent.Callable;
 import java.util.concurrent.Future;
 
@@ -71,7 +72,7 @@ public class Bond implements Serializable {
   @NotNull
   public <O> Promise<O> aPlus(@NotNull final Promise<O> promise) {
     if ((promise instanceof MappedPromise)
-        && (((MappedPromise) promise).getMapper() instanceof APlusMapper)) {
+        && (((MappedPromise) promise).mapper() instanceof APlusMapper)) {
       return promise;
     }
 
@@ -130,8 +131,22 @@ public class Bond implements Serializable {
   }
 
   @NotNull
+  public <I extends Closeable, O> PromiseIterable<O> iterableUsing(
+      @NotNull final Iterable<Provider<I>> providers,
+      @NotNull final Mapper<List<I>, PromiseIterable<O>> mapper) {
+    return iterable(new UsingIterableObserver<I, O>(providers, mapper, mLog, mLogLevel));
+  }
+
+  @NotNull
   public <O> Promise<O> promise(@NotNull final Observer<? super Callback<O>> observer) {
     return new DefaultPromise<O>(observer, mPropagationType, mLog, mLogLevel);
+  }
+
+  @NotNull
+  public <I extends Closeable, O> Promise<O> promiseUsing(
+      @NotNull final Iterable<Provider<I>> providers,
+      @NotNull final Mapper<List<I>, Promise<O>> mapper) {
+    return promise(new UsingObserver<I, O>(providers, mapper, mLog, mLogLevel));
   }
 
   @NotNull
@@ -249,15 +264,6 @@ public class Bond implements Serializable {
   public <O> PromiseIterable<O> resolvedIterable(@Nullable final Iterable<O> outputs) {
     return iterable(new ResolvedIterableObserver<O>(outputs));
   }
-
-  @NotNull
-  public <I extends Closeable, O> Promise<O> tryUsing(@NotNull final Provider<I> provider,
-      @NotNull final ObserverHandler<I, O, ? super Callback<O>> handler) {
-    // TODO: 02/08/2017 re-factor: does not work with executors
-    return promise(new CloseableObserver<I, O>(provider, handler));
-  }
-
-  // TODO: 01/08/2017 tryIterable
 
   @NotNull
   public Bond withLog(@Nullable final Log log) {
@@ -512,7 +518,6 @@ public class Bond implements Serializable {
         }
       }
     }
-
   }
 
   private static class IterableObserver<O> implements Observer<CallbackIterable<O>>, Serializable {

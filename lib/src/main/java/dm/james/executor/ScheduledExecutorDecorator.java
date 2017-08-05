@@ -20,12 +20,14 @@ import org.jetbrains.annotations.NotNull;
 
 import java.util.concurrent.TimeUnit;
 
+import dm.james.util.ConstantConditions;
+
 /**
  * Implementation of a decorator of an executor object.
  * <p>
  * Created by davide-maestroni on 09/22/2014.
  */
-public class ScheduledExecutorDecorator extends ScheduledExecutor {
+public class ScheduledExecutorDecorator implements ScheduledExecutor {
 
   private final ScheduledExecutor mExecutor;
 
@@ -35,37 +37,22 @@ public class ScheduledExecutorDecorator extends ScheduledExecutor {
    * @param wrapped the wrapped instance.
    */
   public ScheduledExecutorDecorator(@NotNull final ScheduledExecutor wrapped) {
-    super(wrapped.getThreadManager());
-    mExecutor = wrapped;
+    mExecutor = ConstantConditions.notNull("executor", wrapped);
   }
 
-  @Override
-  public void cancel(@NotNull final Runnable command) {
-    mExecutor.cancel(command);
-  }
-
-  @Override
   public void execute(@NotNull final Runnable command) {
     mExecutor.execute(command);
   }
 
-  @Override
   public void execute(@NotNull final Runnable command, final long delay,
       @NotNull final TimeUnit timeUnit) {
     mExecutor.execute(command, delay, timeUnit);
   }
 
-  @Override
   public boolean isExecutionThread() {
     return mExecutor.isExecutionThread();
   }
 
-  @Override
-  public boolean isSynchronous() {
-    return mExecutor.isSynchronous();
-  }
-
-  @Override
   public void stop() {
     mExecutor.stop();
   }

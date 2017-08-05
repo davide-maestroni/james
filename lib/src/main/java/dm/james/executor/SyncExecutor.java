@@ -16,8 +16,6 @@
 
 package dm.james.executor;
 
-import org.jetbrains.annotations.NotNull;
-
 /**
  * Base abstract implementation of a synchronous executor.
  * <br>
@@ -25,37 +23,12 @@ import org.jetbrains.annotations.NotNull;
  * <p>
  * Created by davide-maestroni on 06/06/2016.
  */
-public abstract class SyncExecutor extends ScheduledExecutor {
+public abstract class SyncExecutor implements ScheduledExecutor {
 
-  private static final ThreadManager sManager = new ThreadManager() {
-
-    public boolean isManagedThread() {
-      return false;
-    }
-  };
-
-  /**
-   * Constructor.
-   */
-  protected SyncExecutor() {
-    super(sManager);
-  }
-
-  @Override
-  public void cancel(@NotNull final Runnable command) {
-  }
-
-  @Override
   public boolean isExecutionThread() {
     return true;
   }
 
-  @Override
-  public boolean isSynchronous() {
-    return true;
-  }
-
-  @Override
   public void stop() {
   }
 }

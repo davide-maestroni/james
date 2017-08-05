@@ -83,23 +83,8 @@ class ZeroDelayExecutor extends ScheduledExecutorDecorator implements Serializab
   }
 
   @Override
-  public void cancel(@NotNull final Runnable command) {
-    final RunnableDecorator decorator;
-    synchronized (mCommands) {
-      final WeakReference<RunnableDecorator> reference = mCommands.remove(command);
-      decorator = (reference != null) ? reference.get() : null;
-    }
-
-    if (decorator != null) {
-      sSyncExecutor.cancel(decorator);
-    }
-
-    super.cancel(command);
-  }
-
-  @Override
   public void execute(@NotNull final Runnable command) {
-    if (getThreadManager().isManagedThread()) {
+    if (isExecutionThread()) {
       sSyncExecutor.execute(getRunnableDecorator(command));
 
     } else {

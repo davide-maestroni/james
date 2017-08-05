@@ -18,6 +18,7 @@ package dm.james.executor;
 
 import org.jetbrains.annotations.NotNull;
 
+import java.io.ObjectStreamException;
 import java.io.Serializable;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -35,6 +36,8 @@ import dm.james.util.ConstantConditions;
  */
 @SuppressWarnings("WeakerAccess")
 public class ScheduledExecutors {
+
+  // TODO: 04/08/2017 register asynchronous executors and throw on wait?
 
   private static final Object sMutex = new Object();
 
@@ -55,7 +58,7 @@ public class ScheduledExecutors {
   public static ScheduledExecutor backgroundExecutor() {
     synchronized (sMutex) {
       if (sBackgroundExecutor == null) {
-        sBackgroundExecutor = optimizedExecutor(Thread.MIN_PRIORITY);
+        sBackgroundExecutor = new BackgroundExecutor();
       }
 
       return sBackgroundExecutor;
@@ -71,7 +74,7 @@ public class ScheduledExecutors {
   public static ScheduledExecutor defaultExecutor() {
     synchronized (sMutex) {
       if (sDefaultExecutor == null) {
-        sDefaultExecutor = optimizedExecutor(Thread.NORM_PRIORITY);
+        sDefaultExecutor = new DefaultExecutor();
       }
 
       return sDefaultExecutor;
@@ -82,7 +85,7 @@ public class ScheduledExecutors {
   public static ScheduledExecutor foregroundExecutor() {
     synchronized (sMutex) {
       if (sForegroundExecutor == null) {
-        sForegroundExecutor = optimizedExecutor(Thread.MAX_PRIORITY);
+        sForegroundExecutor = new ForegroundExecutor();
       }
 
       return sForegroundExecutor;
@@ -324,6 +327,49 @@ public class ScheduledExecutors {
             new ExecutorThreadFactory(threadPriority)));
   }
 
+  private static class BackgroundExecutor extends ScheduledExecutorDecorator
+      implements Serializable {
+
+    /**
+     * Constructor.
+     */
+    private BackgroundExecutor() {
+      super(optimizedExecutor(Thread.MIN_PRIORITY));
+    }
+
+    private Object writeReplace() throws ObjectStreamException {
+      return new ExecutorProxy();
+    }
+
+    private static class ExecutorProxy implements Serializable {
+
+      Object readResolve() throws ObjectStreamException {
+        return backgroundExecutor();
+      }
+    }
+  }
+
+  private static class DefaultExecutor extends ScheduledExecutorDecorator implements Serializable {
+
+    /**
+     * Constructor.
+     */
+    private DefaultExecutor() {
+      super(optimizedExecutor(Thread.NORM_PRIORITY));
+    }
+
+    private Object writeReplace() throws ObjectStreamException {
+      return new ExecutorProxy();
+    }
+
+    private static class ExecutorProxy implements Serializable {
+
+      Object readResolve() throws ObjectStreamException {
+        return defaultExecutor();
+      }
+    }
+  }
+
   private static class ExecutorThreadFactory implements ThreadFactory, Serializable {
 
     private final int mPriority;
@@ -338,9 +384,31 @@ public class ScheduledExecutors {
 
     public Thread newThread(@NotNull final Runnable runnable) {
       final Thread thread = new Thread(runnable);
-      thread.setName("JRoutine-" + thread.getName());
+      thread.setName("james-" + thread.getName());
       thread.setPriority(mPriority);
       return thread;
+    }
+  }
+
+  private static class ForegroundExecutor extends ScheduledExecutorDecorator
+      implements Serializable {
+
+    /**
+     * Constructor.
+     */
+    private ForegroundExecutor() {
+      super(optimizedExecutor(Thread.MAX_PRIORITY));
+    }
+
+    private Object writeReplace() throws ObjectStreamException {
+      return new ExecutorProxy();
+    }
+
+    private static class ExecutorProxy implements Serializable {
+
+      Object readResolve() throws ObjectStreamException {
+        return foregroundExecutor();
+      }
     }
   }
 }

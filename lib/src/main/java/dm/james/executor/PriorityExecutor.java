@@ -313,37 +313,6 @@ class PriorityExecutor {
     }
 
     @Override
-    public void cancel(@NotNull final Runnable command) {
-      final WeakHashMap<PriorityCommand, Void> priorityCommands;
-      synchronized (mCommands) {
-        priorityCommands = mCommands.remove(command);
-      }
-
-      if (priorityCommands != null) {
-        @SuppressWarnings("UnnecessaryLocalVariable") final PriorityBlockingQueue<PriorityCommand>
-            queue = mQueue;
-        @SuppressWarnings("UnnecessaryLocalVariable") final Map<PriorityCommand, ImmediateCommand>
-            immediateCommands = mImmediateCommands;
-        @SuppressWarnings("UnnecessaryLocalVariable") final Map<PriorityCommand, DelayedCommand>
-            delayedCommands = mDelayedCommands;
-        for (final PriorityCommand priorityCommand : priorityCommands.keySet()) {
-          if (queue.remove(priorityCommand)) {
-            final ImmediateCommand immediateCommand = immediateCommands.remove(priorityCommand);
-            if (immediateCommand != null) {
-              super.cancel(immediateCommand);
-            }
-
-          } else {
-            final DelayedCommand delayedCommand = delayedCommands.remove(priorityCommand);
-            if (delayedCommand != null) {
-              super.cancel(delayedCommand);
-            }
-          }
-        }
-      }
-    }
-
-    @Override
     public void execute(@NotNull final Runnable command) {
       final PriorityCommand priorityCommand = getPriorityCommand(command);
       final ImmediateCommand immediateCommand = new ImmediateCommand(priorityCommand);

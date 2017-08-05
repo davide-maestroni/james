@@ -38,9 +38,6 @@ public interface PromiseIterable<O> extends Promise<Iterable<O>>, Iterable<O> {
   <R> PromiseIterable<R> all(@NotNull StatelessHandler<Iterable<O>, R> handler);
 
   @NotNull
-  <R> PromiseIterable<R> allSorted(@NotNull Handler<Iterable<O>, Iterable<R>> handler);
-
-  @NotNull
   <R> PromiseIterable<R> allSorted(@NotNull StatelessHandler<Iterable<O>, R> handler);
 
   @NotNull
@@ -51,9 +48,6 @@ public interface PromiseIterable<O> extends Promise<Iterable<O>>, Iterable<O> {
 
   @NotNull
   <R> PromiseIterable<R> any(@NotNull StatelessHandler<O, R> handler);
-
-  @NotNull
-  <R> PromiseIterable<R> anySorted(@NotNull Handler<O, R> handler);
 
   @NotNull
   <R> PromiseIterable<R> anySorted(@NotNull StatelessHandler<O, R> handler);

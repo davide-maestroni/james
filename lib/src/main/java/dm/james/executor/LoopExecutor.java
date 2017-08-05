@@ -45,17 +45,10 @@ class LoopExecutor extends SyncExecutor implements Serializable {
     return sInstance;
   }
 
-  @Override
-  public void cancel(@NotNull final Runnable command) {
-    LocalExecutor.cancel(command);
-  }
-
-  @Override
   public void execute(@NotNull final Runnable command) {
     LocalExecutor.run(command);
   }
 
-  @Override
   public void execute(@NotNull final Runnable command, final long delay,
       @NotNull final TimeUnit timeUnit) {
     LocalExecutor.run(command, delay, timeUnit);

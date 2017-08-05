@@ -21,9 +21,6 @@ import org.jetbrains.annotations.NotNull;
 import java.util.concurrent.Executor;
 import java.util.concurrent.TimeUnit;
 
-import dm.james.util.ConstantConditions;
-import dm.james.util.WeakIdentityHashMap;
-
 /**
  * The executor class defines an object responsible for executing routine invocations inside
  * specifically managed threads.
@@ -49,71 +46,7 @@ import dm.james.util.WeakIdentityHashMap;
  * <p>
  * Created by davide-maestroni on 09/07/2014.
  */
-public abstract class ScheduledExecutor implements Executor {
-
-  // TODO: 03/08/2017 make interface, remove everything but execute, stop and isExecutionThread
-
-  private static final Object sMutex = new Object();
-
-  private static volatile WeakIdentityHashMap<ThreadManager, Void> sManagers =
-      new WeakIdentityHashMap<ThreadManager, Void>();
-
-  private final ThreadManager mManager;
-
-  /**
-   * Constructor.
-   *
-   * @param manager the manager of threads.
-   */
-  protected ScheduledExecutor(@NotNull final ThreadManager manager) {
-    registerManager(ConstantConditions.notNull("thread manager", manager));
-    mManager = manager;
-  }
-
-  /**
-   * Checks if the calling thread belongs to the ones managed by an executor.
-   *
-   * @return whether the calling thread is managed by an executor.
-   */
-  public static boolean isManagedThread() {
-    for (final ThreadManager manager : sManagers.keySet()) {
-      if ((manager != null) && manager.isManagedThread()) {
-        return true;
-      }
-    }
-
-    return false;
-  }
-
-  private static void registerManager(@NotNull final ThreadManager manager) {
-    synchronized (sMutex) {
-      // Copy-on-write pattern
-      sManagers = new WeakIdentityHashMap<ThreadManager, Void>(sManagers) {{
-        put(manager, null);
-      }};
-    }
-  }
-
-  /**
-   * Cancels the specified command if not already run.
-   * <p>
-   * Note that the method will have no effect in case the executor does not maintain a queue or the
-   * specified command has been already processed at the moment of the call.
-   * <br>
-   * Note also that, in case the same command has been added more than once to the executor queue,
-   * when the method returns, the queue will not contain the command instance anymore, with the
-   * consequence that the {@link Runnable#run()} method will never be called.
-   * <p>
-   * The implementation of this method is optional, still, it may greatly increase the performance
-   * by avoiding to start invocations which are already aborted.
-   *
-   * @param command the command.
-   */
-  public abstract void cancel(@NotNull Runnable command);
-
-  public void execute(@NotNull final Runnable command) {
-    execute(command, 0, TimeUnit.MILLISECONDS);
-  }
+public interface ScheduledExecutor extends Executor {
 
   /**
    * Executes the specified command (that is, it calls the {@link Runnable#run()} method inside
@@ -126,7 +59,7 @@ public abstract class ScheduledExecutor implements Executor {
    *                                                         fulfill the command (for instance,
    *                                                         after being stopped).
    */
-  public abstract void execute(@NotNull Runnable command, long delay, @NotNull TimeUnit timeUnit);
+  void execute(@NotNull Runnable command, long delay, @NotNull TimeUnit timeUnit);
 
   /**
    * Checks if the calling thread may be employed to run commands.
@@ -138,22 +71,7 @@ public abstract class ScheduledExecutor implements Executor {
    *
    * @return whether the calling thread is employed by the executor.
    */
-  public abstract boolean isExecutionThread();
-
-  /**
-   * Checks if this executor instance is synchronous, that is, all the commands are run in the
-   * calling thread.
-   * <p>
-   * Note that, even if the implementation of this method is not strictly mandatory, it will be
-   * used to optimize the invocation commands.
-   * <p>
-   * Consider inheriting from {@link dm.james.executor.AsyncExecutor AsyncExecutor} or
-   * {@link dm.james.executor.SyncExecutor SyncExecutor} class for a default
-   * implementation of most of the abstract methods.
-   *
-   * @return whether this executor is synchronous.
-   */
-  public abstract boolean isSynchronous();
+  boolean isExecutionThread();
 
   /**
    * Stops the executor.
@@ -163,33 +81,5 @@ public abstract class ScheduledExecutor implements Executor {
    * <br>
    * The specific implementation can leverage the method to eventually free allocated resources.
    */
-  public abstract void stop();
-
-  /**
-   * Returns this executor thread manager.
-   *
-   * @return the thread manager.
-   */
-  @NotNull
-  protected ThreadManager getThreadManager() {
-    return mManager;
-  }
-
-  /**
-   * Interface defining a manager of the executor threads.
-   */
-  protected interface ThreadManager {
-
-    /**
-     * Checks if the calling thread belongs to the ones managed by the executor implementation.
-     * <p>
-     * The implementation of this method is not strictly mandatory, even if, the classes always
-     * returning false effectively prevent the correct detection of possible deadlocks.
-     * <br>
-     * A synchronous executor implementation will always return false.
-     *
-     * @return whether the thread is managed by the executor.
-     */
-    boolean isManagedThread();
-  }
+  void stop();
 }

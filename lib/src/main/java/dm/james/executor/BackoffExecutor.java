@@ -21,9 +21,9 @@ import org.jetbrains.annotations.NotNull;
 import java.io.InvalidObjectException;
 import java.io.ObjectStreamException;
 import java.io.Serializable;
+import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.TimeUnit;
 
-import dm.james.log.Logger;
 import dm.james.util.Backoff;
 import dm.james.util.ConstantConditions;
 import dm.james.util.SerializableProxy;
@@ -39,8 +39,6 @@ class BackoffExecutor extends ScheduledExecutorDecorator implements Serializable
 
   private final ScheduledExecutor mExecutor;
 
-  private final Logger mLogger;
-
   private final Object mMutex = new Object();
 
   private int mCount;
@@ -52,8 +50,7 @@ class BackoffExecutor extends ScheduledExecutorDecorator implements Serializable
         return (mBackoff.getDelay(mCount) < 0);
 
       } catch (final Exception e) {
-        mLogger.err(e, "Ignoring backoff exception");
-        return true;
+        throw new RejectedExecutionException(e);
       }
     }
   };
@@ -68,7 +65,6 @@ class BackoffExecutor extends ScheduledExecutorDecorator implements Serializable
     super(wrapped);
     mExecutor = wrapped;
     mBackoff = ConstantConditions.notNull("backoff", backoff);
-    mLogger = Logger.newLogger(null, null, this);
   }
 
   @NotNull
@@ -91,12 +87,10 @@ class BackoffExecutor extends ScheduledExecutorDecorator implements Serializable
   }
 
   private void waitBackoff() {
-    final Logger logger = mLogger;
     final ScheduledExecutor executor = mExecutor;
     if (executor.isExecutionThread()) {
-      logger.wrn("Ignoring backoff: cannot wait on executor thread [%s %s]", Thread.currentThread(),
-          executor);
-      return;
+      throw new RejectedExecutionException(
+          "cannot wait on executor thread [" + Thread.currentThread() + " " + executor + "]");
     }
 
     synchronized (mMutex) {
@@ -107,7 +101,7 @@ class BackoffExecutor extends ScheduledExecutorDecorator implements Serializable
         }
 
       } catch (final Exception e) {
-        logger.err(e, "Ignoring backoff exception");
+        throw new RejectedExecutionException(e);
       }
     }
   }
@@ -146,12 +140,15 @@ class BackoffExecutor extends ScheduledExecutorDecorator implements Serializable
     }
 
     public void run() {
-      synchronized (mMutex) {
-        --mCount;
-        mMutex.notifyAll();
-      }
+      try {
+        super.run();
 
-      super.run();
+      } finally {
+        synchronized (mMutex) {
+          --mCount;
+          mMutex.notifyAll();
+        }
+      }
     }
   }
 }

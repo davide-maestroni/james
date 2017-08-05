@@ -165,12 +165,6 @@ class DefaultPromiseIterable<O> implements PromiseIterable<O>, Serializable {
   }
 
   @NotNull
-  public <R> PromiseIterable<R> allSorted(
-      @NotNull final Handler<Iterable<O>, Iterable<R>> handler) {
-    return allSorted(new HandlerStatelessIterable<O, R>(handler));
-  }
-
-  @NotNull
   public <R> PromiseIterable<R> allSorted(@NotNull final StatelessHandler<Iterable<O>, R> handler) {
     return thenSorted(new HandlerAll<O, R>(handler));
   }
@@ -188,11 +182,6 @@ class DefaultPromiseIterable<O> implements PromiseIterable<O>, Serializable {
   @NotNull
   public <R> PromiseIterable<R> any(@NotNull final StatelessHandler<O, R> handler) {
     return then(new HandlerAny<O, R>(handler));
-  }
-
-  @NotNull
-  public <R> PromiseIterable<R> anySorted(@NotNull final Handler<O, R> handler) {
-    return anySorted(new HandlerStateless<O, R>(handler));
   }
 
   @NotNull

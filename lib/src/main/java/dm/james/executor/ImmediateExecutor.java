@@ -51,12 +51,10 @@ class ImmediateExecutor extends SyncExecutor implements Serializable {
     return sInstance;
   }
 
-  @Override
   public void execute(@NotNull final Runnable command) {
     command.run();
   }
 
-  @Override
   public void execute(@NotNull final Runnable command, final long delay,
       @NotNull final TimeUnit timeUnit) {
     if (delay > 0) {

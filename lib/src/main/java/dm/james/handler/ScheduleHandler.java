@@ -33,8 +33,6 @@ import dm.james.util.SerializableProxy;
  */
 public class ScheduleHandler<I> implements Handler<I, I>, Serializable {
 
-  // TODO: 21/07/2017 delay, backoff to ScheduledExecutors
-
   private final ScheduledExecutor mExecutor;
 
   ScheduleHandler(@NotNull final ScheduledExecutor executor) {

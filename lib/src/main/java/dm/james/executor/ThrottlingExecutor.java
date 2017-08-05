@@ -22,7 +22,6 @@ import java.io.InvalidObjectException;
 import java.io.ObjectStreamException;
 import java.io.Serializable;
 import java.lang.ref.WeakReference;
-import java.util.Iterator;
 import java.util.concurrent.TimeUnit;
 
 import dm.james.util.ConstantConditions;
@@ -79,29 +78,6 @@ class ThrottlingExecutor extends ScheduledExecutorDecorator implements Serializa
   @NotNull
   static ThrottlingExecutor of(@NotNull final ScheduledExecutor wrapped, final int maxCommands) {
     return new ThrottlingExecutor(wrapped, maxCommands);
-  }
-
-  @Override
-  public void cancel(@NotNull final Runnable command) {
-    ThrottlingCommand throttlingCommand = null;
-    synchronized (mMutex) {
-      final Iterator<PendingCommand> iterator = mQueue.iterator();
-      while (iterator.hasNext()) {
-        final PendingCommand pendingCommand = iterator.next();
-        if (pendingCommand.mCommand == command) {
-          iterator.remove();
-        }
-      }
-
-      final WeakReference<ThrottlingCommand> commandReference = mCommands.get(command);
-      if (commandReference != null) {
-        throttlingCommand = commandReference.get();
-      }
-    }
-
-    if (throttlingCommand != null) {
-      super.cancel(throttlingCommand);
-    }
   }
 
   @Override

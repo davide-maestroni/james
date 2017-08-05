@@ -18,8 +18,12 @@ package dm.james.handler;
 
 import org.jetbrains.annotations.NotNull;
 
+import java.util.List;
+
 import dm.james.executor.ScheduledExecutor;
 import dm.james.promise.Promise.Handler;
+import dm.james.promise.PromiseIterable.StatefulHandler;
+import dm.james.util.Backoff;
 import dm.james.util.ConstantConditions;
 
 /**
@@ -37,5 +41,19 @@ public class Handlers {
   @NotNull
   public static <I> Handler<I, I> scheduleOn(@NotNull final ScheduledExecutor executor) {
     return new ScheduleHandler<I>(executor);
+  }
+
+  @NotNull
+  public static <I> StatefulHandler<I, I, Backoff<I>> scheduleOn(
+      @NotNull final ScheduledExecutor executor,
+      @NotNull final Backoff<ScheduledInputs<I>> backoff) {
+    return null;
+  }
+
+  abstract class ScheduledInputs<I> extends Number {
+
+    abstract List<I> inputs();
+
+    abstract void retain();
   }
 }
