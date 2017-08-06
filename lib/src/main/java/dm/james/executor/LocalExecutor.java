@@ -20,6 +20,7 @@ import org.jetbrains.annotations.NotNull;
 
 import java.util.concurrent.TimeUnit;
 
+import dm.james.util.InterruptedExecutionException;
 import dm.james.util.TimeUtils;
 
 /**

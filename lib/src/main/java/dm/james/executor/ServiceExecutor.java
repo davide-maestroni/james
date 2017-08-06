@@ -63,7 +63,6 @@ class ServiceExecutor extends AsyncExecutor implements Serializable {
     final ServiceExecutor executor = new ServiceExecutor(service);
     synchronized (mOwners) {
       if (!Boolean.TRUE.equals(mOwners.put(service, Boolean.TRUE))) {
-        // TODO: 05/08/2017 ???
         ThreadUtils.register(executor);
       }
     }
@@ -84,7 +83,6 @@ class ServiceExecutor extends AsyncExecutor implements Serializable {
     final StoppableServiceExecutor executor = new StoppableServiceExecutor(service);
     synchronized (mOwners) {
       if (!Boolean.TRUE.equals(mOwners.put(service, Boolean.TRUE))) {
-        // TODO: 05/08/2017 ???
         ThreadUtils.register(executor);
       }
     }

@@ -27,7 +27,6 @@ import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.List;
 
-import dm.james.executor.InterruptedExecutionException;
 import dm.james.log.Log;
 import dm.james.log.Log.Level;
 import dm.james.log.Logger;
@@ -39,12 +38,13 @@ import dm.james.promise.PromiseIterable.StatefulHandler;
 import dm.james.promise.Provider;
 import dm.james.promise.RejectionException;
 import dm.james.util.ConstantConditions;
+import dm.james.util.InterruptedExecutionException;
 import dm.james.util.SerializableProxy;
 
 /**
  * Created by davide-maestroni on 08/05/2017.
  */
-class UsingIterableObserver<I extends Closeable, O>
+class TryIterableObserver<I extends Closeable, O>
     implements Observer<CallbackIterable<O>>, Serializable {
 
   private final Logger mLogger;
@@ -53,7 +53,7 @@ class UsingIterableObserver<I extends Closeable, O>
 
   private final Iterable<Provider<I>> mProviders;
 
-  UsingIterableObserver(@NotNull final Iterable<Provider<I>> providers,
+  TryIterableObserver(@NotNull final Iterable<Provider<I>> providers,
       @NotNull final Mapper<List<I>, PromiseIterable<O>> mapper, @Nullable final Log log,
       @Nullable final Level level) {
     mProviders = ConstantConditions.notNull("providers", providers);
@@ -155,7 +155,7 @@ class UsingIterableObserver<I extends Closeable, O>
       Object readResolve() throws ObjectStreamException {
         try {
           final Object[] args = deserializeArgs();
-          return new UsingIterableObserver.CloseableHandler<O>((List<? extends Closeable>) args[0],
+          return new TryIterableObserver.CloseableHandler<O>((List<? extends Closeable>) args[0],
               (Log) args[1], (Level) args[2]);
 
         } catch (final Throwable t) {
@@ -176,7 +176,7 @@ class UsingIterableObserver<I extends Closeable, O>
     Object readResolve() throws ObjectStreamException {
       try {
         final Object[] args = deserializeArgs();
-        return new UsingIterableObserver<I, O>((Iterable<Provider<I>>) args[0],
+        return new TryIterableObserver<I, O>((Iterable<Provider<I>>) args[0],
             (Mapper<List<I>, PromiseIterable<O>>) args[1], (Log) args[2], (Level) args[3]);
 
       } catch (final Throwable t) {

@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package dm.james.executor;
+package dm.james.util;
 
 import org.jetbrains.annotations.Nullable;
 

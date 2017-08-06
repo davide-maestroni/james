@@ -28,6 +28,7 @@ import java.util.concurrent.Callable;
 import java.util.concurrent.Future;
 
 import dm.james.executor.ScheduledExecutor;
+import dm.james.handler.Handlers;
 import dm.james.log.Log;
 import dm.james.log.Log.Level;
 import dm.james.promise.DeferredPromise;
@@ -47,6 +48,12 @@ import dm.james.util.ReflectionUtils;
  * Created by davide-maestroni on 06/30/2017.
  */
 public class Bond implements Serializable {
+
+  // TODO: 06/08/2017 promisify
+  // TODO: 06/08/2017 range
+  // TODO: 06/08/2017 Handlers
+  // TODO: 06/08/2017 ByteBuffer => Chunk => ChunkOutputStream => PromiseIterable
+  // TODO: 06/08/2017 james-android, james-retrofit, james-swagger
 
   private final Log mLog;
 
@@ -86,6 +93,19 @@ public class Bond implements Serializable {
   }
 
   @NotNull
+  public <O> PromiseIterable<O> all(@NotNull final ScheduledExecutor executor,
+      @NotNull final Iterable<? extends Promise<?>> promises) {
+    return this.<O>resolvedIterable(null).all(Handlers.<Iterable<O>>scheduleOn(executor))
+                                         .allSorted(new PromisesHandler<O>(promises));
+  }
+
+  @NotNull
+  public <O> PromiseIterable<O> all(@NotNull final ScheduledExecutor executor,
+      @NotNull final Promise<? extends Iterable<O>> promise) {
+    return each(executor, promise).all(IdentityMapper.<Iterable<O>>instance());
+  }
+
+  @NotNull
   public <O> PromiseIterable<O> any(@NotNull final Iterable<? extends Promise<?>> promises) {
     return this.<O>each(promises).any(IdentityMapper.<O>instance());
   }
@@ -93,6 +113,18 @@ public class Bond implements Serializable {
   @NotNull
   public <O> PromiseIterable<O> any(@NotNull final Promise<? extends Iterable<O>> promise) {
     return each(promise).any(IdentityMapper.<O>instance());
+  }
+
+  @NotNull
+  public <O> PromiseIterable<O> any(@NotNull final ScheduledExecutor executor,
+      @NotNull final Iterable<? extends Promise<?>> promises) {
+    return this.<O>each(executor, promises).any(IdentityMapper.<O>instance());
+  }
+
+  @NotNull
+  public <O> PromiseIterable<O> any(@NotNull final ScheduledExecutor executor,
+      @NotNull final Promise<? extends Iterable<O>> promise) {
+    return each(executor, promise).any(IdentityMapper.<O>instance());
   }
 
   @NotNull
@@ -121,16 +153,29 @@ public class Bond implements Serializable {
   }
 
   @NotNull
+  public <O> PromiseIterable<O> each(@NotNull final ScheduledExecutor executor,
+      @NotNull final Iterable<? extends Promise<?>> promises) {
+    return iterable(executor, new PromisesHandler<O>(promises));
+  }
+
+  @NotNull
+  public <O> PromiseIterable<O> each(@NotNull final ScheduledExecutor executor,
+      @NotNull final Promise<? extends Iterable<O>> promise) {
+    return iterable(executor, new IterableObserver<O>(promise));
+  }
+
+  @NotNull
   public <O> PromiseIterable<O> iterable(
       @NotNull final Observer<? super CallbackIterable<O>> observer) {
     return new DefaultPromiseIterable<O>(observer, mPropagationType, mLog, mLogLevel);
   }
 
+  // TODO: 06/08/2017 each, any, all?? ScheduledExecutor??
+
   @NotNull
-  public <I extends Closeable, O> PromiseIterable<O> iterableUsing(
-      @NotNull final Iterable<Provider<I>> providers,
-      @NotNull final Mapper<List<I>, PromiseIterable<O>> mapper) {
-    return iterable(new UsingIterableObserver<I, O>(providers, mapper, mLog, mLogLevel));
+  public <O> PromiseIterable<O> iterable(@NotNull final ScheduledExecutor executor,
+      @NotNull final Observer<? super CallbackIterable<O>> observer) {
+    return iterable(new ScheduledIterableObserver<O>(executor, observer));
   }
 
   @NotNull
@@ -139,10 +184,9 @@ public class Bond implements Serializable {
   }
 
   @NotNull
-  public <I extends Closeable, O> Promise<O> promiseUsing(
-      @NotNull final Iterable<Provider<I>> providers,
-      @NotNull final Mapper<List<I>, Promise<O>> mapper) {
-    return promise(new UsingObserver<I, O>(providers, mapper, mLog, mLogLevel));
+  public <O> Promise<O> promise(@NotNull final ScheduledExecutor executor,
+      @NotNull final Observer<? super Callback<O>> observer) {
+    return promise(new ScheduledObserver<O>(executor, observer));
   }
 
   @NotNull
@@ -262,6 +306,20 @@ public class Bond implements Serializable {
   }
 
   @NotNull
+  public <I extends Closeable, O> PromiseIterable<O> tryIterable(
+      @NotNull final Iterable<Provider<I>> providers,
+      @NotNull final Mapper<List<I>, PromiseIterable<O>> mapper) {
+    return iterable(new TryIterableObserver<I, O>(providers, mapper, mLog, mLogLevel));
+  }
+
+  @NotNull
+  public <I extends Closeable, O> Promise<O> tryPromise(
+      @NotNull final Iterable<Provider<I>> providers,
+      @NotNull final Mapper<List<I>, Promise<O>> mapper) {
+    return promise(new TryObserver<I, O>(providers, mapper, mLog, mLogLevel));
+  }
+
+  @NotNull
   public Bond withLog(@Nullable final Log log) {
     return new Bond(mPropagationType, log, mLogLevel);
   }
@@ -309,14 +367,6 @@ public class Bond implements Serializable {
   public interface Func5<I1, I2, I3, I4, I5, O> {
 
     O apply(I1 input1, I2 input2, I3 input3, I4 input4, I5 input5) throws Exception;
-  }
-
-  /**
-   * Created by davide-maestroni on 08/02/2017.
-   */
-  public interface ObserverHandler<I, O, C extends Callback<O>> {
-
-    void accept(I input, @NotNull C callback) throws Exception;
   }
 
   private static class APlusMapper implements Mapper<Promise<?>, Promise<?>>, Serializable {

@@ -108,172 +108,206 @@ class DefaultDeferredPromiseIterable<I, O> implements DeferredPromiseIterable<I,
 
   @NotNull
   public <R> DeferredPromiseIterable<I, R> all(
-      @NotNull final Mapper<Iterable<O>, Iterable<R>> mapper) {
-    return new DefaultDeferredPromiseIterable<I, R>(mPromise.all(mapper), mLogger, mState);
+      @NotNull final Handler<Iterable<O>, Iterable<R>> handler) {
+    return newInstance(mPromise.all(handler));
   }
 
   @NotNull
   public <R> DeferredPromiseIterable<I, R> all(
-      @NotNull final Handler<Iterable<O>, Iterable<R>> handler) {
-    return new DefaultDeferredPromiseIterable<I, R>(mPromise.all(handler), mLogger, mState);
+      @Nullable final HandlerFunction<Iterable<O>, ? super CallbackIterable<R>> resolve,
+      @Nullable final HandlerFunction<Throwable, ? super CallbackIterable<R>> reject) {
+    return newInstance(mPromise.all(resolve, reject));
+  }
+
+  @NotNull
+  public <R> DeferredPromiseIterable<I, R> all(
+      @NotNull final Mapper<Iterable<O>, Iterable<R>> mapper) {
+    return newInstance(mPromise.all(mapper));
   }
 
   @NotNull
   public <R> DeferredPromiseIterable<I, R> all(
       @NotNull final StatelessHandler<Iterable<O>, R> handler) {
-    return new DefaultDeferredPromiseIterable<I, R>(mPromise.all(handler), mLogger, mState);
+    return newInstance(mPromise.all(handler));
+  }
+
+  @NotNull
+  public <R> DeferredPromiseIterable<I, R> allSorted(
+      @Nullable final HandlerFunction<Iterable<O>, ? super CallbackIterable<R>> resolve,
+      @Nullable final HandlerFunction<Throwable, ? super CallbackIterable<R>> reject) {
+    return newInstance(mPromise.allSorted(resolve, reject));
   }
 
   @NotNull
   public <R> DeferredPromiseIterable<I, R> allSorted(
       @NotNull final StatelessHandler<Iterable<O>, R> handler) {
-    return new DefaultDeferredPromiseIterable<I, R>(mPromise.allSorted(handler), mLogger, mState);
-  }
-
-  @NotNull
-  public <R> DeferredPromiseIterable<I, R> any(@NotNull final Mapper<O, R> mapper) {
-    return new DefaultDeferredPromiseIterable<I, R>(mPromise.any(mapper), mLogger, mState);
+    return newInstance(mPromise.allSorted(handler));
   }
 
   @NotNull
   public <R> DeferredPromiseIterable<I, R> any(@NotNull final Handler<O, R> handler) {
-    return new DefaultDeferredPromiseIterable<I, R>(mPromise.any(handler), mLogger, mState);
+    return newInstance(mPromise.any(handler));
+  }
+
+  @NotNull
+  public <R> DeferredPromiseIterable<I, R> any(
+      @Nullable final HandlerFunction<O, ? super CallbackIterable<R>> resolve,
+      @Nullable final HandlerFunction<Throwable, ? super CallbackIterable<R>> reject) {
+    return newInstance(mPromise.any(resolve, reject));
+  }
+
+  @NotNull
+  public <R> DeferredPromiseIterable<I, R> any(@NotNull final Mapper<O, R> mapper) {
+    return newInstance(mPromise.any(mapper));
   }
 
   @NotNull
   public <R> DeferredPromiseIterable<I, R> any(@NotNull final StatelessHandler<O, R> handler) {
-    return new DefaultDeferredPromiseIterable<I, R>(mPromise.any(handler), mLogger, mState);
+    return newInstance(mPromise.any(handler));
+  }
+
+  @NotNull
+  public <R> DeferredPromiseIterable<I, R> anySorted(
+      @Nullable final HandlerFunction<O, ? super CallbackIterable<R>> resolve,
+      @Nullable final HandlerFunction<Throwable, ? super CallbackIterable<R>> reject) {
+    return newInstance(mPromise.anySorted(resolve, reject));
   }
 
   @NotNull
   public <R> DeferredPromiseIterable<I, R> anySorted(
       @NotNull final StatelessHandler<O, R> handler) {
-    return new DefaultDeferredPromiseIterable<I, R>(mPromise.anySorted(handler), mLogger, mState);
+    return newInstance(mPromise.anySorted(handler));
   }
 
   @NotNull
   public <R> DeferredPromiseIterable<I, R> applyAll(
       @NotNull final Mapper<PromiseIterable<O>, PromiseIterable<R>> mapper) {
-    return new DefaultDeferredPromiseIterable<I, R>(mPromise.applyAll(mapper), mLogger, mState);
+    return newInstance(mPromise.applyAll(mapper));
   }
 
   @NotNull
   public <R> DeferredPromiseIterable<I, R> applyAny(
       @NotNull final Mapper<Promise<O>, Promise<R>> mapper) {
-    return new DefaultDeferredPromiseIterable<I, R>(mPromise.applyAny(mapper), mLogger, mState);
+    return newInstance(mPromise.applyAny(mapper));
   }
 
   @NotNull
   public <R> DeferredPromiseIterable<I, R> applyEach(
       @NotNull final Mapper<Promise<O>, Promise<R>> mapper) {
-    return new DefaultDeferredPromiseIterable<I, R>(mPromise.applyEach(mapper), mLogger, mState);
+    return newInstance(mPromise.applyEach(mapper));
   }
 
   @NotNull
   public <R> DeferredPromiseIterable<I, R> applyEachSorted(
       @NotNull final Mapper<Promise<O>, Promise<R>> mapper) {
-    return new DefaultDeferredPromiseIterable<I, R>(mPromise.applyEachSorted(mapper), mLogger,
-        mState);
+    return newInstance(mPromise.applyEachSorted(mapper));
   }
 
   @NotNull
   public DeferredPromiseIterable<I, O> catchAny(
       @NotNull final Mapper<Throwable, Iterable<O>> mapper) {
-    return new DefaultDeferredPromiseIterable<I, O>(mPromise.catchAny(mapper), mLogger, mState);
+    return newInstance(mPromise.catchAny(mapper));
   }
 
   @NotNull
   public DeferredPromiseIterable<I, O> whenFulfilled(
       @NotNull final Observer<Iterable<O>> observer) {
-    return new DefaultDeferredPromiseIterable<I, O>(mPromise.whenFulfilled(observer), mLogger,
-        mState);
+    return newInstance(mPromise.whenFulfilled(observer));
   }
 
   @NotNull
   public DeferredPromiseIterable<I, O> whenRejected(@NotNull final Observer<Throwable> observer) {
-    return new DefaultDeferredPromiseIterable<I, O>(mPromise.whenRejected(observer), mLogger,
-        mState);
+    return newInstance(mPromise.whenRejected(observer));
   }
 
   @NotNull
   public DeferredPromiseIterable<I, O> whenResolved(@NotNull final Action action) {
-    return new DefaultDeferredPromiseIterable<I, O>(mPromise.whenResolved(action), mLogger, mState);
+    return newInstance(mPromise.whenResolved(action));
   }
 
   @NotNull
   public DeferredPromiseIterable<I, O> catchEach(@NotNull final Mapper<Throwable, O> mapper) {
-    return new DefaultDeferredPromiseIterable<I, O>(mPromise.catchEach(mapper), mLogger, mState);
+    return newInstance(mPromise.catchEach(mapper));
   }
 
   @NotNull
   public DeferredPromiseIterable<I, O> catchEach(@NotNull final Mapper<Throwable, O> mapper,
       final int maxBatchSize) {
-    return new DefaultDeferredPromiseIterable<I, O>(mPromise.catchEach(mapper, maxBatchSize),
-        mLogger, mState);
+    return newInstance(mPromise.catchEach(mapper, maxBatchSize));
+  }
+
+  @NotNull
+  public <R> DeferredPromiseIterable<I, R> each(@NotNull final Handler<O, R> handler) {
+    return newInstance(mPromise.each(handler));
+  }
+
+  @NotNull
+  public <R> DeferredPromiseIterable<I, R> each(
+      @Nullable final HandlerFunction<O, ? super CallbackIterable<R>> resolve,
+      @Nullable final HandlerFunction<Throwable, ? super CallbackIterable<R>> reject) {
+    return newInstance(mPromise.each(resolve, reject));
   }
 
   @NotNull
   public <R> DeferredPromiseIterable<I, R> each(@NotNull final Mapper<O, R> mapper) {
-    return new DefaultDeferredPromiseIterable<I, R>(mPromise.each(mapper), mLogger, mState);
+    return newInstance(mPromise.each(mapper));
   }
 
   @NotNull
   public <R> DeferredPromiseIterable<I, R> each(@NotNull final Mapper<O, R> mapper,
       final int maxBatchSize) {
-    return new DefaultDeferredPromiseIterable<I, R>(mPromise.each(mapper, maxBatchSize), mLogger,
-        mState);
-  }
-
-  @NotNull
-  public <R> DeferredPromiseIterable<I, R> each(@NotNull final Handler<O, R> handler) {
-    return new DefaultDeferredPromiseIterable<I, R>(mPromise.each(handler), mLogger, mState);
+    return newInstance(mPromise.each(mapper, maxBatchSize));
   }
 
   @NotNull
   public <R> DeferredPromiseIterable<I, R> each(@NotNull final StatelessHandler<O, R> handler) {
-    return new DefaultDeferredPromiseIterable<I, R>(mPromise.each(handler), mLogger, mState);
+    return newInstance(mPromise.each(handler));
   }
 
   @NotNull
   public <R> DeferredPromiseIterable<I, R> eachSorted(@NotNull final Handler<O, R> handler) {
-    return new DefaultDeferredPromiseIterable<I, R>(mPromise.eachSorted(handler), mLogger, mState);
+    return newInstance(mPromise.eachSorted(handler));
+  }
+
+  @NotNull
+  public <R> DeferredPromiseIterable<I, R> eachSorted(
+      @Nullable final HandlerFunction<O, ? super CallbackIterable<R>> resolve,
+      @Nullable final HandlerFunction<Throwable, ? super CallbackIterable<R>> reject) {
+    return newInstance(mPromise.eachSorted(resolve, reject));
   }
 
   @NotNull
   public <R> DeferredPromiseIterable<I, R> eachSorted(
       @NotNull final StatelessHandler<O, R> handler) {
-    return new DefaultDeferredPromiseIterable<I, R>(mPromise.eachSorted(handler), mLogger, mState);
+    return newInstance(mPromise.eachSorted(handler));
   }
 
   @NotNull
   public <R, S> DeferredPromiseIterable<I, R> then(
       @NotNull final StatefulHandler<O, R, S> handler) {
-    return new DefaultDeferredPromiseIterable<I, R>(mPromise.then(handler), mLogger, mState);
+    return newInstance(mPromise.then(handler));
   }
 
   @NotNull
   public <R, S> DeferredPromiseIterable<I, R> thenSorted(
       @NotNull final StatefulHandler<O, R, S> handler) {
-    return new DefaultDeferredPromiseIterable<I, R>(mPromise.thenSorted(handler), mLogger, mState);
+    return newInstance(mPromise.thenSorted(handler));
   }
 
   @NotNull
   public DeferredPromiseIterable<I, O> whenFulfilledAny(@NotNull final Observer<O> observer) {
-    return new DefaultDeferredPromiseIterable<I, O>(mPromise.whenFulfilledAny(observer), mLogger,
-        mState);
+    return newInstance(mPromise.whenFulfilledAny(observer));
   }
 
   @NotNull
   public DeferredPromiseIterable<I, O> whenFulfilledEach(@NotNull final Observer<O> observer) {
-    return new DefaultDeferredPromiseIterable<I, O>(mPromise.whenFulfilledEach(observer), mLogger,
-        mState);
+    return newInstance(mPromise.whenFulfilledEach(observer));
   }
 
   @NotNull
   public DeferredPromiseIterable<I, O> whenRejectedEach(
       @NotNull final Observer<Throwable> observer) {
-    return new DefaultDeferredPromiseIterable<I, O>(mPromise.whenRejectedEach(observer), mLogger,
-        mState);
+    return newInstance(mPromise.whenRejectedEach(observer));
   }
 
   @NotNull
@@ -289,13 +323,13 @@ class DefaultDeferredPromiseIterable<I, O> implements DeferredPromiseIterable<I,
   }
 
   @NotNull
-  public <R> DeferredPromise<Iterable<I>, R> then(@NotNull final Mapper<Iterable<O>, R> mapper) {
-    return new WrappingDeferredPromise<Iterable<I>, R>(this, mPromise.then(mapper));
+  public <R> DeferredPromise<Iterable<I>, R> then(@NotNull final Handler<Iterable<O>, R> handler) {
+    return new WrappingDeferredPromise<Iterable<I>, R>(this, mPromise.then(handler));
   }
 
   @NotNull
-  public <R> DeferredPromise<Iterable<I>, R> then(@NotNull final Handler<Iterable<O>, R> handler) {
-    return new WrappingDeferredPromise<Iterable<I>, R>(this, mPromise.then(handler));
+  public <R> DeferredPromise<Iterable<I>, R> then(@NotNull final Mapper<Iterable<O>, R> mapper) {
+    return new WrappingDeferredPromise<Iterable<I>, R>(this, mPromise.then(mapper));
   }
 
   @NotNull
@@ -350,6 +384,13 @@ class DefaultDeferredPromiseIterable<I, O> implements DeferredPromiseIterable<I,
 
   public boolean isResolved() {
     return mPromise.isResolved();
+  }
+
+  @NotNull
+  public <R> Promise<R> then(
+      @Nullable final HandlerFunction<Iterable<O>, ? super Callback<R>> resolve,
+      @Nullable final HandlerFunction<Throwable, ? super Callback<R>> reject) {
+    return new WrappingDeferredPromise<Iterable<I>, R>(this, mPromise.then(resolve, reject));
   }
 
   public void waitResolved() {
@@ -443,6 +484,11 @@ class DefaultDeferredPromiseIterable<I, O> implements DeferredPromiseIterable<I,
 
   public void reject(final Throwable reason) {
     mState.reject(reason);
+  }
+
+  @NotNull
+  private <R> DeferredPromiseIterable<I, R> newInstance(@NotNull final PromiseIterable<R> promise) {
+    return new DefaultDeferredPromiseIterable<I, R>(promise, mLogger, mState);
   }
 
   private Object writeReplace() throws ObjectStreamException {

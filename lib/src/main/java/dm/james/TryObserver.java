@@ -27,7 +27,6 @@ import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.List;
 
-import dm.james.executor.InterruptedExecutionException;
 import dm.james.log.Log;
 import dm.james.log.Log.Level;
 import dm.james.log.Logger;
@@ -39,12 +38,13 @@ import dm.james.promise.Promise.Handler;
 import dm.james.promise.Provider;
 import dm.james.promise.RejectionException;
 import dm.james.util.ConstantConditions;
+import dm.james.util.InterruptedExecutionException;
 import dm.james.util.SerializableProxy;
 
 /**
  * Created by davide-maestroni on 08/05/2017.
  */
-class UsingObserver<I extends Closeable, O> implements Observer<Callback<O>>, Serializable {
+class TryObserver<I extends Closeable, O> implements Observer<Callback<O>>, Serializable {
 
   private final Logger mLogger;
 
@@ -52,7 +52,7 @@ class UsingObserver<I extends Closeable, O> implements Observer<Callback<O>>, Se
 
   private final Iterable<Provider<I>> mProviders;
 
-  UsingObserver(@NotNull final Iterable<Provider<I>> providers,
+  TryObserver(@NotNull final Iterable<Provider<I>> providers,
       @NotNull final Mapper<List<I>, Promise<O>> mapper, @Nullable final Log log,
       @Nullable final Level level) {
     mProviders = ConstantConditions.notNull("providers", providers);
@@ -167,7 +167,7 @@ class UsingObserver<I extends Closeable, O> implements Observer<Callback<O>>, Se
     Object readResolve() throws ObjectStreamException {
       try {
         final Object[] args = deserializeArgs();
-        return new UsingObserver<I, O>((Iterable<Provider<I>>) args[0],
+        return new TryObserver<I, O>((Iterable<Provider<I>>) args[0],
             (Mapper<List<I>, Promise<O>>) args[1], (Log) args[2], (Level) args[3]);
 
       } catch (final Throwable t) {

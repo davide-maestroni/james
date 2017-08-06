@@ -139,6 +139,12 @@ class WrappingDeferredPromise<I, O> implements DeferredPromise<I, O>, Serializab
     return mPromise.isResolved();
   }
 
+  @NotNull
+  public <R> Promise<R> then(@Nullable final HandlerFunction<O, ? super Callback<R>> resolve,
+      @Nullable final HandlerFunction<Throwable, ? super Callback<R>> reject) {
+    return new WrappingDeferredPromise<I, R>(mDeferred, mPromise.then(resolve, reject));
+  }
+
   public void waitResolved() {
     mPromise.waitResolved();
   }

@@ -74,37 +74,37 @@ class DefaultDeferredPromise<I, O> implements DeferredPromise<I, O> {
 
   @NotNull
   public <R> DeferredPromise<I, R> apply(@NotNull final Mapper<Promise<O>, Promise<R>> mapper) {
-    return new DefaultDeferredPromise<I, R>(mPromise.apply(mapper), mLogger, mState);
+    return newInstance(mPromise.apply(mapper));
   }
 
   @NotNull
   public DeferredPromise<I, O> catchAny(@NotNull final Mapper<Throwable, O> mapper) {
-    return new DefaultDeferredPromise<I, O>(mPromise.catchAny(mapper), mLogger, mState);
+    return newInstance(mPromise.catchAny(mapper));
   }
 
   @NotNull
   public <R> DeferredPromise<I, R> then(@NotNull final Mapper<O, R> mapper) {
-    return new DefaultDeferredPromise<I, R>(mPromise.then(mapper), mLogger, mState);
+    return newInstance(mPromise.then(mapper));
   }
 
   @NotNull
   public <R> DeferredPromise<I, R> then(@NotNull final Handler<O, R> handler) {
-    return new DefaultDeferredPromise<I, R>(mPromise.then(handler), mLogger, mState);
+    return newInstance(mPromise.then(handler));
   }
 
   @NotNull
   public DeferredPromise<I, O> whenFulfilled(@NotNull final Observer<O> observer) {
-    return new DefaultDeferredPromise<I, O>(mPromise.whenFulfilled(observer), mLogger, mState);
+    return newInstance(mPromise.whenFulfilled(observer));
   }
 
   @NotNull
   public DeferredPromise<I, O> whenRejected(@NotNull final Observer<Throwable> observer) {
-    return new DefaultDeferredPromise<I, O>(mPromise.whenRejected(observer), mLogger, mState);
+    return newInstance(mPromise.whenRejected(observer));
   }
 
   @NotNull
   public DeferredPromise<I, O> whenResolved(@NotNull final Action action) {
-    return new DefaultDeferredPromise<I, O>(mPromise.whenResolved(action), mLogger, mState);
+    return newInstance(mPromise.whenResolved(action));
   }
 
   @NotNull
@@ -166,6 +166,12 @@ class DefaultDeferredPromise<I, O> implements DeferredPromise<I, O> {
     return mPromise.isResolved();
   }
 
+  @NotNull
+  public <R> Promise<R> then(@Nullable final HandlerFunction<O, ? super Callback<R>> resolve,
+      @Nullable final HandlerFunction<Throwable, ? super Callback<R>> reject) {
+    return newInstance(mPromise.then(resolve, reject));
+  }
+
   public void waitResolved() {
     mPromise.waitResolved();
   }
@@ -192,6 +198,11 @@ class DefaultDeferredPromise<I, O> implements DeferredPromise<I, O> {
         callback.resolve(input);
       }
     }
+  }
+
+  @NotNull
+  private <R> DeferredPromise<I, R> newInstance(@NotNull final Promise<R> promise) {
+    return new DefaultDeferredPromise<I, R>(promise, mLogger, mState);
   }
 
   private Object writeReplace() throws ObjectStreamException {

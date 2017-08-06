@@ -17,6 +17,7 @@
 package dm.james.promise;
 
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 
 /**
  * Created by davide-maestroni on 08/01/2017.
@@ -34,25 +35,45 @@ public interface DeferredPromiseIterable<I, O>
   DeferredPromiseIterable<I, O> addedRejection(Throwable reason);
 
   @NotNull
-  <R> DeferredPromiseIterable<I, R> all(@NotNull Mapper<Iterable<O>, Iterable<R>> mapper);
+  <R> DeferredPromiseIterable<I, R> all(@NotNull Handler<Iterable<O>, Iterable<R>> handler);
 
   @NotNull
-  <R> DeferredPromiseIterable<I, R> all(@NotNull Handler<Iterable<O>, Iterable<R>> handler);
+  <R> DeferredPromiseIterable<I, R> all(
+      @Nullable HandlerFunction<Iterable<O>, ? super CallbackIterable<R>> resolve,
+      @Nullable HandlerFunction<Throwable, ? super CallbackIterable<R>> reject);
+
+  @NotNull
+  <R> DeferredPromiseIterable<I, R> all(@NotNull Mapper<Iterable<O>, Iterable<R>> mapper);
 
   @NotNull
   <R> DeferredPromiseIterable<I, R> all(@NotNull StatelessHandler<Iterable<O>, R> handler);
 
   @NotNull
-  <R> DeferredPromiseIterable<I, R> allSorted(@NotNull StatelessHandler<Iterable<O>, R> handler);
+  <R> DeferredPromiseIterable<I, R> allSorted(
+      @Nullable HandlerFunction<Iterable<O>, ? super CallbackIterable<R>> resolve,
+      @Nullable HandlerFunction<Throwable, ? super CallbackIterable<R>> reject);
 
   @NotNull
-  <R> DeferredPromiseIterable<I, R> any(@NotNull Mapper<O, R> mapper);
+  <R> DeferredPromiseIterable<I, R> allSorted(@NotNull StatelessHandler<Iterable<O>, R> handler);
 
   @NotNull
   <R> DeferredPromiseIterable<I, R> any(@NotNull Handler<O, R> handler);
 
   @NotNull
+  <R> DeferredPromiseIterable<I, R> any(
+      @Nullable HandlerFunction<O, ? super CallbackIterable<R>> resolve,
+      @Nullable HandlerFunction<Throwable, ? super CallbackIterable<R>> reject);
+
+  @NotNull
+  <R> DeferredPromiseIterable<I, R> any(@NotNull Mapper<O, R> mapper);
+
+  @NotNull
   <R> DeferredPromiseIterable<I, R> any(@NotNull StatelessHandler<O, R> handler);
+
+  @NotNull
+  <R> DeferredPromiseIterable<I, R> anySorted(
+      @Nullable HandlerFunction<O, ? super CallbackIterable<R>> resolve,
+      @Nullable HandlerFunction<Throwable, ? super CallbackIterable<R>> reject);
 
   @NotNull
   <R> DeferredPromiseIterable<I, R> anySorted(@NotNull StatelessHandler<O, R> handler);
@@ -89,19 +110,29 @@ public interface DeferredPromiseIterable<I, O>
   DeferredPromiseIterable<I, O> catchEach(@NotNull Mapper<Throwable, O> mapper, int maxBatchSize);
 
   @NotNull
+  <R> DeferredPromiseIterable<I, R> each(@NotNull Handler<O, R> handler);
+
+  @NotNull
+  <R> DeferredPromiseIterable<I, R> each(
+      @Nullable HandlerFunction<O, ? super CallbackIterable<R>> resolve,
+      @Nullable HandlerFunction<Throwable, ? super CallbackIterable<R>> reject);
+
+  @NotNull
   <R> DeferredPromiseIterable<I, R> each(@NotNull Mapper<O, R> mapper);
 
   @NotNull
   <R> DeferredPromiseIterable<I, R> each(@NotNull Mapper<O, R> mapper, int maxBatchSize);
 
   @NotNull
-  <R> DeferredPromiseIterable<I, R> each(@NotNull Handler<O, R> handler);
-
-  @NotNull
   <R> DeferredPromiseIterable<I, R> each(@NotNull StatelessHandler<O, R> handler);
 
   @NotNull
   <R> DeferredPromiseIterable<I, R> eachSorted(@NotNull Handler<O, R> handler);
+
+  @NotNull
+  <R> DeferredPromiseIterable<I, R> eachSorted(
+      @Nullable HandlerFunction<O, ? super CallbackIterable<R>> resolve,
+      @Nullable HandlerFunction<Throwable, ? super CallbackIterable<R>> reject);
 
   @NotNull
   <R> DeferredPromiseIterable<I, R> eachSorted(@NotNull StatelessHandler<O, R> handler);
@@ -128,8 +159,8 @@ public interface DeferredPromiseIterable<I, O>
   DeferredPromiseIterable<I, O> resolved(Iterable<I> inputs);
 
   @NotNull
-  <R> DeferredPromise<Iterable<I>, R> then(@NotNull Mapper<Iterable<O>, R> mapper);
+  <R> DeferredPromise<Iterable<I>, R> then(@NotNull Handler<Iterable<O>, R> handler);
 
   @NotNull
-  <R> DeferredPromise<Iterable<I>, R> then(@NotNull Handler<Iterable<O>, R> handler);
+  <R> DeferredPromise<Iterable<I>, R> then(@NotNull Mapper<Iterable<O>, R> mapper);
 }

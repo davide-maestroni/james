@@ -36,8 +36,6 @@ import dm.james.util.ConstantConditions;
 @SuppressWarnings("WeakerAccess")
 public class ScheduledExecutors {
 
-  // TODO: 04/08/2017 register asynchronous executors and throw on wait?
-
   private static final Object sMutex = new Object();
 
   private static ScheduledExecutor sBackgroundExecutor;

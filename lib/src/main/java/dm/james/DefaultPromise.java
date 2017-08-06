@@ -26,7 +26,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 
-import dm.james.executor.InterruptedExecutionException;
 import dm.james.log.Log;
 import dm.james.log.Log.Level;
 import dm.james.log.Logger;
@@ -37,7 +36,9 @@ import dm.james.promise.Promise;
 import dm.james.promise.RejectionException;
 import dm.james.promise.TimeoutException;
 import dm.james.util.ConstantConditions;
+import dm.james.util.InterruptedExecutionException;
 import dm.james.util.SerializableProxy;
+import dm.james.util.ThreadUtils;
 import dm.james.util.TimeUtils;
 import dm.james.util.TimeUtils.Condition;
 
@@ -173,6 +174,7 @@ class DefaultPromise<O> implements Promise<O> {
 
   @SuppressWarnings("unchecked")
   public O get(final long timeout, @NotNull final TimeUnit timeUnit) {
+    deadLockWarning(timeout);
     final ChainHead<?> head = mHead;
     synchronized (mMutex) {
       try {
@@ -202,6 +204,7 @@ class DefaultPromise<O> implements Promise<O> {
 
   @Nullable
   public RejectionException getError(final long timeout, @NotNull final TimeUnit timeUnit) {
+    deadLockWarning(timeout);
     final ChainHead<?> head = mHead;
     synchronized (mMutex) {
       try {
@@ -226,6 +229,7 @@ class DefaultPromise<O> implements Promise<O> {
 
   public RejectionException getErrorOr(final RejectionException other, final long timeout,
       @NotNull final TimeUnit timeUnit) {
+    deadLockWarning(timeout);
     final ChainHead<?> head = mHead;
     synchronized (mMutex) {
       try {
@@ -249,6 +253,7 @@ class DefaultPromise<O> implements Promise<O> {
 
   @SuppressWarnings("unchecked")
   public O getOr(final O other, final long timeout, @NotNull final TimeUnit timeUnit) {
+    deadLockWarning(timeout);
     final ChainHead<?> head = mHead;
     synchronized (mMutex) {
       try {
@@ -301,13 +306,19 @@ class DefaultPromise<O> implements Promise<O> {
   }
 
   @NotNull
-  public <R> Promise<R> then(@NotNull final Mapper<O, R> mapper) {
-    return then(new HandlerMap<O, R>(mapper));
+  public <R> Promise<R> then(@NotNull final Handler<O, R> handler) {
+    return chain(new ChainHandler<O, R>(mPropagationType, handler));
   }
 
   @NotNull
-  public <R> Promise<R> then(@NotNull final Handler<O, R> handler) {
-    return chain(new ChainHandler<O, R>(mPropagationType, handler));
+  public <R> Promise<R> then(@Nullable final HandlerFunction<O, ? super Callback<R>> resolve,
+      @Nullable final HandlerFunction<Throwable, ? super Callback<R>> reject) {
+    return then(new HandlerFunctions<O, R>(resolve, reject));
+  }
+
+  @NotNull
+  public <R> Promise<R> then(@NotNull final Mapper<O, R> mapper) {
+    return then(new HandlerMap<O, R>(mapper));
   }
 
   public void waitResolved() {
@@ -315,6 +326,7 @@ class DefaultPromise<O> implements Promise<O> {
   }
 
   public boolean waitResolved(final long timeout, @NotNull final TimeUnit timeUnit) {
+    deadLockWarning(timeout);
     synchronized (mMutex) {
       try {
         if (TimeUtils.waitUntil(mMutex, new Condition() {
@@ -408,6 +420,17 @@ class DefaultPromise<O> implements Promise<O> {
 
     return new DefaultPromise<O>(mObserver, mPropagationType, logger, newHead,
         (PromiseChain<?, O>) newTail);
+  }
+
+  private void deadLockWarning(final long waitTime) {
+    if (waitTime == 0) {
+      return;
+    }
+
+    final Logger logger = mLogger;
+    if ((logger.getLogLevel().compareTo(Level.WARNING) <= 0) && ThreadUtils.isOwnedThread()) {
+      logger.wrn("ATTENTION: possible deadlock detected! Try to avoid waiting on managed threads");
+    }
   }
 
   private Object writeReplace() throws ObjectStreamException {
@@ -783,6 +806,55 @@ class DefaultPromise<O> implements Promise<O> {
     }
   }
 
+  private static class HandlerFunctions<O, R> implements Handler<O, R>, Serializable {
+
+    private final HandlerFunction<Throwable, ? super Callback<R>> mReject;
+
+    private final HandlerFunction<O, ? super Callback<R>> mResolve;
+
+    @SuppressWarnings("unchecked")
+    private HandlerFunctions(@Nullable final HandlerFunction<O, ? super Callback<R>> resolve,
+        @Nullable final HandlerFunction<Throwable, ? super Callback<R>> reject) {
+      mResolve = (HandlerFunction<O, ? super Callback<R>>) ((resolve != null) ? resolve
+          : new PassThroughOutputHandler<O, R>());
+      mReject = (HandlerFunction<Throwable, ? super Callback<R>>) ((reject != null) ? reject
+          : new PassThroughErrorHandler<R>());
+    }
+
+    private Object writeReplace() throws ObjectStreamException {
+      return new HandlerProxy<O, R>(mResolve, mReject);
+    }
+
+    private static class HandlerProxy<O, R> extends SerializableProxy {
+
+      private HandlerProxy(final HandlerFunction<O, ? super Callback<R>> resolve,
+          final HandlerFunction<Throwable, ? super Callback<R>> reject) {
+        super(resolve, reject);
+      }
+
+      @SuppressWarnings("unchecked")
+      Object readResolve() throws ObjectStreamException {
+        try {
+          final Object[] args = deserializeArgs();
+          return new HandlerFunctions<O, R>((HandlerFunction<O, ? super Callback<R>>) args[0],
+              (HandlerFunction<Throwable, ? super Callback<R>>) args[1]);
+
+        } catch (final Throwable t) {
+          throw new InvalidObjectException(t.getMessage());
+        }
+      }
+    }
+
+    public void reject(final Throwable reason, @NotNull final Callback<R> callback) throws
+        Exception {
+      mReject.accept(reason, callback);
+    }
+
+    public void resolve(final O input, @NotNull final Callback<R> callback) throws Exception {
+      mResolve.accept(input, callback);
+    }
+  }
+
   private static class HandlerMap<O, R> extends DefaultHandler<O, R> implements Serializable {
 
     private final Mapper<O, R> mMapper;
@@ -896,6 +968,23 @@ class DefaultPromise<O> implements Promise<O> {
     public void resolve(final O input, @NotNull final Callback<O> callback) throws Exception {
       mAction.perform();
       callback.resolve(input);
+    }
+  }
+
+  private static class PassThroughErrorHandler<R>
+      implements HandlerFunction<Throwable, Callback<R>>, Serializable {
+
+    public void accept(final Throwable input, @NotNull final Callback<R> callback) {
+      callback.reject(input);
+    }
+  }
+
+  private static class PassThroughOutputHandler<O, R>
+      implements HandlerFunction<O, Callback<R>>, Serializable {
+
+    @SuppressWarnings("unchecked")
+    public void accept(final O input, @NotNull final Callback<R> callback) {
+      callback.resolve((R) input);
     }
   }
 

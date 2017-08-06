@@ -22,6 +22,7 @@ import java.io.ObjectStreamException;
 import java.io.Serializable;
 import java.util.concurrent.TimeUnit;
 
+import dm.james.util.InterruptedExecutionException;
 import dm.james.util.TimeUtils;
 
 /**
