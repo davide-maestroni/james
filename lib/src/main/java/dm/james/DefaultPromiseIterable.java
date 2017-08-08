@@ -24,6 +24,7 @@ import java.io.ObjectStreamException;
 import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.ConcurrentModificationException;
 import java.util.Iterator;
 import java.util.List;
@@ -157,9 +158,9 @@ class DefaultPromiseIterable<O> implements PromiseIterable<O>, Serializable {
 
   @NotNull
   public <R> PromiseIterable<R> all(
-      @Nullable final HandlerFunction<Iterable<O>, ? super CallbackIterable<R>> resolve,
-      @Nullable final HandlerFunction<Throwable, ? super CallbackIterable<R>> reject) {
-    return all(new HandlerFunctions<Iterable<O>, R>(resolve, reject));
+      @Nullable final ObserverHandler<Iterable<O>, ? super CallbackIterable<R>> resolve,
+      @Nullable final ObserverHandler<Throwable, ? super CallbackIterable<R>> reject) {
+    return all(new HandlerObserve<Iterable<O>, R>(resolve, reject));
   }
 
   @NotNull
@@ -174,9 +175,9 @@ class DefaultPromiseIterable<O> implements PromiseIterable<O>, Serializable {
 
   @NotNull
   public <R> PromiseIterable<R> allSorted(
-      @Nullable final HandlerFunction<Iterable<O>, ? super CallbackIterable<R>> resolve,
-      @Nullable final HandlerFunction<Throwable, ? super CallbackIterable<R>> reject) {
-    return allSorted(new HandlerFunctions<Iterable<O>, R>(resolve, reject));
+      @Nullable final ObserverHandler<Iterable<O>, ? super CallbackIterable<R>> resolve,
+      @Nullable final ObserverHandler<Throwable, ? super CallbackIterable<R>> reject) {
+    return allSorted(new HandlerObserve<Iterable<O>, R>(resolve, reject));
   }
 
   @NotNull
@@ -191,9 +192,9 @@ class DefaultPromiseIterable<O> implements PromiseIterable<O>, Serializable {
 
   @NotNull
   public <R> PromiseIterable<R> any(
-      @Nullable final HandlerFunction<O, ? super CallbackIterable<R>> resolve,
-      @Nullable final HandlerFunction<Throwable, ? super CallbackIterable<R>> reject) {
-    return any(new HandlerFunctions<O, R>(resolve, reject));
+      @Nullable final ObserverHandler<O, ? super CallbackIterable<R>> resolve,
+      @Nullable final ObserverHandler<Throwable, ? super CallbackIterable<R>> reject) {
+    return any(new HandlerObserve<O, R>(resolve, reject));
   }
 
   @NotNull
@@ -208,9 +209,9 @@ class DefaultPromiseIterable<O> implements PromiseIterable<O>, Serializable {
 
   @NotNull
   public <R> PromiseIterable<R> anySorted(
-      @Nullable final HandlerFunction<O, ? super CallbackIterable<R>> resolve,
-      @Nullable final HandlerFunction<Throwable, ? super CallbackIterable<R>> reject) {
-    return anySorted(new HandlerFunctions<O, R>(resolve, reject));
+      @Nullable final ObserverHandler<O, ? super CallbackIterable<R>> resolve,
+      @Nullable final ObserverHandler<Throwable, ? super CallbackIterable<R>> reject) {
+    return anySorted(new HandlerObserve<O, R>(resolve, reject));
   }
 
   @NotNull
@@ -274,6 +275,12 @@ class DefaultPromiseIterable<O> implements PromiseIterable<O>, Serializable {
   }
 
   @NotNull
+  public PromiseIterable<O> catchEach(final int minBatchSize,
+      @NotNull final Mapper<Throwable, O> mapper) {
+    return chain(new ChainMapGroup<O, O>(mPropagationType, null, mapper, minBatchSize));
+  }
+
+  @NotNull
   public PromiseIterable<O> catchEach(@NotNull final Mapper<Throwable, O> mapper) {
     return catchEach(mapper, Integer.MAX_VALUE);
   }
@@ -291,9 +298,14 @@ class DefaultPromiseIterable<O> implements PromiseIterable<O>, Serializable {
 
   @NotNull
   public <R> PromiseIterable<R> each(
-      @Nullable final HandlerFunction<O, ? super CallbackIterable<R>> resolve,
-      @Nullable final HandlerFunction<Throwable, ? super CallbackIterable<R>> reject) {
-    return each(new HandlerFunctions<O, R>(resolve, reject));
+      @Nullable final ObserverHandler<O, ? super CallbackIterable<R>> resolve,
+      @Nullable final ObserverHandler<Throwable, ? super CallbackIterable<R>> reject) {
+    return each(new HandlerObserve<O, R>(resolve, reject));
+  }
+
+  @NotNull
+  public <R> PromiseIterable<R> each(final int minBatchSize, @NotNull final Mapper<O, R> mapper) {
+    return chain(new ChainMapGroup<O, R>(mPropagationType, mapper, null, minBatchSize));
   }
 
   @NotNull
@@ -318,9 +330,9 @@ class DefaultPromiseIterable<O> implements PromiseIterable<O>, Serializable {
 
   @NotNull
   public <R> PromiseIterable<R> eachSorted(
-      @Nullable final HandlerFunction<O, ? super CallbackIterable<R>> resolve,
-      @Nullable final HandlerFunction<Throwable, ? super CallbackIterable<R>> reject) {
-    return eachSorted(new HandlerFunctions<O, R>(resolve, reject));
+      @Nullable final ObserverHandler<O, ? super CallbackIterable<R>> resolve,
+      @Nullable final ObserverHandler<Throwable, ? super CallbackIterable<R>> reject) {
+    return eachSorted(new HandlerObserve<O, R>(resolve, reject));
   }
 
   @NotNull
@@ -741,8 +753,8 @@ class DefaultPromiseIterable<O> implements PromiseIterable<O>, Serializable {
 
   @NotNull
   public <R> Promise<R> then(
-      @Nullable final HandlerFunction<Iterable<O>, ? super Callback<R>> resolve,
-      @Nullable final HandlerFunction<Throwable, ? super Callback<R>> reject) {
+      @Nullable final ObserverHandler<Iterable<O>, ? super Callback<R>> resolve,
+      @Nullable final ObserverHandler<Throwable, ? super Callback<R>> reject) {
     return toPromise().then(resolve, reject);
   }
 
@@ -959,8 +971,12 @@ class DefaultPromiseIterable<O> implements PromiseIterable<O>, Serializable {
     }
 
     @NotNull
-    ArrayList<Resolution<O>> consumeOutputs() {
+    List<Resolution<O>> consumeOutputs() {
       final ArrayList<Resolution<O>> outputs = mOutputs;
+      if ((outputs.size() == 1) && mResolution.isEmpty()) {
+        return Collections.emptyList();
+      }
+
       mOutputs = new ArrayList<Resolution<O>>();
       mResolution = new ResolutionFulfilled<O>();
       mOutputs.add(mResolution);
@@ -1022,12 +1038,8 @@ class DefaultPromiseIterable<O> implements PromiseIterable<O>, Serializable {
 
       @Nullable
       Runnable bind(final PromiseChain<O, ?> chain) {
-        return new Runnable() {
-
-          public void run() {
-            chain.prepend(consumeOutputs());
-          }
-        };
+        chain.prepend(consumeOutputs());
+        return null;
       }
 
       @NotNull
@@ -1051,10 +1063,10 @@ class DefaultPromiseIterable<O> implements PromiseIterable<O>, Serializable {
       @Nullable
       @Override
       Runnable bind(final PromiseChain<O, ?> chain) {
+        chain.prepend(consumeOutputs());
         return new Runnable() {
 
           public void run() {
-            chain.prepend(consumeOutputs());
             chain.resolve();
           }
         };
@@ -1237,6 +1249,209 @@ class DefaultPromiseIterable<O> implements PromiseIterable<O>, Serializable {
 
         public void run() {
           try {
+            next.resolve();
+
+          } catch (final Throwable t) {
+            InterruptedExecutionException.throwIfInterrupt(t);
+            getLogger().err(t, "Error while propagating resolution");
+            next.reject(t);
+          }
+        }
+      });
+    }
+  }
+
+  private static class ChainMapGroup<O, R> extends PromiseChain<O, R> {
+
+    private final Mapper<Throwable, R> mErrorMapper;
+
+    private final ScheduledExecutor mExecutor;
+
+    private final int mMinBatchSize;
+
+    private final Object mMutex = new Object();
+
+    private final Mapper<O, R> mOutputMapper;
+
+    private final PropagationType mPropagationType;
+
+    private SimpleQueue<R> mOutputs = new SimpleQueue<R>();
+
+    @SuppressWarnings("unchecked")
+    private ChainMapGroup(@NotNull final PropagationType propagationType,
+        @Nullable final Mapper<O, R> outputMapper, @Nullable final Mapper<Throwable, R> errorMapper,
+        final int minBatchSize) {
+      mMinBatchSize = ConstantConditions.positive("min batch size", minBatchSize);
+      mOutputMapper =
+          (outputMapper != null) ? outputMapper : (Mapper<O, R>) IdentityMapper.instance();
+      mErrorMapper = (errorMapper != null) ? errorMapper : RethrowMapper.<R>instance();
+      mPropagationType = propagationType;
+      mExecutor = propagationType.executor();
+    }
+
+    private void flush(final PromiseChain<R, ?> next, final R result) {
+      final SimpleQueue<R> toAdd;
+      synchronized (mMutex) {
+        final SimpleQueue<R> outputs = mOutputs;
+        outputs.add(result);
+        if (outputs.size() >= mMinBatchSize) {
+          toAdd = outputs;
+          mOutputs = new SimpleQueue<R>();
+
+        } else {
+          toAdd = null;
+        }
+      }
+
+      if (toAdd != null) {
+        next.addAll(toAdd);
+      }
+    }
+
+    private void flush(final PromiseChain<R, ?> next, final List<R> results) {
+      final SimpleQueue<R> toAdd;
+      synchronized (mMutex) {
+        final SimpleQueue<R> outputs = mOutputs;
+        outputs.addAll(results);
+        if (outputs.size() >= mMinBatchSize) {
+          toAdd = outputs;
+          mOutputs = new SimpleQueue<R>();
+
+        } else {
+          toAdd = null;
+        }
+      }
+
+      if (toAdd != null) {
+        next.addAll(toAdd);
+      }
+    }
+
+    private void flush(final PromiseChain<R, ?> next) {
+      final SimpleQueue<R> outputs;
+      synchronized (mMutex) {
+        outputs = mOutputs;
+        mOutputs = new SimpleQueue<R>();
+      }
+
+      try {
+        next.addAll(outputs);
+
+      } catch (final Throwable t) {
+        InterruptedExecutionException.throwIfInterrupt(t);
+        getLogger().wrn("Suppressed rejection with reason: %s", t);
+      }
+    }
+
+    private Object writeReplace() throws ObjectStreamException {
+      return new ChainProxy<O, R>(mPropagationType, mOutputMapper, mErrorMapper, mMinBatchSize);
+    }
+
+    private static class ChainProxy<O, R> extends SerializableProxy {
+
+      private ChainProxy(final PropagationType propagationType, final Mapper<O, R> outputMapper,
+          final Mapper<Throwable, R> errorMapper, final int minBatchSize) {
+        super(propagationType, outputMapper, errorMapper, minBatchSize);
+      }
+
+      @SuppressWarnings("unchecked")
+      Object readResolve() throws ObjectStreamException {
+        try {
+          final Object[] args = deserializeArgs();
+          return new ChainMap<O, R>((PropagationType) args[0], (Mapper<O, R>) args[1],
+              (Mapper<Throwable, R>) args[2], (Integer) args[3]);
+
+        } catch (final Throwable t) {
+          throw new InvalidObjectException(t.getMessage());
+        }
+      }
+    }
+
+    @Override
+    void add(final PromiseChain<R, ?> next, final O input) {
+      mExecutor.execute(new Runnable() {
+
+        public void run() {
+          try {
+            flush(next, mOutputMapper.apply(input));
+
+          } catch (final Throwable t) {
+            InterruptedExecutionException.throwIfInterrupt(t);
+            getLogger().err(t, "Error while processing input: %s", input);
+            flush(next);
+            next.addRejection(t);
+          }
+        }
+      });
+    }
+
+    @Override
+    void addAll(final PromiseChain<R, ?> next, final Iterable<O> inputs) {
+      mExecutor.execute(new Runnable() {
+
+        @SuppressWarnings("WhileLoopReplaceableByForEach")
+        public void run() {
+          final ArrayList<R> outputs = new ArrayList<R>();
+          try {
+            for (final O input : inputs) {
+              outputs.add(mOutputMapper.apply(input));
+            }
+
+          } catch (final Throwable t) {
+            InterruptedExecutionException.throwIfInterrupt(t);
+            getLogger().err(t, "Error while processing input: %s", inputs);
+            try {
+              flush(next, outputs);
+
+            } catch (final Throwable reason) {
+              InterruptedExecutionException.throwIfInterrupt(t);
+              getLogger().wrn("Suppressed rejection with reason: %s", reason);
+            }
+
+            flush(next);
+            next.addRejection(t);
+          }
+        }
+      });
+    }
+
+    @NotNull
+    @Override
+    PromiseChain<O, R> copy() {
+      return new ChainMap<O, R>(mPropagationType, mOutputMapper, mErrorMapper, mMinBatchSize);
+    }
+
+    @Override
+    void addRejection(final PromiseChain<R, ?> next, final Throwable reason) {
+      mExecutor.execute(new Runnable() {
+
+        public void run() {
+          try {
+            flush(next, mErrorMapper.apply(reason));
+
+          } catch (final Throwable t) {
+            InterruptedExecutionException.throwIfInterrupt(t);
+            getLogger().err(t, "Error while processing rejection with reason: %s", reason);
+            flush(next);
+            next.addRejection(t);
+          }
+        }
+      });
+    }
+
+    @Override
+    void resolve(final PromiseChain<R, ?> next) {
+      mExecutor.execute(new Runnable() {
+
+        public void run() {
+          final SimpleQueue<R> outputs;
+          synchronized (mMutex) {
+            outputs = mOutputs;
+            mOutputs = new SimpleQueue<R>();
+          }
+
+          try {
+            next.addAll(outputs);
             next.resolve();
 
           } catch (final Throwable t) {
@@ -2816,57 +3031,6 @@ class DefaultPromiseIterable<O> implements PromiseIterable<O>, Serializable {
     }
   }
 
-  private static class HandlerFunctions<O, R> implements StatelessHandler<O, R>, Serializable {
-
-    private final HandlerFunction<Throwable, ? super CallbackIterable<R>> mReject;
-
-    private final HandlerFunction<O, ? super CallbackIterable<R>> mResolve;
-
-    @SuppressWarnings("unchecked")
-    private HandlerFunctions(
-        @Nullable final HandlerFunction<O, ? super CallbackIterable<R>> resolve,
-        @Nullable final HandlerFunction<Throwable, ? super CallbackIterable<R>> reject) {
-      mResolve = (HandlerFunction<O, ? super CallbackIterable<R>>) ((resolve != null) ? resolve
-          : new PassThroughOutputHandler<O, R>());
-      mReject = (HandlerFunction<Throwable, ? super CallbackIterable<R>>) ((reject != null) ? reject
-          : new PassThroughErrorHandler<R>());
-    }
-
-    private Object writeReplace() throws ObjectStreamException {
-      return new HandlerProxy<O, R>(mResolve, mReject);
-    }
-
-    private static class HandlerProxy<O, R> extends SerializableProxy {
-
-      private HandlerProxy(final HandlerFunction<O, ? super CallbackIterable<R>> resolve,
-          final HandlerFunction<Throwable, ? super CallbackIterable<R>> reject) {
-        super(resolve, reject);
-      }
-
-      @SuppressWarnings("unchecked")
-      Object readResolve() throws ObjectStreamException {
-        try {
-          final Object[] args = deserializeArgs();
-          return new HandlerFunctions<O, R>((HandlerFunction<O, ? super Callback<R>>) args[0],
-              (HandlerFunction<Throwable, ? super Callback<R>>) args[1]);
-
-        } catch (final Throwable t) {
-          throw new InvalidObjectException(t.getMessage());
-        }
-      }
-    }
-
-    public void reject(final Throwable reason, @NotNull final CallbackIterable<R> callback) throws
-        Exception {
-      mReject.accept(reason, callback);
-    }
-
-    public void resolve(final O input, @NotNull final CallbackIterable<R> callback) throws
-        Exception {
-      mResolve.accept(input, callback);
-    }
-  }
-
   private static class HandlerMapAll<O, R> extends IterableStatelessHandler<Iterable<O>, R>
       implements Serializable {
 
@@ -2941,6 +3105,56 @@ class DefaultPromiseIterable<O> implements PromiseIterable<O>, Serializable {
     public void resolve(final O input, @NotNull final CallbackIterable<R> callback) throws
         Exception {
       callback.resolve(mMapper.apply(input));
+    }
+  }
+
+  private static class HandlerObserve<O, R> implements StatelessHandler<O, R>, Serializable {
+
+    private final ObserverHandler<Throwable, ? super CallbackIterable<R>> mReject;
+
+    private final ObserverHandler<O, ? super CallbackIterable<R>> mResolve;
+
+    @SuppressWarnings("unchecked")
+    private HandlerObserve(@Nullable final ObserverHandler<O, ? super CallbackIterable<R>> resolve,
+        @Nullable final ObserverHandler<Throwable, ? super CallbackIterable<R>> reject) {
+      mResolve = (ObserverHandler<O, ? super CallbackIterable<R>>) ((resolve != null) ? resolve
+          : new PassThroughOutputHandler<O, R>());
+      mReject = (ObserverHandler<Throwable, ? super CallbackIterable<R>>) ((reject != null) ? reject
+          : new PassThroughErrorHandler<R>());
+    }
+
+    private Object writeReplace() throws ObjectStreamException {
+      return new HandlerProxy<O, R>(mResolve, mReject);
+    }
+
+    private static class HandlerProxy<O, R> extends SerializableProxy {
+
+      private HandlerProxy(final ObserverHandler<O, ? super CallbackIterable<R>> resolve,
+          final ObserverHandler<Throwable, ? super CallbackIterable<R>> reject) {
+        super(resolve, reject);
+      }
+
+      @SuppressWarnings("unchecked")
+      Object readResolve() throws ObjectStreamException {
+        try {
+          final Object[] args = deserializeArgs();
+          return new HandlerObserve<O, R>((ObserverHandler<O, ? super Callback<R>>) args[0],
+              (ObserverHandler<Throwable, ? super Callback<R>>) args[1]);
+
+        } catch (final Throwable t) {
+          throw new InvalidObjectException(t.getMessage());
+        }
+      }
+    }
+
+    public void reject(final Throwable reason, @NotNull final CallbackIterable<R> callback) throws
+        Exception {
+      mReject.accept(reason, callback);
+    }
+
+    public void resolve(final O input, @NotNull final CallbackIterable<R> callback) throws
+        Exception {
+      mResolve.accept(input, callback);
     }
   }
 
@@ -3199,7 +3413,7 @@ class DefaultPromiseIterable<O> implements PromiseIterable<O>, Serializable {
   }
 
   private static class PassThroughErrorHandler<R>
-      implements HandlerFunction<Throwable, Callback<R>>, Serializable {
+      implements ObserverHandler<Throwable, Callback<R>>, Serializable {
 
     public void accept(final Throwable input, @NotNull final Callback<R> callback) {
       callback.reject(input);
@@ -3207,7 +3421,7 @@ class DefaultPromiseIterable<O> implements PromiseIterable<O>, Serializable {
   }
 
   private static class PassThroughOutputHandler<O, R>
-      implements HandlerFunction<O, Callback<R>>, Serializable {
+      implements ObserverHandler<O, Callback<R>>, Serializable {
 
     @SuppressWarnings("unchecked")
     public void accept(final O input, @NotNull final Callback<R> callback) {
@@ -3258,7 +3472,9 @@ class DefaultPromiseIterable<O> implements PromiseIterable<O>, Serializable {
     }
 
     void prepend(@NotNull final List<Resolution<I>> resolutions) {
-      mInnerState = new StatePrepending(resolutions);
+      if (!resolutions.isEmpty()) {
+        mInnerState = new StatePrepending(resolutions);
+      }
     }
 
     abstract void resolve(PromiseChain<O, ?> next);
@@ -3329,6 +3545,7 @@ class DefaultPromiseIterable<O> implements PromiseIterable<O>, Serializable {
       @Nullable
       @Override
       Runnable reject(final Throwable reason) {
+        mInnerState = new StatePending();
         return new Runnable() {
 
           public void run() {
@@ -3343,6 +3560,7 @@ class DefaultPromiseIterable<O> implements PromiseIterable<O>, Serializable {
       @Nullable
       @Override
       Runnable resolve() {
+        mInnerState = new StatePending();
         return new Runnable() {
 
           public void run() {
@@ -3646,6 +3864,10 @@ class DefaultPromiseIterable<O> implements PromiseIterable<O>, Serializable {
       mOutputs.add(input);
     }
 
+    boolean isEmpty() {
+      return mOutputs.isEmpty();
+    }
+
     @Nullable
     public RejectionException getError() {
       return null;
@@ -3840,9 +4062,15 @@ class DefaultPromiseIterable<O> implements PromiseIterable<O>, Serializable {
     private PromiseIterator(final long timeout, @NotNull final TimeUnit timeUnit) {
       mOriginalTimeout = timeout;
       mOriginalTimeUnit = timeUnit;
-      mTimeUnit = ((timeUnit.toNanos(timeout) % TimeUnit.MILLISECONDS.toNanos(1)) == 0)
-          ? TimeUnit.MILLISECONDS : TimeUnit.NANOSECONDS;
-      mTimeout = mTimeUnit.convert(timeout, timeUnit) + TimeUtils.currentTimeIn(mTimeUnit);
+      if (timeout >= 0) {
+        mTimeUnit = ((timeUnit.toNanos(timeout) % TimeUnit.MILLISECONDS.toNanos(1)) == 0)
+            ? TimeUnit.MILLISECONDS : TimeUnit.NANOSECONDS;
+        mTimeout = mTimeUnit.convert(timeout, timeUnit) + TimeUtils.currentTimeIn(mTimeUnit);
+
+      } else {
+        mTimeUnit = TimeUnit.MILLISECONDS;
+        mTimeout = -1;
+      }
     }
 
     @SuppressWarnings("unchecked")
@@ -3860,7 +4088,7 @@ class DefaultPromiseIterable<O> implements PromiseIterable<O>, Serializable {
               return ((head.getOutputs().size() > index) || head.getState().isResolved());
             }
           }, timeout, mTimeUnit)) {
-            final List<O> outputs = (List<O>) head.getOutputs();
+            final SimpleQueue<O> outputs = (SimpleQueue<O>) head.getOutputs();
             return (outputs.size() > index);
           }
 
@@ -3887,7 +4115,7 @@ class DefaultPromiseIterable<O> implements PromiseIterable<O>, Serializable {
               return ((head.getOutputs().size() > index) || head.getState().isResolved());
             }
           }, timeout, mTimeUnit)) {
-            final List<O> outputs = (List<O>) head.getOutputs();
+            final SimpleQueue<O> outputs = (SimpleQueue<O>) head.getOutputs();
             if (outputs.size() <= index) {
               throw new NoSuchElementException();
             }
@@ -3922,7 +4150,7 @@ class DefaultPromiseIterable<O> implements PromiseIterable<O>, Serializable {
           throw new IllegalStateException("next() not called yet");
         }
 
-        final List<O> outputs = (List<O>) mHead.getOutputs();
+        final SimpleQueue<O> outputs = (SimpleQueue<O>) mHead.getOutputs();
         if (outputs.size() <= index) {
           throw new ConcurrentModificationException();
         }

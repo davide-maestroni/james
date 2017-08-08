@@ -25,6 +25,7 @@ import java.io.Serializable;
 import dm.james.promise.Mapper;
 import dm.james.promise.Observer;
 import dm.james.promise.PromiseIterable.CallbackIterable;
+import dm.james.range.EndpointsType;
 import dm.james.util.ConstantConditions;
 import dm.james.util.SerializableProxy;
 

@@ -14,12 +14,12 @@
  * limitations under the License.
  */
 
-package dm.james;
+package dm.james.range;
 
 /**
  * Created by davide-maestroni on 08/07/2017.
  */
-interface SequenceIncrement<O> {
+public interface SequenceIncrement<O> {
 
   O getNext(O current, long index) throws Exception;
 }

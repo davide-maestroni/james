@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package dm.james;
+package dm.james.range;
 
 /**
  * Enumeration defining whether the endpoints are included or not in the range.

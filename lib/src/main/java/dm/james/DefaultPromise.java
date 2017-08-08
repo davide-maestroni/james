@@ -311,9 +311,9 @@ class DefaultPromise<O> implements Promise<O> {
   }
 
   @NotNull
-  public <R> Promise<R> then(@Nullable final HandlerFunction<O, ? super Callback<R>> resolve,
-      @Nullable final HandlerFunction<Throwable, ? super Callback<R>> reject) {
-    return then(new HandlerFunctions<O, R>(resolve, reject));
+  public <R> Promise<R> then(@Nullable final ObserverHandler<O, ? super Callback<R>> resolve,
+      @Nullable final ObserverHandler<Throwable, ? super Callback<R>> reject) {
+    return then(new HandlerObserve<O, R>(resolve, reject));
   }
 
   @NotNull
@@ -806,55 +806,6 @@ class DefaultPromise<O> implements Promise<O> {
     }
   }
 
-  private static class HandlerFunctions<O, R> implements Handler<O, R>, Serializable {
-
-    private final HandlerFunction<Throwable, ? super Callback<R>> mReject;
-
-    private final HandlerFunction<O, ? super Callback<R>> mResolve;
-
-    @SuppressWarnings("unchecked")
-    private HandlerFunctions(@Nullable final HandlerFunction<O, ? super Callback<R>> resolve,
-        @Nullable final HandlerFunction<Throwable, ? super Callback<R>> reject) {
-      mResolve = (HandlerFunction<O, ? super Callback<R>>) ((resolve != null) ? resolve
-          : new PassThroughOutputHandler<O, R>());
-      mReject = (HandlerFunction<Throwable, ? super Callback<R>>) ((reject != null) ? reject
-          : new PassThroughErrorHandler<R>());
-    }
-
-    private Object writeReplace() throws ObjectStreamException {
-      return new HandlerProxy<O, R>(mResolve, mReject);
-    }
-
-    private static class HandlerProxy<O, R> extends SerializableProxy {
-
-      private HandlerProxy(final HandlerFunction<O, ? super Callback<R>> resolve,
-          final HandlerFunction<Throwable, ? super Callback<R>> reject) {
-        super(resolve, reject);
-      }
-
-      @SuppressWarnings("unchecked")
-      Object readResolve() throws ObjectStreamException {
-        try {
-          final Object[] args = deserializeArgs();
-          return new HandlerFunctions<O, R>((HandlerFunction<O, ? super Callback<R>>) args[0],
-              (HandlerFunction<Throwable, ? super Callback<R>>) args[1]);
-
-        } catch (final Throwable t) {
-          throw new InvalidObjectException(t.getMessage());
-        }
-      }
-    }
-
-    public void reject(final Throwable reason, @NotNull final Callback<R> callback) throws
-        Exception {
-      mReject.accept(reason, callback);
-    }
-
-    public void resolve(final O input, @NotNull final Callback<R> callback) throws Exception {
-      mResolve.accept(input, callback);
-    }
-  }
-
   private static class HandlerMap<O, R> extends DefaultHandler<O, R> implements Serializable {
 
     private final Mapper<O, R> mMapper;
@@ -888,6 +839,55 @@ class DefaultPromise<O> implements Promise<O> {
     @Override
     public void resolve(final O input, @NotNull final Callback<R> callback) throws Exception {
       callback.resolve(mMapper.apply(input));
+    }
+  }
+
+  private static class HandlerObserve<O, R> implements Handler<O, R>, Serializable {
+
+    private final ObserverHandler<Throwable, ? super Callback<R>> mReject;
+
+    private final ObserverHandler<O, ? super Callback<R>> mResolve;
+
+    @SuppressWarnings("unchecked")
+    private HandlerObserve(@Nullable final ObserverHandler<O, ? super Callback<R>> resolve,
+        @Nullable final ObserverHandler<Throwable, ? super Callback<R>> reject) {
+      mResolve = (ObserverHandler<O, ? super Callback<R>>) ((resolve != null) ? resolve
+          : new PassThroughOutputHandler<O, R>());
+      mReject = (ObserverHandler<Throwable, ? super Callback<R>>) ((reject != null) ? reject
+          : new PassThroughErrorHandler<R>());
+    }
+
+    private Object writeReplace() throws ObjectStreamException {
+      return new HandlerProxy<O, R>(mResolve, mReject);
+    }
+
+    private static class HandlerProxy<O, R> extends SerializableProxy {
+
+      private HandlerProxy(final ObserverHandler<O, ? super Callback<R>> resolve,
+          final ObserverHandler<Throwable, ? super Callback<R>> reject) {
+        super(resolve, reject);
+      }
+
+      @SuppressWarnings("unchecked")
+      Object readResolve() throws ObjectStreamException {
+        try {
+          final Object[] args = deserializeArgs();
+          return new HandlerObserve<O, R>((ObserverHandler<O, ? super Callback<R>>) args[0],
+              (ObserverHandler<Throwable, ? super Callback<R>>) args[1]);
+
+        } catch (final Throwable t) {
+          throw new InvalidObjectException(t.getMessage());
+        }
+      }
+    }
+
+    public void reject(final Throwable reason, @NotNull final Callback<R> callback) throws
+        Exception {
+      mReject.accept(reason, callback);
+    }
+
+    public void resolve(final O input, @NotNull final Callback<R> callback) throws Exception {
+      mResolve.accept(input, callback);
     }
   }
 
@@ -972,7 +972,7 @@ class DefaultPromise<O> implements Promise<O> {
   }
 
   private static class PassThroughErrorHandler<R>
-      implements HandlerFunction<Throwable, Callback<R>>, Serializable {
+      implements ObserverHandler<Throwable, Callback<R>>, Serializable {
 
     public void accept(final Throwable input, @NotNull final Callback<R> callback) {
       callback.reject(input);
@@ -980,7 +980,7 @@ class DefaultPromise<O> implements Promise<O> {
   }
 
   private static class PassThroughOutputHandler<O, R>
-      implements HandlerFunction<O, Callback<R>>, Serializable {
+      implements ObserverHandler<O, Callback<R>>, Serializable {
 
     @SuppressWarnings("unchecked")
     public void accept(final O input, @NotNull final Callback<R> callback) {

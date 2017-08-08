@@ -110,6 +110,16 @@ public class SimpleQueue<E> extends AbstractCollection<E> implements Queue<E> {
     ++mSize;
   }
 
+  // TODO: 08/08/2017 javadoc
+  @SuppressWarnings("unchecked")
+  public E get(final int index) {
+    if ((index < 0) || (index >= size())) {
+      throw new IndexOutOfBoundsException();
+    }
+
+    return (E) mData[(mFirst + index) & mMask];
+  }
+
   @NotNull
   @Override
   public Iterator<E> iterator() {

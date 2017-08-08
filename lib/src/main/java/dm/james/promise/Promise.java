@@ -63,8 +63,8 @@ public interface Promise<O> extends Serializable {
   <R> Promise<R> then(@NotNull Handler<O, R> handler);
 
   @NotNull
-  <R> Promise<R> then(@Nullable HandlerFunction<O, ? super Callback<R>> resolve,
-      @Nullable HandlerFunction<Throwable, ? super Callback<R>> reject);
+  <R> Promise<R> then(@Nullable ObserverHandler<O, ? super Callback<R>> resolve,
+      @Nullable ObserverHandler<Throwable, ? super Callback<R>> reject);
 
   @NotNull
   <R> Promise<R> then(@NotNull Mapper<O, R> mapper);
@@ -98,7 +98,7 @@ public interface Promise<O> extends Serializable {
     void resolve(I input, @NotNull Callback<O> callback) throws Exception;
   }
 
-  interface HandlerFunction<I, C> {
+  interface ObserverHandler<I, C> {
 
     void accept(I input, C callback);
   }

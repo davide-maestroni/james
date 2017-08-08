@@ -103,8 +103,8 @@ abstract class PromiseWrapper<O> implements Promise<O>, Serializable {
   }
 
   @NotNull
-  public <R> Promise<R> then(@Nullable final HandlerFunction<O, ? super Callback<R>> resolve,
-      @Nullable final HandlerFunction<Throwable, ? super Callback<R>> reject) {
+  public <R> Promise<R> then(@Nullable final ObserverHandler<O, ? super Callback<R>> resolve,
+      @Nullable final ObserverHandler<Throwable, ? super Callback<R>> reject) {
     return newInstance(mPromise.then(resolve, reject));
   }
 
