@@ -47,37 +47,61 @@ class WrappingDeferredPromise<I, O> implements DeferredPromise<I, O>, Serializab
 
   @NotNull
   public <R> DeferredPromise<I, R> apply(@NotNull final Mapper<Promise<O>, Promise<R>> mapper) {
-    return new WrappingDeferredPromise<I, R>(mDeferred, mPromise.apply(mapper));
+    return newInstance(mPromise.apply(mapper));
   }
 
   @NotNull
   public DeferredPromise<I, O> catchAny(@NotNull final Mapper<Throwable, O> mapper) {
-    return new WrappingDeferredPromise<I, O>(mDeferred, mPromise.catchAny(mapper));
-  }
-
-  @NotNull
-  public <R> DeferredPromise<I, R> then(@NotNull final Mapper<O, R> mapper) {
-    return new WrappingDeferredPromise<I, R>(mDeferred, mPromise.then(mapper));
+    return newInstance(mPromise.catchAny(mapper));
   }
 
   @NotNull
   public <R> DeferredPromise<I, R> then(@NotNull final Handler<O, R> handler) {
-    return new WrappingDeferredPromise<I, R>(mDeferred, mPromise.then(handler));
+    return newInstance(mPromise.then(handler));
+  }
+
+  @NotNull
+  public <R> DeferredPromise<I, R> then(
+      @Nullable final HandlerObserver<O, ? super Callback<R>> resolve,
+      @Nullable final HandlerObserver<Throwable, ? super Callback<R>> reject) {
+    return newInstance(mPromise.then(resolve, reject));
+  }
+
+  @NotNull
+  public <R> DeferredPromise<I, R> then(@NotNull final Mapper<O, R> mapper) {
+    return newInstance(mPromise.then(mapper));
+  }
+
+  @NotNull
+  public <R> DeferredPromise<I, R> thenTry(@NotNull final Handler<O, R> handler) {
+    return newInstance(mPromise.thenTry(handler));
+  }
+
+  @NotNull
+  public <R> DeferredPromise<I, R> thenTry(
+      @Nullable final HandlerObserver<O, ? super Callback<R>> resolve,
+      @Nullable final HandlerObserver<Throwable, ? super Callback<R>> reject) {
+    return newInstance(mPromise.thenTry(resolve, reject));
+  }
+
+  @NotNull
+  public <R> DeferredPromise<I, R> thenTry(@NotNull final Mapper<O, R> mapper) {
+    return newInstance(mPromise.thenTry(mapper));
   }
 
   @NotNull
   public DeferredPromise<I, O> whenFulfilled(@NotNull final Observer<O> observer) {
-    return new WrappingDeferredPromise<I, O>(mDeferred, mPromise.whenFulfilled(observer));
+    return newInstance(mPromise.whenFulfilled(observer));
   }
 
   @NotNull
   public DeferredPromise<I, O> whenRejected(@NotNull final Observer<Throwable> observer) {
-    return new WrappingDeferredPromise<I, O>(mDeferred, mPromise.whenRejected(observer));
+    return newInstance(mPromise.whenRejected(observer));
   }
 
   @NotNull
   public DeferredPromise<I, O> whenResolved(@NotNull final Action action) {
-    return new WrappingDeferredPromise<I, O>(mDeferred, mPromise.whenResolved(action));
+    return newInstance(mPromise.whenResolved(action));
   }
 
   @NotNull
@@ -100,23 +124,23 @@ class WrappingDeferredPromise<I, O> implements DeferredPromise<I, O>, Serializab
     return mPromise.get(timeout, timeUnit);
   }
 
-  @Nullable
-  public RejectionException getError() {
-    return mPromise.getError();
-  }
-
-  @Nullable
-  public RejectionException getError(final long timeout, @NotNull final TimeUnit timeUnit) {
-    return mPromise.getError(timeout, timeUnit);
-  }
-
-  public RejectionException getErrorOr(final RejectionException other, final long timeout,
-      @NotNull final TimeUnit timeUnit) {
-    return mPromise.getErrorOr(other, timeout, timeUnit);
-  }
-
   public O getOr(final O other, final long timeout, @NotNull final TimeUnit timeUnit) {
     return mPromise.getOr(other, timeout, timeUnit);
+  }
+
+  @Nullable
+  public RejectionException getReason() {
+    return mPromise.getReason();
+  }
+
+  @Nullable
+  public RejectionException getReason(final long timeout, @NotNull final TimeUnit timeUnit) {
+    return mPromise.getReason(timeout, timeUnit);
+  }
+
+  public RejectionException getReasonOr(final RejectionException other, final long timeout,
+      @NotNull final TimeUnit timeUnit) {
+    return mPromise.getReasonOr(other, timeout, timeUnit);
   }
 
   public boolean isBound() {
@@ -139,12 +163,6 @@ class WrappingDeferredPromise<I, O> implements DeferredPromise<I, O>, Serializab
     return mPromise.isResolved();
   }
 
-  @NotNull
-  public <R> Promise<R> then(@Nullable final ObserverHandler<O, ? super Callback<R>> resolve,
-      @Nullable final ObserverHandler<Throwable, ? super Callback<R>> reject) {
-    return new WrappingDeferredPromise<I, R>(mDeferred, mPromise.then(resolve, reject));
-  }
-
   public void waitResolved() {
     mPromise.waitResolved();
   }
@@ -159,5 +177,10 @@ class WrappingDeferredPromise<I, O> implements DeferredPromise<I, O>, Serializab
 
   public void resolve(final I input) {
     mDeferred.resolve(input);
+  }
+
+  @NotNull
+  private <R> WrappingDeferredPromise<I, R> newInstance(@NotNull final Promise<R> promise) {
+    return new WrappingDeferredPromise<I, R>(mDeferred, promise);
   }
 }

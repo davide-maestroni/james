@@ -39,15 +39,16 @@ public interface Promise<O> extends Serializable {
 
   O get(long timeout, @NotNull TimeUnit timeUnit);
 
-  @Nullable
-  RejectionException getError();
-
-  @Nullable
-  RejectionException getError(long timeout, @NotNull TimeUnit timeUnit);
-
-  RejectionException getErrorOr(RejectionException other, long timeout, @NotNull TimeUnit timeUnit);
-
   O getOr(O other, long timeout, @NotNull TimeUnit timeUnit);
+
+  @Nullable
+  RejectionException getReason();
+
+  @Nullable
+  RejectionException getReason(long timeout, @NotNull TimeUnit timeUnit);
+
+  RejectionException getReasonOr(RejectionException other, long timeout,
+      @NotNull TimeUnit timeUnit);
 
   boolean isBound();
 
@@ -63,11 +64,21 @@ public interface Promise<O> extends Serializable {
   <R> Promise<R> then(@NotNull Handler<O, R> handler);
 
   @NotNull
-  <R> Promise<R> then(@Nullable ObserverHandler<O, ? super Callback<R>> resolve,
-      @Nullable ObserverHandler<Throwable, ? super Callback<R>> reject);
+  <R> Promise<R> then(@Nullable HandlerObserver<O, ? super Callback<R>> resolve,
+      @Nullable HandlerObserver<Throwable, ? super Callback<R>> reject);
 
   @NotNull
   <R> Promise<R> then(@NotNull Mapper<O, R> mapper);
+
+  @NotNull
+  <R> Promise<R> thenTry(@NotNull Handler<O, R> handler);
+
+  @NotNull
+  <R> Promise<R> thenTry(@Nullable HandlerObserver<O, ? super Callback<R>> resolve,
+      @Nullable HandlerObserver<Throwable, ? super Callback<R>> reject);
+
+  @NotNull
+  <R> Promise<R> thenTry(@NotNull Mapper<O, R> mapper);
 
   void waitResolved();
 
@@ -98,7 +109,7 @@ public interface Promise<O> extends Serializable {
     void resolve(I input, @NotNull Callback<O> callback) throws Exception;
   }
 
-  interface ObserverHandler<I, C> {
+  interface HandlerObserver<I, C> {
 
     void accept(I input, C callback);
   }

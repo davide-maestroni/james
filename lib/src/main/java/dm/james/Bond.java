@@ -24,12 +24,12 @@ import java.io.InvalidObjectException;
 import java.io.ObjectStreamException;
 import java.io.Serializable;
 import java.lang.reflect.Method;
-import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.Callable;
 import java.util.concurrent.Future;
 
 import dm.james.executor.ScheduledExecutor;
+import dm.james.executor.ScheduledExecutors;
 import dm.james.handler.Handlers;
 import dm.james.log.Log;
 import dm.james.log.Log.Level;
@@ -46,8 +46,12 @@ import dm.james.promise.PromiseIterable.StatelessHandler;
 import dm.james.promise.Provider;
 import dm.james.range.EndpointsType;
 import dm.james.range.SequenceIncrement;
+import dm.james.reflect.CallbackMapper;
+import dm.james.reflect.PromisifiedObject;
+import dm.james.reflect.SimpleCallbackMapper;
 import dm.james.util.ConstantConditions;
 import dm.james.util.ReflectionUtils;
+import dm.james.util.SerializableProxy;
 
 import static dm.james.math.Numbers.getHigherPrecisionOperation;
 import static dm.james.math.Numbers.getOperation;
@@ -57,11 +61,13 @@ import static dm.james.math.Numbers.getOperation;
  */
 public class Bond implements Serializable {
 
-  // TODO: 06/08/2017 Handlers
+  // TODO: 08/08/2017 promisify
+  // TODO: 08/08/2017 BinaryObserver??
   // TODO: 06/08/2017 ByteBuffer => Chunk => ChunkOutputStream => PromiseIterable
+  // TODO: 06/08/2017 Handlers
   // TODO: 06/08/2017 james-android, james-retrofit, james-swagger
 
-  private static final EndpointsType DEFAULT_ENDPOINTS = EndpointsType.INCLUSIVE;
+  private static final NoMapper sNoMapper = new NoMapper();
 
   private final Log mLog;
 
@@ -78,41 +84,6 @@ public class Bond implements Serializable {
     mPropagationType = propagationType;
     mLog = log;
     mLogLevel = level;
-  }
-
-  @NotNull
-  private static <O> Object[] replaceParams(@NotNull final Object[] params,
-      @NotNull final Mapper<Callback<O>, Object> mapper, @NotNull final Callback<O> callback) throws
-      Exception {
-    boolean found = false;
-    final Object[] objects = params.clone();
-    for (int i = 0; i < objects.length; ++i) {
-      if (objects[i] == PromiseFunction.CALLBACK) {
-        if (found) {
-          throw new IllegalArgumentException(
-              "input parameters include more then one callback function: " + Arrays.toString(
-                  params));
-        }
-
-        found = true;
-        objects[i] = mapper.apply(callback);
-      }
-    }
-
-    if (!found) {
-      throw new IllegalArgumentException(
-          "input parameters do not include the callback function: " + Arrays.toString(params));
-    }
-
-    return objects;
-  }
-
-  private static void validateParams(@NotNull final Object[] params, final int length) {
-    if (params.length != length) {
-      throw new IllegalArgumentException(
-          "invalid number of parameters: expected <" + length + "> but was <" + params.length
-              + ">");
-    }
   }
 
   @NotNull
@@ -191,7 +162,12 @@ public class Bond implements Serializable {
   }
 
   @NotNull
+  @SuppressWarnings("unchecked")
   public <O> PromiseIterable<O> each(@NotNull final Promise<? extends Iterable<O>> promise) {
+    if (promise instanceof PromiseIterable) {
+      return (PromiseIterable<O>) promise;
+    }
+
     return iterable(new IterableObserver<O>(promise));
   }
 
@@ -253,53 +229,50 @@ public class Bond implements Serializable {
   }
 
   @NotNull
-  public <T> T promisify(final Object target, @NotNull final Class<? extends T> type) {
-    return null;
+  public PromisifiedObject promisify(@NotNull final Class<?> target) {
+    // TODO: 09/08/2017 remove all??
+    return promisify(target, sNoMapper);
   }
 
   @NotNull
-  public <O> PromiseFunction<O> promisify(final Object target, @NotNull final Method method,
-      @NotNull final Mapper<Callback<O>, Object> mapper) {
-    return new DefaultPromiseFunction<O>(target, method, mapper);
+  public PromisifiedObject promisify(@NotNull final Class<?> target,
+      @NotNull final CallbackMapper mapper) {
+    return promisify(ScheduledExecutors.immediateExecutor(), target, mapper);
   }
 
   @NotNull
-  public <I1, I2, I3, I4, I5, O> PromiseFunction<O> promisifyFive(
-      @NotNull final ObserverFive<I1, I2, I3, I4, I5> method,
-      @NotNull final Mapper<Callback<O>, Object> mapper) {
-    return new DefaultPromiseFunctionFive<I1, I2, I3, I4, I5, O>(method, mapper);
+  public PromisifiedObject promisify(@NotNull final Object target) {
+    return promisify(target, sNoMapper);
   }
 
   @NotNull
-  public <I1, I2, I3, I4, O> PromiseFunction<O> promisifyFour(
-      @NotNull final ObserverFour<I1, I2, I3, I4> method,
-      @NotNull final Mapper<Callback<O>, Object> mapper) {
-    return new DefaultPromiseFunctionFour<I1, I2, I3, I4, O>(method, mapper);
+  public PromisifiedObject promisify(@NotNull final Object target,
+      @NotNull final CallbackMapper mapper) {
+    return promisify(ScheduledExecutors.immediateExecutor(), target, mapper);
   }
 
   @NotNull
-  public <I, O> PromiseFunction<O> promisifyOne(@NotNull final Observer<I> method,
-      @NotNull final Mapper<Callback<O>, Object> mapper) {
-    return new DefaultPromiseFunctionOne<I, O>(method, mapper);
+  public PromisifiedObject promisify(@NotNull final ScheduledExecutor executor,
+      @NotNull final Class<?> target) {
+    return promisify(executor, target, sNoMapper);
   }
 
   @NotNull
-  public <I1, I2, I3, O> PromiseFunction<O> promisifyThree(
-      @NotNull final ObserverThree<I1, I2, I3> method,
-      @NotNull final Mapper<Callback<O>, Object> mapper) {
-    return new DefaultPromiseFunctionThree<I1, I2, I3, O>(method, mapper);
+  public PromisifiedObject promisify(@NotNull final ScheduledExecutor executor,
+      @NotNull final Class<?> target, @NotNull final CallbackMapper mapper) {
+    return new DefaultPromisedObject(this, executor, null, target, mapper);
   }
 
   @NotNull
-  public <O> PromiseFunction<O> promisifyTwin(@NotNull final ObserverTwo<Object, Object> method,
-      @NotNull final Mapper<Callback<O>, Object> mapper) {
-    return new DefaultPromiseFunctionTwo<Object, Object, O>(method, mapper);
+  public PromisifiedObject promisify(@NotNull final ScheduledExecutor executor,
+      @NotNull final Object target) {
+    return promisify(executor, target, sNoMapper);
   }
 
   @NotNull
-  public <I1, I2, O> PromiseFunction<O> promisifyTwo(@NotNull final ObserverTwo<I1, I2> method,
-      @NotNull final Mapper<Callback<O>, Object> mapper) {
-    return new DefaultPromiseFunctionTwo<I1, I2, O>(method, mapper);
+  public PromisifiedObject promisify(@NotNull final ScheduledExecutor executor,
+      @NotNull final Object target, @NotNull final CallbackMapper mapper) {
+    return new DefaultPromisedObject(this, executor, target, target.getClass(), mapper);
   }
 
   /**
@@ -352,7 +325,7 @@ public class Bond implements Serializable {
   @NotNull
   public <N extends Number> PromiseIterable<N> range(@NotNull final EndpointsType endpoints,
       @NotNull final N start, @NotNull final N end, @NotNull final N increment) {
-    return iterable(new NumberRangeObserver<N>(endpoints, start, end, increment));
+    return iterable(Handlers.range(endpoints, start, end, increment));
   }
 
   /**
@@ -374,66 +347,64 @@ public class Bond implements Serializable {
   public <O extends Comparable<? super O>> PromiseIterable<O> range(
       @NotNull final EndpointsType endpoints, @NotNull final O start, @NotNull final O end,
       @NotNull final Mapper<O, O> increment) {
-    return iterable(new RangeObserver<O>(endpoints, start, end, increment));
+    return iterable(Handlers.range(endpoints, start, end, increment));
   }
 
   @NotNull
   public <N extends Number> PromiseIterable<N> range(@NotNull final N start, @NotNull final N end) {
-    return range(DEFAULT_ENDPOINTS, start, end);
+    return iterable(Handlers.range(start, end));
   }
 
   @NotNull
   public <N extends Number> PromiseIterable<N> range(@NotNull final N start, @NotNull final N end,
       @NotNull final N increment) {
-    return range(DEFAULT_ENDPOINTS, start, end, increment);
+    return iterable(Handlers.range(start, end, increment));
   }
 
   @NotNull
   public <O extends Comparable<? super O>> PromiseIterable<O> range(@NotNull final O start,
       @NotNull final O end, @NotNull final Mapper<O, O> increment) {
-    return range(DEFAULT_ENDPOINTS, start, end, increment);
+    return iterable(Handlers.range(start, end, increment));
   }
 
   @NotNull
   @SuppressWarnings("unchecked")
   public <N extends Number> PromiseIterable<N> range(@NotNull final ScheduledExecutor executor,
       @NotNull final EndpointsType endpoints, @NotNull final N start, @NotNull final N end) {
-    final Operation<?> operation = getHigherPrecisionOperation(start.getClass(), end.getClass());
-    return range(executor, endpoints, start, end,
-        (N) getOperation(start.getClass()).convert((operation.compare(start, end) <= 0) ? 1 : -1));
+    return iterable(executor, Handlers.range(endpoints, start, end));
   }
 
   @NotNull
   public <N extends Number> PromiseIterable<N> range(@NotNull final ScheduledExecutor executor,
       @NotNull final EndpointsType endpoints, @NotNull final N start, @NotNull final N end,
       @NotNull final N increment) {
-    return iterable(executor, new NumberRangeObserver<N>(endpoints, start, end, increment));
+    return iterable(executor, Handlers.range(endpoints, start, end, increment));
   }
 
   @NotNull
   public <O extends Comparable<? super O>> PromiseIterable<O> range(
       @NotNull final ScheduledExecutor executor, @NotNull final EndpointsType endpoints,
       @NotNull final O start, @NotNull final O end, @NotNull final Mapper<O, O> increment) {
-    return iterable(executor, new RangeObserver<O>(endpoints, start, end, increment));
+    return iterable(executor, Handlers.range(endpoints, start, end, increment));
   }
 
   @NotNull
   public <N extends Number> PromiseIterable<N> range(@NotNull final ScheduledExecutor executor,
       @NotNull final N start, @NotNull final N end) {
-    return range(executor, DEFAULT_ENDPOINTS, start, end);
+    return iterable(executor, Handlers.range(start, end));
   }
 
   @NotNull
   public <N extends Number> PromiseIterable<N> range(@NotNull final ScheduledExecutor executor,
       @NotNull final N start, @NotNull final N end, @NotNull final N increment) {
-    return range(executor, DEFAULT_ENDPOINTS, start, end, increment);
+    return iterable(executor, Handlers.range(start, end, increment));
   }
 
   @NotNull
   public <O extends Comparable<? super O>> PromiseIterable<O> range(
       @NotNull final ScheduledExecutor executor, @NotNull final O start, @NotNull final O end,
       @NotNull final Mapper<O, O> increment) {
-    return range(executor, DEFAULT_ENDPOINTS, start, end, increment);
+    return iterable(executor, Handlers.range(start, end, increment));
   }
 
   @NotNull
@@ -472,13 +443,13 @@ public class Bond implements Serializable {
   @NotNull
   public <O> PromiseIterable<O> sequence(@NotNull final O start, final long size,
       @NotNull final SequenceIncrement<O> next) {
-    return iterable(new SequenceObserver<O>(start, size, next));
+    return iterable(Handlers.sequence(start, size, next));
   }
 
   @NotNull
   public <O> PromiseIterable<O> sequence(@NotNull final ScheduledExecutor executor,
       @NotNull final O start, final long size, @NotNull final SequenceIncrement<O> next) {
-    return iterable(new SequenceObserver<O>(start, size, next));
+    return iterable(executor, Handlers.sequence(start, size, next));
   }
 
   @NotNull
@@ -537,37 +508,6 @@ public class Bond implements Serializable {
     }
 
     return proxy;
-  }
-
-  public interface ObserverFive<I1, I2, I3, I4, I5> {
-
-    void accept(I1 input1, I2 input2, I3 input3, I4 input4, I5 input5) throws Exception;
-  }
-
-  public interface ObserverFour<I1, I2, I3, I4> {
-
-    void accept(I1 input1, I2 input2, I3 input3, I4 input4) throws Exception;
-  }
-
-  public interface ObserverThree<I1, I2, I3> {
-
-    void accept(I1 input1, I2 input2, I3 input3) throws Exception;
-  }
-
-  public interface ObserverTwo<I1, I2> {
-
-    void accept(I1 input1, I2 input2) throws Exception;
-  }
-
-  public interface PromiseFunction<O> {
-
-    Object CALLBACK = new Object();
-
-    @NotNull
-    Promise<O> call(@NotNull Object... params);
-
-    @NotNull
-    Promise<O> callAsync(@NotNull ScheduledExecutor executor, @NotNull Object... params);
   }
 
   private static class APlusMapper implements Mapper<Promise<?>, Promise<?>>, Serializable {
@@ -657,6 +597,79 @@ public class Bond implements Serializable {
     }
   }
 
+  private static class DefaultPromisedObject implements PromisifiedObject, Serializable {
+
+    private final Bond mBond;
+
+    private final ScheduledExecutor mExecutor;
+
+    private final CallbackMapper mMapper;
+
+    private final Object mTarget;
+
+    private final Class<?> mTargetClass;
+
+    DefaultPromisedObject(@NotNull final Bond bond, @NotNull final ScheduledExecutor executor,
+        final Object target, @NotNull final Class<?> targetClass,
+        @NotNull final CallbackMapper mapper) {
+      mExecutor = ConstantConditions.notNull("executor", executor);
+      mTargetClass = ConstantConditions.notNull("class", targetClass);
+      mMapper = ConstantConditions.notNull("mapper", mapper);
+      mTarget = target;
+      mBond = bond;
+    }
+
+    @NotNull
+    public <O> PromiseIterable<O> iterable(@NotNull final Method method,
+        @Nullable final Object... params) {
+      return mBond.iterable(mExecutor,
+          PromisifiedObservers.<O>iterableObserver(mTarget, method, params, mMapper));
+    }
+
+    @NotNull
+    public <O> PromiseIterable<O> iterable(@NotNull final String name,
+        @Nullable final Object... params) {
+      return mBond.iterable(mExecutor,
+          PromisifiedObservers.<O>iterableObserver(mTarget, mTargetClass, name, params, mMapper));
+    }
+
+    @NotNull
+    public <O> Promise<O> promise(@NotNull final Method method, @Nullable final Object... params) {
+      return mBond.promise(mExecutor,
+          PromisifiedObservers.<O>observer(mTarget, method, params, mMapper));
+    }
+
+    @NotNull
+    public <O> Promise<O> promise(@NotNull final String name, @Nullable final Object... params) {
+      return mBond.promise(mExecutor,
+          PromisifiedObservers.<O>observer(mTarget, mTargetClass, name, params, mMapper));
+    }
+
+    private Object writeReplace() throws ObjectStreamException {
+      return new ObjectProxy(mBond, mExecutor, mTarget, mTargetClass, mMapper);
+    }
+
+    private static class ObjectProxy extends SerializableProxy {
+
+      private ObjectProxy(final Bond bond, final ScheduledExecutor executor, final Object target,
+          final Class<?> targetClass, final CallbackMapper mapper) {
+        super(bond, executor, target, targetClass, mapper);
+      }
+
+      @SuppressWarnings("unchecked")
+      Object readResolve() throws ObjectStreamException {
+        try {
+          final Object[] args = deserializeArgs();
+          return new DefaultPromisedObject((Bond) args[0], (ScheduledExecutor) args[1], args[2],
+              (Class<?>) args[3], (CallbackMapper) args[4]);
+
+        } catch (final Throwable t) {
+          throw new InvalidObjectException(t.getMessage());
+        }
+      }
+    }
+  }
+
   private static class IterableObserver<O> implements Observer<CallbackIterable<O>>, Serializable {
 
     private final Promise<? extends Iterable<O>> mPromise;
@@ -668,6 +681,18 @@ public class Bond implements Serializable {
     public void accept(final CallbackIterable<O> callback) {
       callback.addAllDeferred(mPromise);
       callback.resolve();
+    }
+  }
+
+  private static class NoMapper extends SimpleCallbackMapper implements Serializable {
+
+    public boolean canMapCallback(@NotNull final Class<?> type) {
+      return false;
+    }
+
+    public Object mapCallback(@NotNull final Class<?> type,
+        @NotNull final Callback<Object> callback) {
+      return null;
     }
   }
 
@@ -710,263 +735,6 @@ public class Bond implements Serializable {
       }
 
       callback.resolve();
-    }
-  }
-
-  private class DefaultPromiseFunction<O> implements PromiseFunction<O>, Serializable {
-
-    private final Mapper<Callback<O>, Object> mMapper;
-
-    private final Method mMethod;
-
-    private final Object mTarget;
-
-    private DefaultPromiseFunction(final Object target, @NotNull final Method method,
-        @NotNull final Mapper<Callback<O>, Object> mapper) {
-      mMethod = ConstantConditions.notNull("method", method);
-      mMapper = ConstantConditions.notNull("mapper", mapper);
-      mTarget = target;
-    }
-
-    @NotNull
-    public Promise<O> call(@NotNull final Object... params) {
-      return promise(new FunctionObserver(params));
-    }
-
-    // TODO: 07/08/2017 proxy
-
-    private class FunctionObserver implements Observer<Callback<O>>, Serializable {
-
-      private final Object[] mParams;
-
-      private FunctionObserver(@NotNull final Object... params) {
-        validateParams(params, mMethod.getParameterTypes().length);
-        mParams = params.clone();
-      }
-
-      public void accept(final Callback<O> callback) throws Exception {
-        mMethod.invoke(mTarget, replaceParams(mParams, mMapper, callback));
-      }
-    }
-
-    @NotNull
-    public Promise<O> callAsync(@NotNull final ScheduledExecutor executor,
-        @NotNull final Object... params) {
-      return promise(executor, new FunctionObserver(params));
-    }
-  }
-
-  private class DefaultPromiseFunctionFive<I1, I2, I3, I4, I5, O>
-      implements PromiseFunction<O>, Serializable {
-
-    private final Mapper<Callback<O>, Object> mMapper;
-
-    private final ObserverFive<I1, I2, I3, I4, I5> mMethod;
-
-    private DefaultPromiseFunctionFive(@NotNull final ObserverFive<I1, I2, I3, I4, I5> method,
-        @NotNull final Mapper<Callback<O>, Object> mapper) {
-      mMethod = ConstantConditions.notNull("method", method);
-      mMapper = ConstantConditions.notNull("mapper", mapper);
-    }
-
-    // TODO: 07/08/2017 proxy
-
-    private class FunctionObserver implements Observer<Callback<O>>, Serializable {
-
-      private final Object[] mParams;
-
-      private FunctionObserver(@NotNull final Object... params) {
-        validateParams(params, 4);
-        mParams = params.clone();
-      }
-
-      @SuppressWarnings("unchecked")
-      public void accept(final Callback<O> callback) throws Exception {
-        final Object[] params = replaceParams(mParams, mMapper, callback);
-        mMethod.accept((I1) params[0], (I2) params[1], (I3) params[2], (I4) params[3],
-            (I5) params[4]);
-      }
-    }
-
-    @NotNull
-    public Promise<O> call(@NotNull final Object... params) {
-      return promise(new FunctionObserver(params));
-    }
-
-    @NotNull
-    public Promise<O> callAsync(@NotNull final ScheduledExecutor executor,
-        @NotNull final Object... params) {
-      return promise(executor, new FunctionObserver(params));
-    }
-  }
-
-  private class DefaultPromiseFunctionFour<I1, I2, I3, I4, O>
-      implements PromiseFunction<O>, Serializable {
-
-    private final Mapper<Callback<O>, Object> mMapper;
-
-    private final ObserverFour<I1, I2, I3, I4> mMethod;
-
-    private DefaultPromiseFunctionFour(@NotNull final ObserverFour<I1, I2, I3, I4> method,
-        @NotNull final Mapper<Callback<O>, Object> mapper) {
-      mMethod = ConstantConditions.notNull("method", method);
-      mMapper = ConstantConditions.notNull("mapper", mapper);
-    }
-
-    // TODO: 07/08/2017 proxy
-
-    private class FunctionObserver implements Observer<Callback<O>>, Serializable {
-
-      private final Object[] mParams;
-
-      private FunctionObserver(@NotNull final Object... params) {
-        validateParams(params, 4);
-        mParams = params.clone();
-      }
-
-      @SuppressWarnings("unchecked")
-      public void accept(final Callback<O> callback) throws Exception {
-        final Object[] params = replaceParams(mParams, mMapper, callback);
-        mMethod.accept((I1) params[0], (I2) params[1], (I3) params[2], (I4) params[3]);
-      }
-    }
-
-    @NotNull
-    public Promise<O> call(@NotNull final Object... params) {
-      return promise(new FunctionObserver(params));
-    }
-
-    @NotNull
-    public Promise<O> callAsync(@NotNull final ScheduledExecutor executor,
-        @NotNull final Object... params) {
-      return promise(executor, new FunctionObserver(params));
-    }
-  }
-
-  private class DefaultPromiseFunctionOne<I, O> implements PromiseFunction<O>, Serializable {
-
-    private final Mapper<Callback<O>, Object> mMapper;
-
-    private final Observer<I> mMethod;
-
-    private DefaultPromiseFunctionOne(@NotNull final Observer<I> method,
-        @NotNull final Mapper<Callback<O>, Object> mapper) {
-      mMethod = ConstantConditions.notNull("method", method);
-      mMapper = ConstantConditions.notNull("mapper", mapper);
-    }
-
-    // TODO: 07/08/2017 proxy
-
-    private class FunctionObserver implements Observer<Callback<O>>, Serializable {
-
-      private final Object[] mParams;
-
-      private FunctionObserver(@NotNull final Object... params) {
-        validateParams(params, 1);
-        mParams = params.clone();
-      }
-
-      @SuppressWarnings("unchecked")
-      public void accept(final Callback<O> callback) throws Exception {
-        final Object[] params = replaceParams(mParams, mMapper, callback);
-        mMethod.accept((I) params[0]);
-      }
-    }
-
-    @NotNull
-    public Promise<O> call(@NotNull final Object... params) {
-      return promise(new FunctionObserver(params));
-    }
-
-    @NotNull
-    public Promise<O> callAsync(@NotNull final ScheduledExecutor executor,
-        @NotNull final Object... params) {
-      return promise(executor, new FunctionObserver(params));
-    }
-  }
-
-  private class DefaultPromiseFunctionThree<I1, I2, I3, O>
-      implements PromiseFunction<O>, Serializable {
-
-    private final Mapper<Callback<O>, Object> mMapper;
-
-    private final ObserverThree<I1, I2, I3> mMethod;
-
-    private DefaultPromiseFunctionThree(@NotNull final ObserverThree<I1, I2, I3> method,
-        @NotNull final Mapper<Callback<O>, Object> mapper) {
-      mMethod = ConstantConditions.notNull("method", method);
-      mMapper = ConstantConditions.notNull("mapper", mapper);
-    }
-
-    // TODO: 07/08/2017 proxy
-
-    private class FunctionObserver implements Observer<Callback<O>>, Serializable {
-
-      private final Object[] mParams;
-
-      private FunctionObserver(@NotNull final Object... params) {
-        validateParams(params, 3);
-        mParams = params.clone();
-      }
-
-      @SuppressWarnings("unchecked")
-      public void accept(final Callback<O> callback) throws Exception {
-        final Object[] params = replaceParams(mParams, mMapper, callback);
-        mMethod.accept((I1) params[0], (I2) params[1], (I3) params[2]);
-      }
-    }
-
-    @NotNull
-    public Promise<O> call(@NotNull final Object... params) {
-      return promise(new FunctionObserver(params));
-    }
-
-    @NotNull
-    public Promise<O> callAsync(@NotNull final ScheduledExecutor executor,
-        @NotNull final Object... params) {
-      return promise(executor, new FunctionObserver(params));
-    }
-  }
-
-  private class DefaultPromiseFunctionTwo<I1, I2, O> implements PromiseFunction<O>, Serializable {
-
-    private final Mapper<Callback<O>, Object> mMapper;
-
-    private final ObserverTwo<I1, I2> mMethod;
-
-    private DefaultPromiseFunctionTwo(@NotNull final ObserverTwo<I1, I2> method,
-        @NotNull final Mapper<Callback<O>, Object> mapper) {
-      mMethod = ConstantConditions.notNull("method", method);
-      mMapper = ConstantConditions.notNull("mapper", mapper);
-    }
-
-    // TODO: 07/08/2017 proxy
-
-    private class FunctionObserver implements Observer<Callback<O>>, Serializable {
-
-      private final Object[] mParams;
-
-      private FunctionObserver(@NotNull final Object... params) {
-        validateParams(params, 2);
-        mParams = params.clone();
-      }
-
-      @SuppressWarnings("unchecked")
-      public void accept(final Callback<O> callback) throws Exception {
-        final Object[] params = replaceParams(mParams, mMapper, callback);
-        mMethod.accept((I1) params[0], (I2) params[1]);
-      }
-    }
-
-    @NotNull
-    public Promise<O> call(@NotNull final Object... params) {
-      return promise(new FunctionObserver(params));
-    }
-
-    @NotNull
-    public Promise<O> callAsync(@NotNull final ScheduledExecutor executor,
-        @NotNull final Object... params) {
-      return promise(executor, new FunctionObserver(params));
     }
   }
 }

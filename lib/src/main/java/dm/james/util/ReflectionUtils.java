@@ -20,8 +20,10 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 import java.lang.reflect.Constructor;
+import java.lang.reflect.Method;
 import java.security.AccessController;
 import java.security.PrivilegedAction;
+import java.util.HashMap;
 
 /**
  * Created by davide-maestroni on 07/18/2017.
@@ -32,6 +34,19 @@ public class ReflectionUtils {
    * Constant defining an empty argument array for methods or constructors.
    */
   public static final Object[] NO_ARGS = new Object[0];
+
+  private static final HashMap<Class<?>, Class<?>> sBoxingClasses =
+      new HashMap<Class<?>, Class<?>>(9) {{
+        put(boolean.class, Boolean.class);
+        put(byte.class, Byte.class);
+        put(char.class, Character.class);
+        put(double.class, Double.class);
+        put(float.class, Float.class);
+        put(int.class, Integer.class);
+        put(long.class, Long.class);
+        put(short.class, Short.class);
+        put(void.class, Void.class);
+      }};
 
   private ReflectionUtils() {
   }
@@ -45,6 +60,23 @@ public class ReflectionUtils {
   @NotNull
   public static Object[] asArgs(@Nullable final Object... args) {
     return (args != null) ? args : NO_ARGS;
+  }
+
+  /**
+   * Returns the class boxing the specified primitive type.
+   * <p>
+   * If the passed class does not represent a primitive type, the same class is returned.
+   *
+   * @param type the primitive type.
+   * @return the boxing class.
+   */
+  @NotNull
+  public static Class<?> boxingClass(@NotNull final Class<?> type) {
+    if (!type.isPrimitive()) {
+      return type;
+    }
+
+    return sBoxingClasses.get(type);
   }
 
   /**
@@ -107,6 +139,21 @@ public class ReflectionUtils {
   }
 
   /**
+   * Makes the specified method accessible.
+   *
+   * @param method the method instance.
+   * @return the method.
+   */
+  @NotNull
+  public static Method makeAccessible(@NotNull final Method method) {
+    if (!method.isAccessible()) {
+      AccessController.doPrivileged(new SetAccessibleMethodAction(method));
+    }
+
+    return method;
+  }
+
+  /**
    * Makes the specified constructor accessible.
    *
    * @param constructor the constructor instance.
@@ -139,6 +186,28 @@ public class ReflectionUtils {
 
     public Void run() {
       mmConstructor.setAccessible(true);
+      return null;
+    }
+  }
+
+  /**
+   * Privileged action used to grant accessibility to a method.
+   */
+  private static class SetAccessibleMethodAction implements PrivilegedAction<Void> {
+
+    private final Method mMethod;
+
+    /**
+     * Constructor.
+     *
+     * @param method the method instance.
+     */
+    private SetAccessibleMethodAction(@NotNull final Method method) {
+      mMethod = method;
+    }
+
+    public Void run() {
+      mMethod.setAccessible(true);
       return null;
     }
   }

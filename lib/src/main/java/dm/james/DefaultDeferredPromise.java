@@ -83,13 +83,37 @@ class DefaultDeferredPromise<I, O> implements DeferredPromise<I, O> {
   }
 
   @NotNull
+  public <R> DeferredPromise<I, R> then(@NotNull final Handler<O, R> handler) {
+    return newInstance(mPromise.then(handler));
+  }
+
+  @NotNull
+  public <R> DeferredPromise<I, R> then(
+      @Nullable final HandlerObserver<O, ? super Callback<R>> resolve,
+      @Nullable final HandlerObserver<Throwable, ? super Callback<R>> reject) {
+    return newInstance(mPromise.then(resolve, reject));
+  }
+
+  @NotNull
   public <R> DeferredPromise<I, R> then(@NotNull final Mapper<O, R> mapper) {
     return newInstance(mPromise.then(mapper));
   }
 
   @NotNull
-  public <R> DeferredPromise<I, R> then(@NotNull final Handler<O, R> handler) {
-    return newInstance(mPromise.then(handler));
+  public <R> DeferredPromise<I, R> thenTry(@NotNull final Handler<O, R> handler) {
+    return newInstance(mPromise.thenTry(handler));
+  }
+
+  @NotNull
+  public <R> DeferredPromise<I, R> thenTry(
+      @Nullable final HandlerObserver<O, ? super Callback<R>> resolve,
+      @Nullable final HandlerObserver<Throwable, ? super Callback<R>> reject) {
+    return newInstance(mPromise.thenTry(resolve, reject));
+  }
+
+  @NotNull
+  public <R> DeferredPromise<I, R> thenTry(@NotNull final Mapper<O, R> mapper) {
+    return newInstance(mPromise.thenTry(mapper));
   }
 
   @NotNull
@@ -127,23 +151,23 @@ class DefaultDeferredPromise<I, O> implements DeferredPromise<I, O> {
     return mPromise.get(timeout, timeUnit);
   }
 
-  @Nullable
-  public RejectionException getError() {
-    return mPromise.getError();
-  }
-
-  @Nullable
-  public RejectionException getError(final long timeout, @NotNull final TimeUnit timeUnit) {
-    return mPromise.getError(timeout, timeUnit);
-  }
-
-  public RejectionException getErrorOr(final RejectionException other, final long timeout,
-      @NotNull final TimeUnit timeUnit) {
-    return mPromise.getErrorOr(other, timeout, timeUnit);
-  }
-
   public O getOr(final O other, final long timeout, @NotNull final TimeUnit timeUnit) {
     return mPromise.getOr(other, timeout, timeUnit);
+  }
+
+  @Nullable
+  public RejectionException getReason() {
+    return mPromise.getReason();
+  }
+
+  @Nullable
+  public RejectionException getReason(final long timeout, @NotNull final TimeUnit timeUnit) {
+    return mPromise.getReason(timeout, timeUnit);
+  }
+
+  public RejectionException getReasonOr(final RejectionException other, final long timeout,
+      @NotNull final TimeUnit timeUnit) {
+    return mPromise.getReasonOr(other, timeout, timeUnit);
   }
 
   public boolean isBound() {
@@ -164,12 +188,6 @@ class DefaultDeferredPromise<I, O> implements DeferredPromise<I, O> {
 
   public boolean isResolved() {
     return mPromise.isResolved();
-  }
-
-  @NotNull
-  public <R> Promise<R> then(@Nullable final ObserverHandler<O, ? super Callback<R>> resolve,
-      @Nullable final ObserverHandler<Throwable, ? super Callback<R>> reject) {
-    return newInstance(mPromise.then(resolve, reject));
   }
 
   public void waitResolved() {

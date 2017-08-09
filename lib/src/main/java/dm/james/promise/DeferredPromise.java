@@ -17,6 +17,7 @@
 package dm.james.promise;
 
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 
 /**
  * Created by davide-maestroni on 07/19/2017.
@@ -30,10 +31,24 @@ public interface DeferredPromise<I, O> extends Promise<O>, Resolvable<I> {
   DeferredPromise<I, O> catchAny(@NotNull Mapper<Throwable, O> mapper);
 
   @NotNull
+  <R> DeferredPromise<I, R> then(@NotNull Handler<O, R> handler);
+
+  @NotNull
+  <R> DeferredPromise<I, R> then(@Nullable HandlerObserver<O, ? super Callback<R>> resolve,
+      @Nullable HandlerObserver<Throwable, ? super Callback<R>> reject);
+
+  @NotNull
   <R> DeferredPromise<I, R> then(@NotNull Mapper<O, R> mapper);
 
   @NotNull
-  <R> DeferredPromise<I, R> then(@NotNull Handler<O, R> handler);
+  <R> DeferredPromise<I, R> thenTry(@NotNull Handler<O, R> handler);
+
+  @NotNull
+  <R> DeferredPromise<I, R> thenTry(@Nullable HandlerObserver<O, ? super Callback<R>> resolve,
+      @Nullable HandlerObserver<Throwable, ? super Callback<R>> reject);
+
+  @NotNull
+  <R> DeferredPromise<I, R> thenTry(@NotNull Mapper<O, R> mapper);
 
   @NotNull
   DeferredPromise<I, O> whenFulfilled(@NotNull Observer<O> observer);
