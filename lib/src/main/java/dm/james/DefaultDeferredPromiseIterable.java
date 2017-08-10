@@ -45,7 +45,7 @@ import dm.james.promise.RejectionException;
 import dm.james.promise.ResolvableIterable;
 import dm.james.util.ConstantConditions;
 import dm.james.util.SerializableProxy;
-import dm.james.util.SimpleQueue;
+import dm.james.util.DoubleQueue;
 
 /**
  * Created by davide-maestroni on 08/01/2017.
@@ -673,7 +673,7 @@ class DefaultDeferredPromiseIterable<I, O> implements DeferredPromiseIterable<I,
 
   private static class StateExecutor extends SyncExecutor {
 
-    private final SimpleQueue<Runnable> mCommands = new SimpleQueue<Runnable>();
+    private final DoubleQueue<Runnable> mCommands = new DoubleQueue<Runnable>();
 
     private final Object mMutex;
 
@@ -703,7 +703,7 @@ class DefaultDeferredPromiseIterable<I, O> implements DeferredPromiseIterable<I,
     @Nullable
     private Runnable getCommand() {
       synchronized (mMutex) {
-        final SimpleQueue<Runnable> commands = mCommands;
+        final DoubleQueue<Runnable> commands = mCommands;
         if (!commands.isEmpty()) {
           return commands.removeFirst();
         }
@@ -766,7 +766,7 @@ class DefaultDeferredPromiseIterable<I, O> implements DeferredPromiseIterable<I,
 
     private class StatePending implements Observer<CallbackIterable<I>>, ResolvableIterable<I> {
 
-      private final SimpleQueue<I> mOutputs = new SimpleQueue<I>();
+      private final DoubleQueue<I> mOutputs = new DoubleQueue<I>();
 
       public void accept(final CallbackIterable<I> callback) {
         mExecutor.execute(new Runnable() {
@@ -798,7 +798,7 @@ class DefaultDeferredPromiseIterable<I, O> implements DeferredPromiseIterable<I,
         mExecutor.execute(new Runnable() {
 
           public void run() {
-            @SuppressWarnings("UnnecessaryLocalVariable") final SimpleQueue<I> outputs = mOutputs;
+            @SuppressWarnings("UnnecessaryLocalVariable") final DoubleQueue<I> outputs = mOutputs;
             for (final I input : inputs) {
               outputs.add(input);
             }

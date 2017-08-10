@@ -39,7 +39,7 @@ import java.util.Queue;
  *
  * @param <E> the element type.
  */
-public class SimpleQueue<E> extends AbstractCollection<E> implements Queue<E> {
+public class DoubleQueue<E> extends AbstractCollection<E> implements Queue<E> {
 
   private static final int DEFAULT_SIZE = 1 << 3;
 
@@ -56,7 +56,7 @@ public class SimpleQueue<E> extends AbstractCollection<E> implements Queue<E> {
   /**
    * Constructor.
    */
-  public SimpleQueue() {
+  public DoubleQueue() {
     mData = new Object[DEFAULT_SIZE];
     mMask = DEFAULT_SIZE - 1;
   }
@@ -67,7 +67,7 @@ public class SimpleQueue<E> extends AbstractCollection<E> implements Queue<E> {
    * @param minCapacity the minimum capacity.
    * @throws IllegalArgumentException if the specified capacity is less than 1.
    */
-  public SimpleQueue(final int minCapacity) {
+  public DoubleQueue(final int minCapacity) {
     final int msb =
         Integer.highestOneBit(ConstantConditions.positive("minimum capacity", minCapacity));
     final int initialCapacity = (minCapacity == msb) ? msb : msb << 1;
@@ -123,7 +123,7 @@ public class SimpleQueue<E> extends AbstractCollection<E> implements Queue<E> {
   @NotNull
   @Override
   public Iterator<E> iterator() {
-    return new SimpleQueueIterator<E>(this);
+    return new DoubleQueueIterator<E>(this);
   }
 
   @Override
@@ -443,9 +443,9 @@ public class SimpleQueue<E> extends AbstractCollection<E> implements Queue<E> {
   /**
    * Queue iterator implementation.
    */
-  private static class SimpleQueueIterator<E> implements Iterator<E> {
+  private static class DoubleQueueIterator<E> implements Iterator<E> {
 
-    private final SimpleQueue<E> mQueue;
+    private final DoubleQueue<E> mQueue;
 
     private boolean mIsRemoved;
 
@@ -458,7 +458,7 @@ public class SimpleQueue<E> extends AbstractCollection<E> implements Queue<E> {
     /**
      * Constructor.
      */
-    private SimpleQueueIterator(@NotNull final SimpleQueue<E> queue) {
+    private DoubleQueueIterator(@NotNull final DoubleQueue<E> queue) {
       mQueue = queue;
       mPointer = (mOriginalFirst = queue.mFirst);
       mOriginalLast = queue.mLast;
@@ -476,7 +476,7 @@ public class SimpleQueue<E> extends AbstractCollection<E> implements Queue<E> {
         throw new NoSuchElementException();
       }
 
-      final SimpleQueue<E> queue = mQueue;
+      final DoubleQueue<E> queue = mQueue;
       if ((queue.mFirst != mOriginalFirst) || (queue.mLast != originalLast)) {
         throw new ConcurrentModificationException();
       }
@@ -497,7 +497,7 @@ public class SimpleQueue<E> extends AbstractCollection<E> implements Queue<E> {
         throw new IllegalStateException();
       }
 
-      final SimpleQueue<E> queue = mQueue;
+      final DoubleQueue<E> queue = mQueue;
       if ((queue.mFirst != originalFirst) || (queue.mLast != mOriginalLast)) {
         throw new ConcurrentModificationException();
       }

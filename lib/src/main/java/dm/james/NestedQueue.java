@@ -21,7 +21,7 @@ import org.jetbrains.annotations.Nullable;
 
 import java.util.Collection;
 
-import dm.james.util.SimpleQueue;
+import dm.james.util.DoubleQueue;
 
 /**
  * Implementation of a nested queue ensuring that data are returned in the same order as they are
@@ -35,7 +35,7 @@ class NestedQueue<E> {
 
   private boolean mClosed;
 
-  private SimpleQueue<Object> mQueue = new SimpleQueue<Object>();
+  private DoubleQueue<Object> mQueue = new DoubleQueue<Object>();
 
   private QueueManager<E> mQueueManager;
 
@@ -237,16 +237,16 @@ class NestedQueue<E> {
    *
    * @param <E> the element type.
    */
-  private static class ReadOnlyQueue<E> extends SimpleQueue<E> {
+  private static class ReadOnlyQueue<E> extends DoubleQueue<E> {
 
-    private final SimpleQueue<E> mQueue;
+    private final DoubleQueue<E> mQueue;
 
     /**
      * Constructor.
      *
      * @param wrapped the wrapped queue.
      */
-    private ReadOnlyQueue(@NotNull final SimpleQueue<E> wrapped) {
+    private ReadOnlyQueue(@NotNull final DoubleQueue<E> wrapped) {
       mQueue = wrapped;
     }
 
@@ -306,7 +306,7 @@ class NestedQueue<E> {
         return false;
       }
 
-      final SimpleQueue<Object> queue = mQueue;
+      final DoubleQueue<Object> queue = mQueue;
       for (final Object element : queue) {
         if (element instanceof InnerNestedQueue) {
           if (!((InnerNestedQueue) element).isClosed()) {
@@ -320,7 +320,7 @@ class NestedQueue<E> {
 
     @SuppressWarnings("unchecked")
     public boolean isEmpty() {
-      final SimpleQueue<Object> queue = mQueue;
+      final DoubleQueue<Object> queue = mQueue;
       while (!queue.isEmpty()) {
         final Object element = queue.peekFirst();
         if (element instanceof InnerNestedQueue) {
@@ -342,7 +342,7 @@ class NestedQueue<E> {
 
     @SuppressWarnings("unchecked")
     public E removeFirst() {
-      final SimpleQueue<Object> queue = mQueue;
+      final DoubleQueue<Object> queue = mQueue;
       while (true) {
         final Object element = queue.peekFirst();
         if (element instanceof InnerNestedQueue) {
@@ -366,7 +366,7 @@ class NestedQueue<E> {
 
     @SuppressWarnings("unchecked")
     public void transferTo(@NotNull final Collection<? super E> collection) {
-      final SimpleQueue<Object> queue = mQueue;
+      final DoubleQueue<Object> queue = mQueue;
       while (!queue.isEmpty()) {
         final Object element = queue.peekFirst();
         if (element instanceof InnerNestedQueue) {
@@ -390,7 +390,7 @@ class NestedQueue<E> {
       int i = destPos;
       int result = 0;
       final int length = dst.length;
-      final SimpleQueue<Object> queue = mQueue;
+      final DoubleQueue<Object> queue = mQueue;
       while (!queue.isEmpty()) {
         final Object element = queue.peekFirst();
         if (element instanceof InnerNestedQueue) {
@@ -442,7 +442,7 @@ class NestedQueue<E> {
 
     @SuppressWarnings("unchecked")
     public void transferTo(@NotNull final Collection<? super E> collection) {
-      ((SimpleQueue<E>) mQueue).transferTo(collection);
+      ((DoubleQueue<E>) mQueue).transferTo(collection);
     }
 
     public <T> int transferTo(@NotNull final T[] dst, final int destPos) {

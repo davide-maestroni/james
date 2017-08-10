@@ -27,15 +27,15 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.Assert.fail;
 
 /**
- * Simple queue unit tests.
+ * Double queue unit tests.
  * <p>
  * Created by davide-maestroni on 10/01/2014.
  */
-public class SimpleQueueTest {
+public class DoubleQueueTest {
 
   @Test
   public void testAdd() {
-    final SimpleQueue<Integer> queue = new SimpleQueue<Integer>();
+    final DoubleQueue<Integer> queue = new DoubleQueue<Integer>();
     for (int i = 0; i < 77; i++) {
       queue.add(i);
     }
@@ -72,7 +72,7 @@ public class SimpleQueueTest {
 
   @Test
   public void testAddFirst() {
-    final SimpleQueue<Integer> queue = new SimpleQueue<Integer>();
+    final DoubleQueue<Integer> queue = new DoubleQueue<Integer>();
     for (int i = 0; i < 77; i++) {
       queue.addFirst(i);
     }
@@ -109,7 +109,7 @@ public class SimpleQueueTest {
 
   @Test
   public void testClear() {
-    final SimpleQueue<Integer> queue = new SimpleQueue<Integer>(10);
+    final DoubleQueue<Integer> queue = new DoubleQueue<Integer>(10);
     for (int i = 0; i < 77; i++) {
       queue.add(i);
     }
@@ -126,7 +126,7 @@ public class SimpleQueueTest {
 
   @Test
   public void testCollection() {
-    final SimpleQueue<Integer> queue = new SimpleQueue<Integer>();
+    final DoubleQueue<Integer> queue = new DoubleQueue<Integer>();
     assertThat(queue.poll()).isNull();
     assertThat(queue.peek()).isNull();
 
@@ -162,7 +162,7 @@ public class SimpleQueueTest {
 
   @Test
   public void testIterator() {
-    final SimpleQueue<Integer> queue = new SimpleQueue<Integer>();
+    final DoubleQueue<Integer> queue = new DoubleQueue<Integer>();
     for (int i = 0; i < 7; i++) {
       queue.add(i);
     }
@@ -194,7 +194,7 @@ public class SimpleQueueTest {
 
   @Test
   public void testIteratorError() {
-    final SimpleQueue<Integer> queue = new SimpleQueue<Integer>();
+    final DoubleQueue<Integer> queue = new DoubleQueue<Integer>();
     for (int i = 0; i < 7; i++) {
       queue.add(i);
     }
@@ -226,7 +226,7 @@ public class SimpleQueueTest {
 
   @Test
   public void testIteratorError1() {
-    final SimpleQueue<Integer> queue = new SimpleQueue<Integer>();
+    final DoubleQueue<Integer> queue = new DoubleQueue<Integer>();
     queue.add(0);
 
     final Iterator<Integer> iterator = queue.iterator();
@@ -249,7 +249,7 @@ public class SimpleQueueTest {
 
   @Test
   public void testIteratorError2() {
-    final SimpleQueue<Integer> queue = new SimpleQueue<Integer>();
+    final DoubleQueue<Integer> queue = new DoubleQueue<Integer>();
     for (int i = 0; i < 7; i++) {
       queue.add(i);
     }
@@ -280,7 +280,7 @@ public class SimpleQueueTest {
 
   @Test
   public void testIteratorRemove1() {
-    final SimpleQueue<Integer> queue = new SimpleQueue<Integer>();
+    final DoubleQueue<Integer> queue = new DoubleQueue<Integer>();
     for (int i = 0; i < 7; i++) {
       queue.add(i);
     }
@@ -307,7 +307,7 @@ public class SimpleQueueTest {
 
   @Test
   public void testIteratorRemove2() {
-    final SimpleQueue<Integer> queue = new SimpleQueue<Integer>();
+    final DoubleQueue<Integer> queue = new DoubleQueue<Integer>();
     for (int i = 0; i < 2; i++) {
       queue.add(0);
       queue.removeFirst();
@@ -338,7 +338,7 @@ public class SimpleQueueTest {
 
   @Test
   public void testIteratorRemove3() {
-    final SimpleQueue<Integer> queue = new SimpleQueue<Integer>();
+    final DoubleQueue<Integer> queue = new DoubleQueue<Integer>();
     for (int i = 0; i < 7; i++) {
       queue.add(0);
       queue.removeFirst();
@@ -369,7 +369,7 @@ public class SimpleQueueTest {
 
   @Test
   public void testPeekAllError() {
-    final SimpleQueue<Integer> queue = new SimpleQueue<Integer>();
+    final DoubleQueue<Integer> queue = new DoubleQueue<Integer>();
     for (int i = 0; i < 7; i++) {
       queue.add(i);
     }
@@ -389,7 +389,7 @@ public class SimpleQueueTest {
 
   @Test
   public void testPeekClearError() {
-    final SimpleQueue<Integer> queue = new SimpleQueue<Integer>();
+    final DoubleQueue<Integer> queue = new DoubleQueue<Integer>();
     for (int i = 0; i < 7; i++) {
       queue.add(i);
     }
@@ -405,7 +405,7 @@ public class SimpleQueueTest {
 
   @Test
   public void testPeekEmptyError() {
-    final SimpleQueue<Integer> queue = new SimpleQueue<Integer>();
+    final DoubleQueue<Integer> queue = new DoubleQueue<Integer>();
     try {
       queue.peekFirst();
       fail();
@@ -416,7 +416,7 @@ public class SimpleQueueTest {
 
   @Test
   public void testRemoveAllError() {
-    final SimpleQueue<Integer> queue = new SimpleQueue<Integer>();
+    final DoubleQueue<Integer> queue = new DoubleQueue<Integer>();
     for (int i = 0; i < 7; i++) {
       queue.add(i);
     }
@@ -437,7 +437,7 @@ public class SimpleQueueTest {
 
   @Test
   public void testRemoveAllError1() {
-    final SimpleQueue<Integer> queue = new SimpleQueue<Integer>();
+    final DoubleQueue<Integer> queue = new DoubleQueue<Integer>();
     for (int i = 0; i < 7; i++) {
       queue.add(i);
     }
@@ -458,7 +458,7 @@ public class SimpleQueueTest {
 
   @Test
   public void testRemoveClearError() {
-    final SimpleQueue<Integer> queue = new SimpleQueue<Integer>();
+    final DoubleQueue<Integer> queue = new DoubleQueue<Integer>();
     for (int i = 0; i < 7; i++) {
       queue.add(i);
     }
@@ -474,7 +474,7 @@ public class SimpleQueueTest {
 
   @Test
   public void testRemoveClearError1() {
-    final SimpleQueue<Integer> queue = new SimpleQueue<Integer>();
+    final DoubleQueue<Integer> queue = new DoubleQueue<Integer>();
     for (int i = 0; i < 7; i++) {
       queue.add(i);
     }
@@ -490,7 +490,7 @@ public class SimpleQueueTest {
 
   @Test
   public void testRemoveEmptyError() {
-    final SimpleQueue<Integer> queue = new SimpleQueue<Integer>();
+    final DoubleQueue<Integer> queue = new DoubleQueue<Integer>();
     try {
       queue.removeFirst();
       fail();
@@ -501,7 +501,7 @@ public class SimpleQueueTest {
 
   @Test
   public void testRemoveEmptyError1() {
-    final SimpleQueue<Integer> queue = new SimpleQueue<Integer>();
+    final DoubleQueue<Integer> queue = new DoubleQueue<Integer>();
     try {
       queue.removeLast();
       fail();
@@ -512,7 +512,7 @@ public class SimpleQueueTest {
 
   @Test
   public void testRemoveLast() {
-    final SimpleQueue<Integer> queue = new SimpleQueue<Integer>();
+    final DoubleQueue<Integer> queue = new DoubleQueue<Integer>();
     for (int i = 0; i < 77; i++) {
       queue.add(i);
     }
@@ -528,7 +528,7 @@ public class SimpleQueueTest {
 
   @Test
   public void testSize() {
-    final SimpleQueue<Integer> queue = new SimpleQueue<Integer>();
+    final DoubleQueue<Integer> queue = new DoubleQueue<Integer>();
     for (int i = 0; i < 77; i++) {
       queue.add(i);
     }
@@ -549,7 +549,7 @@ public class SimpleQueueTest {
 
   @Test
   public void testToArray() {
-    final SimpleQueue<Integer> queue = new SimpleQueue<Integer>();
+    final DoubleQueue<Integer> queue = new DoubleQueue<Integer>();
     for (int i = 0; i < 7; i++) {
       queue.add(i);
     }
@@ -569,7 +569,7 @@ public class SimpleQueueTest {
 
   @Test
   public void testToArray2() {
-    final SimpleQueue<Integer> queue = new SimpleQueue<Integer>();
+    final DoubleQueue<Integer> queue = new DoubleQueue<Integer>();
     for (int i = 0; i < 4; i++) {
       queue.add(0);
       queue.removeFirst();
@@ -593,7 +593,7 @@ public class SimpleQueueTest {
 
   @Test
   public void testTransferToArray() {
-    final SimpleQueue<Integer> queue = new SimpleQueue<Integer>();
+    final DoubleQueue<Integer> queue = new DoubleQueue<Integer>();
     for (int i = 0; i < 7; i++) {
       queue.add(i);
     }
@@ -613,7 +613,7 @@ public class SimpleQueueTest {
 
   @Test
   public void testTransferToCollection() {
-    final SimpleQueue<Integer> queue = new SimpleQueue<Integer>();
+    final DoubleQueue<Integer> queue = new DoubleQueue<Integer>();
     for (int i = 0; i < 7; i++) {
       queue.add(i);
     }
@@ -634,7 +634,7 @@ public class SimpleQueueTest {
 
   @Test
   public void testTransferToCollection1() {
-    final SimpleQueue<Integer> queue = new SimpleQueue<Integer>();
+    final DoubleQueue<Integer> queue = new DoubleQueue<Integer>();
     for (int i = 0; i < 7; i++) {
       queue.add(i);
     }
@@ -645,7 +645,7 @@ public class SimpleQueueTest {
       assertThat(queue.removeFirst()).isEqualTo(i);
     }
 
-    final SimpleQueue<Integer> other = new SimpleQueue<Integer>();
+    final DoubleQueue<Integer> other = new DoubleQueue<Integer>();
     queue.transferTo(other);
     assertThat(queue.isEmpty()).isTrue();
     int i = 3;

@@ -111,6 +111,6 @@ public interface Promise<O> extends Serializable {
 
   interface HandlerObserver<I, C> {
 
-    void accept(I input, C callback);
+    void accept(I input, C callback) throws Exception;
   }
 }

@@ -26,7 +26,7 @@ import java.util.concurrent.TimeUnit;
 
 import dm.james.util.ConstantConditions;
 import dm.james.util.SerializableProxy;
-import dm.james.util.SimpleQueue;
+import dm.james.util.DoubleQueue;
 import dm.james.util.WeakIdentityHashMap;
 
 /**
@@ -50,7 +50,7 @@ class ThrottlingExecutor extends ScheduledExecutorDecorator implements Serializa
 
   private final Object mMutex = new Object();
 
-  private final SimpleQueue<PendingCommand> mQueue = new SimpleQueue<PendingCommand>();
+  private final DoubleQueue<PendingCommand> mQueue = new DoubleQueue<PendingCommand>();
 
   private int mRunningCount;
 
@@ -84,7 +84,7 @@ class ThrottlingExecutor extends ScheduledExecutorDecorator implements Serializa
   public void execute(@NotNull final Runnable command) {
     final ThrottlingCommand throttlingCommand;
     synchronized (mMutex) {
-      final SimpleQueue<PendingCommand> queue = mQueue;
+      final DoubleQueue<PendingCommand> queue = mQueue;
       if ((mRunningCount + queue.size()) >= mMaxRunning) {
         queue.add(new PendingCommand(command, 0, TimeUnit.MILLISECONDS));
         return;
@@ -101,7 +101,7 @@ class ThrottlingExecutor extends ScheduledExecutorDecorator implements Serializa
       @NotNull final TimeUnit timeUnit) {
     final ThrottlingCommand throttlingCommand;
     synchronized (mMutex) {
-      final SimpleQueue<PendingCommand> queue = mQueue;
+      final DoubleQueue<PendingCommand> queue = mQueue;
       if ((mRunningCount + queue.size()) >= mMaxRunning) {
         queue.add(new PendingCommand(command, delay, timeUnit));
         return;
@@ -210,7 +210,7 @@ class ThrottlingExecutor extends ScheduledExecutorDecorator implements Serializa
 
     public void run() {
       final Runnable command = mCommand;
-      final SimpleQueue<PendingCommand> queue = mQueue;
+      final DoubleQueue<PendingCommand> queue = mQueue;
       synchronized (mMutex) {
         if (mRunningCount >= mMaxRunning) {
           queue.addFirst(new PendingCommand(command, 0, TimeUnit.MILLISECONDS));
