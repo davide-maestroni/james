@@ -84,6 +84,7 @@ class BackoffHandler<I> implements StatefulHandler<I, I, BackoffInputs<I>>, Seri
 
   public BackoffInputs<I> reject(final BackoffInputs<I> state, final Throwable reason,
       @NotNull final CallbackIterable<I> callback) throws Exception {
+    applyBackoff(state);
     final List<I> inputs = state.resetInputs();
     mExecutor.execute(new Runnable() {
 

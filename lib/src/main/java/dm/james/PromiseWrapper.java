@@ -98,13 +98,8 @@ abstract class PromiseWrapper<O> implements Promise<O>, Serializable {
   }
 
   @NotNull
-  public <R> Promise<R> then(@NotNull final Handler<O, R> handler) {
-    return newInstance(mPromise.then(handler));
-  }
-
-  @NotNull
-  public <R> Promise<R> then(@Nullable final HandlerObserver<O, ? super Callback<R>> fulfill,
-      @Nullable final HandlerObserver<Throwable, ? super Callback<R>> reject) {
+  public <R> Promise<R> then(@Nullable final Handler<O, ? super Callback<R>> fulfill,
+      @Nullable final Handler<Throwable, ? super Callback<R>> reject) {
     return newInstance(mPromise.then(fulfill, reject));
   }
 
@@ -114,14 +109,9 @@ abstract class PromiseWrapper<O> implements Promise<O>, Serializable {
   }
 
   @NotNull
-  public <R> Promise<R> thenTry(@NotNull final Handler<O, R> handler) {
-    return newInstance(mPromise.thenTry(handler));
-  }
-
-  @NotNull
-  public <R> Promise<R> thenTry(@Nullable final HandlerObserver<O, ? super Callback<R>> resolve,
-      @Nullable final HandlerObserver<Throwable, ? super Callback<R>> reject) {
-    return newInstance(mPromise.thenTry(resolve, reject));
+  public <R> Promise<R> thenTry(@Nullable final Handler<O, ? super Callback<R>> fulfill,
+      @Nullable final Handler<Throwable, ? super Callback<R>> reject) {
+    return newInstance(mPromise.thenTry(fulfill, reject));
   }
 
   @NotNull

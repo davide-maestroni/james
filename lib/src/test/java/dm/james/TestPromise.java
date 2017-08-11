@@ -163,8 +163,8 @@ public class TestPromise {
         callback.resolve("test");
       }
     })
-                         .then(Handlers.<String>scheduleOn(
-                             withDelay(defaultExecutor(), 100, TimeUnit.MILLISECONDS)))
+                         .then(Handlers.<String>fulfillOn(
+                             withDelay(defaultExecutor(), 100, TimeUnit.MILLISECONDS)), null)
                          .get()).isEqualTo("test");
   }
 

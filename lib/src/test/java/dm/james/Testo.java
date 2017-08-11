@@ -16,9 +16,6 @@
 
 package dm.james;
 
-import org.jetbrains.annotations.NotNull;
-import org.jetbrains.annotations.Nullable;
-
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -26,7 +23,6 @@ import java.io.InputStream;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.util.Random;
-import java.util.concurrent.TimeUnit;
 
 import dm.james.executor.ScheduledExecutor;
 import dm.james.executor.ScheduledExecutors;
@@ -36,7 +32,6 @@ import dm.james.promise.Mapper;
 import dm.james.promise.Observer;
 import dm.james.promise.Promise;
 import dm.james.promise.Promise.Callback;
-import dm.james.promise.Promise.Handler;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -66,93 +61,6 @@ public class Testo {
         return input.toUpperCase();
       }
     });
-  }
-
-  @org.junit.Test
-  public void test0() {
-    final String test = new Bond().promise(new Observer<Callback<String>>() {
-
-      public void accept(final Callback<String> callback) {
-        callback.resolve("test");
-      }
-    }).then(new Mapper<String, String>() {
-
-      public String apply(final String input) {
-        return input.toUpperCase();
-      }
-    }).then(new Handler<String, String>() {
-
-      public void reject(@Nullable final Throwable reason,
-          @NotNull final Callback<String> callback) {
-        ScheduledExecutors.defaultExecutor().execute(new Runnable() {
-
-          public void run() {
-            callback.reject(reason);
-          }
-        });
-      }
-
-      public void resolve(final String input, @NotNull final Callback<String> callback) {
-        ScheduledExecutors.defaultExecutor().execute(new Runnable() {
-
-          public void run() {
-            callback.resolve(input);
-          }
-        }, 100, TimeUnit.MILLISECONDS);
-      }
-    }).get(1, TimeUnit.SECONDS);
-    assertThat(test).isEqualTo("TEST");
-  }
-
-  @org.junit.Test
-  public void test1() {
-    final String test = new Bond().promise(new Observer<Callback<String>>() {
-
-      public void accept(final Callback<String> callback) {
-        callback.resolve("test");
-      }
-    }).then(new Handler<String, String>() {
-
-      public void resolve(final String input, @NotNull final Callback<String> callback) {
-        ScheduledExecutors.defaultExecutor().execute(new Runnable() {
-
-          public void run() {
-            callback.resolve(input);
-          }
-        });
-      }
-
-      public void reject(@Nullable final Throwable reason,
-          @NotNull final Callback<String> callback) {
-        ScheduledExecutors.defaultExecutor().execute(new Runnable() {
-
-          public void run() {
-            callback.reject(reason);
-          }
-        });
-      }
-    }).then(new Mapper<String, String>() {
-
-      public String apply(final String input) {
-        return input.toUpperCase();
-      }
-    }).apply(new Mapper<Promise<String>, Promise<String>>() {
-
-      public Promise<String> apply(final Promise<String> promise) {
-        return new Bond().promise(new Observer<Callback<String>>() {
-
-          public void accept(final Callback<String> callback) throws Exception {
-            callback.defer(promise.then(new Mapper<String, String>() {
-
-              public String apply(final String input) {
-                return input + "_suffix";
-              }
-            }));
-          }
-        });
-      }
-    }).get(1, TimeUnit.SECONDS);
-    assertThat(test).isEqualTo("TEST_suffix");
   }
 
   @org.junit.Test

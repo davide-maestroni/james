@@ -61,21 +61,15 @@ public interface Promise<O> extends Serializable {
   boolean isResolved();
 
   @NotNull
-  <R> Promise<R> then(@NotNull Handler<O, R> handler);
-
-  @NotNull
-  <R> Promise<R> then(@Nullable HandlerObserver<O, ? super Callback<R>> fulfill,
-      @Nullable HandlerObserver<Throwable, ? super Callback<R>> reject);
+  <R> Promise<R> then(@Nullable Handler<O, ? super Callback<R>> fulfill,
+      @Nullable Handler<Throwable, ? super Callback<R>> reject);
 
   @NotNull
   <R> Promise<R> then(@NotNull Mapper<O, R> mapper);
 
   @NotNull
-  <R> Promise<R> thenTry(@NotNull Handler<O, R> handler);
-
-  @NotNull
-  <R> Promise<R> thenTry(@Nullable HandlerObserver<O, ? super Callback<R>> resolve,
-      @Nullable HandlerObserver<Throwable, ? super Callback<R>> reject);
+  <R> Promise<R> thenTry(@Nullable Handler<O, ? super Callback<R>> fulfill,
+      @Nullable Handler<Throwable, ? super Callback<R>> reject);
 
   @NotNull
   <R> Promise<R> thenTry(@NotNull Mapper<O, R> mapper);
@@ -102,14 +96,7 @@ public interface Promise<O> extends Serializable {
     void resolve(O output);
   }
 
-  interface Handler<I, O> {
-
-    void reject(Throwable reason, @NotNull Callback<O> callback) throws Exception;
-
-    void resolve(I input, @NotNull Callback<O> callback) throws Exception;
-  }
-
-  interface HandlerObserver<I, C> {
+  interface Handler<I, C> {
 
     void accept(I input, C callback) throws Exception;
   }

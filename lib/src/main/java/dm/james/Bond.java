@@ -39,9 +39,9 @@ import dm.james.promise.Mapper;
 import dm.james.promise.Observer;
 import dm.james.promise.Promise;
 import dm.james.promise.Promise.Callback;
+import dm.james.promise.Promise.Handler;
 import dm.james.promise.PromiseIterable;
 import dm.james.promise.PromiseIterable.CallbackIterable;
-import dm.james.promise.PromiseIterable.StatelessHandler;
 import dm.james.reflect.CallbackMapper;
 import dm.james.reflect.PromisifiedObject;
 import dm.james.reflect.SimpleCallbackMapper;
@@ -91,7 +91,7 @@ public class Bond implements Serializable {
 
   @NotNull
   public <O> PromiseIterable<O> all(@NotNull final Iterable<? extends Promise<?>> promises) {
-    return this.<O>resolvedIterable(null).allSorted(new PromisesHandler<O>(promises));
+    return this.<O>resolvedIterable(null).allSorted(new PromisesHandler<O>(promises), null);
   }
 
   @NotNull
@@ -102,8 +102,8 @@ public class Bond implements Serializable {
   @NotNull
   public <O> PromiseIterable<O> all(@NotNull final ScheduledExecutor executor,
       @NotNull final Iterable<? extends Promise<?>> promises) {
-    return this.<O>resolvedIterable(null).all(Handlers.<Iterable<O>>scheduleOn(executor))
-                                         .allSorted(new PromisesHandler<O>(promises));
+    return this.<O>resolvedIterable(null).then(null, null, Handlers.<O>resolveOn(executor))
+                                         .allSorted(new PromisesHandler<O>(promises), null);
   }
 
   @NotNull
@@ -521,7 +521,8 @@ public class Bond implements Serializable {
   }
 
   private static class PromisesHandler<O>
-      implements StatelessHandler<Iterable<O>, O>, Observer<CallbackIterable<O>>, Serializable {
+      implements Handler<Iterable<O>, CallbackIterable<O>>, Observer<CallbackIterable<O>>,
+      Serializable {
 
     private final Iterable<? extends Promise<?>> mPromises;
 
@@ -529,12 +530,9 @@ public class Bond implements Serializable {
       mPromises = ConstantConditions.notNull("promises", promises);
     }
 
-    public void reject(final Throwable reason, @NotNull final CallbackIterable<O> callback) {
-      callback.reject(reason);
-    }
-
     @SuppressWarnings("unchecked")
-    public void resolve(final Iterable<O> input, @NotNull final CallbackIterable<O> callback) {
+    public void accept(final Iterable<O> input, final CallbackIterable<O> callback) throws
+        Exception {
       for (final Promise<?> promise : mPromises) {
         if (promise instanceof PromiseIterable) {
           callback.addAllDeferred((PromiseIterable<O>) promise);

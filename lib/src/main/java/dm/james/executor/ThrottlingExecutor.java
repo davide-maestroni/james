@@ -25,8 +25,8 @@ import java.lang.ref.WeakReference;
 import java.util.concurrent.TimeUnit;
 
 import dm.james.util.ConstantConditions;
-import dm.james.util.SerializableProxy;
 import dm.james.util.DoubleQueue;
+import dm.james.util.SerializableProxy;
 import dm.james.util.WeakIdentityHashMap;
 
 /**

@@ -35,92 +35,55 @@ public interface DeferredPromiseIterable<I, O>
   DeferredPromiseIterable<I, O> addedRejection(Throwable reason);
 
   @NotNull
-  <R> DeferredPromiseIterable<I, R> all(@NotNull Handler<Iterable<O>, Iterable<R>> handler);
-
-  @NotNull
   <R> DeferredPromiseIterable<I, R> all(
-      @Nullable HandlerObserver<Iterable<O>, ? super CallbackIterable<R>> resolve,
-      @Nullable HandlerObserver<Throwable, ? super CallbackIterable<R>> reject);
+      @Nullable Handler<Iterable<O>, ? super CallbackIterable<R>> fulfill,
+      @Nullable Handler<Throwable, ? super CallbackIterable<R>> reject);
 
   @NotNull
   <R> DeferredPromiseIterable<I, R> all(@NotNull Mapper<Iterable<O>, Iterable<R>> mapper);
 
   @NotNull
-  <R> DeferredPromiseIterable<I, R> all(@NotNull StatelessHandler<Iterable<O>, R> handler);
-
-  @NotNull
   <R> DeferredPromiseIterable<I, R> allSorted(
-      @Nullable HandlerObserver<Iterable<O>, ? super CallbackIterable<R>> resolve,
-      @Nullable HandlerObserver<Throwable, ? super CallbackIterable<R>> reject);
-
-  @NotNull
-  <R> DeferredPromiseIterable<I, R> allSorted(@NotNull StatelessHandler<Iterable<O>, R> handler);
-
-  @NotNull
-  <R> DeferredPromiseIterable<I, R> allTry(@NotNull Handler<Iterable<O>, Iterable<R>> handler);
+      @Nullable Handler<Iterable<O>, ? super CallbackIterable<R>> fulfill,
+      @Nullable Handler<Throwable, ? super CallbackIterable<R>> reject);
 
   @NotNull
   <R> DeferredPromiseIterable<I, R> allTry(
-      @Nullable HandlerObserver<Iterable<O>, ? super CallbackIterable<R>> resolve,
-      @Nullable HandlerObserver<Throwable, ? super CallbackIterable<R>> reject);
+      @Nullable Handler<Iterable<O>, ? super CallbackIterable<R>> fulfill,
+      @Nullable Handler<Throwable, ? super CallbackIterable<R>> reject);
 
   @NotNull
   <R> DeferredPromiseIterable<I, R> allTry(@NotNull Mapper<Iterable<O>, Iterable<R>> mapper);
 
   @NotNull
-  <R> DeferredPromiseIterable<I, R> allTry(@NotNull StatelessHandler<Iterable<O>, R> handler);
-
-  @NotNull
   <R> DeferredPromiseIterable<I, R> allTrySorted(
-      @Nullable HandlerObserver<Iterable<O>, ? super CallbackIterable<R>> resolve,
-      @Nullable HandlerObserver<Throwable, ? super CallbackIterable<R>> reject);
+      @Nullable Handler<Iterable<O>, ? super CallbackIterable<R>> fulfill,
+      @Nullable Handler<Throwable, ? super CallbackIterable<R>> reject);
 
   @NotNull
-  <R> DeferredPromiseIterable<I, R> allTrySorted(@NotNull StatelessHandler<Iterable<O>, R> handler);
-
-  @NotNull
-  <R> DeferredPromiseIterable<I, R> any(@NotNull Handler<O, R> handler);
-
-  @NotNull
-  <R> DeferredPromiseIterable<I, R> any(
-      @Nullable HandlerObserver<O, ? super CallbackIterable<R>> resolve,
-      @Nullable HandlerObserver<Throwable, ? super CallbackIterable<R>> reject);
+  <R> DeferredPromiseIterable<I, R> any(@Nullable Handler<O, ? super CallbackIterable<R>> fulfill,
+      @Nullable Handler<Throwable, ? super CallbackIterable<R>> reject);
 
   @NotNull
   <R> DeferredPromiseIterable<I, R> any(@NotNull Mapper<O, R> mapper);
 
   @NotNull
-  <R> DeferredPromiseIterable<I, R> any(@NotNull StatelessHandler<O, R> handler);
-
-  @NotNull
   <R> DeferredPromiseIterable<I, R> anySorted(
-      @Nullable HandlerObserver<O, ? super CallbackIterable<R>> resolve,
-      @Nullable HandlerObserver<Throwable, ? super CallbackIterable<R>> reject);
-
-  @NotNull
-  <R> DeferredPromiseIterable<I, R> anySorted(@NotNull StatelessHandler<O, R> handler);
-
-  @NotNull
-  <R> DeferredPromiseIterable<I, R> anyTry(@NotNull Handler<O, R> handler);
+      @Nullable Handler<O, ? super CallbackIterable<R>> fulfill,
+      @Nullable Handler<Throwable, ? super CallbackIterable<R>> reject);
 
   @NotNull
   <R> DeferredPromiseIterable<I, R> anyTry(
-      @Nullable HandlerObserver<O, ? super CallbackIterable<R>> resolve,
-      @Nullable HandlerObserver<Throwable, ? super CallbackIterable<R>> reject);
+      @Nullable Handler<O, ? super CallbackIterable<R>> fulfill,
+      @Nullable Handler<Throwable, ? super CallbackIterable<R>> reject);
 
   @NotNull
   <R> DeferredPromiseIterable<I, R> anyTry(@NotNull Mapper<O, R> mapper);
 
   @NotNull
-  <R> DeferredPromiseIterable<I, R> anyTry(@NotNull StatelessHandler<O, R> handler);
-
-  @NotNull
   <R> DeferredPromiseIterable<I, R> anyTrySorted(
-      @Nullable HandlerObserver<O, ? super CallbackIterable<R>> resolve,
-      @Nullable HandlerObserver<Throwable, ? super CallbackIterable<R>> reject);
-
-  @NotNull
-  <R> DeferredPromiseIterable<I, R> anyTrySorted(@NotNull StatelessHandler<O, R> handler);
+      @Nullable Handler<O, ? super CallbackIterable<R>> fulfill,
+      @Nullable Handler<Throwable, ? super CallbackIterable<R>> reject);
 
   @NotNull
   <R> DeferredPromiseIterable<I, R> applyAll(
@@ -157,12 +120,8 @@ public interface DeferredPromiseIterable<I, O>
   DeferredPromiseIterable<I, O> catchEach(@NotNull Mapper<Throwable, O> mapper, int maxBatchSize);
 
   @NotNull
-  <R> DeferredPromiseIterable<I, R> each(@NotNull Handler<O, R> handler);
-
-  @NotNull
-  <R> DeferredPromiseIterable<I, R> each(
-      @Nullable HandlerObserver<O, ? super CallbackIterable<R>> resolve,
-      @Nullable HandlerObserver<Throwable, ? super CallbackIterable<R>> reject);
+  <R> DeferredPromiseIterable<I, R> each(@Nullable Handler<O, ? super CallbackIterable<R>> fulfill,
+      @Nullable Handler<Throwable, ? super CallbackIterable<R>> reject);
 
   @NotNull
   <R> DeferredPromiseIterable<I, R> each(int minBatchSize, @NotNull Mapper<O, R> mapper);
@@ -174,26 +133,14 @@ public interface DeferredPromiseIterable<I, O>
   <R> DeferredPromiseIterable<I, R> each(@NotNull Mapper<O, R> mapper, int maxBatchSize);
 
   @NotNull
-  <R> DeferredPromiseIterable<I, R> each(@NotNull StatelessHandler<O, R> handler);
-
-  @NotNull
-  <R> DeferredPromiseIterable<I, R> eachSorted(@NotNull Handler<O, R> handler);
-
-  @NotNull
   <R> DeferredPromiseIterable<I, R> eachSorted(
-      @Nullable HandlerObserver<O, ? super CallbackIterable<R>> resolve,
-      @Nullable HandlerObserver<Throwable, ? super CallbackIterable<R>> reject);
-
-  @NotNull
-  <R> DeferredPromiseIterable<I, R> eachSorted(@NotNull StatelessHandler<O, R> handler);
-
-  @NotNull
-  <R> DeferredPromiseIterable<I, R> eachTry(@NotNull Handler<O, R> handler);
+      @Nullable Handler<O, ? super CallbackIterable<R>> fulfill,
+      @Nullable Handler<Throwable, ? super CallbackIterable<R>> reject);
 
   @NotNull
   <R> DeferredPromiseIterable<I, R> eachTry(
-      @Nullable HandlerObserver<O, ? super CallbackIterable<R>> resolve,
-      @Nullable HandlerObserver<Throwable, ? super CallbackIterable<R>> reject);
+      @Nullable Handler<O, ? super CallbackIterable<R>> fulfill,
+      @Nullable Handler<Throwable, ? super CallbackIterable<R>> reject);
 
   @NotNull
   <R> DeferredPromiseIterable<I, R> eachTry(int minBatchSize, @NotNull Mapper<O, R> mapper);
@@ -205,21 +152,23 @@ public interface DeferredPromiseIterable<I, O>
   <R> DeferredPromiseIterable<I, R> eachTry(@NotNull Mapper<O, R> mapper, int maxBatchSize);
 
   @NotNull
-  <R> DeferredPromiseIterable<I, R> eachTry(@NotNull StatelessHandler<O, R> handler);
-
-  @NotNull
-  <R> DeferredPromiseIterable<I, R> eachTrySorted(@NotNull Handler<O, R> handler);
-
-  @NotNull
   <R> DeferredPromiseIterable<I, R> eachTrySorted(
-      @Nullable HandlerObserver<O, ? super CallbackIterable<R>> resolve,
-      @Nullable HandlerObserver<Throwable, ? super CallbackIterable<R>> reject);
+      @Nullable Handler<O, ? super CallbackIterable<R>> fulfill,
+      @Nullable Handler<Throwable, ? super CallbackIterable<R>> reject);
 
   @NotNull
-  <R> DeferredPromiseIterable<I, R> eachTrySorted(@NotNull StatelessHandler<O, R> handler);
+  <R> DeferredPromiseIterable<I, R> then(@Nullable Handler<O, ? super CallbackIterable<R>> fulfill,
+      @Nullable Handler<Throwable, ? super CallbackIterable<R>> reject,
+      @Nullable Observer<? super CallbackIterable<R>> resolve);
 
   @NotNull
   <R, S> DeferredPromiseIterable<I, R> then(@NotNull StatefulHandler<O, R, S> handler);
+
+  @NotNull
+  <R> DeferredPromiseIterable<I, R> thenSorted(
+      @Nullable Handler<O, ? super CallbackIterable<R>> fulfill,
+      @Nullable Handler<Throwable, ? super CallbackIterable<R>> reject,
+      @Nullable Observer<? super CallbackIterable<R>> resolve);
 
   @NotNull
   <R, S> DeferredPromiseIterable<I, R> thenSorted(@NotNull StatefulHandler<O, R, S> handler);
@@ -240,8 +189,18 @@ public interface DeferredPromiseIterable<I, O>
   DeferredPromiseIterable<I, O> resolved(Iterable<I> inputs);
 
   @NotNull
-  <R> DeferredPromise<Iterable<I>, R> then(@NotNull Handler<Iterable<O>, R> handler);
+  <R> DeferredPromise<Iterable<I>, R> then(
+      @Nullable Handler<Iterable<O>, ? super Callback<R>> fulfill,
+      @Nullable Handler<Throwable, ? super Callback<R>> reject);
 
   @NotNull
   <R> DeferredPromise<Iterable<I>, R> then(@NotNull Mapper<Iterable<O>, R> mapper);
+
+  @NotNull
+  <R> DeferredPromise<Iterable<I>, R> thenTry(
+      @Nullable Handler<Iterable<O>, ? super Callback<R>> fulfill,
+      @Nullable Handler<Throwable, ? super Callback<R>> reject);
+
+  @NotNull
+  <R> DeferredPromise<Iterable<I>, R> thenTry(@NotNull Mapper<Iterable<O>, R> mapper);
 }

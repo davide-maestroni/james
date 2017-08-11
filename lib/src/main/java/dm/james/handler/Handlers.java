@@ -18,8 +18,6 @@ package dm.james.handler;
 
 import org.jetbrains.annotations.NotNull;
 
-import java.io.InvalidObjectException;
-import java.io.ObjectStreamException;
 import java.io.Serializable;
 import java.util.List;
 
@@ -29,14 +27,12 @@ import dm.james.promise.Mapper;
 import dm.james.promise.Observer;
 import dm.james.promise.Promise.Callback;
 import dm.james.promise.Promise.Handler;
-import dm.james.promise.Promise.HandlerObserver;
 import dm.james.promise.PromiseIterable.CallbackIterable;
 import dm.james.promise.PromiseIterable.StatefulHandler;
 import dm.james.range.EndpointsType;
 import dm.james.range.SequenceIncrement;
 import dm.james.util.Backoff;
 import dm.james.util.ConstantConditions;
-import dm.james.util.SerializableProxy;
 
 import static dm.james.math.Numbers.getHigherPrecisionOperation;
 import static dm.james.math.Numbers.getOperation;
@@ -53,6 +49,11 @@ public class Handlers {
    */
   protected Handlers() {
     ConstantConditions.avoid();
+  }
+
+  @NotNull
+  public static <I> Handler<I, Callback<I>> fulfillOn(@NotNull final ScheduledExecutor executor) {
+    return new ScheduleFulfill<I>(executor);
   }
 
   /**
@@ -150,98 +151,15 @@ public class Handlers {
   }
 
   @NotNull
-  public static <I> HandlerObserver<I, Callback<I>> fulfillOn(@NotNull final ScheduledExecutor executor) {
-    return new ScheduleFulfill<I>(executor);
-  }
-
-  @NotNull
-  public static <I> HandlerObserver<Throwable, Callback<I>> rejectOn(@NotNull final ScheduledExecutor executor) {
+  public static <I> Handler<Throwable, Callback<I>> rejectOn(
+      @NotNull final ScheduledExecutor executor) {
     return new ScheduleReject<I>(executor);
   }
 
-  private static class ScheduleFulfill<I> implements HandlerObserver<I, Callback<I>>, Serializable {
-
-    private final ScheduledExecutor mExecutor;
-
-    private ScheduleFulfill(@NotNull final ScheduledExecutor executor) {
-      mExecutor = executor;
-    }
-
-    public void accept(final I input, final Callback<I> callback) throws Exception {
-      mExecutor.execute(new Runnable() {
-
-        public void run() {
-          callback.resolve(input);
-        }
-      });
-    }
-
-    private Object writeReplace() throws ObjectStreamException {
-      return new HandlerProxy(mExecutor);
-    }
-
-    private static class HandlerProxy<I> extends SerializableProxy {
-
-      private HandlerProxy(final ScheduledExecutor executor) {
-        super(executor);
-      }
-
-      @SuppressWarnings("unchecked")
-      Object readResolve() throws ObjectStreamException {
-        try {
-          final Object[] args = deserializeArgs();
-          return new ScheduleFulfill<I>((ScheduledExecutor) args[0]);
-
-        } catch (final Throwable t) {
-          throw new InvalidObjectException(t.getMessage());
-        }
-      }
-    }
-  }
-
-  private static class ScheduleReject<I> implements HandlerObserver<Throwable, Callback<I>>, Serializable {
-
-    private final ScheduledExecutor mExecutor;
-
-    private ScheduleReject(@NotNull final ScheduledExecutor executor) {
-      mExecutor = executor;
-    }
-
-    public void accept(final Throwable input, final Callback<I> callback) throws Exception {
-      mExecutor.execute(new Runnable() {
-
-        public void run() {
-          callback.reject(input);
-        }
-      });
-    }
-
-    private Object writeReplace() throws ObjectStreamException {
-      return new HandlerProxy(mExecutor);
-    }
-
-    private static class HandlerProxy<I> extends SerializableProxy {
-
-      private HandlerProxy(final ScheduledExecutor executor) {
-        super(executor);
-      }
-
-      @SuppressWarnings("unchecked")
-      Object readResolve() throws ObjectStreamException {
-        try {
-          final Object[] args = deserializeArgs();
-          return new ScheduleReject<I>((ScheduledExecutor) args[0]);
-
-        } catch (final Throwable t) {
-          throw new InvalidObjectException(t.getMessage());
-        }
-      }
-    }
-  }
-
   @NotNull
-  public static <I> Handler<I, I> scheduleOn(@NotNull final ScheduledExecutor executor) {
-    return new ScheduleHandler<I>(executor);
+  public static <I> Observer<CallbackIterable<I>> resolveOn(
+      @NotNull final ScheduledExecutor executor) {
+    return new ScheduleResolve<I>(executor);
   }
 
   @NotNull
@@ -277,5 +195,59 @@ public class Handlers {
     int pending();
 
     void retain();
+  }
+
+  private static class ScheduleFulfill<I> implements Handler<I, Callback<I>>, Serializable {
+
+    private final ScheduledExecutor mExecutor;
+
+    private ScheduleFulfill(@NotNull final ScheduledExecutor executor) {
+      mExecutor = executor;
+    }
+
+    public void accept(final I input, final Callback<I> callback) throws Exception {
+      mExecutor.execute(new Runnable() {
+
+        public void run() {
+          callback.resolve(input);
+        }
+      });
+    }
+  }
+
+  private static class ScheduleReject<I> implements Handler<Throwable, Callback<I>>, Serializable {
+
+    private final ScheduledExecutor mExecutor;
+
+    private ScheduleReject(@NotNull final ScheduledExecutor executor) {
+      mExecutor = executor;
+    }
+
+    public void accept(final Throwable input, final Callback<I> callback) throws Exception {
+      mExecutor.execute(new Runnable() {
+
+        public void run() {
+          callback.reject(input);
+        }
+      });
+    }
+  }
+
+  private static class ScheduleResolve<I> implements Observer<CallbackIterable<I>>, Serializable {
+
+    private final ScheduledExecutor mExecutor;
+
+    private ScheduleResolve(@NotNull final ScheduledExecutor executor) {
+      mExecutor = executor;
+    }
+
+    public void accept(final CallbackIterable<I> callback) throws Exception {
+      mExecutor.execute(new Runnable() {
+
+        public void run() {
+          callback.resolve();
+        }
+      });
+    }
   }
 }

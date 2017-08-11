@@ -227,12 +227,16 @@ class DefaultBufferOutputStream extends BufferOutputStream implements Serializab
       final int position = byteBuffer.position();
       if (byteBuffer.hasArray()) {
         read = in.read(byteBuffer.array(), position, Math.min(remaining, limit));
-        byteBuffer.position(position + read);
+        if (read > 0) {
+          byteBuffer.position(position + read);
+        }
 
       } else {
         final byte[] bytes = new byte[Math.min(remaining, limit)];
         read = in.read(bytes);
-        byteBuffer.put(bytes, 0, read);
+        if (read > 0) {
+          byteBuffer.put(bytes, 0, read);
+        }
       }
 
       if (byteBuffer.remaining() == 0) {

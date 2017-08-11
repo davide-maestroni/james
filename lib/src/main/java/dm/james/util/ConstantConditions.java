@@ -96,7 +96,7 @@ public class ConstantConditions {
    * Asserts that the specified object is not null.
    *
    * @param object the object.
-   * @param <T> the object type.
+   * @param <T>    the object type.
    * @return the object.
    * @throws NullPointerException is the object is null.
    */
@@ -110,7 +110,7 @@ public class ConstantConditions {
    *
    * @param name   the name of the parameter used to build the error message.
    * @param object the object.
-   * @param <T> the object type.
+   * @param <T>    the object type.
    * @return the object.
    * @throws NullPointerException is the object is null.
    */
