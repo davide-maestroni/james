@@ -110,7 +110,7 @@ class DynamicScheduledThreadPoolExecutorService extends ScheduledThreadPoolExecu
 
     private ExecutorProxy(final int corePoolSize, final int maximumPoolSize,
         final long keepAliveTime, final TimeUnit keepAliveUnit, final ThreadFactory threadFactory) {
-      super(corePoolSize, maximumPoolSize, keepAliveTime, keepAliveUnit, threadFactory);
+      super(corePoolSize, maximumPoolSize, keepAliveTime, keepAliveUnit, proxy(threadFactory));
     }
 
     @SuppressWarnings("unchecked")

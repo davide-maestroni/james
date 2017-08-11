@@ -18,15 +18,35 @@ package dm.james.log;
 
 import org.jetbrains.annotations.NotNull;
 
+import java.io.ObjectStreamException;
+import java.io.Serializable;
+
 /**
  * Simple log implementation writing messages to the system output.
  * <p>
  * Created by davide-maestroni on 10/03/2014.
  */
-public class SystemLog extends TemplateLog {
+class SystemLog extends TemplateLog implements Serializable {
+
+  private static final SystemLog sInstance = new SystemLog();
+
+  /**
+   * Avoid explicit instantiation.
+   */
+  private SystemLog() {
+  }
+
+  @NotNull
+  static SystemLog instance() {
+    return sInstance;
+  }
 
   @Override
   public void log(@NotNull final String message) {
     System.out.println(message);
+  }
+
+  Object readResolve() throws ObjectStreamException {
+    return sInstance;
   }
 }

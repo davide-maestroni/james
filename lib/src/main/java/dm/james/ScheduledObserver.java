@@ -67,7 +67,7 @@ class ScheduledObserver<O> implements Observer<Callback<O>>, Serializable {
 
     private ObserverProxy(final ScheduledExecutor executor,
         final Observer<? super Callback<O>> observer) {
-      super(executor, observer);
+      super(executor, proxy(observer));
     }
 
     @SuppressWarnings("unchecked")

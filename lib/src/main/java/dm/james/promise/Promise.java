@@ -64,7 +64,7 @@ public interface Promise<O> extends Serializable {
   <R> Promise<R> then(@NotNull Handler<O, R> handler);
 
   @NotNull
-  <R> Promise<R> then(@Nullable HandlerObserver<O, ? super Callback<R>> resolve,
+  <R> Promise<R> then(@Nullable HandlerObserver<O, ? super Callback<R>> fulfill,
       @Nullable HandlerObserver<Throwable, ? super Callback<R>> reject);
 
   @NotNull

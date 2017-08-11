@@ -80,7 +80,7 @@ class SequenceObserver<O> implements Observer<CallbackIterable<O>>, Serializable
   private static class ObserverProxy<O> extends SerializableProxy {
 
     private ObserverProxy(final O start, final long size, final SequenceIncrement<O> next) {
-      super(start, size, next);
+      super(start, size, proxy(next));
     }
 
     @SuppressWarnings("unchecked")

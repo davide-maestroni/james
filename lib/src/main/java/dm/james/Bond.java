@@ -135,17 +135,17 @@ public class Bond implements Serializable {
   }
 
   @NotNull
-  public BufferOutputStream buffer() {
+  public BufferOutputStream bufferStream() {
     return new DefaultBufferOutputStream(this.<Buffer>deferredIterable());
   }
 
   @NotNull
-  public BufferOutputStream buffer(final int coreSize) {
+  public BufferOutputStream bufferStream(final int coreSize) {
     return new DefaultBufferOutputStream(this.<Buffer>deferredIterable(), coreSize);
   }
 
   @NotNull
-  public BufferOutputStream buffer(final int bufferSize, final int poolSize) {
+  public BufferOutputStream bufferStream(final int bufferSize, final int poolSize) {
     return new DefaultBufferOutputStream(this.<Buffer>deferredIterable(), bufferSize, poolSize);
   }
 
@@ -477,7 +477,7 @@ public class Bond implements Serializable {
 
       private ObjectProxy(final Bond bond, final ScheduledExecutor executor, final Object target,
           final Class<?> targetClass, final CallbackMapper mapper) {
-        super(bond, executor, target, targetClass, mapper);
+        super(bond, executor, target, targetClass, proxy(mapper));
       }
 
       @SuppressWarnings("unchecked")

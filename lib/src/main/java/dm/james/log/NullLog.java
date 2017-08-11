@@ -19,6 +19,8 @@ package dm.james.log;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
+import java.io.ObjectStreamException;
+import java.io.Serializable;
 import java.util.List;
 
 /**
@@ -26,10 +28,27 @@ import java.util.List;
  * <p>
  * Created by davide-maestroni on 10/04/2014.
  */
-public class NullLog extends TemplateLog {
+class NullLog extends TemplateLog implements Serializable {
+
+  private static final NullLog sInstance = new NullLog();
+
+  /**
+   * Avoid explicit instantiation.
+   */
+  private NullLog() {
+  }
+
+  @NotNull
+  static NullLog instance() {
+    return sInstance;
+  }
 
   @Override
   protected void log(@NotNull final Level level, @NotNull final List<Object> contexts,
       @Nullable final String message, @Nullable final Throwable throwable) {
+  }
+
+  Object readResolve() throws ObjectStreamException {
+    return sInstance;
   }
 }

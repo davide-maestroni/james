@@ -525,9 +525,9 @@ class DefaultDeferredPromiseIterable<I, O> implements DeferredPromiseIterable<I,
 
   @NotNull
   public <R> DeferredPromise<Iterable<I>, R> then(
-      @Nullable final HandlerObserver<Iterable<O>, ? super Callback<R>> resolve,
+      @Nullable final HandlerObserver<Iterable<O>, ? super Callback<R>> fulfill,
       @Nullable final HandlerObserver<Throwable, ? super Callback<R>> reject) {
-    return new WrappingDeferredPromise<Iterable<I>, R>(this, mPromise.then(resolve, reject));
+    return new WrappingDeferredPromise<Iterable<I>, R>(this, mPromise.then(fulfill, reject));
   }
 
   @NotNull

@@ -326,9 +326,9 @@ class DefaultPromise<O> implements Promise<O> {
   }
 
   @NotNull
-  public <R> Promise<R> then(@Nullable final HandlerObserver<O, ? super Callback<R>> resolve,
+  public <R> Promise<R> then(@Nullable final HandlerObserver<O, ? super Callback<R>> fulfill,
       @Nullable final HandlerObserver<Throwable, ? super Callback<R>> reject) {
-    return then(new HandlerObserve<O, R>(resolve, reject));
+    return then(new HandlerObserve<O, R>(fulfill, reject));
   }
 
   @NotNull
@@ -524,7 +524,7 @@ class DefaultPromise<O> implements Promise<O> {
     private static class ChainProxy<O, R> extends SerializableProxy {
 
       private ChainProxy(final PropagationType propagationType, final Handler<O, R> handler) {
-        super(propagationType, handler);
+        super(propagationType, proxy(handler));
       }
 
       @SuppressWarnings("unchecked")
@@ -785,7 +785,7 @@ class DefaultPromise<O> implements Promise<O> {
     private static class HandlerProxy<O> extends SerializableProxy {
 
       private HandlerProxy(final Mapper<Throwable, O> mapper) {
-        super(mapper);
+        super(proxy(mapper));
       }
 
       @SuppressWarnings("unchecked")
@@ -816,7 +816,7 @@ class DefaultPromise<O> implements Promise<O> {
     private static class HandlerProxy<O> extends SerializableProxy {
 
       private HandlerProxy(final Observer<O> observer) {
-        super(observer);
+        super(proxy(observer));
       }
 
       @SuppressWarnings("unchecked")
@@ -853,7 +853,7 @@ class DefaultPromise<O> implements Promise<O> {
     private static class HandlerProxy<O, R> extends SerializableProxy {
 
       private HandlerProxy(final Mapper<O, R> mapper) {
-        super(mapper);
+        super(proxy(mapper));
       }
 
       @SuppressWarnings("unchecked")
@@ -897,7 +897,7 @@ class DefaultPromise<O> implements Promise<O> {
 
       private HandlerProxy(final HandlerObserver<O, ? super Callback<R>> resolve,
           final HandlerObserver<Throwable, ? super Callback<R>> reject) {
-        super(resolve, reject);
+        super(proxy(resolve), proxy(reject));
       }
 
       @SuppressWarnings("unchecked")
@@ -938,7 +938,7 @@ class DefaultPromise<O> implements Promise<O> {
     private static class HandlerProxy<O> extends SerializableProxy {
 
       private HandlerProxy(final Observer<Throwable> observer) {
-        super(observer);
+        super(proxy(observer));
       }
 
       @SuppressWarnings("unchecked")
@@ -976,7 +976,7 @@ class DefaultPromise<O> implements Promise<O> {
     private static class HandlerProxy<O> extends SerializableProxy {
 
       private HandlerProxy(final Action action) {
-        super(action);
+        super(proxy(action));
       }
 
       @SuppressWarnings("unchecked")
@@ -1024,7 +1024,7 @@ class DefaultPromise<O> implements Promise<O> {
     private static class HandlerProxy<O, R> extends SerializableProxy {
 
       private HandlerProxy(final Handler<O, R> handler, final Log log, final Level level) {
-        super(handler, log, level);
+        super(proxy(handler), log, level);
       }
 
       @SuppressWarnings("unchecked")
@@ -1196,7 +1196,7 @@ class DefaultPromise<O> implements Promise<O> {
     private PromiseProxy(final Observer<? extends Callback<?>> observer,
         final PropagationType propagationType, final Log log, final Level logLevel,
         final List<PromiseChain<?, ?>> chains) {
-      super(observer, propagationType, log, logLevel, chains);
+      super(proxy(observer), propagationType, log, logLevel, chains);
     }
 
     @SuppressWarnings("unchecked")

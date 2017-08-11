@@ -28,7 +28,9 @@ import java.io.ObjectOutputStream;
 import java.util.Random;
 import java.util.concurrent.TimeUnit;
 
+import dm.james.executor.ScheduledExecutor;
 import dm.james.executor.ScheduledExecutors;
+import dm.james.handler.Handlers;
 import dm.james.promise.DeferredPromise;
 import dm.james.promise.Mapper;
 import dm.james.promise.Observer;
@@ -301,6 +303,22 @@ public class Testo {
 
       }
     }).get()).isNotEqualTo(integer);
+  }
+
+  @org.junit.Test
+  public void testS() throws IOException, ClassNotFoundException {
+    final ScheduledExecutor executor = ScheduledExecutors.newPoolExecutor(2);
+    final Promise<String> promise = createPromise().then(Handlers.<String>fulfillOn(executor),
+        Handlers.<String>rejectOn(executor));
+    final ByteArrayOutputStream byteOutputStream = new ByteArrayOutputStream();
+    final ObjectOutputStream objectOutputStream = new ObjectOutputStream(byteOutputStream);
+    objectOutputStream.writeObject(promise);
+    final ByteArrayInputStream byteInputStream =
+        new ByteArrayInputStream(byteOutputStream.toByteArray());
+    final ObjectInputStream objectInputStream = new ObjectInputStream(byteInputStream);
+    @SuppressWarnings("unchecked") final Promise<String> deserialized =
+        (Promise<String>) objectInputStream.readObject();
+    assertThat(deserialized.get()).isEqualTo("TEST");
   }
 
   @org.junit.Test

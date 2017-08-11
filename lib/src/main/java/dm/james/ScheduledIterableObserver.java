@@ -67,7 +67,7 @@ class ScheduledIterableObserver<O> implements Observer<CallbackIterable<O>>, Ser
 
     private ObserverProxy(final ScheduledExecutor executor,
         final Observer<? super CallbackIterable<O>> observer) {
-      super(executor, observer);
+      super(executor, proxy(observer));
     }
 
     @SuppressWarnings("unchecked")

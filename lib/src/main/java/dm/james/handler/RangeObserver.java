@@ -97,7 +97,7 @@ class RangeObserver<O extends Comparable<? super O>>
 
     private ObserverProxy(final EndpointsType endpoints, final O start, final O end,
         final Mapper<O, O> increment) {
-      super(endpoints, start, end, increment);
+      super(endpoints, start, end, proxy(increment));
     }
 
     @SuppressWarnings("unchecked")

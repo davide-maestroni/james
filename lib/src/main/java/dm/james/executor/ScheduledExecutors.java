@@ -183,7 +183,7 @@ public class ScheduledExecutors {
    */
   @NotNull
   public static ScheduledExecutor newPoolExecutor() {
-    return newPoolExecutor((Runtime.getRuntime().availableProcessors() << 1) - 1);
+    return new PoolExecutor();
   }
 
   /**
@@ -195,7 +195,7 @@ public class ScheduledExecutors {
    */
   @NotNull
   public static ScheduledExecutor newPoolExecutor(final int poolSize) {
-    return newStoppableServiceExecutor(Executors.newScheduledThreadPool(poolSize));
+    return new PoolExecutor(poolSize);
   }
 
   /**
@@ -404,6 +404,39 @@ public class ScheduledExecutors {
 
       Object readResolve() throws ObjectStreamException {
         return foregroundExecutor();
+      }
+    }
+  }
+
+  private static class PoolExecutor extends ScheduledExecutorDecorator implements Serializable {
+
+    private final int mPoolSize;
+
+    private PoolExecutor() {
+      super(newStoppableServiceExecutor(
+          Executors.newScheduledThreadPool((Runtime.getRuntime().availableProcessors() << 1) - 1)));
+      mPoolSize = Integer.MIN_VALUE;
+    }
+
+    private PoolExecutor(final int poolSize) {
+      super(newStoppableServiceExecutor(Executors.newScheduledThreadPool(poolSize)));
+      mPoolSize = poolSize;
+    }
+
+    private Object writeReplace() throws ObjectStreamException {
+      return new ExecutorProxy(mPoolSize);
+    }
+
+    private static class ExecutorProxy implements Serializable {
+
+      private final int mPoolSize;
+
+      private ExecutorProxy(final int poolSize) {
+        mPoolSize = poolSize;
+      }
+
+      Object readResolve() throws ObjectStreamException {
+        return (mPoolSize == Integer.MIN_VALUE) ? new PoolExecutor() : new PoolExecutor(mPoolSize);
       }
     }
   }

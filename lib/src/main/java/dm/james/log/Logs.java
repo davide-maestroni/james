@@ -27,10 +27,6 @@ import dm.james.util.ConstantConditions;
  */
 public class Logs {
 
-  private static final NullLog sNullLog = new NullLog();
-
-  private static final SystemLog sSystemLog = new SystemLog();
-
   /**
    * Avoid explicit instantiation.
    */
@@ -44,8 +40,8 @@ public class Logs {
    * @return the shared instance.
    */
   @NotNull
-  public static NullLog nullLog() {
-    return sNullLog;
+  public static Log nullLog() {
+    return NullLog.instance();
   }
 
   /**
@@ -54,7 +50,7 @@ public class Logs {
    * @return the shared instance.
    */
   @NotNull
-  public static SystemLog systemLog() {
-    return sSystemLog;
+  public static Log systemLog() {
+    return SystemLog.instance();
   }
 }

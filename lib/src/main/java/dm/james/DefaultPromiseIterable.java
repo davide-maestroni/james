@@ -48,9 +48,9 @@ import dm.james.promise.PromiseIterable;
 import dm.james.promise.RejectionException;
 import dm.james.promise.TimeoutException;
 import dm.james.util.ConstantConditions;
+import dm.james.util.DoubleQueue;
 import dm.james.util.InterruptedExecutionException;
 import dm.james.util.SerializableProxy;
-import dm.james.util.DoubleQueue;
 import dm.james.util.ThreadUtils;
 import dm.james.util.TimeUtils;
 import dm.james.util.TimeUtils.Condition;
@@ -896,9 +896,9 @@ class DefaultPromiseIterable<O> implements PromiseIterable<O>, Serializable {
 
   @NotNull
   public <R> Promise<R> then(
-      @Nullable final HandlerObserver<Iterable<O>, ? super Callback<R>> resolve,
+      @Nullable final HandlerObserver<Iterable<O>, ? super Callback<R>> fulfill,
       @Nullable final HandlerObserver<Throwable, ? super Callback<R>> reject) {
-    return toPromise().then(resolve, reject);
+    return toPromise().then(fulfill, reject);
   }
 
   @NotNull
@@ -1311,7 +1311,7 @@ class DefaultPromiseIterable<O> implements PromiseIterable<O>, Serializable {
 
       private ChainProxy(final PropagationType propagationType, final Mapper<O, R> outputMapper,
           final Mapper<Throwable, R> errorMapper, final int maxBatchSize) {
-        super(propagationType, outputMapper, errorMapper, maxBatchSize);
+        super(propagationType, proxy(outputMapper), proxy(errorMapper), maxBatchSize);
       }
 
       @SuppressWarnings("unchecked")
@@ -1511,7 +1511,7 @@ class DefaultPromiseIterable<O> implements PromiseIterable<O>, Serializable {
 
       private ChainProxy(final PropagationType propagationType, final Mapper<O, R> outputMapper,
           final Mapper<Throwable, R> errorMapper, final int minBatchSize) {
-        super(propagationType, outputMapper, errorMapper, minBatchSize);
+        super(propagationType, proxy(outputMapper), proxy(errorMapper), minBatchSize);
       }
 
       @SuppressWarnings("unchecked")
@@ -1653,7 +1653,7 @@ class DefaultPromiseIterable<O> implements PromiseIterable<O>, Serializable {
 
       private ChainProxy(final PropagationType propagationType,
           final StatefulHandler<O, R, S> handler) {
-        super(propagationType, handler);
+        super(propagationType, proxy(handler));
       }
 
       @SuppressWarnings("unchecked")
@@ -1872,7 +1872,7 @@ class DefaultPromiseIterable<O> implements PromiseIterable<O>, Serializable {
 
       private ChainProxy(final PropagationType propagationType,
           final StatefulHandler<O, R, S> handler) {
-        super(propagationType, handler);
+        super(propagationType, proxy(handler));
       }
 
       @SuppressWarnings("unchecked")
@@ -2249,7 +2249,7 @@ class DefaultPromiseIterable<O> implements PromiseIterable<O>, Serializable {
 
       private ChainProxy(final PropagationType propagationType,
           final StatelessHandler<O, R> handler) {
-        super(propagationType, handler);
+        super(propagationType, proxy(handler));
       }
 
       @SuppressWarnings("unchecked")
@@ -2586,7 +2586,7 @@ class DefaultPromiseIterable<O> implements PromiseIterable<O>, Serializable {
 
       private ChainProxy(final PropagationType propagationType,
           final StatelessHandler<O, R> handler) {
-        super(propagationType, handler);
+        super(propagationType, proxy(handler));
       }
 
       @SuppressWarnings("unchecked")
@@ -2923,7 +2923,7 @@ class DefaultPromiseIterable<O> implements PromiseIterable<O>, Serializable {
     private static class HandlerProxy<O, R> extends SerializableProxy {
 
       private HandlerProxy(final StatelessHandler<Iterable<O>, R> handler) {
-        super(handler);
+        super(proxy(handler));
       }
 
       @SuppressWarnings("unchecked")
@@ -2975,7 +2975,7 @@ class DefaultPromiseIterable<O> implements PromiseIterable<O>, Serializable {
     private static class HandlerProxy<O, R> extends SerializableProxy {
 
       private HandlerProxy(final StatelessHandler<O, R> handler) {
-        super(handler);
+        super(proxy(handler));
       }
 
       @SuppressWarnings("unchecked")
@@ -3043,7 +3043,7 @@ class DefaultPromiseIterable<O> implements PromiseIterable<O>, Serializable {
 
       private HandlerProxy(final Mapper<Promise<O>, Promise<R>> mapper,
           final PropagationType propagationType, final Log log, final Level logLevel) {
-        super(mapper, propagationType, log, logLevel);
+        super(proxy(mapper), propagationType, log, logLevel);
       }
 
       @SuppressWarnings("unchecked")
@@ -3097,7 +3097,7 @@ class DefaultPromiseIterable<O> implements PromiseIterable<O>, Serializable {
     private static class HandlerProxy<O> extends SerializableProxy {
 
       private HandlerProxy(final Mapper<Throwable, Iterable<O>> mapper) {
-        super(mapper);
+        super(proxy(mapper));
       }
 
       @SuppressWarnings("unchecked")
@@ -3129,7 +3129,7 @@ class DefaultPromiseIterable<O> implements PromiseIterable<O>, Serializable {
     private static class HandlerProxy<O> extends SerializableProxy {
 
       private HandlerProxy(final Observer<Iterable<O>> observer) {
-        super(observer);
+        super(proxy(observer));
       }
 
       @SuppressWarnings("unchecked")
@@ -3168,7 +3168,7 @@ class DefaultPromiseIterable<O> implements PromiseIterable<O>, Serializable {
     private static class HandlerProxy<O> extends SerializableProxy {
 
       private HandlerProxy(final Observer<O> observer) {
-        super(observer);
+        super(proxy(observer));
       }
 
       @SuppressWarnings("unchecked")
@@ -3207,7 +3207,7 @@ class DefaultPromiseIterable<O> implements PromiseIterable<O>, Serializable {
     private static class HandlerProxy<O, R> extends SerializableProxy {
 
       private HandlerProxy(final Mapper<Iterable<O>, Iterable<R>> mapper) {
-        super(mapper);
+        super(proxy(mapper));
       }
 
       @SuppressWarnings("unchecked")
@@ -3246,7 +3246,7 @@ class DefaultPromiseIterable<O> implements PromiseIterable<O>, Serializable {
     private static class HandlerProxy<O, R> extends SerializableProxy {
 
       private HandlerProxy(final Mapper<O, R> mapper) {
-        super(mapper);
+        super(proxy(mapper));
       }
 
       @SuppressWarnings("unchecked")
@@ -3291,7 +3291,7 @@ class DefaultPromiseIterable<O> implements PromiseIterable<O>, Serializable {
 
       private HandlerProxy(final HandlerObserver<O, ? super CallbackIterable<R>> resolve,
           final HandlerObserver<Throwable, ? super CallbackIterable<R>> reject) {
-        super(resolve, reject);
+        super(proxy(resolve), proxy(reject));
       }
 
       @SuppressWarnings("unchecked")
@@ -3334,7 +3334,7 @@ class DefaultPromiseIterable<O> implements PromiseIterable<O>, Serializable {
     private static class HandlerProxy<O> extends SerializableProxy {
 
       private HandlerProxy(final Observer<Throwable> observer) {
-        super(observer);
+        super(proxy(observer));
       }
 
       @SuppressWarnings("unchecked")
@@ -3380,7 +3380,7 @@ class DefaultPromiseIterable<O> implements PromiseIterable<O>, Serializable {
     private static class HandlerProxy<O> extends SerializableProxy {
 
       private HandlerProxy(final Observer<Throwable> observer) {
-        super(observer);
+        super(proxy(observer));
       }
 
       @SuppressWarnings("unchecked")
@@ -3412,7 +3412,7 @@ class DefaultPromiseIterable<O> implements PromiseIterable<O>, Serializable {
     private static class HandlerProxy<O> extends SerializableProxy {
 
       private HandlerProxy(final Action action) {
-        super(action);
+        super(proxy(action));
       }
 
       @SuppressWarnings("unchecked")
@@ -3456,7 +3456,7 @@ class DefaultPromiseIterable<O> implements PromiseIterable<O>, Serializable {
     private static class HandlerProxy<O, R> extends SerializableProxy {
 
       private HandlerProxy(final Handler<O, R> handler) {
-        super(handler);
+        super(proxy(handler));
       }
 
       @SuppressWarnings("unchecked")
@@ -3530,7 +3530,7 @@ class DefaultPromiseIterable<O> implements PromiseIterable<O>, Serializable {
     private static class HandlerProxy<O, R> extends SerializableProxy {
 
       private HandlerProxy(final Handler<Iterable<O>, Iterable<R>> handler) {
-        super(handler);
+        super(proxy(handler));
       }
 
       @SuppressWarnings("unchecked")
@@ -3576,7 +3576,7 @@ class DefaultPromiseIterable<O> implements PromiseIterable<O>, Serializable {
     private static class HandlerProxy<O, R> extends SerializableProxy {
 
       private HandlerProxy(final StatelessHandler<O, R> handler, final Log log, final Level level) {
-        super(handler, log, level);
+        super(proxy(handler), log, level);
       }
 
       @SuppressWarnings("unchecked")
@@ -3673,7 +3673,7 @@ class DefaultPromiseIterable<O> implements PromiseIterable<O>, Serializable {
 
       private HandlerProxy(final StatelessHandler<Iterable<O>, R> handler, final Log log,
           final Level level) {
-        super(handler, log, level);
+        super(proxy(handler), log, level);
       }
 
       @SuppressWarnings("unchecked")
@@ -3808,7 +3808,7 @@ class DefaultPromiseIterable<O> implements PromiseIterable<O>, Serializable {
     private static class MapperProxy<O, R> extends SerializableProxy {
 
       private MapperProxy(final Mapper<O, R> mapper, final Log log, final Level level) {
-        super(mapper, log, level);
+        super(proxy(mapper), log, level);
       }
 
       @SuppressWarnings("unchecked")
@@ -4228,7 +4228,7 @@ class DefaultPromiseIterable<O> implements PromiseIterable<O>, Serializable {
     private PromiseProxy(final Observer<? extends CallbackIterable<?>> observer,
         final PropagationType propagationType, final Log log, final Level logLevel,
         final List<PromiseChain<?, ?>> chains) {
-      super(observer, propagationType, log, logLevel, chains);
+      super(proxy(observer), propagationType, log, logLevel, chains);
     }
 
     @SuppressWarnings("unchecked")

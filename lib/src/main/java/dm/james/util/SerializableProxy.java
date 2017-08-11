@@ -21,30 +21,45 @@ import org.jetbrains.annotations.Nullable;
 
 import java.io.Serializable;
 import java.util.ArrayList;
+import java.util.Collections;
 
 /**
  * Created by davide-maestroni on 07/21/2017.
  */
 public abstract class SerializableProxy implements Serializable {
 
-  private final ArrayList<SerializableObject> mObjects = new ArrayList<SerializableObject>();
+  private final ArrayList<Object> mObjects = new ArrayList<Object>();
 
   public SerializableProxy(@Nullable final Object... args) {
     if (args != null) {
-      final ArrayList<SerializableObject> objects = mObjects;
-      for (final Object arg : args) {
-        objects.add(new SerializableObject(arg));
-      }
+      Collections.addAll(mObjects, args);
     }
   }
 
   @NotNull
+  @SuppressWarnings("unchecked")
+  protected static Serializable proxy(final Object object) {
+    if (object instanceof Serializable) {
+      return (Serializable) object;
+    }
+
+    return new SerializableObject(object);
+  }
+
+  @NotNull
+  @SuppressWarnings("unchecked")
   protected Object[] deserializeArgs() throws Exception {
-    final ArrayList<SerializableObject> objects = mObjects;
+    final ArrayList<Object> objects = mObjects;
     final int size = objects.size();
     final Object[] args = new Object[size];
     for (int i = 0; i < size; ++i) {
-      args[i] = objects.get(i).deserialize();
+      final Object object = objects.get(i);
+      if (object instanceof SerializableObject) {
+        args[i] = ((SerializableObject) object).deserialize();
+
+      } else {
+        args[i] = object;
+      }
     }
 
     return args;
@@ -54,33 +69,13 @@ public abstract class SerializableProxy implements Serializable {
 
     private final Class<?> mClass;
 
-    private final Object mInstance;
-
     private SerializableObject(final Object instance) {
-      if (instance == null) {
-        mInstance = null;
-        mClass = null;
-
-      } else if (instance instanceof Serializable) {
-        mInstance = instance;
-        mClass = null;
-
-      } else {
-        mInstance = null;
-        mClass = instance.getClass();
-      }
+      mClass = (instance != null) ? instance.getClass() : null;
     }
 
     Object deserialize() throws Exception {
-      Object instance = mInstance;
-      if (instance == null) {
-        final Class<?> aClass = mClass;
-        if (aClass != null) {
-          instance = ReflectionUtils.getDefaultConstructor(aClass).newInstance();
-        }
-      }
-
-      return instance;
+      final Class<?> aClass = mClass;
+      return (aClass != null) ? ReflectionUtils.getDefaultConstructor(aClass).newInstance() : null;
     }
   }
 }

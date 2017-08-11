@@ -50,7 +50,7 @@ class CallableObserver<O> implements Observer<Callback<O>>, Serializable {
   private static class ObserverProxy<O> extends SerializableProxy {
 
     private ObserverProxy(final Callable<O> callable) {
-      super(callable);
+      super(proxy(callable));
     }
 
     @SuppressWarnings("unchecked")

@@ -369,6 +369,7 @@ class DefaultBufferOutputStream extends BufferOutputStream implements Serializab
       return byteBuffer;
     }
 
+    // TODO: 10/08/2017 direct??
     return ByteBuffer.allocate(mMaxBufferSize);
   }
 

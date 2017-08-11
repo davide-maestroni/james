@@ -62,9 +62,9 @@ class WrappingDeferredPromise<I, O> implements DeferredPromise<I, O>, Serializab
 
   @NotNull
   public <R> DeferredPromise<I, R> then(
-      @Nullable final HandlerObserver<O, ? super Callback<R>> resolve,
+      @Nullable final HandlerObserver<O, ? super Callback<R>> fulfill,
       @Nullable final HandlerObserver<Throwable, ? super Callback<R>> reject) {
-    return newInstance(mPromise.then(resolve, reject));
+    return newInstance(mPromise.then(fulfill, reject));
   }
 
   @NotNull

@@ -34,7 +34,7 @@ public interface DeferredPromise<I, O> extends Promise<O>, Resolvable<I> {
   <R> DeferredPromise<I, R> then(@NotNull Handler<O, R> handler);
 
   @NotNull
-  <R> DeferredPromise<I, R> then(@Nullable HandlerObserver<O, ? super Callback<R>> resolve,
+  <R> DeferredPromise<I, R> then(@Nullable HandlerObserver<O, ? super Callback<R>> fulfill,
       @Nullable HandlerObserver<Throwable, ? super Callback<R>> reject);
 
   @NotNull

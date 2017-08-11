@@ -19,6 +19,7 @@ package dm.james.log;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
+import java.io.Serializable;
 import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.List;
@@ -37,7 +38,7 @@ import java.util.Locale;
  * Created by davide-maestroni on 10/03/2014.
  */
 @SuppressWarnings("WeakerAccess")
-public abstract class TemplateLog implements Log {
+public abstract class TemplateLog implements Log, Serializable {
 
   private static final String DATE_FORMAT = "MM/dd HH:mm:ss.SSS z";
 
