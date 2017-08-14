@@ -17,7 +17,9 @@
 package dm.james;
 
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InvalidObjectException;
@@ -47,6 +49,8 @@ class DefaultBufferOutputStream extends BufferOutputStream implements Serializab
 
   private static final int DEFAULT_POOL_SIZE = 16;
 
+  private final AllocationType mAllocation;
+
   private final int mCorePoolSize;
 
   private final DeferredPromiseIterable<Buffer, Buffer> mIterable;
@@ -61,13 +65,15 @@ class DefaultBufferOutputStream extends BufferOutputStream implements Serializab
 
   private boolean mIsClosed;
 
-  DefaultBufferOutputStream(@NotNull final DeferredPromiseIterable<Buffer, Buffer> iterable) {
-    this(iterable, DEFAULT_BUFFER_SIZE, DEFAULT_POOL_SIZE);
+  DefaultBufferOutputStream(@NotNull final DeferredPromiseIterable<Buffer, Buffer> iterable,
+      @Nullable final AllocationType allocationType) {
+    this(iterable, allocationType, DEFAULT_BUFFER_SIZE, DEFAULT_POOL_SIZE);
   }
 
   DefaultBufferOutputStream(@NotNull final DeferredPromiseIterable<Buffer, Buffer> iterable,
-      final int coreSize) {
+      @Nullable final AllocationType allocationType, final int coreSize) {
     mIterable = ConstantConditions.notNull(iterable);
+    mAllocation = (allocationType != null) ? allocationType : AllocationType.HEAP;
     final int poolSize = (mCorePoolSize =
         ConstantConditions.notNegative("coreSize", coreSize) / DEFAULT_BUFFER_SIZE);
     mMaxBufferSize = DEFAULT_BUFFER_SIZE;
@@ -75,8 +81,9 @@ class DefaultBufferOutputStream extends BufferOutputStream implements Serializab
   }
 
   DefaultBufferOutputStream(@NotNull final DeferredPromiseIterable<Buffer, Buffer> iterable,
-      final int bufferSize, final int poolSize) {
+      @Nullable final AllocationType allocationType, final int bufferSize, final int poolSize) {
     mIterable = ConstantConditions.notNull(iterable);
+    mAllocation = (allocationType != null) ? allocationType : AllocationType.HEAP;
     mCorePoolSize = ConstantConditions.notNegative("poolSize", poolSize);
     mMaxBufferSize = ConstantConditions.notNegative("bufferSize", bufferSize);
     mPool = new DoubleQueue<ByteBuffer>(Math.max(poolSize, 1));
@@ -206,7 +213,44 @@ class DefaultBufferOutputStream extends BufferOutputStream implements Serializab
   }
 
   public int write(@NotNull final Buffer buffer) throws IOException {
-    return 0;
+    final int read;
+    final boolean isAdd;
+    final ByteBuffer byteBuffer;
+    final ByteArrayOutputStream outputStream;
+    synchronized (mMutex) {
+      if (mIsClosed) {
+        throw new IOException("cannot write into a closed output stream");
+      }
+
+      byteBuffer = getBuffer();
+      final int remaining = byteBuffer.remaining();
+      if (buffer.available() > remaining) {
+        outputStream = new ByteArrayOutputStream(buffer.available());
+        buffer.read(outputStream);
+        read = outputStream.size();
+
+      } else {
+        outputStream = null;
+        read = buffer.read(byteBuffer);
+      }
+
+      if (byteBuffer.remaining() == 0) {
+        isAdd = true;
+        mBuffer = null;
+
+      } else {
+        isAdd = false;
+      }
+    }
+
+    if (outputStream != null) {
+      write(outputStream.toByteArray());
+
+    } else if (isAdd) {
+      mIterable.add(new DefaultBuffer(byteBuffer));
+    }
+
+    return read;
   }
 
   public int write(@NotNull final InputStream in, final int limit) throws IOException {
@@ -227,7 +271,7 @@ class DefaultBufferOutputStream extends BufferOutputStream implements Serializab
       final int position = byteBuffer.position();
       if (byteBuffer.hasArray()) {
         read = in.read(byteBuffer.array(), position, Math.min(remaining, limit));
-        if (read > 0) {
+        if (read >= 0) {
           byteBuffer.position(position + read);
         }
 
@@ -373,8 +417,7 @@ class DefaultBufferOutputStream extends BufferOutputStream implements Serializab
       return byteBuffer;
     }
 
-    // TODO: 10/08/2017 direct??
-    return ByteBuffer.allocate(mMaxBufferSize);
+    return mAllocation.allocate(mMaxBufferSize);
   }
 
   @NotNull
@@ -398,7 +441,7 @@ class DefaultBufferOutputStream extends BufferOutputStream implements Serializab
   }
 
   private Object writeReplace() throws ObjectStreamException {
-    return new StreamProxy(mIterable, mMaxBufferSize, mCorePoolSize);
+    return new StreamProxy(mIterable, mAllocation, mMaxBufferSize, mCorePoolSize);
   }
 
   private static class SerializableBuffer implements Buffer, Serializable {
@@ -496,13 +539,18 @@ class DefaultBufferOutputStream extends BufferOutputStream implements Serializab
       return bytes.length;
     }
 
+    public void release() {
+      synchronized (mMutex) {
+        mBuffer = EMPTY_BUFFER;
+      }
+    }
   }
 
   private static class StreamProxy extends SerializableProxy {
 
     private StreamProxy(final DeferredPromiseIterable<Buffer, Buffer> iterable,
-        final int bufferSize, final int poolSize) {
-      super(iterable, bufferSize, poolSize);
+        final AllocationType allocationType, final int bufferSize, final int poolSize) {
+      super(iterable, allocationType, bufferSize, poolSize);
     }
 
     @SuppressWarnings("unchecked")
@@ -510,7 +558,7 @@ class DefaultBufferOutputStream extends BufferOutputStream implements Serializab
       try {
         final Object[] args = deserializeArgs();
         return new DefaultBufferOutputStream((DeferredPromiseIterable<Buffer, Buffer>) args[0],
-            (Integer) args[1], (Integer) args[2]);
+            (AllocationType) args[1], (Integer) args[2], (Integer) args[3]);
 
       } catch (final Throwable t) {
         throw new InvalidObjectException(t.getMessage());
@@ -550,7 +598,7 @@ class DefaultBufferOutputStream extends BufferOutputStream implements Serializab
         return new SerializableBuffer(bytes);
 
       } finally {
-        release(byteBuffer);
+        DefaultBufferOutputStream.this.release(byteBuffer);
       }
     }
 
@@ -627,7 +675,7 @@ class DefaultBufferOutputStream extends BufferOutputStream implements Serializab
         }
 
       } finally {
-        release(byteBuffer);
+        DefaultBufferOutputStream.this.release(byteBuffer);
       }
 
       return remaining;
@@ -649,7 +697,7 @@ class DefaultBufferOutputStream extends BufferOutputStream implements Serializab
         buffer.put(byteBuffer);
 
       } finally {
-        release(byteBuffer);
+        DefaultBufferOutputStream.this.release(byteBuffer);
       }
 
       return remaining;
@@ -673,10 +721,22 @@ class DefaultBufferOutputStream extends BufferOutputStream implements Serializab
         }
 
       } finally {
-        release(byteBuffer);
+        DefaultBufferOutputStream.this.release(byteBuffer);
       }
 
       return remaining;
+    }
+
+    public void release() {
+      final ByteBuffer byteBuffer;
+      synchronized (mMutex) {
+        byteBuffer = mByteBuffer;
+        mByteBuffer = null;
+      }
+
+      if (byteBuffer != null) {
+        DefaultBufferOutputStream.this.release(byteBuffer);
+      }
     }
   }
 }

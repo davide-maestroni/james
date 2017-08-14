@@ -47,6 +47,11 @@ class BoundPromise<I, O> extends PromiseWrapper<O> implements Serializable {
     return boundPromise;
   }
 
+  @Override
+  public void cancel() {
+    mPromise.cancel();
+  }
+
   @NotNull
   @SuppressWarnings("unchecked")
   protected <R> Promise<R> newInstance(@NotNull final Promise<R> promise) {

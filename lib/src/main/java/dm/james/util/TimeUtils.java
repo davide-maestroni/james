@@ -124,6 +124,58 @@ public class TimeUtils {
     return true;
   }
 
+  public static long toDays(final float value, @NotNull final TimeUnit timeUnit) {
+    if (timeUnit.compareTo(TimeUnit.DAYS) < 0) {
+      return Math.round(value / timeUnit.convert(1, TimeUnit.DAYS));
+    }
+
+    return Math.round(value * TimeUnit.DAYS.convert(1, timeUnit));
+  }
+
+  public static long toHours(final float value, @NotNull final TimeUnit timeUnit) {
+    if (timeUnit.compareTo(TimeUnit.HOURS) < 0) {
+      return Math.round(value / timeUnit.convert(1, TimeUnit.HOURS));
+    }
+
+    return Math.round(value * TimeUnit.HOURS.convert(1, timeUnit));
+  }
+
+  public static long toManos(final float value, @NotNull final TimeUnit timeUnit) {
+    return Math.round(value * timeUnit.toNanos(1));
+  }
+
+  public static long toMicros(final float value, @NotNull final TimeUnit timeUnit) {
+    if (timeUnit.compareTo(TimeUnit.MICROSECONDS) < 0) {
+      return Math.round(value / timeUnit.convert(1, TimeUnit.MICROSECONDS));
+    }
+
+    return Math.round(value * TimeUnit.MICROSECONDS.convert(1, timeUnit));
+  }
+
+  public static long toMillis(final float value, @NotNull final TimeUnit timeUnit) {
+    if (timeUnit.compareTo(TimeUnit.MILLISECONDS) < 0) {
+      return Math.round(value / timeUnit.convert(1, TimeUnit.MILLISECONDS));
+    }
+
+    return Math.round(value * TimeUnit.MILLISECONDS.convert(1, timeUnit));
+  }
+
+  public static long toMinutes(final float value, @NotNull final TimeUnit timeUnit) {
+    if (timeUnit.compareTo(TimeUnit.MINUTES) < 0) {
+      return Math.round(value / timeUnit.convert(1, TimeUnit.MINUTES));
+    }
+
+    return Math.round(value * TimeUnit.MINUTES.convert(1, timeUnit));
+  }
+
+  public static long toSeconds(final float value, @NotNull final TimeUnit timeUnit) {
+    if (timeUnit.compareTo(TimeUnit.SECONDS) < 0) {
+      return Math.round(value / timeUnit.convert(1, TimeUnit.SECONDS));
+    }
+
+    return Math.round(value * TimeUnit.SECONDS.convert(1, timeUnit));
+  }
+
   /**
    * Performs an {@link Object#wait()} as if started from the specified system time in
    * milliseconds, by using the specified time.

@@ -25,7 +25,9 @@ import dm.james.executor.ScheduledExecutors;
  * Created by davide-maestroni on 07/20/2017.
  */
 public enum PropagationType {
-  IMMEDIATE(ScheduledExecutors.immediateExecutor()), LOOP(ScheduledExecutors.loopExecutor());
+  IMMEDIATE(ScheduledExecutors.immediateExecutor()),
+
+  LOOP(ScheduledExecutors.loopExecutor());
 
   private final ScheduledExecutor mExecutor;
 

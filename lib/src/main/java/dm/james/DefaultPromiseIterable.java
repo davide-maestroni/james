@@ -41,6 +41,7 @@ import dm.james.log.Log;
 import dm.james.log.Log.Level;
 import dm.james.log.Logger;
 import dm.james.promise.Action;
+import dm.james.promise.CancellationException;
 import dm.james.promise.Mapper;
 import dm.james.promise.Observer;
 import dm.james.promise.Promise;
@@ -82,6 +83,7 @@ class DefaultPromiseIterable<O> implements PromiseIterable<O>, Serializable {
   DefaultPromiseIterable(@NotNull final Observer<? super CallbackIterable<O>> observer,
       @Nullable final PropagationType propagationType, @Nullable final Log log,
       @Nullable final Level level) {
+    // TODO: 14/08/2017 remove propagation => explicit loop
     mObserver = (Observer<CallbackIterable<?>>) ConstantConditions.notNull("observer", observer);
     mLogger = Logger.newLogger(log, level, this);
     mPropagationType = (propagationType != null) ? propagationType : PropagationType.LOOP;
@@ -170,7 +172,8 @@ class DefaultPromiseIterable<O> implements PromiseIterable<O>, Serializable {
   public <R> PromiseIterable<R> all(
       @Nullable final Handler<Iterable<O>, ? super CallbackIterable<R>> fulfill,
       @Nullable final Handler<Throwable, ? super CallbackIterable<R>> reject) {
-    return then(new HandlerAll<O, R>(fulfill, reject));
+    final Logger logger = mLogger;
+    return then(new HandlerAll<O, R>(fulfill, reject, logger.getLog(), logger.getLogLevel()));
   }
 
   @NotNull
@@ -182,7 +185,8 @@ class DefaultPromiseIterable<O> implements PromiseIterable<O>, Serializable {
   public <R> PromiseIterable<R> allSorted(
       @Nullable final Handler<Iterable<O>, ? super CallbackIterable<R>> fulfill,
       @Nullable final Handler<Throwable, ? super CallbackIterable<R>> reject) {
-    return thenSorted(new HandlerAll<O, R>(fulfill, reject));
+    final Logger logger = mLogger;
+    return thenSorted(new HandlerAll<O, R>(fulfill, reject, logger.getLog(), logger.getLogLevel()));
   }
 
   @NotNull
@@ -315,7 +319,7 @@ class DefaultPromiseIterable<O> implements PromiseIterable<O>, Serializable {
 
   @NotNull
   public PromiseIterable<O> whenResolved(@NotNull final Action action) {
-    return all(new HandlerResolvedAll<O>(action), null);
+    return then(null, null, new HandlerResolvedAll<O>(action));
   }
 
   @NotNull
@@ -361,7 +365,7 @@ class DefaultPromiseIterable<O> implements PromiseIterable<O>, Serializable {
   public <R> PromiseIterable<R> eachSorted(
       @Nullable final Handler<O, ? super CallbackIterable<R>> fulfill,
       @Nullable final Handler<Throwable, ? super CallbackIterable<R>> reject) {
-    return chain(new ChainHandlerSorted<O, R>(mPropagationType, fulfill, reject, null));
+    return chain(new ChainHandler<O, R>(mPropagationType, fulfill, reject, null));
   }
 
   @NotNull
@@ -625,16 +629,34 @@ class DefaultPromiseIterable<O> implements PromiseIterable<O>, Serializable {
   }
 
   @NotNull
-  public <R> PromiseIterable<R> thenSorted(
-      @Nullable final Handler<O, ? super CallbackIterable<R>> fulfill,
-      @Nullable final Handler<Throwable, ? super CallbackIterable<R>> reject,
-      @Nullable final Observer<? super CallbackIterable<R>> resolve) {
-    return chain(new ChainHandlerSorted<O, R>(mPropagationType, fulfill, reject, resolve));
+  public <R, S> PromiseIterable<R> thenSorted(@NotNull final StatefulHandler<O, R, S> handler) {
+    return chain(new ChainStatefulSorted<O, R, S>(mPropagationType, handler));
   }
 
   @NotNull
-  public <R, S> PromiseIterable<R> thenSorted(@NotNull final StatefulHandler<O, R, S> handler) {
-    return chain(new ChainStatefulSorted<O, R, S>(mPropagationType, handler));
+  public <R> PromiseIterable<R> thenTry(
+      @Nullable final Handler<O, ? super CallbackIterable<R>> fulfill,
+      @Nullable final Handler<Throwable, ? super CallbackIterable<R>> reject,
+      @Nullable final Observer<? super CallbackIterable<R>> resolve) {
+    final Logger logger = mLogger;
+    return then(
+        (fulfill != null) ? new HandlerTry<O, R>(fulfill, logger.getLog(), logger.getLogLevel())
+            : null, reject, resolve);
+  }
+
+  @NotNull
+  public <R, S extends Closeable> PromiseIterable<R> thenTryState(
+      @NotNull final StatefulHandler<O, R, S> handler) {
+    final Logger logger = mLogger;
+    return then(new StatefulHandlerTry<O, R, S>(handler, logger.getLog(), logger.getLogLevel()));
+  }
+
+  @NotNull
+  public <R, S extends Closeable> PromiseIterable<R> thenTryStateSorted(
+      @NotNull final StatefulHandler<O, R, S> handler) {
+    final Logger logger = mLogger;
+    return thenSorted(
+        new StatefulHandlerTry<O, R, S>(handler, logger.getLog(), logger.getLogLevel()));
   }
 
   public void waitComplete() {
@@ -687,6 +709,10 @@ class DefaultPromiseIterable<O> implements PromiseIterable<O>, Serializable {
       mLogger.err(t, "Error while applying promise transformation");
       throw RejectionException.wrapIfNotRejectionException(t);
     }
+  }
+
+  public void cancel() {
+    mHead.cancel();
   }
 
   public Iterable<O> get() {
@@ -995,6 +1021,8 @@ class DefaultPromiseIterable<O> implements PromiseIterable<O>, Serializable {
     }
   }
 
+  private interface AnyState<R> extends Observer<CallbackIterable<R>> {}
+
   private interface Resolution<O> {
 
     void consume(@NotNull PromiseChain<O, ?> chain);
@@ -1008,13 +1036,36 @@ class DefaultPromiseIterable<O> implements PromiseIterable<O>, Serializable {
     void throwError();
   }
 
+  private static class AnyStateRejected<R> implements AnyState<R> {
+
+    private final Throwable mReason;
+
+    private AnyStateRejected(final Throwable reason) {
+      mReason = reason;
+    }
+
+    public void accept(final CallbackIterable<R> callback) throws Exception {
+      callback.reject(mReason);
+    }
+  }
+
+  private static class AnyStateResolved<R> implements AnyState<R> {
+
+    public void accept(final CallbackIterable<R> callback) throws Exception {
+    }
+  }
+
   private static class ChainHandler<O, R> extends PromiseChain<O, R> {
 
-    private final AtomicLong mCallbackCount = new AtomicLong();
+    private final AtomicLong mCallbackCount = new AtomicLong(1);
 
     private final Handler<O, ? super CallbackIterable<R>> mFulfill;
 
+    private final Object mMutex = new Object();
+
     private final PropagationType mPropagationType;
+
+    private final NestedQueue<Resolution<R>> mQueue = new NestedQueue<Resolution<R>>();
 
     private final Handler<Throwable, ? super CallbackIterable<R>> mReject;
 
@@ -1046,22 +1097,50 @@ class DefaultPromiseIterable<O> implements PromiseIterable<O>, Serializable {
           } catch (final Throwable t) {
             InterruptedExecutionException.throwIfInterrupt(t);
             getLogger().err(t, "Error while processing input: %s", input);
-            callback.reject(t);
+            next.addRejectionSafe(t);
+            innerResolve(next);
           }
         }
       });
     }
 
+    // TODO: 31/07/2017 find tradeoff and switch between transferTo and removeFirst
+    private void flushQueue(final PromiseChain<R, ?> next) {
+      Resolution<R> resolution = removeFirst();
+      try {
+        while (resolution != null) {
+          resolution.consume(next);
+          resolution = removeFirst();
+        }
+
+      } finally {
+        synchronized (mMutex) {
+          mQueue.clear();
+        }
+      }
+    }
+
     private void innerResolve(final PromiseChain<R, ?> next) {
       if (mCallbackCount.decrementAndGet() <= 0) {
         try {
-          next.resolve();
+          flushQueue(next);
+          mResolve.accept(next);
 
         } catch (final Throwable t) {
           InterruptedExecutionException.throwIfInterrupt(t);
-          getLogger().err(t, "Error while propagating resolution");
+          getLogger().err(t, "Error while processing resolution");
           next.reject(t);
         }
+      }
+    }
+
+    private Resolution<R> removeFirst() {
+      synchronized (mMutex) {
+        if (mQueue.isEmpty()) {
+          return null;
+        }
+
+        return mQueue.removeFirst();
       }
     }
 
@@ -1108,368 +1187,21 @@ class DefaultPromiseIterable<O> implements PromiseIterable<O>, Serializable {
       }
 
       public void add(final R output) {
-        try {
-          mNext.add(output);
-
-        } catch (final Throwable t) {
-          InterruptedExecutionException.throwIfInterrupt(t);
-          getLogger().err(t, "Error while propagating resolution: %s", output);
-          mNext.reject(t);
-        }
-      }
-
-      public void defer(@NotNull final Promise<R> promise) {
-        addDeferred(promise);
-        innerResolve(mNext);
-      }
-
-      @SuppressWarnings("unchecked")
-      public void addAllDeferred(@NotNull final Promise<? extends Iterable<R>> promise) {
-        if (promise instanceof PromiseIterable) {
-          ((PromiseIterable<R>) promise).then(new ChainStatefulHandler(mNext));
-          // TODO: 11/08/2017 StatefulHandler??
-
-        } else {
-          mCallbackCount.incrementAndGet();
-          ((Promise<Iterable<R>>) promise).then(new ChainHandlerFulfillIterable(mNext),
-              new ChainHandlerReject(mNext));
-        }
-      }
-
-      public void reject(final Throwable reason) {
-        addRejection(reason);
-        innerResolve(mNext);
-      }
-
-      public void addAll(@Nullable final Iterable<R> outputs) {
-        mNext.addAll(outputs);
-      }
-
-      public void addDeferred(@NotNull final Promise<R> promise) {
-        mCallbackCount.incrementAndGet();
-        promise.then(new ChainHandlerFulfill(mNext), new ChainHandlerReject(mNext));
-      }
-
-      public void addRejection(final Throwable reason) {
-        try {
-          mNext.addRejection(reason);
-
-        } catch (final Throwable t) {
-          InterruptedExecutionException.throwIfInterrupt(t);
-          getLogger().err(t, "Error while propagating rejection with reason: %s", reason);
-          mNext.reject(t);
-        }
-      }
-
-      public void resolve() {
-        innerResolve(mNext);
-      }
-
-      public void resolve(final R output) {
-        add(output);
-        innerResolve(mNext);
-      }
-    }
-
-    private class ChainHandlerFulfill implements Handler<R, Callback<Void>> {
-
-      private final PromiseChain<R, ?> mNext;
-
-      private ChainHandlerFulfill(final PromiseChain<R, ?> next) {
-        mNext = next;
-      }
-
-      public void accept(final R input, final Callback<Void> callback) {
-        try {
-          mNext.add(input);
-
-        } catch (final Throwable t) {
-          InterruptedExecutionException.throwIfInterrupt(t);
-          getLogger().err(t, "Error while propagating resolution: %s", input);
-          mNext.reject(t);
-        }
-
-        innerResolve(mNext);
-      }
-    }
-
-    private class ChainHandlerFulfillIterable implements Handler<Iterable<R>, Callback<Void>> {
-
-      private final PromiseChain<R, ?> mNext;
-
-      private ChainHandlerFulfillIterable(final PromiseChain<R, ?> next) {
-        mNext = next;
-      }
-
-      public void accept(final Iterable<R> inputs, final Callback<Void> callback) {
-        try {
-          mNext.addAll(inputs);
-
-        } catch (final Throwable t) {
-          InterruptedExecutionException.throwIfInterrupt(t);
-          getLogger().err(t, "Error while propagating resolutions: %s", inputs);
-          mNext.reject(t);
-        }
-
-        innerResolve(mNext);
-      }
-    }
-
-    private class ChainHandlerReject implements Handler<Throwable, Callback<Void>> {
-
-      private final PromiseChain<R, ?> mNext;
-
-      private ChainHandlerReject(final PromiseChain<R, ?> next) {
-        mNext = next;
-      }
-
-      public void accept(final Throwable reason, final Callback<Void> callback) {
-        mNext.addRejection(reason);
-        innerResolve(mNext);
-      }
-    }
-
-    private class ChainStatefulHandler implements StatefulHandler<R, Void, Void> {
-
-      private final PromiseChain<R, ?> mNext;
-
-      private ChainStatefulHandler(final PromiseChain<R, ?> next) {
-        mCallbackCount.incrementAndGet();
-        mNext = next;
-      }
-
-      public Void create(@NotNull final CallbackIterable<Void> callback) {
-        return null;
-      }
-
-      public Void fulfill(final Void state, final R input,
-          @NotNull final CallbackIterable<Void> callback) {
-        try {
-          mNext.add(input);
-
-        } catch (final Throwable t) {
-          InterruptedExecutionException.throwIfInterrupt(t);
-          getLogger().err(t, "Error while propagating resolution: %s", input);
-          mNext.reject(t);
-        }
-
-        return null;
-      }
-
-      public Void reject(final Void state, final Throwable reason,
-          @NotNull final CallbackIterable<Void> callback) {
-        try {
-          mNext.addRejection(reason);
-
-        } catch (final Throwable t) {
-          InterruptedExecutionException.throwIfInterrupt(t);
-          getLogger().err(t, "Error while propagating rejection with reason: %s", reason);
-          mNext.reject(t);
-        }
-
-        return null;
-      }
-
-      public void resolve(final Void state, @NotNull final CallbackIterable<Void> callback) {
-        innerResolve(mNext);
-      }
-    }
-
-    @Override
-    void addAll(final PromiseChain<R, ?> next, final Iterable<O> inputs) {
-      int size;
-      if (inputs instanceof Collection) {
-        size = ((Collection) inputs).size();
-
-      } else {
-        size = 0;
-        for (final O ignored : inputs) {
-          ++size;
-        }
-      }
-
-      final ChainCallback callback = new ChainCallback(next, size);
-      mPropagationType.execute(new Runnable() {
-
-        public void run() {
-          for (final O input : inputs) {
-            try {
-              mFulfill.accept(input, callback);
-
-            } catch (final Throwable t) {
-              InterruptedExecutionException.throwIfInterrupt(t);
-              getLogger().err(t, "Error while processing input: %s", input);
-              callback.reject(t);
-            }
-          }
-        }
-      });
-    }
-
-    @NotNull
-    @Override
-    PromiseChain<O, R> copy() {
-      return new ChainHandler<O, R>(mPropagationType, mFulfill, mReject, mResolve);
-    }
-
-    @Override
-    void addRejection(final PromiseChain<R, ?> next, final Throwable reason) {
-      final ChainCallback callback = new ChainCallback(next);
-      mPropagationType.execute(new Runnable() {
-
-        public void run() {
-          try {
-            mReject.accept(reason, callback);
-
-          } catch (final Throwable t) {
-            InterruptedExecutionException.throwIfInterrupt(t);
-            getLogger().err(t, "Error while processing rejection with reason: %s", reason);
-            callback.reject(t);
-          }
-        }
-      });
-    }
-
-    @Override
-    void resolve(final PromiseChain<R, ?> next) {
-      final ChainCallback callback = new ChainCallback(next);
-      mPropagationType.execute(new Runnable() {
-
-        public void run() {
-          try {
-            mResolve.accept(callback);
-
-          } catch (final Throwable t) {
-            InterruptedExecutionException.throwIfInterrupt(t);
-            getLogger().err(t, "Error while processing resolution");
-            callback.reject(t);
-          }
-        }
-      });
-    }
-  }
-
-  private static class ChainHandlerSorted<O, R> extends PromiseChain<O, R> {
-
-    private final AtomicLong mCallbackCount = new AtomicLong();
-
-    private final Handler<O, ? super CallbackIterable<R>> mFulfill;
-
-    private final Object mMutex = new Object();
-
-    private final PropagationType mPropagationType;
-
-    private final NestedQueue<Resolution<R>> mQueue = new NestedQueue<Resolution<R>>();
-
-    private final Handler<Throwable, ? super CallbackIterable<R>> mReject;
-
-    private final Observer<? super CallbackIterable<R>> mResolve;
-
-    @SuppressWarnings("unchecked")
-    private ChainHandlerSorted(@NotNull final PropagationType propagationType,
-        @Nullable final Handler<O, ? super CallbackIterable<R>> fulfill,
-        @Nullable final Handler<Throwable, ? super CallbackIterable<R>> reject,
-        @Nullable final Observer<? super CallbackIterable<R>> resolve) {
-      mFulfill = (Handler<O, ? super CallbackIterable<R>>) ((fulfill != null) ? fulfill
-          : new PassThroughOutputHandler<O, R>());
-      mReject = (Handler<Throwable, ? super CallbackIterable<R>>) ((reject != null) ? reject
-          : new PassThroughErrorHandler<R>());
-      mResolve = (Observer<? super CallbackIterable<R>>) ((resolve != null) ? resolve
-          : new ResolveObserver<R>());
-      mPropagationType = propagationType;
-    }
-
-    // TODO: 31/07/2017 find tradeoff and switch between transferTo and removeFirst
-    private void flushQueue(final PromiseChain<R, ?> next) {
-      Resolution<R> resolution = removeFirst();
-      try {
-        while (resolution != null) {
-          resolution.consume(next);
-          resolution = removeFirst();
-        }
-
-      } catch (final Throwable t) {
-        InterruptedExecutionException.throwIfInterrupt(t);
-        getLogger().err(t, "Error while propagating resolutions");
-        next.reject(t);
-        synchronized (mMutex) {
-          mQueue.clear();
-        }
-      }
-    }
-
-    private void innerResolve(final PromiseChain<R, ?> next) {
-      if (mCallbackCount.decrementAndGet() <= 0) {
-        try {
-          flushQueue(next);
-          next.resolve();
-
-        } catch (final Throwable t) {
-          InterruptedExecutionException.throwIfInterrupt(t);
-          getLogger().err(t, "Error while propagating resolution");
-          next.reject(t);
-        }
-      }
-    }
-
-    private Resolution<R> removeFirst() {
-      synchronized (mMutex) {
-        if (mQueue.isEmpty()) {
-          return null;
-        }
-
-        return mQueue.removeFirst();
-      }
-    }
-
-    private Object writeReplace() throws ObjectStreamException {
-      return new ChainProxy<O, R>(mPropagationType, mFulfill, mReject, mResolve);
-    }
-
-    private static class ChainProxy<O, R> extends SerializableProxy {
-
-      private ChainProxy(final PropagationType propagationType,
-          final Handler<O, ? super CallbackIterable<R>> fulfill,
-          final Handler<Throwable, ? super CallbackIterable<R>> reject,
-          final Observer<? super CallbackIterable<R>> resolve) {
-        super(propagationType, proxy(fulfill), proxy(reject), proxy(resolve));
-      }
-
-      @SuppressWarnings("unchecked")
-      Object readResolve() throws ObjectStreamException {
-        try {
-          final Object[] args = deserializeArgs();
-          return new ChainHandlerSorted<O, R>((PropagationType) args[0],
-              (Handler<O, ? super CallbackIterable<R>>) args[1],
-              (Handler<Throwable, ? super CallbackIterable<R>>) args[2],
-              (Observer<? super CallbackIterable<R>>) args[3]);
-
-        } catch (final Throwable t) {
-          throw new InvalidObjectException(t.getMessage());
-        }
-      }
-    }
-
-    private class ChainCallback implements CallbackIterable<R> {
-
-      private final PromiseChain<R, ?> mNext;
-
-      private ChainCallback(final PromiseChain<R, ?> next) {
-        mCallbackCount.incrementAndGet();
-        mNext = next;
-      }
-
-      private ChainCallback(final PromiseChain<R, ?> next, final int count) {
-        mCallbackCount.addAndGet(count);
-        mNext = next;
-      }
-
-      public void add(final R output) {
         synchronized (mMutex) {
           mQueue.add(new ResolutionOutput<R>(output));
         }
 
         flushQueue(mNext);
+      }
+
+      public void defer(@NotNull final Promise<R> promise) {
+        addDeferred(promise);
+        resolve();
+      }
+
+      public void resolve(final R output) {
+        add(output);
+        innerResolve(mNext);
       }
 
       @SuppressWarnings("unchecked")
@@ -1479,25 +1211,77 @@ class DefaultPromiseIterable<O> implements PromiseIterable<O>, Serializable {
           queue = mQueue.addNested();
         }
 
+        mCallbackCount.incrementAndGet();
         if (promise instanceof PromiseIterable) {
-          ((PromiseIterable<R>) promise).then(new ChainStatefulHandler(mNext, queue));
-          // TODO: 11/08/2017 StatefulHandler??
+          ((PromiseIterable<R>) promise).then(new Handler<R, CallbackIterable<Void>>() {
+
+            public void accept(final R input, final CallbackIterable<Void> callback) {
+              synchronized (mMutex) {
+                queue.add(new ResolutionOutput<R>(input));
+              }
+
+              flushQueue(mNext);
+            }
+          }, new Handler<Throwable, CallbackIterable<Void>>() {
+
+            public void accept(final Throwable reason, final CallbackIterable<Void> callback) {
+              synchronized (mMutex) {
+                queue.add(new ResolutionThrowable<R>(reason));
+              }
+
+              flushQueue(mNext);
+            }
+          }, new Observer<CallbackIterable<Void>>() {
+
+            public void accept(final CallbackIterable<Void> callback) {
+              synchronized (mMutex) {
+                queue.close();
+              }
+
+              final PromiseChain<R, ?> next = mNext;
+              flushQueue(next);
+              innerResolve(next);
+            }
+          });
 
         } else {
-          mCallbackCount.incrementAndGet();
-          ((Promise<Iterable<R>>) promise).then(new ChainHandlerFulfillIterable(mNext, queue),
-              new ChainHandlerReject(mNext, queue));
+          ((Promise<Iterable<R>>) promise).then(new Handler<Iterable<R>, Callback<Void>>() {
+
+            public void accept(final Iterable<R> input, final Callback<Void> callback) {
+              synchronized (mMutex) {
+                queue.add(new ResolutionOutputs<R>(input));
+                queue.close();
+              }
+
+              final PromiseChain<R, ?> next = mNext;
+              flushQueue(next);
+              innerResolve(next);
+            }
+          }, new Handler<Throwable, Callback<Void>>() {
+
+            public void accept(final Throwable reason, final Callback<Void> callback) {
+              synchronized (mMutex) {
+                queue.add(new ResolutionThrowable<R>(reason));
+                queue.close();
+              }
+
+              final PromiseChain<R, ?> next = mNext;
+              flushQueue(next);
+              innerResolve(next);
+            }
+          });
         }
       }
 
-      public void defer(@NotNull final Promise<R> promise) {
-        addDeferred(promise);
-        resolve();
-      }
-
       public void reject(final Throwable reason) {
-        addRejection(reason);
-        innerResolve(mNext);
+        try {
+          addRejection(reason);
+          innerResolve(mNext);
+
+        } catch (final Throwable t) {
+          InterruptedExecutionException.throwIfInterrupt(t);
+          getLogger().err(reason, "Suppressed rejection");
+        }
       }
 
       public void addAll(@Nullable final Iterable<R> outputs) {
@@ -1508,6 +1292,22 @@ class DefaultPromiseIterable<O> implements PromiseIterable<O>, Serializable {
         flushQueue(mNext);
       }
 
+      @SuppressWarnings("unchecked")
+      public void addAllDeferred(@Nullable final Iterable<? extends Promise<?>> promises) {
+        if (promises == null) {
+          return;
+        }
+
+        for (final Promise<?> promise : promises) {
+          if (promise instanceof PromiseIterable) {
+            addAllDeferred((Promise<? extends Iterable<R>>) promise);
+
+          } else {
+            addDeferred((Promise<R>) promise);
+          }
+        }
+      }
+
       public void addDeferred(@NotNull final Promise<R> promise) {
         final NestedQueue<Resolution<R>> queue;
         synchronized (mMutex) {
@@ -1515,7 +1315,32 @@ class DefaultPromiseIterable<O> implements PromiseIterable<O>, Serializable {
         }
 
         mCallbackCount.incrementAndGet();
-        promise.then(new ChainHandlerFulfill(mNext, queue), new ChainHandlerReject(mNext, queue));
+        promise.then(new Handler<R, Callback<Void>>() {
+
+          public void accept(final R input, final Callback<Void> callback) {
+            synchronized (mMutex) {
+              queue.add(new ResolutionOutput<R>(input));
+              queue.close();
+            }
+
+            final PromiseChain<R, ?> next = mNext;
+            flushQueue(next);
+            innerResolve(next);
+
+          }
+        }, new Handler<Throwable, Callback<Void>>() {
+
+          public void accept(final Throwable reason, final Callback<Void> callback) {
+            synchronized (mMutex) {
+              queue.add(new ResolutionThrowable<R>(reason));
+              queue.close();
+            }
+
+            final PromiseChain<R, ?> next = mNext;
+            flushQueue(next);
+            innerResolve(next);
+          }
+        });
       }
 
       public void addRejection(final Throwable reason) {
@@ -1531,152 +1356,6 @@ class DefaultPromiseIterable<O> implements PromiseIterable<O>, Serializable {
         flushQueue(next);
         innerResolve(next);
       }
-
-      public void resolve(final R output) {
-        add(output);
-        innerResolve(mNext);
-      }
-    }
-
-    private class ChainHandlerFulfill implements Handler<R, Callback<Void>> {
-
-      private final PromiseChain<R, ?> mNext;
-
-      private final NestedQueue<Resolution<R>> mQueue;
-
-      private ChainHandlerFulfill(final PromiseChain<R, ?> next,
-          final NestedQueue<Resolution<R>> queue) {
-        mNext = next;
-        mQueue = queue;
-      }
-
-      public void accept(final R input, final Callback<Void> callback) throws Exception {
-        synchronized (mMutex) {
-          final NestedQueue<Resolution<R>> queue = mQueue;
-          queue.add(new ResolutionOutput<R>(input));
-          queue.close();
-        }
-
-        final PromiseChain<R, ?> next = mNext;
-        flushQueue(next);
-        innerResolve(next);
-      }
-    }
-
-    private class ChainHandlerFulfillIterable implements Handler<Iterable<R>, Callback<Void>> {
-
-      private final PromiseChain<R, ?> mNext;
-
-      private final NestedQueue<Resolution<R>> mQueue;
-
-      private ChainHandlerFulfillIterable(final PromiseChain<R, ?> next,
-          final NestedQueue<Resolution<R>> queue) {
-        mNext = next;
-        mQueue = queue;
-      }
-
-      public void accept(final Iterable<R> input, final Callback<Void> callback) throws Exception {
-        synchronized (mMutex) {
-          final NestedQueue<Resolution<R>> queue = mQueue;
-          queue.add(new ResolutionOutputs<R>(input));
-          queue.close();
-        }
-
-        final PromiseChain<R, ?> next = mNext;
-        flushQueue(next);
-        innerResolve(next);
-      }
-    }
-
-    private class ChainHandlerReject implements Handler<Throwable, Callback<Void>> {
-
-      private final PromiseChain<R, ?> mNext;
-
-      private final NestedQueue<Resolution<R>> mQueue;
-
-      private ChainHandlerReject(final PromiseChain<R, ?> next,
-          final NestedQueue<Resolution<R>> queue) {
-        mNext = next;
-        mQueue = queue;
-      }
-
-      public void accept(final Throwable reason, final Callback<Void> callback) throws Exception {
-        synchronized (mMutex) {
-          final NestedQueue<Resolution<R>> queue = mQueue;
-          queue.add(new ResolutionThrowable<R>(reason));
-          queue.close();
-        }
-
-        final PromiseChain<R, ?> next = mNext;
-        flushQueue(next);
-        innerResolve(next);
-      }
-    }
-
-    private class ChainStatefulHandler implements StatefulHandler<R, Void, Void> {
-
-      private final PromiseChain<R, ?> mNext;
-
-      private final NestedQueue<Resolution<R>> mQueue;
-
-      private ChainStatefulHandler(final PromiseChain<R, ?> next,
-          final NestedQueue<Resolution<R>> queue) {
-        mCallbackCount.incrementAndGet();
-        mNext = next;
-        mQueue = queue;
-      }
-
-      public Void create(@NotNull final CallbackIterable<Void> callback) {
-        return null;
-      }
-
-      public Void fulfill(final Void state, final R input,
-          @NotNull final CallbackIterable<Void> callback) {
-        synchronized (mMutex) {
-          mQueue.add(new ResolutionOutput<R>(input));
-        }
-
-        flushQueue(mNext);
-        return null;
-      }
-
-      public Void reject(final Void state, final Throwable reason,
-          @NotNull final CallbackIterable<Void> callback) {
-        synchronized (mMutex) {
-          mQueue.add(new ResolutionThrowable<R>(reason));
-        }
-
-        flushQueue(mNext);
-        return null;
-      }
-
-      public void resolve(final Void state, @NotNull final CallbackIterable<Void> callback) {
-        synchronized (mMutex) {
-          mQueue.close();
-        }
-
-        final PromiseChain<R, ?> next = mNext;
-        flushQueue(next);
-        innerResolve(next);
-      }
-    }
-
-    @Override
-    void add(final PromiseChain<R, ?> next, final O input) {
-      final ChainCallback callback = new ChainCallback(next);
-      mPropagationType.execute(new Runnable() {
-
-        public void run() {
-          try {
-            mFulfill.accept(input, callback);
-
-          } catch (final Throwable t) {
-            InterruptedExecutionException.throwIfInterrupt(t);
-            getLogger().err(t, "Error while processing input: %s", input);
-            callback.reject(t);
-          }
-        }
-      });
     }
 
     @Override
@@ -1703,7 +1382,8 @@ class DefaultPromiseIterable<O> implements PromiseIterable<O>, Serializable {
             } catch (final Throwable t) {
               InterruptedExecutionException.throwIfInterrupt(t);
               getLogger().err(t, "Error while processing input: %s", input);
-              callback.reject(t);
+              next.addRejectionSafe(t);
+              innerResolve(next);
             }
           }
         }
@@ -1713,7 +1393,7 @@ class DefaultPromiseIterable<O> implements PromiseIterable<O>, Serializable {
     @NotNull
     @Override
     PromiseChain<O, R> copy() {
-      return new ChainHandlerSorted<O, R>(mPropagationType, mFulfill, mReject, mResolve);
+      return new ChainHandler<O, R>(mPropagationType, mFulfill, mReject, mResolve);
     }
 
     @Override
@@ -1728,7 +1408,8 @@ class DefaultPromiseIterable<O> implements PromiseIterable<O>, Serializable {
           } catch (final Throwable t) {
             InterruptedExecutionException.throwIfInterrupt(t);
             getLogger().err(t, "Error while processing rejection with reason: %s", reason);
-            callback.reject(t);
+            next.addRejectionSafe(t);
+            innerResolve(next);
           }
         }
       });
@@ -1736,18 +1417,10 @@ class DefaultPromiseIterable<O> implements PromiseIterable<O>, Serializable {
 
     @Override
     void resolve(final PromiseChain<R, ?> next) {
-      final ChainCallback callback = new ChainCallback(next);
       mPropagationType.execute(new Runnable() {
 
         public void run() {
-          try {
-            mResolve.accept(callback);
-
-          } catch (final Throwable t) {
-            InterruptedExecutionException.throwIfInterrupt(t);
-            getLogger().err(t, "Error while processing resolution");
-            callback.reject(t);
-          }
+          innerResolve(next);
         }
       });
     }
@@ -1904,26 +1577,12 @@ class DefaultPromiseIterable<O> implements PromiseIterable<O>, Serializable {
 
     @Override
     void add(final PromiseChain<O, ?> next, final O input) {
-      try {
-        next.add(input);
-
-      } catch (final Throwable t) {
-        InterruptedExecutionException.throwIfInterrupt(t);
-        getLogger().err(t, "Error while propagating resolution: %s", input);
-        next.reject(t);
-      }
+      next.add(input);
     }
 
     @Override
     void addAll(final PromiseChain<O, ?> next, final Iterable<O> inputs) {
-      try {
-        next.addAll(inputs);
-
-      } catch (final Throwable t) {
-        InterruptedExecutionException.throwIfInterrupt(t);
-        getLogger().err(t, "Error while propagating resolutions: %s", inputs);
-        next.reject(t);
-      }
+      next.addAll(inputs);
     }
 
     @NotNull
@@ -1934,26 +1593,12 @@ class DefaultPromiseIterable<O> implements PromiseIterable<O>, Serializable {
 
     @Override
     void addRejection(final PromiseChain<O, ?> next, final Throwable reason) {
-      try {
-        next.addRejection(reason);
-
-      } catch (final Throwable t) {
-        InterruptedExecutionException.throwIfInterrupt(t);
-        getLogger().err(t, "Error while propagating rejection with reason: %s", reason);
-        next.reject(t);
-      }
+      next.addRejection(reason);
     }
 
     @Override
     void resolve(final PromiseChain<O, ?> next) {
-      try {
-        next.resolve();
-
-      } catch (final Throwable t) {
-        InterruptedExecutionException.throwIfInterrupt(t);
-        getLogger().err(t, "Error while propagating resolution");
-        next.reject(t);
-      }
+      next.resolve();
     }
   }
 
@@ -2016,7 +1661,7 @@ class DefaultPromiseIterable<O> implements PromiseIterable<O>, Serializable {
           } catch (final Throwable t) {
             InterruptedExecutionException.throwIfInterrupt(t);
             getLogger().err(t, "Error while processing input: %s", input);
-            next.addRejection(t);
+            next.addRejectionSafe(t);
           }
         }
       });
@@ -2048,10 +1693,10 @@ class DefaultPromiseIterable<O> implements PromiseIterable<O>, Serializable {
 
               } catch (final Throwable reason) {
                 InterruptedExecutionException.throwIfInterrupt(t);
-                getLogger().wrn("Suppressed rejection with reason: %s", reason);
+                getLogger().wrn(reason, "Suppressed rejection");
               }
 
-              next.addRejection(t);
+              next.addRejectionSafe(t);
             }
           }
         }
@@ -2075,7 +1720,7 @@ class DefaultPromiseIterable<O> implements PromiseIterable<O>, Serializable {
           } catch (final Throwable t) {
             InterruptedExecutionException.throwIfInterrupt(t);
             getLogger().err(t, "Error while processing rejection with reason: %s", reason);
-            next.addRejection(t);
+            next.addRejectionSafe(t);
           }
         }
       });
@@ -2092,7 +1737,6 @@ class DefaultPromiseIterable<O> implements PromiseIterable<O>, Serializable {
           } catch (final Throwable t) {
             InterruptedExecutionException.throwIfInterrupt(t);
             getLogger().err(t, "Error while propagating resolution");
-            next.reject(t);
           }
         }
       });
@@ -2177,7 +1821,7 @@ class DefaultPromiseIterable<O> implements PromiseIterable<O>, Serializable {
 
       } catch (final Throwable t) {
         InterruptedExecutionException.throwIfInterrupt(t);
-        getLogger().wrn("Suppressed rejection with reason: %s", t);
+        getLogger().wrn(t, "Suppressed rejection");
       }
     }
 
@@ -2217,7 +1861,7 @@ class DefaultPromiseIterable<O> implements PromiseIterable<O>, Serializable {
             InterruptedExecutionException.throwIfInterrupt(t);
             getLogger().err(t, "Error while processing input: %s", input);
             flush(next);
-            next.addRejection(t);
+            next.addRejectionSafe(t);
           }
         }
       });
@@ -2243,11 +1887,11 @@ class DefaultPromiseIterable<O> implements PromiseIterable<O>, Serializable {
 
             } catch (final Throwable reason) {
               InterruptedExecutionException.throwIfInterrupt(t);
-              getLogger().wrn("Suppressed rejection with reason: %s", reason);
+              getLogger().wrn(reason, "Suppressed rejection");
             }
 
             flush(next);
-            next.addRejection(t);
+            next.addRejectionSafe(t);
           }
         }
       });
@@ -2271,7 +1915,7 @@ class DefaultPromiseIterable<O> implements PromiseIterable<O>, Serializable {
             InterruptedExecutionException.throwIfInterrupt(t);
             getLogger().err(t, "Error while processing rejection with reason: %s", reason);
             flush(next);
-            next.addRejection(t);
+            next.addRejectionSafe(t);
           }
         }
       });
@@ -2295,7 +1939,6 @@ class DefaultPromiseIterable<O> implements PromiseIterable<O>, Serializable {
           } catch (final Throwable t) {
             InterruptedExecutionException.throwIfInterrupt(t);
             getLogger().err(t, "Error while propagating resolution");
-            next.reject(t);
           }
         }
       });
@@ -2413,7 +2056,6 @@ class DefaultPromiseIterable<O> implements PromiseIterable<O>, Serializable {
 
     @Override
     void addRejection(final PromiseChain<R, ?> next, final Throwable reason) {
-      innerReject(reason);
       mExecutor.execute(new Runnable() {
 
         public void run() {
@@ -2433,6 +2075,7 @@ class DefaultPromiseIterable<O> implements PromiseIterable<O>, Serializable {
           } catch (final Throwable t) {
             InterruptedExecutionException.throwIfInterrupt(t);
             getLogger().err(t, "Error while processing rejection with reason: %s", reason);
+            mIsRejected = true;
             next.reject(t);
           }
         }
@@ -2504,10 +2147,7 @@ class DefaultPromiseIterable<O> implements PromiseIterable<O>, Serializable {
           resolution = removeFirst();
         }
 
-      } catch (final Throwable t) {
-        InterruptedExecutionException.throwIfInterrupt(t);
-        getLogger().err(t, "Error while propagating resolutions");
-        next.reject(t);
+      } finally {
         synchronized (mMutex) {
           mQueue.clear();
         }
@@ -2526,7 +2166,6 @@ class DefaultPromiseIterable<O> implements PromiseIterable<O>, Serializable {
         } catch (final Throwable t) {
           InterruptedExecutionException.throwIfInterrupt(t);
           getLogger().err(t, "Error while propagating resolution");
-          next.reject(t);
         }
       }
     }
@@ -2574,77 +2213,9 @@ class DefaultPromiseIterable<O> implements PromiseIterable<O>, Serializable {
         mNext = next;
       }
 
-      public void add(final R output) {
-        synchronized (mMutex) {
-          mQueue.add(new ResolutionOutput<R>(output));
-        }
-
-        flushQueue(mNext);
-      }
-
       public void defer(@NotNull final Promise<R> promise) {
         addDeferred(promise);
         resolve();
-      }
-
-      public void reject(final Throwable reason) {
-        synchronized (mMutex) {
-          final NestedQueue<Resolution<R>> queue = mQueue;
-          queue.add(new ResolutionThrowable<R>(reason));
-          queue.close();
-        }
-
-        flushQueue(mNext);
-      }
-
-      @SuppressWarnings("unchecked")
-      public void addAllDeferred(@NotNull final Promise<? extends Iterable<R>> promise) {
-        final NestedQueue<Resolution<R>> queue;
-        synchronized (mMutex) {
-          queue = mQueue.addNested();
-        }
-
-        if (promise instanceof PromiseIterable) {
-          // TODO: 11/08/2017 StatefulHandler??
-          ((PromiseIterable<R>) promise).then(new ChainStatefulHandler(mNext, queue));
-
-        } else {
-          ((Promise<Iterable<R>>) promise).then(new ChainHandlerFulfillIterable(mNext, queue),
-              new ChainHandlerReject(mNext, queue));
-        }
-      }
-
-      public void addAll(@Nullable final Iterable<R> outputs) {
-        synchronized (mMutex) {
-          mQueue.add(new ResolutionOutputs<R>(outputs));
-        }
-
-        flushQueue(mNext);
-      }
-
-      public void addDeferred(@NotNull final Promise<R> promise) {
-        final NestedQueue<Resolution<R>> queue;
-        synchronized (mMutex) {
-          queue = mQueue.addNested();
-        }
-
-        promise.then(new ChainHandlerFulfill(mNext, queue), new ChainHandlerReject(mNext, queue));
-      }
-
-      public void addRejection(final Throwable reason) {
-        synchronized (mMutex) {
-          mQueue.add(new ResolutionThrowable<R>(reason));
-        }
-
-        flushQueue(mNext);
-      }
-
-      public void resolve() {
-        synchronized (mMutex) {
-          mQueue.close();
-        }
-
-        flushQueue(mNext);
       }
 
       public void resolve(final R output) {
@@ -2656,114 +2227,158 @@ class DefaultPromiseIterable<O> implements PromiseIterable<O>, Serializable {
 
         flushQueue(mNext);
       }
-    }
 
-    private class ChainHandlerFulfill implements Handler<R, Callback<Void>> {
-
-      private final PromiseChain<R, ?> mNext;
-
-      private final NestedQueue<Resolution<R>> mQueue;
-
-      private ChainHandlerFulfill(final PromiseChain<R, ?> next,
-          final NestedQueue<Resolution<R>> queue) {
-        mNext = next;
-        mQueue = queue;
-      }
-
-      public void accept(final R input, final Callback<Void> callback) {
+      public void add(final R output) {
         synchronized (mMutex) {
-          final NestedQueue<Resolution<R>> queue = mQueue;
-          queue.add(new ResolutionOutput<R>(input));
-          queue.close();
+          mQueue.add(new ResolutionOutput<R>(output));
         }
 
         flushQueue(mNext);
       }
-    }
 
-    private class ChainHandlerFulfillIterable implements Handler<Iterable<R>, Callback<Void>> {
-
-      private final PromiseChain<R, ?> mNext;
-
-      private final NestedQueue<Resolution<R>> mQueue;
-
-      private ChainHandlerFulfillIterable(final PromiseChain<R, ?> next,
-          final NestedQueue<Resolution<R>> queue) {
-        mNext = next;
-        mQueue = queue;
-      }
-
-      public void accept(final Iterable<R> input, final Callback<Void> callback) {
-        synchronized (mMutex) {
-          final NestedQueue<Resolution<R>> queue = mQueue;
-          queue.add(new ResolutionOutputs<R>(input));
-          queue.close();
-        }
-
-        flushQueue(mNext);
-      }
-    }
-
-    private class ChainHandlerReject implements Handler<Throwable, Callback<Void>> {
-
-      private final PromiseChain<R, ?> mNext;
-
-      private final NestedQueue<Resolution<R>> mQueue;
-
-      private ChainHandlerReject(final PromiseChain<R, ?> next,
-          final NestedQueue<Resolution<R>> queue) {
-        mNext = next;
-        mQueue = queue;
-      }
-
-      public void accept(final Throwable reason, final Callback<Void> callback) {
+      public void reject(final Throwable reason) {
         synchronized (mMutex) {
           final NestedQueue<Resolution<R>> queue = mQueue;
           queue.add(new ResolutionThrowable<R>(reason));
           queue.close();
         }
 
-        flushQueue(mNext);
-      }
-    }
+        try {
+          flushQueue(mNext);
 
-    private class ChainStatefulHandler implements StatefulHandler<R, Void, Void> {
-
-      private final PromiseChain<R, ?> mNext;
-
-      private final NestedQueue<Resolution<R>> mQueue;
-
-      private ChainStatefulHandler(final PromiseChain<R, ?> next,
-          final NestedQueue<Resolution<R>> queue) {
-        mNext = next;
-        mQueue = queue;
+        } catch (final Throwable t) {
+          InterruptedExecutionException.throwIfInterrupt(t);
+          getLogger().err(reason, "Suppressed rejection");
+        }
       }
 
-      public Void create(@NotNull final CallbackIterable<Void> callback) {
-        return null;
-      }
-
-      public Void fulfill(final Void state, final R input,
-          @NotNull final CallbackIterable<Void> callback) {
+      @SuppressWarnings("unchecked")
+      public void addAllDeferred(@NotNull final Promise<? extends Iterable<R>> promise) {
+        final NestedQueue<Resolution<R>> queue;
         synchronized (mMutex) {
-          mQueue.add(new ResolutionOutput<R>(input));
+          queue = mQueue.addNested();
+        }
+
+        if (promise instanceof PromiseIterable) {
+          ((PromiseIterable<R>) promise).then(new Handler<R, CallbackIterable<Void>>() {
+
+            public void accept(final R input, final CallbackIterable<Void> callback) {
+              synchronized (mMutex) {
+                queue.add(new ResolutionOutput<R>(input));
+              }
+
+              flushQueue(mNext);
+            }
+          }, new Handler<Throwable, CallbackIterable<Void>>() {
+
+            public void accept(final Throwable reason, final CallbackIterable<Void> callback) {
+              synchronized (mMutex) {
+                queue.add(new ResolutionThrowable<R>(reason));
+              }
+
+              flushQueue(mNext);
+            }
+          }, new Observer<CallbackIterable<Void>>() {
+
+            public void accept(final CallbackIterable<Void> callback) {
+              synchronized (mMutex) {
+                queue.close();
+              }
+
+              flushQueue(mNext);
+            }
+          });
+
+        } else {
+          ((Promise<Iterable<R>>) promise).then(new Handler<Iterable<R>, Callback<Void>>() {
+
+            public void accept(final Iterable<R> input, final Callback<Void> callback) {
+              synchronized (mMutex) {
+                queue.add(new ResolutionOutputs<R>(input));
+                queue.close();
+              }
+
+              flushQueue(mNext);
+
+            }
+          }, new Handler<Throwable, Callback<Void>>() {
+
+            public void accept(final Throwable reason, final Callback<Void> callback) {
+              synchronized (mMutex) {
+                queue.add(new ResolutionThrowable<R>(reason));
+                queue.close();
+              }
+
+              flushQueue(mNext);
+            }
+          });
+        }
+      }
+
+      public void addAll(@Nullable final Iterable<R> outputs) {
+        synchronized (mMutex) {
+          mQueue.add(new ResolutionOutputs<R>(outputs));
         }
 
         flushQueue(mNext);
-        return null;
       }
 
-      public Void reject(final Void state, final Throwable reason,
-          @NotNull final CallbackIterable<Void> callback) {
+      @SuppressWarnings("unchecked")
+      public void addAllDeferred(@Nullable final Iterable<? extends Promise<?>> promises) {
+        if (promises == null) {
+          return;
+        }
+
+        for (final Promise<?> promise : promises) {
+          if (promise instanceof PromiseIterable) {
+            addAllDeferred((Promise<? extends Iterable<R>>) promise);
+
+          } else {
+            addDeferred((Promise<R>) promise);
+          }
+        }
+      }
+
+      public void addDeferred(@NotNull final Promise<R> promise) {
+        final NestedQueue<Resolution<R>> queue;
+        synchronized (mMutex) {
+          queue = mQueue.addNested();
+        }
+
+        promise.then(new Handler<R, Callback<Void>>() {
+
+          public void accept(final R input, final Callback<Void> callback) {
+            synchronized (mMutex) {
+              queue.add(new ResolutionOutput<R>(input));
+              queue.close();
+            }
+
+            flushQueue(mNext);
+
+          }
+        }, new Handler<Throwable, Callback<Void>>() {
+
+          public void accept(final Throwable reason, final Callback<Void> callback) {
+            synchronized (mMutex) {
+              queue.add(new ResolutionThrowable<R>(reason));
+              queue.close();
+            }
+
+            flushQueue(mNext);
+
+          }
+        });
+      }
+
+      public void addRejection(final Throwable reason) {
         synchronized (mMutex) {
           mQueue.add(new ResolutionThrowable<R>(reason));
         }
 
         flushQueue(mNext);
-        return null;
       }
 
-      public void resolve(final Void state, @NotNull final CallbackIterable<Void> callback) {
+      public void resolve() {
         synchronized (mMutex) {
           mQueue.close();
         }
@@ -2840,7 +2455,6 @@ class DefaultPromiseIterable<O> implements PromiseIterable<O>, Serializable {
 
     @Override
     void addRejection(final PromiseChain<R, ?> next, final Throwable reason) {
-      innerReject(reason);
       mExecutor.execute(new Runnable() {
 
         public void run() {
@@ -2903,26 +2517,36 @@ class DefaultPromiseIterable<O> implements PromiseIterable<O>, Serializable {
 
     private final Handler<Iterable<O>, ? super CallbackIterable<R>> mFulfill;
 
+    private final Logger mLogger;
+
     private final Handler<Throwable, ? super CallbackIterable<R>> mReject;
 
     @SuppressWarnings("unchecked")
     private HandlerAll(@Nullable final Handler<Iterable<O>, ? super CallbackIterable<R>> fulfill,
-        @Nullable final Handler<Throwable, ? super CallbackIterable<R>> reject) {
+        @Nullable final Handler<Throwable, ? super CallbackIterable<R>> reject,
+        @Nullable final Log log, @Nullable final Level level) {
       mFulfill = (Handler<Iterable<O>, ? super CallbackIterable<R>>) ((fulfill != null) ? fulfill
           : new PassThroughOutputsHandler<O, R>());
       mReject = (Handler<Throwable, ? super CallbackIterable<R>>) ((reject != null) ? reject
           : new PassThroughErrorHandler<R>());
+      mLogger = Logger.newLogger(log, level, this);
+    }
+
+    public ArrayList<O> create(@NotNull final CallbackIterable<R> callback) {
+      return new ArrayList<O>();
     }
 
     private Object writeReplace() throws ObjectStreamException {
-      return new HandlerProxy<O, R>(mFulfill, mReject);
+      final Logger logger = mLogger;
+      return new HandlerProxy<O, R>(mFulfill, mReject, logger.getLog(), logger.getLogLevel());
     }
 
     private static class HandlerProxy<O, R> extends SerializableProxy {
 
       private HandlerProxy(final Handler<Iterable<O>, ? super CallbackIterable<R>> fulfill,
-          final Handler<Throwable, ? super CallbackIterable<R>> reject) {
-        super(proxy(fulfill), proxy(reject));
+          final Handler<Throwable, ? super CallbackIterable<R>> reject, final Log log,
+          final Level level) {
+        super(proxy(fulfill), proxy(reject), log, level);
       }
 
       @SuppressWarnings("unchecked")
@@ -2930,7 +2554,8 @@ class DefaultPromiseIterable<O> implements PromiseIterable<O>, Serializable {
         try {
           final Object[] args = deserializeArgs();
           return new HandlerAll<O, R>((Handler<Iterable<O>, ? super CallbackIterable<R>>) args[0],
-              (Handler<Throwable, ? super CallbackIterable<R>>) args[1]);
+              (Handler<Throwable, ? super CallbackIterable<R>>) args[1], (Log) args[2],
+              (Level) args[3]);
 
         } catch (final Throwable t) {
           throw new InvalidObjectException(t.getMessage());
@@ -2938,30 +2563,40 @@ class DefaultPromiseIterable<O> implements PromiseIterable<O>, Serializable {
       }
     }
 
-    public ArrayList<O> create(@NotNull final CallbackIterable<R> callback) {
-      return new ArrayList<O>();
-    }
-
     public ArrayList<O> fulfill(final ArrayList<O> state, final O input,
         @NotNull final CallbackIterable<R> callback) {
-      state.add(input);
+      if (state != null) {
+        state.add(input);
+      }
+
       return state;
     }
 
     public ArrayList<O> reject(final ArrayList<O> state, final Throwable reason,
         @NotNull final CallbackIterable<R> callback) throws Exception {
-      // TODO: 11/08/2017 accumulate rejections?
-      mReject.accept(reason, callback);
-      return state;
+      if (state != null) {
+        mReject.accept(reason, callback);
+
+      } else {
+        mLogger.wrn(reason, "Suppressed rejection");
+      }
+
+      return null;
     }
 
     public void resolve(final ArrayList<O> state,
         @NotNull final CallbackIterable<R> callback) throws Exception {
-      mFulfill.accept(state, callback);
+      if (state != null) {
+        mFulfill.accept(state, callback);
+
+      } else {
+        callback.resolve();
+      }
     }
   }
 
-  private static class HandlerAny<O, R> implements StatefulHandler<O, R, Boolean>, Serializable {
+  private static class HandlerAny<O, R>
+      implements StatefulHandler<O, R, AnyState<R>>, Serializable {
 
     private final Handler<O, ? super CallbackIterable<R>> mFulfill;
 
@@ -3000,38 +2635,42 @@ class DefaultPromiseIterable<O> implements PromiseIterable<O>, Serializable {
       }
     }
 
-    public Boolean create(@NotNull final CallbackIterable<R> callback) {
-      return Boolean.TRUE;
+    public AnyState<R> create(@NotNull final CallbackIterable<R> callback) {
+      return null;
     }
 
-    public Boolean fulfill(final Boolean state, final O input,
+    public AnyState<R> fulfill(final AnyState<R> state, final O input,
         @NotNull final CallbackIterable<R> callback) throws Exception {
-      if (state) {
+      if ((state == null) || (state instanceof AnyStateRejected)) {
         mFulfill.accept(input, callback);
-        return Boolean.FALSE;
+        return new AnyStateResolved<R>();
       }
 
       return state;
     }
 
-    public Boolean reject(final Boolean state, final Throwable reason,
+    public AnyState<R> reject(final AnyState<R> state, final Throwable reason,
         @NotNull final CallbackIterable<R> callback) throws Exception {
-      if (state) {
-        mReject.accept(reason, callback);
-        return Boolean.FALSE;
+      if (state == null) {
+        return new AnyStateRejected<R>(reason);
       }
 
       return state;
     }
 
-    public void resolve(final Boolean state, @NotNull final CallbackIterable<R> callback) {
-      if (state) {
+    public void resolve(final AnyState<R> state, @NotNull final CallbackIterable<R> callback) throws
+        Exception {
+      if (state != null) {
+        state.accept(callback);
+
+      } else {
         callback.resolve();
       }
     }
   }
 
-  private static class HandlerApplyFulfill<O, R> implements Handler<O, Callback<R>>, Serializable {
+  private static class HandlerApplyFulfill<O, R>
+      implements Handler<O, CallbackIterable<R>>, Serializable {
 
     private final Log mLog;
 
@@ -3073,15 +2712,16 @@ class DefaultPromiseIterable<O> implements PromiseIterable<O>, Serializable {
       }
     }
 
-    public void accept(final O input, final Callback<R> callback) throws Exception {
-      callback.defer(mMapper.apply(
+    public void accept(final O input, final CallbackIterable<R> callback) throws Exception {
+      callback.addDeferred(mMapper.apply(
           new DefaultPromise<O>(new ResolvedObserver<O>(input), mPropagationType, mLog,
               mLogLevel)));
+      callback.resolve();
     }
   }
 
   private static class HandlerApplyReject<O, R>
-      implements Handler<Throwable, Callback<R>>, Serializable {
+      implements Handler<Throwable, CallbackIterable<R>>, Serializable {
 
     private final Log mLog;
 
@@ -3123,10 +2763,12 @@ class DefaultPromiseIterable<O> implements PromiseIterable<O>, Serializable {
       }
     }
 
-    public void accept(final Throwable reason, final Callback<R> callback) throws Exception {
-      callback.defer(mMapper.apply(
+    public void accept(final Throwable reason, final CallbackIterable<R> callback) throws
+        Exception {
+      callback.addDeferred(mMapper.apply(
           new DefaultPromise<O>(new RejectedObserver<O>(reason), mPropagationType, mLog,
               mLogLevel)));
+      callback.resolve();
     }
   }
 
@@ -3242,10 +2884,10 @@ class DefaultPromiseIterable<O> implements PromiseIterable<O>, Serializable {
       callback.addAll(mMapper.apply(input));
       callback.resolve();
     }
-
   }
 
-  private static class HandlerMapEach<O, R> implements Handler<O, Callback<R>>, Serializable {
+  private static class HandlerMapEach<O, R>
+      implements Handler<O, CallbackIterable<R>>, Serializable {
 
     private final Mapper<O, R> mMapper;
 
@@ -3275,8 +2917,9 @@ class DefaultPromiseIterable<O> implements PromiseIterable<O>, Serializable {
       }
     }
 
-    public void accept(final O input, final Callback<R> callback) throws Exception {
-      callback.resolve(mMapper.apply(input));
+    public void accept(final O input, final CallbackIterable<R> callback) throws Exception {
+      callback.add(mMapper.apply(input));
+      callback.resolve();
     }
   }
 
@@ -3357,7 +3000,7 @@ class DefaultPromiseIterable<O> implements PromiseIterable<O>, Serializable {
   }
 
   private static class HandlerResolvedAll<O>
-      implements Handler<Iterable<O>, CallbackIterable<O>>, Serializable {
+      implements Observer<CallbackIterable<O>>, Serializable {
 
     private final Action mAction;
 
@@ -3387,10 +3030,8 @@ class DefaultPromiseIterable<O> implements PromiseIterable<O>, Serializable {
       }
     }
 
-    public void accept(final Iterable<O> input, final CallbackIterable<O> callback) throws
-        Exception {
+    public void accept(final CallbackIterable<O> callback) throws Exception {
       mAction.perform();
-      callback.addAll(input);
       callback.resolve();
     }
   }
@@ -3434,48 +3075,7 @@ class DefaultPromiseIterable<O> implements PromiseIterable<O>, Serializable {
 
     public void accept(final O input, final CallbackIterable<R> callback) throws Exception {
       try {
-        mHandler.accept(input, new CallbackIterable<R>() {
-
-          public void defer(@NotNull final Promise<R> promise) {
-            safeClose(input, mLogger);
-            callback.defer(promise);
-          }
-
-          public void add(final R output) {
-            callback.add(output);
-          }
-
-          public void addAll(@Nullable final Iterable<R> outputs) {
-            callback.addAll(outputs);
-          }
-
-          public void addAllDeferred(@NotNull final Promise<? extends Iterable<R>> promise) {
-            callback.addAllDeferred(promise);
-          }
-
-          public void addDeferred(@NotNull final Promise<R> promise) {
-            callback.addDeferred(promise);
-          }
-
-          public void addRejection(final Throwable reason) {
-            callback.addRejection(reason);
-          }
-
-          public void reject(final Throwable reason) {
-            safeClose(input, mLogger);
-            callback.reject(reason);
-          }
-
-          public void resolve() {
-            safeClose(input, mLogger);
-            callback.resolve();
-          }
-
-          public void resolve(final R output) {
-            safeClose(input, mLogger);
-            callback.resolve(output);
-          }
-        });
+        mHandler.accept(input, new TryCallback<R>(input, callback, mLogger));
 
       } catch (final Throwable t) {
         safeClose(input, mLogger);
@@ -3528,60 +3128,7 @@ class DefaultPromiseIterable<O> implements PromiseIterable<O>, Serializable {
     public void accept(final Iterable<O> inputs, final CallbackIterable<R> callback) throws
         Exception {
       try {
-        mHandler.accept(inputs, new CallbackIterable<R>() {
-
-          public void add(final R output) {
-            callback.add(output);
-          }
-
-          public void defer(@NotNull final Promise<R> promise) {
-            for (final O input : inputs) {
-              safeClose(input, mLogger);
-            }
-
-            callback.defer(promise);
-          }
-
-          public void addAll(@Nullable final Iterable<R> outputs) {
-            callback.addAll(outputs);
-          }
-
-          public void addAllDeferred(@NotNull final Promise<? extends Iterable<R>> promise) {
-            callback.addAllDeferred(promise);
-          }
-
-          public void addDeferred(@NotNull final Promise<R> promise) {
-            callback.addDeferred(promise);
-          }
-
-          public void addRejection(final Throwable reason) {
-            callback.addRejection(reason);
-          }
-
-          public void reject(final Throwable reason) {
-            for (final O input : inputs) {
-              safeClose(input, mLogger);
-            }
-
-            callback.reject(reason);
-          }
-
-          public void resolve() {
-            for (final O input : inputs) {
-              safeClose(input, mLogger);
-            }
-
-            callback.resolve();
-          }
-
-          public void resolve(final R output) {
-            for (final O input : inputs) {
-              safeClose(input, mLogger);
-            }
-
-            callback.resolve(output);
-          }
-        });
+        mHandler.accept(inputs, new TryCallbackIterable<R>(inputs, callback, mLogger));
 
       } catch (final Throwable t) {
         for (final O input : inputs) {
@@ -3673,7 +3220,6 @@ class DefaultPromiseIterable<O> implements PromiseIterable<O>, Serializable {
         safeClose(input, mLogger);
       }
     }
-
   }
 
   private static class PassThroughErrorHandler<R>
@@ -3711,7 +3257,7 @@ class DefaultPromiseIterable<O> implements PromiseIterable<O>, Serializable {
 
     private transient volatile StatePending mInnerState = new StatePending();
 
-    private transient Logger mLogger;
+    private transient volatile Logger mLogger;
 
     private transient volatile PromiseChain<O, ?> mNext;
 
@@ -3720,6 +3266,35 @@ class DefaultPromiseIterable<O> implements PromiseIterable<O>, Serializable {
     abstract void addAll(PromiseChain<O, ?> next, Iterable<I> inputs);
 
     abstract void addRejection(PromiseChain<O, ?> next, Throwable reason);
+
+    final void addRejectionSafe(final Throwable reason) {
+      final Runnable command;
+      synchronized (mMutex) {
+        command = mInnerState.addRejection(reason);
+      }
+
+      if (command != null) {
+        command.run();
+        addRejection(mNext, reason);
+      }
+    }
+
+    void cancel() {
+      final CancellationException reason = new CancellationException();
+      final Runnable command;
+      synchronized (mMutex) {
+        command = mInnerState.reject(reason);
+      }
+
+      if (command != null) {
+        command.run();
+        addRejection(mNext, reason);
+        innerResolve();
+
+      } else {
+        mNext.cancel();
+      }
+    }
 
     @NotNull
     abstract PromiseChain<I, O> copy();
@@ -3730,19 +3305,6 @@ class DefaultPromiseIterable<O> implements PromiseIterable<O>, Serializable {
 
     void setLogger(@NotNull final Logger logger) {
       mLogger = logger.subContextLogger(this);
-    }
-
-    void innerReject(final Throwable reason) {
-      final Runnable command;
-      synchronized (mMutex) {
-        command = mInnerState.reject(reason);
-      }
-
-      if (command != null) {
-        command.run();
-      }
-
-      innerResolve();
     }
 
     void prepend(@NotNull final List<Resolution<I>> resolutions) {
@@ -3760,7 +3322,7 @@ class DefaultPromiseIterable<O> implements PromiseIterable<O>, Serializable {
     private void innerResolve() {
       final boolean needResolve;
       synchronized (mMutex) {
-        needResolve = (--mDeferredCount <= 0);
+        needResolve = (--mDeferredCount == 0);
       }
 
       if (needResolve) {
@@ -3768,27 +3330,35 @@ class DefaultPromiseIterable<O> implements PromiseIterable<O>, Serializable {
       }
     }
 
-    private class StatePending {
+    private class StatePending implements Runnable {
 
       @Nullable
       Runnable add() {
-        return null;
+        return this;
+      }
+
+      @Nullable
+      Runnable addRejection(final Throwable reason) {
+        return this;
       }
 
       @Nullable
       Runnable reject(final Throwable reason) {
         mInnerState = new StateRejected(reason);
-        return null;
+        return this;
       }
 
       @Nullable
       Runnable resolve() {
         mInnerState = new StateResolved();
-        return null;
+        return this;
+      }
+
+      public void run() {
       }
     }
 
-    private class StatePrepending extends StatePending implements Runnable {
+    private class StatePrepending extends StatePending {
 
       private final List<Resolution<I>> mResolutions;
 
@@ -3804,16 +3374,15 @@ class DefaultPromiseIterable<O> implements PromiseIterable<O>, Serializable {
       }
 
       public void run() {
-        try {
-          for (final Resolution<I> resolution : mResolutions) {
-            resolution.consume(PromiseChain.this);
-          }
-
-        } catch (final Throwable t) {
-          InterruptedExecutionException.throwIfInterrupt(t);
-          getLogger().err(t, "Error while propagating resolutions");
-          reject(t);
+        for (final Resolution<I> resolution : mResolutions) {
+          resolution.consume(PromiseChain.this);
         }
+      }
+
+      @Nullable
+      @Override
+      Runnable addRejection(final Throwable reason) {
+        return add();
       }
 
       @Nullable
@@ -3849,18 +3418,26 @@ class DefaultPromiseIterable<O> implements PromiseIterable<O>, Serializable {
 
     private class StateRejected extends StatePending {
 
-      private final Throwable mReason;
+      private final Throwable mException;
 
       private StateRejected(final Throwable reason) {
-        mReason = reason;
+        mException = reason;
       }
 
       @Nullable
       @Override
       Runnable add() {
-        final Throwable reason = mReason;
-        mLogger.wrn("Chain has been already rejected with reason: %s", reason);
-        throw RejectionException.wrapIfNotRejectionException(reason);
+        final Throwable exception = mException;
+        mLogger.wrn("Promise has been already rejected with reason: %s", exception);
+        throw RejectionException.wrapIfNotRejectionException(exception);
+      }
+
+      @Nullable
+      @Override
+      Runnable addRejection(final Throwable reason) {
+        final Throwable exception = mException;
+        mLogger.wrn("Promise has been already rejected with reason: %s", exception);
+        throw RejectionException.wrapIfNotRejectionException(exception);
       }
 
       @Nullable
@@ -3873,9 +3450,9 @@ class DefaultPromiseIterable<O> implements PromiseIterable<O>, Serializable {
       @Nullable
       @Override
       Runnable resolve() {
-        final Throwable reason = mReason;
-        mLogger.wrn("Chain has been already rejected with reason: %s", reason);
-        throw RejectionException.wrapIfNotRejectionException(reason);
+        final Throwable exception = mException;
+        mLogger.wrn("Promise has been already rejected with reason: %s", exception);
+        throw RejectionException.wrapIfNotRejectionException(exception);
       }
     }
 
@@ -3884,15 +3461,47 @@ class DefaultPromiseIterable<O> implements PromiseIterable<O>, Serializable {
       @Nullable
       @Override
       Runnable add() {
-        mLogger.wrn("Chain has been already resolved");
-        throw new IllegalStateException("chain has been already resolved");
+        mLogger.wrn("Promise has been already resolved");
+        throw new IllegalStateException("promise has been already resolved");
+      }
+
+      @Nullable
+      @Override
+      Runnable addRejection(final Throwable reason) {
+        mLogger.wrn("Promise has been already resolved");
+        throw new IllegalStateException("promise has been already resolved");
+      }
+
+      @Nullable
+      @Override
+      Runnable reject(final Throwable reason) {
+        mLogger.wrn(reason, "Suppressed rejection");
+        return null;
       }
 
       @Nullable
       @Override
       Runnable resolve() {
-        mLogger.wrn("Chain has been already resolved");
-        throw new IllegalStateException("chain has been already resolved");
+        mLogger.wrn("Promise has been already resolved");
+        throw new IllegalStateException("promise has been already resolved");
+      }
+    }
+
+    public final void defer(@NotNull final Promise<I> promise) {
+      addDeferred(promise);
+      resolve();
+    }
+
+    public final void resolve(final I output) {
+      final Runnable command;
+      synchronized (mMutex) {
+        command = mInnerState.resolve();
+      }
+
+      if (command != null) {
+        command.run();
+        add(mNext, output);
+        innerResolve();
       }
     }
 
@@ -3904,9 +3513,8 @@ class DefaultPromiseIterable<O> implements PromiseIterable<O>, Serializable {
 
       if (command != null) {
         command.run();
+        addRejection(mNext, reason);
       }
-
-      addRejection(mNext, reason);
     }
 
     public final void add(final I output) {
@@ -3917,9 +3525,8 @@ class DefaultPromiseIterable<O> implements PromiseIterable<O>, Serializable {
 
       if (command != null) {
         command.run();
+        add(mNext, output);
       }
-
-      add(mNext, output);
     }
 
     public final void addAll(@Nullable final Iterable<I> outputs) {
@@ -3930,10 +3537,26 @@ class DefaultPromiseIterable<O> implements PromiseIterable<O>, Serializable {
 
       if (command != null) {
         command.run();
+
+        if (outputs != null) {
+          addAll(mNext, outputs);
+        }
+      }
+    }
+
+    @SuppressWarnings("unchecked")
+    public void addAllDeferred(@Nullable final Iterable<? extends Promise<?>> promises) {
+      if (promises == null) {
+        return;
       }
 
-      if (outputs != null) {
-        addAll(mNext, outputs);
+      for (final Promise<?> promise : promises) {
+        if (promise instanceof PromiseIterable) {
+          addAllDeferred((Promise<? extends Iterable<I>>) promise);
+
+        } else {
+          addDeferred((Promise<I>) promise);
+        }
       }
     }
 
@@ -3947,50 +3570,42 @@ class DefaultPromiseIterable<O> implements PromiseIterable<O>, Serializable {
 
       if (command != null) {
         command.run();
-      }
+        if (promise instanceof PromiseIterable) {
+          ((PromiseIterable<I>) promise).then(new Handler<I, CallbackIterable<Void>>() {
 
-      if (promise instanceof PromiseIterable) {
-        // TODO: 11/08/2017 StatefulHandler??
-        ((PromiseIterable<I>) promise).then(new StatefulHandler<I, Void, Void>() {
-
-          public Void fulfill(final Void state, final I input,
-              @NotNull final CallbackIterable<Void> callback) {
-            PromiseChain.this.add(mNext, input);
-            return null;
-          }
-
-          public Void create(@NotNull final CallbackIterable<Void> callback) {
-            return null;
-          }
-
-          public Void reject(final Void state, final Throwable reason,
-              @NotNull final CallbackIterable<Void> callback) {
-            PromiseChain.this.addRejection(mNext, reason);
-            return null;
-          }
-
-          public void resolve(final Void state, @NotNull final CallbackIterable<Void> callback) {
-            PromiseChain.this.innerResolve();
-          }
-        });
-
-      } else {
-        ((Promise<Iterable<I>>) promise).then(new Handler<Iterable<I>, Callback<Void>>() {
-
-          public void accept(final Iterable<I> inputs, final Callback<Void> callback) {
-            if (inputs != null) {
-              PromiseChain.this.addAll(mNext, inputs);
+            public void accept(final I input, final CallbackIterable<Void> callback) {
+              PromiseChain.this.add(mNext, input);
             }
+          }, new Handler<Throwable, CallbackIterable<Void>>() {
 
-            PromiseChain.this.innerResolve();
-          }
-        }, new Handler<Throwable, Callback<Void>>() {
+            public void accept(final Throwable reason, final CallbackIterable<Void> callback) {
+              PromiseChain.this.addRejection(mNext, reason);
+            }
+          }, new Observer<CallbackIterable<Void>>() {
 
-          public void accept(final Throwable reason, final Callback<Void> callback) {
-            PromiseChain.this.addRejection(mNext, reason);
-            PromiseChain.this.innerResolve();
-          }
-        });
+            public void accept(final CallbackIterable<Void> callback) {
+              PromiseChain.this.innerResolve();
+            }
+          });
+
+        } else {
+          ((Promise<Iterable<I>>) promise).then(new Handler<Iterable<I>, Callback<Void>>() {
+
+            public void accept(final Iterable<I> inputs, final Callback<Void> callback) {
+              if (inputs != null) {
+                PromiseChain.this.addAll(mNext, inputs);
+              }
+
+              PromiseChain.this.innerResolve();
+            }
+          }, new Handler<Throwable, Callback<Void>>() {
+
+            public void accept(final Throwable reason, final Callback<Void> callback) {
+              PromiseChain.this.addRejection(mNext, reason);
+              PromiseChain.this.innerResolve();
+            }
+          });
+        }
       }
     }
 
@@ -4003,21 +3618,20 @@ class DefaultPromiseIterable<O> implements PromiseIterable<O>, Serializable {
 
       if (command != null) {
         command.run();
+        promise.then(new Handler<I, Callback<Void>>() {
+
+          public void accept(final I input, final Callback<Void> callback) {
+            PromiseChain.this.add(mNext, input);
+            PromiseChain.this.innerResolve();
+          }
+        }, new Handler<Throwable, Callback<Void>>() {
+
+          public void accept(final Throwable reason, final Callback<Void> callback) {
+            PromiseChain.this.addRejection(mNext, reason);
+            PromiseChain.this.innerResolve();
+          }
+        });
       }
-
-      promise.then(new Handler<I, Callback<Void>>() {
-
-        public void accept(final I input, final Callback<Void> callback) {
-          PromiseChain.this.add(mNext, input);
-          PromiseChain.this.innerResolve();
-        }
-      }, new Handler<Throwable, Callback<Void>>() {
-
-        public void accept(final Throwable reason, final Callback<Void> callback) {
-          PromiseChain.this.addRejection(mNext, reason);
-          PromiseChain.this.innerResolve();
-        }
-      });
     }
 
     public final void resolve() {
@@ -4028,14 +3642,8 @@ class DefaultPromiseIterable<O> implements PromiseIterable<O>, Serializable {
 
       if (command != null) {
         command.run();
+        innerResolve();
       }
-
-      innerResolve();
-    }
-
-    public final void defer(@NotNull final Promise<I> promise) {
-      addDeferred(promise);
-      resolve();
     }
 
     public final void reject(final Throwable reason) {
@@ -4046,24 +3654,9 @@ class DefaultPromiseIterable<O> implements PromiseIterable<O>, Serializable {
 
       if (command != null) {
         command.run();
+        addRejection(mNext, reason);
+        innerResolve();
       }
-
-      addRejection(mNext, reason);
-      innerResolve();
-    }
-
-    public final void resolve(final I output) {
-      final Runnable command;
-      synchronized (mMutex) {
-        command = mInnerState.resolve();
-      }
-
-      if (command != null) {
-        command.run();
-      }
-
-      add(mNext, output);
-      innerResolve();
     }
   }
 
@@ -4213,12 +3806,228 @@ class DefaultPromiseIterable<O> implements PromiseIterable<O>, Serializable {
     }
   }
 
+  private static class StatefulHandlerTry<O, R, S extends Closeable>
+      implements StatefulHandler<O, R, S>, Serializable {
+
+    private final StatefulHandler<O, R, S> mHandler;
+
+    private final Logger mLogger;
+
+    private StatefulHandlerTry(@NotNull final StatefulHandler<O, R, S> handler,
+        @Nullable final Log log, @Nullable final Level level) {
+      mHandler = ConstantConditions.notNull("handler", handler);
+      mLogger = Logger.newLogger(log, level, this);
+    }
+
+    private Object writeReplace() throws ObjectStreamException {
+      final Logger logger = mLogger;
+      return new HandlerProxy<O, R, S>(mHandler, logger.getLog(), logger.getLogLevel());
+    }
+
+    private static class HandlerProxy<O, R, S extends Closeable> extends SerializableProxy {
+
+      private HandlerProxy(final StatefulHandler<O, R, S> handler, final Log log,
+          final Level level) {
+        super(proxy(handler), log, level);
+      }
+
+      @SuppressWarnings("unchecked")
+      Object readResolve() throws ObjectStreamException {
+        try {
+          final Object[] args = deserializeArgs();
+          return new StatefulHandlerTry<O, R, S>((StatefulHandler<O, R, S>) args[0], (Log) args[1],
+              (Level) args[2]);
+
+        } catch (final Throwable t) {
+          throw new InvalidObjectException(t.getMessage());
+        }
+      }
+    }
+
+    public S create(@NotNull final CallbackIterable<R> callback) throws Exception {
+      return mHandler.create(callback);
+    }
+
+    public S fulfill(final S state, final O input,
+        @NotNull final CallbackIterable<R> callback) throws Exception {
+      try {
+        return mHandler.fulfill(state, input, new TryCallback<R>(state, callback, mLogger));
+
+      } catch (final Throwable t) {
+        safeClose(state, mLogger);
+        InterruptedExecutionException.throwIfInterrupt(t);
+        throw RejectionException.wrapIfNot(RuntimeException.class, t);
+      }
+    }
+
+    public S reject(final S state, final Throwable reason,
+        @NotNull final CallbackIterable<R> callback) throws Exception {
+      try {
+        return mHandler.reject(state, reason, new TryCallback<R>(state, callback, mLogger));
+
+      } catch (final Throwable t) {
+        safeClose(state, mLogger);
+        InterruptedExecutionException.throwIfInterrupt(t);
+        throw RejectionException.wrapIfNot(RuntimeException.class, t);
+      }
+    }
+
+    public void resolve(final S state, @NotNull final CallbackIterable<R> callback) throws
+        Exception {
+      try {
+        mHandler.resolve(state, new TryCallback<R>(state, callback, mLogger));
+
+      } catch (final Throwable t) {
+        safeClose(state, mLogger);
+        InterruptedExecutionException.throwIfInterrupt(t);
+        throw RejectionException.wrapIfNot(RuntimeException.class, t);
+      }
+    }
+  }
+
+  private static class TryCallback<O> implements CallbackIterable<O> {
+
+    private final CallbackIterable<O> mCallback;
+
+    private final Object mCloseable;
+
+    private final Logger mLogger;
+
+    private TryCallback(final Object closeable, @NotNull final CallbackIterable<O> callback,
+        @NotNull final Logger logger) {
+      mCloseable = closeable;
+      mCallback = callback;
+      mLogger = logger;
+    }
+
+    public void defer(@NotNull final Promise<O> promise) {
+      safeClose(mCloseable, mLogger);
+      mCallback.defer(promise);
+    }
+
+    public void resolve(final O output) {
+      safeClose(mCloseable, mLogger);
+      mCallback.resolve(output);
+    }
+
+    public void add(final O output) {
+      mCallback.add(output);
+    }
+
+    public void addAll(@Nullable final Iterable<O> outputs) {
+      mCallback.addAll(outputs);
+    }
+
+    public void addAllDeferred(@Nullable final Iterable<? extends Promise<?>> promises) {
+      mCallback.addAllDeferred(promises);
+    }
+
+    public void addAllDeferred(@NotNull final Promise<? extends Iterable<O>> promise) {
+      mCallback.addAllDeferred(promise);
+    }
+
+    public void addDeferred(@NotNull final Promise<O> promise) {
+      mCallback.addDeferred(promise);
+    }
+
+    public void addRejection(final Throwable reason) {
+      mCallback.addRejection(reason);
+    }
+
+    public void reject(final Throwable reason) {
+      safeClose(mCloseable, mLogger);
+      mCallback.reject(reason);
+    }
+
+    public void resolve() {
+      safeClose(mCloseable, mLogger);
+      mCallback.resolve();
+    }
+  }
+
+  private static class TryCallbackIterable<O> implements CallbackIterable<O> {
+
+    private final CallbackIterable<O> mCallback;
+
+    private final Iterable<?> mCloseables;
+
+    private final Logger mLogger;
+
+    private TryCallbackIterable(final Iterable<?> closeables,
+        @NotNull final CallbackIterable<O> callback, @NotNull final Logger logger) {
+      mCloseables = closeables;
+      mCallback = callback;
+      mLogger = logger;
+    }
+
+    public void defer(@NotNull final Promise<O> promise) {
+      @SuppressWarnings("UnnecessaryLocalVariable") final Logger logger = mLogger;
+      for (final Object closeable : mCloseables) {
+        safeClose(closeable, logger);
+      }
+
+      mCallback.defer(promise);
+    }
+
+    public void resolve(final O output) {
+      @SuppressWarnings("UnnecessaryLocalVariable") final Logger logger = mLogger;
+      for (final Object closeable : mCloseables) {
+        safeClose(closeable, logger);
+      }
+
+      mCallback.resolve(output);
+    }
+
+    public void add(final O output) {
+      mCallback.add(output);
+    }
+
+    public void addAll(@Nullable final Iterable<O> outputs) {
+      mCallback.addAll(outputs);
+    }
+
+    public void addAllDeferred(@Nullable final Iterable<? extends Promise<?>> promises) {
+      mCallback.addAllDeferred(promises);
+    }
+
+    public void addAllDeferred(@NotNull final Promise<? extends Iterable<O>> promise) {
+      mCallback.addAllDeferred(promise);
+    }
+
+    public void addDeferred(@NotNull final Promise<O> promise) {
+      mCallback.addDeferred(promise);
+    }
+
+    public void addRejection(final Throwable reason) {
+      mCallback.addRejection(reason);
+    }
+
+    public void reject(final Throwable reason) {
+      @SuppressWarnings("UnnecessaryLocalVariable") final Logger logger = mLogger;
+      for (final Object closeable : mCloseables) {
+        safeClose(closeable, logger);
+      }
+
+      mCallback.reject(reason);
+    }
+
+    public void resolve() {
+      @SuppressWarnings("UnnecessaryLocalVariable") final Logger logger = mLogger;
+      for (final Object closeable : mCloseables) {
+        safeClose(closeable, logger);
+      }
+
+      mCallback.resolve();
+    }
+  }
+
   private class ChainTail extends PromiseChain<O, Object> {
 
     private final ChainHead<O> mHead;
 
     private ChainTail(@NotNull final ChainHead<O> head) {
       mHead = head;
+      setLogger(mLogger);
     }
 
     @Override

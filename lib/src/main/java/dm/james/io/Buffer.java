@@ -49,4 +49,6 @@ public interface Buffer {
   int read(@NotNull ByteBuffer buffer) throws IOException;
 
   int read(@NotNull WritableByteChannel channel) throws IOException;
+
+  void release();
 }

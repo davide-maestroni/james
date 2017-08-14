@@ -19,6 +19,7 @@ package dm.james.promise;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
+import java.io.Closeable;
 import java.util.Iterator;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
@@ -31,7 +32,6 @@ public interface PromiseIterable<O> extends Promise<Iterable<O>>, Iterable<O> {
   @NotNull
   <R> PromiseIterable<R> all(@Nullable Handler<Iterable<O>, ? super CallbackIterable<R>> fulfill,
       @Nullable Handler<Throwable, ? super CallbackIterable<R>> reject);
-  // TODO: 11/08/2017 Handler<Iterable<Throwable>, ? super CallbackIterable<R>>???
 
   @NotNull
   <R> PromiseIterable<R> all(@NotNull Mapper<Iterable<O>, Iterable<R>> mapper);
@@ -190,12 +190,20 @@ public interface PromiseIterable<O> extends Promise<Iterable<O>>, Iterable<O> {
   <R, S> PromiseIterable<R> then(@NotNull StatefulHandler<O, R, S> handler);
 
   @NotNull
-  <R> PromiseIterable<R> thenSorted(@Nullable Handler<O, ? super CallbackIterable<R>> fulfill,
+  <R, S> PromiseIterable<R> thenSorted(@NotNull StatefulHandler<O, R, S> handler);
+
+  @NotNull
+  <R> PromiseIterable<R> thenTry(@Nullable Handler<O, ? super CallbackIterable<R>> fulfill,
       @Nullable Handler<Throwable, ? super CallbackIterable<R>> reject,
       @Nullable Observer<? super CallbackIterable<R>> resolve);
 
   @NotNull
-  <R, S> PromiseIterable<R> thenSorted(@NotNull StatefulHandler<O, R, S> handler);
+  <R, S extends Closeable> PromiseIterable<R> thenTryState(
+      @NotNull StatefulHandler<O, R, S> handler);
+
+  @NotNull
+  <R, S extends Closeable> PromiseIterable<R> thenTryStateSorted(
+      @NotNull StatefulHandler<O, R, S> handler);
 
   void waitComplete();
 
@@ -210,18 +218,15 @@ public interface PromiseIterable<O> extends Promise<Iterable<O>>, Iterable<O> {
   @NotNull
   PromiseIterable<O> whenRejectedEach(@NotNull Observer<Throwable> observer);
 
-  // TODO: 11/08/2017 extends Callback<Iterable<O>>???
   interface CallbackIterable<O> extends Callback<O> {
-
-    // TODO: 01/08/2017 return CallbackIterable<O>?
 
     void add(O output);
 
     void addAll(@Nullable Iterable<O> outputs);
 
-    void addAllDeferred(@NotNull Promise<? extends Iterable<O>> promise);
+    void addAllDeferred(@Nullable Iterable<? extends Promise<?>> promises);
 
-    // TODO: 11/08/2017 void addAllDeferred(@Nullable Iterable<? extends Promise<?>> promises)
+    void addAllDeferred(@NotNull Promise<? extends Iterable<O>> promise);
 
     void addDeferred(@NotNull Promise<O> promise);
 

@@ -19,20 +19,25 @@ package dm.james.promise;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
+import java.io.Closeable;
+
 /**
  * Created by davide-maestroni on 08/01/2017.
  */
 public interface DeferredPromiseIterable<I, O>
-    extends PromiseIterable<O>, ResolvableIterable<I>, DeferredPromise<Iterable<I>, Iterable<O>> {
+    extends PromiseIterable<O>, DeferredPromise<Iterable<I>, Iterable<O>> {
 
-  @NotNull
-  DeferredPromiseIterable<I, O> added(I input);
+  void add(I input);
 
-  @NotNull
-  DeferredPromiseIterable<I, O> addedAll(Iterable<I> input);
+  void addAll(@Nullable Iterable<I> inputs);
 
-  @NotNull
-  DeferredPromiseIterable<I, O> addedRejection(Throwable reason);
+  void addAllDeferred(@Nullable Iterable<? extends Promise<?>> promises);
+
+  void addAllDeferred(@NotNull Promise<? extends Iterable<I>> promise);
+
+  void addDeferred(@NotNull Promise<I> promise);
+
+  void addRejection(Throwable reason);
 
   @NotNull
   <R> DeferredPromiseIterable<I, R> all(
@@ -165,13 +170,21 @@ public interface DeferredPromiseIterable<I, O>
   <R, S> DeferredPromiseIterable<I, R> then(@NotNull StatefulHandler<O, R, S> handler);
 
   @NotNull
-  <R> DeferredPromiseIterable<I, R> thenSorted(
+  <R, S> DeferredPromiseIterable<I, R> thenSorted(@NotNull StatefulHandler<O, R, S> handler);
+
+  @NotNull
+  <R> DeferredPromiseIterable<I, R> thenTry(
       @Nullable Handler<O, ? super CallbackIterable<R>> fulfill,
       @Nullable Handler<Throwable, ? super CallbackIterable<R>> reject,
       @Nullable Observer<? super CallbackIterable<R>> resolve);
 
   @NotNull
-  <R, S> DeferredPromiseIterable<I, R> thenSorted(@NotNull StatefulHandler<O, R, S> handler);
+  <R, S extends Closeable> DeferredPromiseIterable<I, R> thenTryState(
+      @NotNull StatefulHandler<O, R, S> handler);
+
+  @NotNull
+  <R, S extends Closeable> DeferredPromiseIterable<I, R> thenTryStateSorted(
+      @NotNull StatefulHandler<O, R, S> handler);
 
   @NotNull
   DeferredPromiseIterable<I, O> whenFulfilledAny(@NotNull Observer<O> observer);
@@ -182,11 +195,7 @@ public interface DeferredPromiseIterable<I, O>
   @NotNull
   DeferredPromiseIterable<I, O> whenRejectedEach(@NotNull Observer<Throwable> observer);
 
-  @NotNull
-  DeferredPromiseIterable<I, O> rejected(Throwable reason);
-
-  @NotNull
-  DeferredPromiseIterable<I, O> resolved(Iterable<I> inputs);
+  void resolve();
 
   @NotNull
   <R> DeferredPromise<Iterable<I>, R> then(

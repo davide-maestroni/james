@@ -32,6 +32,7 @@ import dm.james.log.Log;
 import dm.james.log.Log.Level;
 import dm.james.log.Logger;
 import dm.james.promise.Action;
+import dm.james.promise.CancellationException;
 import dm.james.promise.Mapper;
 import dm.james.promise.Observer;
 import dm.james.promise.Promise;
@@ -176,6 +177,10 @@ class DefaultPromise<O> implements Promise<O> {
       mLogger.err(t, "Error while applying promise transformation");
       throw RejectionException.wrapIfNotRejectionException(t);
     }
+  }
+
+  public void cancel() {
+    mHead.cancel();
   }
 
   @NotNull
@@ -739,14 +744,7 @@ class DefaultPromise<O> implements Promise<O> {
 
     @Override
     public void resolve(final PromiseChain<O, ?> next, final O input) {
-      try {
-        next.resolve(input);
-
-      } catch (final Throwable t) {
-        InterruptedExecutionException.throwIfInterrupt(t);
-        getLogger().err(t, "Error while propagating resolution: %s", input);
-        next.reject(t);
-      }
+      next.resolve(input);
     }
 
     @Override
@@ -1061,6 +1059,16 @@ class DefaultPromise<O> implements Promise<O> {
 
     private transient volatile PromiseChain<O, ?> mNext;
 
+    void cancel() {
+      final CancellationException reason = new CancellationException();
+      if (mInnerState.reject(reason)) {
+        reject(mNext, reason);
+
+      } else {
+        mNext.cancel();
+      }
+    }
+
     @NotNull
     abstract PromiseChain<I, O> copy();
 
@@ -1124,8 +1132,8 @@ class DefaultPromise<O> implements Promise<O> {
 
       @Override
       boolean reject(final Throwable reason) {
-        mInnerState = new StateRejected(reason);
-        return true;
+        mLogger.wrn(reason, "Suppressed rejection");
+        return false;
       }
     }
 
@@ -1186,6 +1194,10 @@ class DefaultPromise<O> implements Promise<O> {
   }
 
   private class ChainTail extends PromiseChain<O, Object> {
+
+    private ChainTail() {
+      setLogger(mLogger);
+    }
 
     @NotNull
     @Override

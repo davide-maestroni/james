@@ -92,16 +92,20 @@ class WrappingDeferredPromise<I, O> implements DeferredPromise<I, O>, Serializab
     return newInstance(mPromise.whenResolved(action));
   }
 
-  @NotNull
-  public DeferredPromise<I, O> rejected(final Throwable reason) {
-    reject(reason);
-    return this;
+  public void defer(@NotNull final Promise<I> promise) {
+    mDeferred.defer(promise);
   }
 
-  @NotNull
-  public DeferredPromise<I, O> resolved(final I input) {
-    resolve(input);
-    return this;
+  public void reject(final Throwable reason) {
+    mDeferred.reject(reason);
+  }
+
+  public void resolve(final I input) {
+    mDeferred.resolve(input);
+  }
+
+  public void cancel() {
+    mDeferred.cancel();
   }
 
   public O get() {
@@ -157,14 +161,6 @@ class WrappingDeferredPromise<I, O> implements DeferredPromise<I, O>, Serializab
 
   public boolean waitResolved(final long timeout, @NotNull final TimeUnit timeUnit) {
     return mPromise.waitResolved(timeout, timeUnit);
-  }
-
-  public void reject(final Throwable reason) {
-    mDeferred.reject(reason);
-  }
-
-  public void resolve(final I input) {
-    mDeferred.resolve(input);
   }
 
   @NotNull

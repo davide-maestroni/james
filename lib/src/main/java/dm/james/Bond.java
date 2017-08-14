@@ -135,18 +135,21 @@ public class Bond implements Serializable {
   }
 
   @NotNull
-  public BufferOutputStream bufferStream() {
-    return new DefaultBufferOutputStream(this.<Buffer>deferredIterable());
+  public BufferOutputStream bufferStream(@Nullable final AllocationType allocationType) {
+    return new DefaultBufferOutputStream(this.<Buffer>deferredIterable(), allocationType);
   }
 
   @NotNull
-  public BufferOutputStream bufferStream(final int coreSize) {
-    return new DefaultBufferOutputStream(this.<Buffer>deferredIterable(), coreSize);
+  public BufferOutputStream bufferStream(@Nullable final AllocationType allocationType,
+      final int coreSize) {
+    return new DefaultBufferOutputStream(this.<Buffer>deferredIterable(), allocationType, coreSize);
   }
 
   @NotNull
-  public BufferOutputStream bufferStream(final int bufferSize, final int poolSize) {
-    return new DefaultBufferOutputStream(this.<Buffer>deferredIterable(), bufferSize, poolSize);
+  public BufferOutputStream bufferStream(@Nullable final AllocationType allocationType,
+      final int bufferSize, final int poolSize) {
+    return new DefaultBufferOutputStream(this.<Buffer>deferredIterable(), allocationType,
+        bufferSize, poolSize);
   }
 
   @NotNull

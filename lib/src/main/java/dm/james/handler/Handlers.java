@@ -33,6 +33,7 @@ import dm.james.range.EndpointsType;
 import dm.james.range.SequenceIncrement;
 import dm.james.util.Backoff;
 import dm.james.util.ConstantConditions;
+import dm.james.util.InterruptedExecutionException;
 
 import static dm.james.math.Numbers.getHigherPrecisionOperation;
 import static dm.james.math.Numbers.getOperation;
@@ -163,6 +164,11 @@ public class Handlers {
   }
 
   @NotNull
+  public static <I> StatefulHandler<I, I, ?> scheduleOn(@NotNull final ScheduledExecutor executor) {
+    return new ScheduleHandler<I>(executor);
+  }
+
+  @NotNull
   public static <I> StatefulHandler<I, I, ?> scheduleOn(@NotNull final ScheduledExecutor executor,
       @NotNull final Backoff<ScheduledInputs<I>> backoff) {
     return new BackoffHandler<I>(executor, backoff);
@@ -209,7 +215,12 @@ public class Handlers {
       mExecutor.execute(new Runnable() {
 
         public void run() {
-          callback.resolve(input);
+          try {
+            callback.resolve(input);
+
+          } catch (final Throwable t) {
+            InterruptedExecutionException.throwIfInterrupt(t);
+          }
         }
       });
     }
@@ -245,7 +256,12 @@ public class Handlers {
       mExecutor.execute(new Runnable() {
 
         public void run() {
-          callback.resolve();
+          try {
+            callback.resolve();
+
+          } catch (final Throwable t) {
+            InterruptedExecutionException.throwIfInterrupt(t);
+          }
         }
       });
     }

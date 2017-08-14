@@ -16,18 +16,9 @@
 
 package dm.james.promise;
 
-import org.jetbrains.annotations.Nullable;
-
 /**
- * Created by davide-maestroni on 07/22/2017.
+ * Created by davide-maestroni on 08/14/2017.
  */
-public interface ResolvableIterable<I> extends Resolvable<Iterable<I>> {
+public class CancellationException extends RejectionException {
 
-  void add(I output);
-
-  void addAll(@Nullable Iterable<I> outputs);
-
-  void addRejection(Throwable reason);
-
-  void resolve();
 }

@@ -19,11 +19,11 @@ package dm.james;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
+import java.io.Closeable;
 import java.io.InvalidObjectException;
 import java.io.ObjectStreamException;
 import java.io.Serializable;
 import java.util.ArrayList;
-import java.util.Collection;
 import java.util.Iterator;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
@@ -42,7 +42,6 @@ import dm.james.promise.Observer;
 import dm.james.promise.Promise;
 import dm.james.promise.PromiseIterable;
 import dm.james.promise.RejectionException;
-import dm.james.promise.ResolvableIterable;
 import dm.james.util.ConstantConditions;
 import dm.james.util.DoubleQueue;
 import dm.james.util.SerializableProxy;
@@ -88,22 +87,36 @@ class DefaultDeferredPromiseIterable<I, O> implements DeferredPromiseIterable<I,
     mState.add(input);
   }
 
-  @NotNull
-  public DeferredPromiseIterable<I, O> added(final I input) {
-    add(input);
-    return this;
+  public void addAll(@Nullable final Iterable<I> inputs) {
+    mState.addAll(inputs);
   }
 
-  @NotNull
-  public DeferredPromiseIterable<I, O> addedAll(final Iterable<I> input) {
-    addAll(input);
-    return this;
+  @SuppressWarnings("unchecked")
+  public void addAllDeferred(@Nullable final Iterable<? extends Promise<?>> promises) {
+    if (promises == null) {
+      return;
+    }
+
+    for (final Promise<?> promise : promises) {
+      if (promise instanceof PromiseIterable) {
+        addAllDeferred((Promise<? extends Iterable<I>>) promise);
+
+      } else {
+        addDeferred((Promise<I>) promise);
+      }
+    }
   }
 
-  @NotNull
-  public DeferredPromiseIterable<I, O> addedRejection(final Throwable reason) {
-    addRejection(reason);
-    return this;
+  public void addAllDeferred(@NotNull final Promise<? extends Iterable<I>> promise) {
+    mState.addAllDeferred(promise);
+  }
+
+  public void addDeferred(@NotNull final Promise<I> promise) {
+    mState.addDeferred(promise);
+  }
+
+  public void addRejection(final Throwable reason) {
+    mState.addRejection(reason);
   }
 
   @NotNull
@@ -324,17 +337,29 @@ class DefaultDeferredPromiseIterable<I, O> implements DeferredPromiseIterable<I,
   }
 
   @NotNull
-  public <R> DeferredPromiseIterable<I, R> thenSorted(
-      @Nullable final Handler<O, ? super CallbackIterable<R>> fulfill,
-      @Nullable final Handler<Throwable, ? super CallbackIterable<R>> reject,
-      @Nullable final Observer<? super CallbackIterable<R>> resolve) {
-    return newInstance(mPromise.thenSorted(fulfill, reject, resolve));
-  }
-
-  @NotNull
   public <R, S> DeferredPromiseIterable<I, R> thenSorted(
       @NotNull final StatefulHandler<O, R, S> handler) {
     return newInstance(mPromise.thenSorted(handler));
+  }
+
+  @NotNull
+  public <R> DeferredPromiseIterable<I, R> thenTry(
+      @Nullable final Handler<O, ? super CallbackIterable<R>> fulfill,
+      @Nullable final Handler<Throwable, ? super CallbackIterable<R>> reject,
+      @Nullable final Observer<? super CallbackIterable<R>> resolve) {
+    return newInstance(mPromise.thenTry(fulfill, reject, resolve));
+  }
+
+  @NotNull
+  public <R, S extends Closeable> DeferredPromiseIterable<I, R> thenTryState(
+      @NotNull final StatefulHandler<O, R, S> handler) {
+    return newInstance(mPromise.thenTryState(handler));
+  }
+
+  @NotNull
+  public <R, S extends Closeable> DeferredPromiseIterable<I, R> thenTryStateSorted(
+      @NotNull final StatefulHandler<O, R, S> handler) {
+    return newInstance(mPromise.thenTryStateSorted(handler));
   }
 
   @NotNull
@@ -353,16 +378,8 @@ class DefaultDeferredPromiseIterable<I, O> implements DeferredPromiseIterable<I,
     return newInstance(mPromise.whenRejectedEach(observer));
   }
 
-  @NotNull
-  public DeferredPromiseIterable<I, O> rejected(final Throwable reason) {
-    reject(reason);
-    return this;
-  }
-
-  @NotNull
-  public DeferredPromiseIterable<I, O> resolved(final Iterable<I> inputs) {
-    resolve(inputs);
-    return this;
+  public void resolve() {
+    mState.resolve();
   }
 
   @NotNull
@@ -393,6 +410,10 @@ class DefaultDeferredPromiseIterable<I, O> implements DeferredPromiseIterable<I,
   public <R> DeferredPromise<Iterable<I>, R> apply(
       @NotNull final Mapper<Promise<Iterable<O>>, Promise<R>> mapper) {
     return new WrappingDeferredPromise<Iterable<I>, R>(this, mPromise.apply(mapper));
+  }
+
+  public void cancel() {
+    mPromise.cancel();
   }
 
   public Iterable<O> get() {
@@ -449,6 +470,18 @@ class DefaultDeferredPromiseIterable<I, O> implements DeferredPromiseIterable<I,
 
   public boolean waitResolved(final long timeout, @NotNull final TimeUnit timeUnit) {
     return mPromise.waitResolved(timeout, timeUnit);
+  }
+
+  public void defer(@NotNull final Promise<Iterable<I>> promise) {
+    mState.defer(promise);
+  }
+
+  public void reject(final Throwable reason) {
+    mState.reject(reason);
+  }
+
+  public void resolve(final Iterable<I> input) {
+    mState.resolve(input);
   }
 
   @NotNull
@@ -532,10 +565,6 @@ class DefaultDeferredPromiseIterable<I, O> implements DeferredPromiseIterable<I,
     return mPromise.iterator();
   }
 
-  public void reject(final Throwable reason) {
-    mState.reject(reason);
-  }
-
   @NotNull
   private <R> DeferredPromiseIterable<I, R> newInstance(@NotNull final PromiseIterable<R> promise) {
     return new DefaultDeferredPromiseIterable<I, R>(promise, mLogger, mState);
@@ -544,6 +573,11 @@ class DefaultDeferredPromiseIterable<I, O> implements DeferredPromiseIterable<I,
   private Object writeReplace() throws ObjectStreamException {
     final Logger logger = mLogger;
     return new PromiseProxy<I, O>(mPromise, logger.getLog(), logger.getLogLevel(), mState);
+  }
+
+  private interface Resolution<I> {
+
+    void consume(@NotNull CallbackIterable<I> callback);
   }
 
   private static class PromiseProxy<I, O> extends SerializableProxy {
@@ -563,6 +597,71 @@ class DefaultDeferredPromiseIterable<I, O> implements DeferredPromiseIterable<I,
       } catch (final Throwable t) {
         throw new InvalidObjectException(t.getMessage());
       }
+    }
+  }
+
+  private static class ResolutionInput<I> implements Resolution<I> {
+
+    private final I mInput;
+
+    private ResolutionInput(final I input) {
+      mInput = input;
+    }
+
+    public void consume(@NotNull final CallbackIterable<I> callback) {
+      callback.add(mInput);
+    }
+  }
+
+  private static class ResolutionInputs<I> implements Resolution<I> {
+
+    private final Iterable<I> mInputs;
+
+    private ResolutionInputs(final Iterable<I> inputs) {
+      mInputs = inputs;
+    }
+
+    public void consume(@NotNull final CallbackIterable<I> callback) {
+      callback.addAll(mInputs);
+    }
+  }
+
+  private static class ResolutionPromise<I> implements Resolution<I> {
+
+    private final Promise<I> mPromise;
+
+    private ResolutionPromise(@NotNull final Promise<I> promise) {
+      mPromise = ConstantConditions.notNull("promise", promise);
+    }
+
+    public void consume(@NotNull final CallbackIterable<I> callback) {
+      callback.addDeferred(mPromise);
+    }
+  }
+
+  private static class ResolutionPromiseIterable<I> implements Resolution<I> {
+
+    private final Promise<? extends Iterable<I>> mPromise;
+
+    private ResolutionPromiseIterable(@NotNull final Promise<? extends Iterable<I>> promise) {
+      mPromise = ConstantConditions.notNull("promise", promise);
+    }
+
+    public void consume(@NotNull final CallbackIterable<I> callback) {
+      callback.addAllDeferred(mPromise);
+    }
+  }
+
+  private static class ResolutionRejection<I> implements Resolution<I> {
+
+    private final Throwable mReason;
+
+    private ResolutionRejection(final Throwable reason) {
+      mReason = reason;
+    }
+
+    public void consume(@NotNull final CallbackIterable<I> callback) {
+      callback.addRejection(mReason);
     }
   }
 
@@ -608,12 +707,13 @@ class DefaultDeferredPromiseIterable<I, O> implements DeferredPromiseIterable<I,
     }
   }
 
-  private static class StateHolder<I>
-      implements Observer<CallbackIterable<I>>, ResolvableIterable<I>, Serializable {
+  private static class StateHolder<I> implements Observer<CallbackIterable<I>>, Serializable {
 
     private final ArrayList<CallbackIterable<I>> mCallbacks = new ArrayList<CallbackIterable<I>>();
 
     private final ScheduledExecutor mExecutor;
+
+    private final DoubleQueue<Resolution<I>> mInputs = new DoubleQueue<Resolution<I>>();
 
     private final Logger mLogger;
 
@@ -632,6 +732,78 @@ class DefaultDeferredPromiseIterable<I, O> implements DeferredPromiseIterable<I,
     public void accept(final CallbackIterable<I> callback) throws Exception {
       synchronized (mMutex) {
         mState.accept(callback);
+      }
+
+      mStateExecutor.run();
+    }
+
+    void add(final I output) {
+      synchronized (mMutex) {
+        mState.add(output);
+      }
+
+      mStateExecutor.run();
+    }
+
+    void addAll(@Nullable final Iterable<I> outputs) {
+      synchronized (mMutex) {
+        mState.addAll(outputs);
+      }
+
+      mStateExecutor.run();
+    }
+
+    void addAllDeferred(@NotNull final Promise<? extends Iterable<I>> promise) {
+      synchronized (mMutex) {
+        mState.addAllDeferred(promise);
+      }
+
+      mStateExecutor.run();
+    }
+
+    void addDeferred(@NotNull final Promise<I> promise) {
+      synchronized (mMutex) {
+        mState.addDeferred(promise);
+      }
+
+      mStateExecutor.run();
+    }
+
+    void addRejection(final Throwable reason) {
+      synchronized (mMutex) {
+        mState.addRejection(reason);
+      }
+
+      mStateExecutor.run();
+    }
+
+    void defer(@NotNull final Promise<Iterable<I>> promise) {
+      synchronized (mMutex) {
+        mState.defer(promise);
+      }
+
+      mStateExecutor.run();
+    }
+
+    void reject(final Throwable reason) {
+      synchronized (mMutex) {
+        mState.reject(reason);
+      }
+
+      mStateExecutor.run();
+    }
+
+    void resolve(final Iterable<I> inputs) {
+      synchronized (mMutex) {
+        mState.resolve(inputs);
+      }
+
+      mStateExecutor.run();
+    }
+
+    void resolve() {
+      synchronized (mMutex) {
+        mState.resolve();
       }
 
       mStateExecutor.run();
@@ -659,25 +831,13 @@ class DefaultDeferredPromiseIterable<I, O> implements DeferredPromiseIterable<I,
       }
     }
 
-    private class StatePending implements Observer<CallbackIterable<I>>, ResolvableIterable<I> {
+    private class StatePending implements Observer<CallbackIterable<I>> {
 
-      private final DoubleQueue<I> mOutputs = new DoubleQueue<I>();
-
-      public void accept(final CallbackIterable<I> callback) {
+      void add(final I input) {
         mExecutor.execute(new Runnable() {
 
           public void run() {
-            callback.addAll(new ArrayList<I>(mOutputs));
-            mCallbacks.add(callback);
-          }
-        });
-      }
-
-      public void add(final I input) {
-        mExecutor.execute(new Runnable() {
-
-          public void run() {
-            mOutputs.add(input);
+            mInputs.add(new ResolutionInput<I>(input));
             for (final CallbackIterable<I> callback : mCallbacks) {
               callback.add(input);
             }
@@ -685,7 +845,7 @@ class DefaultDeferredPromiseIterable<I, O> implements DeferredPromiseIterable<I,
         });
       }
 
-      public void addAll(@Nullable final Iterable<I> inputs) {
+      void addAll(@Nullable final Iterable<I> inputs) {
         if (inputs == null) {
           return;
         }
@@ -693,11 +853,7 @@ class DefaultDeferredPromiseIterable<I, O> implements DeferredPromiseIterable<I,
         mExecutor.execute(new Runnable() {
 
           public void run() {
-            @SuppressWarnings("UnnecessaryLocalVariable") final DoubleQueue<I> outputs = mOutputs;
-            for (final I input : inputs) {
-              outputs.add(input);
-            }
-
+            mInputs.add(new ResolutionInputs<I>(inputs));
             for (final CallbackIterable<I> callback : mCallbacks) {
               callback.addAll(inputs);
             }
@@ -705,10 +861,35 @@ class DefaultDeferredPromiseIterable<I, O> implements DeferredPromiseIterable<I,
         });
       }
 
-      public void addRejection(final Throwable reason) {
+      void addAllDeferred(@NotNull final Promise<? extends Iterable<I>> promise) {
         mExecutor.execute(new Runnable() {
 
           public void run() {
+            mInputs.add(new ResolutionPromiseIterable<I>(promise));
+            for (final CallbackIterable<I> callback : mCallbacks) {
+              callback.addAllDeferred(promise);
+            }
+          }
+        });
+      }
+
+      void addDeferred(@NotNull final Promise<I> promise) {
+        mExecutor.execute(new Runnable() {
+
+          public void run() {
+            mInputs.add(new ResolutionPromise<I>(promise));
+            for (final CallbackIterable<I> callback : mCallbacks) {
+              callback.addDeferred(promise);
+            }
+          }
+        });
+      }
+
+      void addRejection(final Throwable reason) {
+        mExecutor.execute(new Runnable() {
+
+          public void run() {
+            mInputs.add(new ResolutionRejection<I>(reason));
             for (final CallbackIterable<I> callback : mCallbacks) {
               callback.addRejection(reason);
             }
@@ -716,11 +897,26 @@ class DefaultDeferredPromiseIterable<I, O> implements DeferredPromiseIterable<I,
         });
       }
 
-      public void reject(final Throwable reason) {
-        mState = new StateRejected(mOutputs, reason);
+      void defer(@NotNull final Promise<Iterable<I>> promise) {
+        mState = new StateResolved("promise already resolved");
         mExecutor.execute(new Runnable() {
 
           public void run() {
+            mInputs.add(new ResolutionPromiseIterable<I>(promise));
+            for (final CallbackIterable<I> callback : mCallbacks) {
+              callback.addAllDeferred(promise);
+              callback.resolve();
+            }
+          }
+        });
+      }
+
+      void reject(final Throwable reason) {
+        mState = new StateResolved("promise already rejected");
+        mExecutor.execute(new Runnable() {
+
+          public void run() {
+            mInputs.add(new ResolutionRejection<I>(reason));
             for (final CallbackIterable<I> callback : mCallbacks) {
               callback.reject(reason);
             }
@@ -728,16 +924,12 @@ class DefaultDeferredPromiseIterable<I, O> implements DeferredPromiseIterable<I,
         });
       }
 
-      public void resolve(final Iterable<I> inputs) {
-        final ArrayList<I> outputs = new ArrayList<I>(mOutputs);
-        for (final I input : inputs) {
-          outputs.add(input);
-        }
-
-        mState = new StateResolved(outputs);
+      void resolve(final Iterable<I> inputs) {
+        mState = new StateResolved("promise already resolved");
         mExecutor.execute(new Runnable() {
 
           public void run() {
+            mInputs.add(new ResolutionInputs<I>(inputs));
             for (final CallbackIterable<I> callback : mCallbacks) {
               callback.addAll(inputs);
               callback.resolve();
@@ -746,8 +938,8 @@ class DefaultDeferredPromiseIterable<I, O> implements DeferredPromiseIterable<I,
         });
       }
 
-      public void resolve() {
-        mState = new StateResolved(mOutputs);
+      void resolve() {
+        mState = new StateResolved("promise already resolved");
         mExecutor.execute(new Runnable() {
 
           public void run() {
@@ -757,88 +949,27 @@ class DefaultDeferredPromiseIterable<I, O> implements DeferredPromiseIterable<I,
           }
         });
       }
-    }
-
-    private class StateRejected extends StatePending {
-
-      private final Throwable mException;
-
-      private final Collection<I> mOutputs;
-
-      private StateRejected(@NotNull final Collection<I> outputs,
-          @Nullable final Throwable reason) {
-        mOutputs = outputs;
-        mException = reason;
-      }
 
       public void accept(final CallbackIterable<I> callback) {
         mExecutor.execute(new Runnable() {
 
           public void run() {
-            callback.addAll(mOutputs);
-            callback.reject(mException);
+            for (final Resolution<I> input : mInputs) {
+              input.consume(callback);
+            }
+
+            mCallbacks.add(callback);
           }
         });
-      }
-
-      @NotNull
-      private IllegalStateException exception() {
-        return new IllegalStateException("promise already rejected");
-      }
-
-      @Override
-      public void add(final I input) {
-        throw exception();
-      }
-
-      @Override
-      public void addAll(@Nullable final Iterable<I> inputs) {
-        throw exception();
-      }
-
-      @Override
-      public void addRejection(final Throwable reason) {
-        mLogger.wrn(reason, "Suppressed rejection");
-      }
-
-      @Override
-      public void reject(final Throwable reason) {
-        mLogger.wrn(reason, "Suppressed rejection");
-      }
-
-      @Override
-      public void resolve(final Iterable<I> inputs) {
-        throw exception();
-      }
-
-      @Override
-      public void resolve() {
-        throw exception();
       }
     }
 
     private class StateResolved extends StatePending {
 
-      private final Collection<I> mOutputs;
+      private final String mMessage;
 
-      private StateResolved(@NotNull final Collection<I> outputs) {
-        mOutputs = outputs;
-      }
-
-      @NotNull
-      private IllegalStateException exception() {
-        return new IllegalStateException("promise already resolved");
-      }
-
-      public void accept(final CallbackIterable<I> callback) {
-        mExecutor.execute(new Runnable() {
-
-          public void run() {
-            callback.addAll(mOutputs);
-            callback.resolve();
-            mCallbacks.add(callback);
-          }
-        });
+      private StateResolved(@NotNull final String message) {
+        mMessage = message;
       }
 
       @Override
@@ -852,21 +983,28 @@ class DefaultDeferredPromiseIterable<I, O> implements DeferredPromiseIterable<I,
       }
 
       @Override
+      void addAllDeferred(@NotNull final Promise<? extends Iterable<I>> promise) {
+        throw exception();
+      }
+
+      @Override
+      void addDeferred(@NotNull final Promise<I> promise) {
+        throw exception();
+      }
+
+      @Override
       public void addRejection(final Throwable reason) {
         throw exception();
       }
 
       @Override
-      public void reject(final Throwable reason) {
-        mState = new StateRejected(mOutputs, reason);
-        mExecutor.execute(new Runnable() {
+      void defer(@NotNull final Promise<Iterable<I>> promise) {
+        throw exception();
+      }
 
-          public void run() {
-            for (final CallbackIterable<I> callback : mCallbacks) {
-              callback.reject(reason);
-            }
-          }
-        });
+      @Override
+      public void reject(final Throwable reason) {
+        throw exception();
       }
 
       @Override
@@ -878,70 +1016,24 @@ class DefaultDeferredPromiseIterable<I, O> implements DeferredPromiseIterable<I,
       public void resolve() {
         throw exception();
       }
-    }
 
-    public void add(final I output) {
-      synchronized (mMutex) {
-        mState.add(output);
+      public void accept(final CallbackIterable<I> callback) {
+        mExecutor.execute(new Runnable() {
+
+          public void run() {
+            for (final Resolution<I> input : mInputs) {
+              input.consume(callback);
+            }
+
+            callback.resolve();
+          }
+        });
       }
 
-      mStateExecutor.run();
-    }
-
-    public void addAll(@Nullable final Iterable<I> outputs) {
-      synchronized (mMutex) {
-        mState.addAll(outputs);
+      @NotNull
+      private IllegalStateException exception() {
+        return new IllegalStateException(mMessage);
       }
-
-      mStateExecutor.run();
     }
-
-    public void addRejection(final Throwable reason) {
-      synchronized (mMutex) {
-        mState.addRejection(reason);
-      }
-
-      mStateExecutor.run();
-    }
-
-    public void resolve() {
-      synchronized (mMutex) {
-        mState.resolve();
-      }
-
-      mStateExecutor.run();
-    }
-
-    public void reject(final Throwable reason) {
-      synchronized (mMutex) {
-        mState.reject(reason);
-      }
-
-      mStateExecutor.run();
-    }
-
-    public void resolve(final Iterable<I> inputs) {
-      synchronized (mMutex) {
-        mState.resolve(inputs);
-      }
-
-      mStateExecutor.run();
-    }
-  }
-
-  public void resolve(final Iterable<I> inputs) {
-    mState.resolve(inputs);
-  }
-
-  public void addAll(@Nullable final Iterable<I> inputs) {
-    mState.addAll(inputs);
-  }
-
-  public void addRejection(final Throwable reason) {
-    mState.addRejection(reason);
-  }
-
-  public void resolve() {
-    mState.resolve();
   }
 }

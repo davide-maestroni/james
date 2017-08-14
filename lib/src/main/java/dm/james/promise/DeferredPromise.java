@@ -22,7 +22,7 @@ import org.jetbrains.annotations.Nullable;
 /**
  * Created by davide-maestroni on 07/19/2017.
  */
-public interface DeferredPromise<I, O> extends Promise<O>, Resolvable<I> {
+public interface DeferredPromise<I, O> extends Promise<O> {
 
   @NotNull
   <R> DeferredPromise<I, R> apply(@NotNull Mapper<Promise<O>, Promise<R>> mapper);
@@ -53,9 +53,9 @@ public interface DeferredPromise<I, O> extends Promise<O>, Resolvable<I> {
   @NotNull
   DeferredPromise<I, O> whenResolved(@NotNull Action action);
 
-  @NotNull
-  DeferredPromise<I, O> rejected(Throwable reason);
+  void defer(@NotNull Promise<I> promise);
 
-  @NotNull
-  DeferredPromise<I, O> resolved(I input);
+  void reject(Throwable reason);
+
+  void resolve(I input);
 }

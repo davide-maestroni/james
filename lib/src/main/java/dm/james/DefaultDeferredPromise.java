@@ -35,6 +35,7 @@ import dm.james.promise.Mapper;
 import dm.james.promise.Observer;
 import dm.james.promise.Promise;
 import dm.james.promise.RejectionException;
+import dm.james.util.ConstantConditions;
 import dm.james.util.SerializableProxy;
 
 /**
@@ -119,16 +120,44 @@ class DefaultDeferredPromise<I, O> implements DeferredPromise<I, O> {
     return newInstance(mPromise.whenResolved(action));
   }
 
-  @NotNull
-  public DeferredPromise<I, O> rejected(final Throwable reason) {
-    reject(reason);
-    return this;
+  public void defer(@NotNull final Promise<I> promise) {
+    mLogger.dbg("Resolving deferred promise with deferred: %s", promise);
+    final List<Callback<I>> callbacks = mState.defer(promise);
+    promise.then(new Handler<I, Callback<Void>>() {
+
+      public void accept(final I input, final Callback<Void> ignored) {
+        for (final Callback<I> callback : callbacks) {
+          callback.resolve(input);
+        }
+      }
+    }, new Handler<Throwable, Callback<Void>>() {
+
+      public void accept(final Throwable reason, final Callback<Void> ignored) {
+        for (final Callback<I> callback : callbacks) {
+          callback.reject(reason);
+        }
+      }
+    });
   }
 
-  @NotNull
-  public DeferredPromise<I, O> resolved(final I input) {
-    resolve(input);
-    return this;
+  public void reject(final Throwable reason) {
+    mLogger.dbg("Rejecting deferred promise with reason: %s", reason);
+    final List<Callback<I>> callbacks = mState.reject(reason);
+    for (final Callback<I> callback : callbacks) {
+      callback.reject(reason);
+    }
+  }
+
+  public void resolve(final I input) {
+    mLogger.dbg("Resolving deferred promise with resolution: %s", input);
+    final List<Callback<I>> callbacks = mState.resolve(input);
+    for (final Callback<I> callback : callbacks) {
+      callback.resolve(input);
+    }
+  }
+
+  public void cancel() {
+    mPromise.cancel();
   }
 
   public O get() {
@@ -186,26 +215,6 @@ class DefaultDeferredPromise<I, O> implements DeferredPromise<I, O> {
     return mPromise.waitResolved(timeout, timeUnit);
   }
 
-  public void reject(final Throwable reason) {
-    mLogger.dbg("Rejecting deferred promise with reason: %s", reason);
-    final List<Callback<I>> callbacks = mState.reject(reason);
-    if (callbacks != null) {
-      for (final Callback<I> callback : callbacks) {
-        callback.reject(reason);
-      }
-    }
-  }
-
-  public void resolve(final I input) {
-    mLogger.dbg("Resolving deferred promise with resolution: %s", input);
-    final List<Callback<I>> callbacks = mState.resolve(input);
-    if (callbacks != null) {
-      for (final Callback<I> callback : callbacks) {
-        callback.resolve(input);
-      }
-    }
-  }
-
   @NotNull
   private <R> DeferredPromise<I, R> newInstance(@NotNull final Promise<R> promise) {
     return new DefaultDeferredPromise<I, R>(promise, mLogger, mState);
@@ -255,14 +264,21 @@ class DefaultDeferredPromise<I, O> implements DeferredPromise<I, O> {
       }
     }
 
-    @Nullable
+    @NotNull
+    List<Callback<I>> defer(@NotNull final Promise<I> promise) {
+      synchronized (mMutex) {
+        return mState.defer(promise);
+      }
+    }
+
+    @NotNull
     List<Callback<I>> reject(final Throwable reason) {
       synchronized (mMutex) {
         return mState.reject(reason);
       }
     }
 
-    @Nullable
+    @NotNull
     List<Callback<I>> resolve(final I input) {
       synchronized (mMutex) {
         return mState.resolve(input);
@@ -280,6 +296,47 @@ class DefaultDeferredPromise<I, O> implements DeferredPromise<I, O> {
       }
     }
 
+    private class StateDeferred extends StatePending implements Observer<Callback<I>> {
+
+      private final Promise<I> mPromise;
+
+      private StateDeferred(final Promise<I> promise) {
+        mPromise = ConstantConditions.notNull("promise", promise);
+      }
+
+      @Override
+      public Observer<Callback<I>> apply(final Callback<I> callback) {
+        return this;
+      }
+
+      @NotNull
+      private IllegalStateException exception() {
+        return new IllegalStateException("promise already resolved");
+      }
+
+      @NotNull
+      @Override
+      List<Callback<I>> defer(@NotNull final Promise<I> promise) {
+        throw exception();
+      }
+
+      @NotNull
+      @Override
+      List<Callback<I>> resolve(final I input) {
+        throw exception();
+      }
+
+      @NotNull
+      @Override
+      List<Callback<I>> reject(final Throwable reason) {
+        throw exception();
+      }
+
+      public void accept(final Callback<I> callback) {
+        callback.defer(mPromise);
+      }
+    }
+
     private class StatePending implements Mapper<Callback<I>, Observer<Callback<I>>> {
 
       public Observer<Callback<I>> apply(final Callback<I> callback) {
@@ -287,13 +344,19 @@ class DefaultDeferredPromise<I, O> implements DeferredPromise<I, O> {
         return null;
       }
 
-      @Nullable
+      @NotNull
+      List<Callback<I>> defer(@NotNull final Promise<I> promise) {
+        mState = new StateDeferred(promise);
+        return mCallbacks;
+      }
+
+      @NotNull
       List<Callback<I>> reject(final Throwable reason) {
         mState = new StateRejected(reason);
         return mCallbacks;
       }
 
-      @Nullable
+      @NotNull
       List<Callback<I>> resolve(final I input) {
         mState = new StateResolved(input);
         return mCallbacks;
@@ -308,23 +371,29 @@ class DefaultDeferredPromise<I, O> implements DeferredPromise<I, O> {
         mException = reason;
       }
 
+      @NotNull
+      private IllegalStateException exception() {
+        return new IllegalStateException("promise already rejected");
+      }
+
       @Override
       public Observer<Callback<I>> apply(final Callback<I> callback) {
         return this;
       }
 
       @NotNull
-      private IllegalStateException exception() {
-        return new IllegalStateException("promise already rejected");
+      @Override
+      List<Callback<I>> defer(@NotNull final Promise<I> promise) {
+        throw exception();
       }
 
-      @Nullable
+      @NotNull
       @Override
       List<Callback<I>> resolve(final I input) {
         throw exception();
       }
 
-      @Nullable
+      @NotNull
       @Override
       List<Callback<I>> reject(final Throwable reason) {
         throw exception();
@@ -353,13 +422,19 @@ class DefaultDeferredPromise<I, O> implements DeferredPromise<I, O> {
         return this;
       }
 
-      @Nullable
+      @NotNull
+      @Override
+      List<Callback<I>> defer(@NotNull final Promise<I> promise) {
+        throw exception();
+      }
+
+      @NotNull
       @Override
       List<Callback<I>> resolve(final I input) {
         throw exception();
       }
 
-      @Nullable
+      @NotNull
       @Override
       List<Callback<I>> reject(final Throwable reason) {
         throw exception();

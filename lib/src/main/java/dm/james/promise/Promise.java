@@ -27,10 +27,10 @@ import java.util.concurrent.TimeUnit;
  */
 public interface Promise<O> extends Serializable {
 
-  // TODO: 18/07/2017 float timeout?? TimeUtils method?
-
   @NotNull
   <R> Promise<R> apply(@NotNull Mapper<Promise<O>, Promise<R>> mapper);
+
+  void cancel();
 
   @NotNull
   Promise<O> catchAny(@NotNull Mapper<Throwable, O> mapper);
