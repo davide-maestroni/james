@@ -48,8 +48,8 @@ class BoundPromise<I, O> extends PromiseWrapper<O> implements Serializable {
   }
 
   @Override
-  public void cancel() {
-    mPromise.cancel();
+  public boolean cancel() {
+    return mPromise.cancel();
   }
 
   @NotNull

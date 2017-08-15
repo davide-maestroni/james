@@ -14,33 +14,21 @@
  * limitations under the License.
  */
 
-package dm.james;
+package dm.james.handler;
 
 import org.jetbrains.annotations.NotNull;
 
-import dm.james.executor.ScheduledExecutor;
-import dm.james.executor.ScheduledExecutors;
+import java.util.List;
 
 /**
- * Created by davide-maestroni on 07/20/2017.
+ * Created by davide-maestroni on 08/15/2017.
  */
-public enum PropagationType {
-  IMMEDIATE(ScheduledExecutors.immediateExecutor()),
-
-  LOOP(ScheduledExecutors.loopExecutor());
-
-  private final ScheduledExecutor mExecutor;
-
-  PropagationType(@NotNull final ScheduledExecutor executor) {
-    mExecutor = executor;
-  }
-
-  void execute(@NotNull final Runnable command) {
-    mExecutor.execute(command);
-  }
+public interface ScheduledInputs<I> {
 
   @NotNull
-  ScheduledExecutor executor() {
-    return mExecutor;
-  }
+  List<I> inputs();
+
+  int pending();
+
+  void retain();
 }

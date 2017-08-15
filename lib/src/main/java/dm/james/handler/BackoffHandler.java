@@ -28,7 +28,6 @@ import java.util.concurrent.TimeUnit;
 
 import dm.james.executor.ScheduledExecutor;
 import dm.james.handler.BackoffHandler.BackoffInputs;
-import dm.james.handler.Handlers.ScheduledInputs;
 import dm.james.promise.PromiseIterable.CallbackIterable;
 import dm.james.promise.PromiseIterable.StatefulHandler;
 import dm.james.promise.RejectionException;

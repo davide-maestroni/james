@@ -58,8 +58,6 @@ class DefaultPromise<O> implements Promise<O> {
 
   private final Observer<Callback<?>> mObserver;
 
-  private final PropagationType mPropagationType;
-
   private final PromiseChain<?, O> mTail;
 
   private PromiseChain<O, ?> mBond;
@@ -67,12 +65,10 @@ class DefaultPromise<O> implements Promise<O> {
   private PromiseState mState = PromiseState.Pending;
 
   @SuppressWarnings("unchecked")
-  DefaultPromise(@NotNull final Observer<? super Callback<O>> observer,
-      @Nullable final PropagationType propagationType, @Nullable final Log log,
+  DefaultPromise(@NotNull final Observer<? super Callback<O>> observer, @Nullable final Log log,
       @Nullable final Level level) {
     mObserver = (Observer<Callback<?>>) ConstantConditions.notNull("observer", observer);
     mLogger = Logger.newLogger(log, level, this);
-    mPropagationType = (propagationType != null) ? propagationType : PropagationType.LOOP;
     final ChainHead<O> head = new ChainHead<O>();
     head.setLogger(mLogger);
     head.setNext(new ChainTail());
@@ -89,25 +85,22 @@ class DefaultPromise<O> implements Promise<O> {
   }
 
   @SuppressWarnings("unchecked")
-  private DefaultPromise(@NotNull final Observer<Callback<?>> observer,
-      @NotNull final PropagationType propagationType, @Nullable final Log log,
+  private DefaultPromise(@NotNull final Observer<Callback<?>> observer, @Nullable final Log log,
       @Nullable final Level level, @NotNull final ChainHead<?> head,
       @NotNull final PromiseChain<?, O> tail) {
     // serialization
     mObserver = observer;
-    mPropagationType = propagationType;
     mLogger = Logger.newLogger(log, level, this);
     mMutex = head.getMutex();
     mHead = head;
     mTail = tail;
     tail.setNext(new ChainTail());
     PromiseChain<?, ?> chain = head;
-    while (chain != tail) {
+    while (!chain.isTail()) {
       chain.setLogger(mLogger);
       chain = chain.mNext;
     }
 
-    chain.setLogger(mLogger);
     try {
       observer.accept(head);
 
@@ -119,12 +112,10 @@ class DefaultPromise<O> implements Promise<O> {
 
   @SuppressWarnings("unchecked")
   private DefaultPromise(@NotNull final Observer<Callback<?>> observer,
-      @NotNull final PropagationType propagationType, @NotNull final Logger logger,
-      @NotNull final ChainHead<?> head, @NotNull final PromiseChain<?, ?> tail,
-      @NotNull final PromiseChain<?, O> chain) {
+      @NotNull final Logger logger, @NotNull final ChainHead<?> head,
+      @NotNull final PromiseChain<?, ?> tail, @NotNull final PromiseChain<?, O> chain) {
     // bind
     mObserver = observer;
-    mPropagationType = propagationType;
     mLogger = logger;
     mMutex = head.getMutex();
     mHead = head;
@@ -135,11 +126,10 @@ class DefaultPromise<O> implements Promise<O> {
 
   @SuppressWarnings("unchecked")
   private DefaultPromise(@NotNull final Observer<Callback<?>> observer,
-      @NotNull final PropagationType propagationType, @NotNull final Logger logger,
-      @NotNull final ChainHead<?> head, @NotNull final PromiseChain<?, O> tail) {
+      @NotNull final Logger logger, @NotNull final ChainHead<?> head,
+      @NotNull final PromiseChain<?, O> tail) {
     // copy
     mObserver = observer;
-    mPropagationType = propagationType;
     mLogger = logger;
     mMutex = head.getMutex();
     mHead = head;
@@ -179,8 +169,18 @@ class DefaultPromise<O> implements Promise<O> {
     }
   }
 
-  public void cancel() {
-    mHead.cancel();
+  public boolean cancel() {
+    PromiseChain<?, ?> chain = mHead;
+    final CancellationException reason = new CancellationException();
+    while (!chain.isTail()) {
+      if (chain.cancel(reason)) {
+        return true;
+      }
+
+      chain = chain.mNext;
+    }
+
+    return false;
   }
 
   @NotNull
@@ -328,7 +328,7 @@ class DefaultPromise<O> implements Promise<O> {
   @NotNull
   public <R> Promise<R> then(@Nullable final Handler<O, ? super Callback<R>> fulfill,
       @Nullable final Handler<Throwable, ? super Callback<R>> reject) {
-    return chain(new ChainHandler<O, R>(mPropagationType, fulfill, reject));
+    return chain(new ChainHandler<O, R>(fulfill, reject));
   }
 
   @NotNull
@@ -394,7 +394,6 @@ class DefaultPromise<O> implements Promise<O> {
   @NotNull
   private <R> Promise<R> chain(@NotNull final PromiseChain<O, R> chain) {
     final ChainHead<?> head = mHead;
-    final PropagationType propagationType = mPropagationType;
     final Logger logger = mLogger;
     final boolean isBound;
     final Runnable binding;
@@ -417,10 +416,9 @@ class DefaultPromise<O> implements Promise<O> {
 
     }
 
-    final DefaultPromise<R> promise =
-        new DefaultPromise<R>(mObserver, propagationType, logger, head, mTail, chain);
+    final DefaultPromise<R> promise = new DefaultPromise<R>(mObserver, logger, head, mTail, chain);
     if (binding != null) {
-      propagationType.execute(binding);
+      binding.run();
     }
 
     return promise;
@@ -448,8 +446,7 @@ class DefaultPromise<O> implements Promise<O> {
       newTail = chain;
     }
 
-    return new DefaultPromise<O>(mObserver, mPropagationType, logger, newHead,
-        (PromiseChain<?, O>) newTail);
+    return new DefaultPromise<O>(mObserver, logger, newHead, (PromiseChain<?, O>) newTail);
   }
 
   private void deadLockWarning(final long waitTime) {
@@ -480,8 +477,7 @@ class DefaultPromise<O> implements Promise<O> {
     }
 
     final Logger logger = mLogger;
-    return new PromiseProxy(mObserver, mPropagationType, logger.getLog(), logger.getLogLevel(),
-        chains);
+    return new PromiseProxy(mObserver, logger.getLog(), logger.getLogLevel(), chains);
   }
 
   private enum PromiseState {
@@ -502,44 +498,38 @@ class DefaultPromise<O> implements Promise<O> {
 
     private final Handler<O, ? super Callback<R>> mFulfill;
 
-    private final PropagationType mPropagationType;
-
     private final Handler<Throwable, ? super Callback<R>> mReject;
 
     @SuppressWarnings("unchecked")
-    private ChainHandler(@NotNull final PropagationType propagationType,
-        @Nullable final Handler<O, ? super Callback<R>> fulfill,
+    private ChainHandler(@Nullable final Handler<O, ? super Callback<R>> fulfill,
         @Nullable final Handler<Throwable, ? super Callback<R>> reject) {
       mFulfill = (Handler<O, ? super Callback<R>>) ((fulfill != null) ? fulfill
           : new PassThroughOutputHandler<O, R>());
       mReject = (Handler<Throwable, ? super Callback<R>>) ((reject != null) ? reject
           : new PassThroughErrorHandler<R>());
-      mPropagationType = propagationType;
     }
 
     @NotNull
     PromiseChain<O, R> copy() {
-      return new ChainHandler<O, R>(mPropagationType, mFulfill, mReject);
+      return new ChainHandler<O, R>(mFulfill, mReject);
     }
 
     private Object writeReplace() throws ObjectStreamException {
-      return new ChainProxy<O, R>(mFulfill, mReject, mPropagationType);
+      return new ChainProxy<O, R>(mFulfill, mReject);
     }
 
     private static class ChainProxy<O, R> extends SerializableProxy {
 
       private ChainProxy(final Handler<O, ? super Callback<R>> fulfill,
-          final Handler<Throwable, ? super Callback<R>> reject,
-          final PropagationType propagationType) {
-        super(proxy(fulfill), proxy(reject), propagationType);
+          final Handler<Throwable, ? super Callback<R>> reject) {
+        super(proxy(fulfill), proxy(reject));
       }
 
       @SuppressWarnings("unchecked")
       Object readResolve() throws ObjectStreamException {
         try {
           final Object[] args = deserializeArgs();
-          return new ChainHandler<O, R>((PropagationType) args[2],
-              (Handler<O, ? super Callback<R>>) args[0],
+          return new ChainHandler<O, R>((Handler<O, ? super Callback<R>>) args[0],
               (Handler<Throwable, ? super Callback<R>>) args[1]);
 
         } catch (final Throwable t) {
@@ -550,38 +540,28 @@ class DefaultPromise<O> implements Promise<O> {
 
     @Override
     void reject(final PromiseChain<R, ?> next, final Throwable reason) {
-      mPropagationType.execute(new Runnable() {
+      try {
+        getLogger().dbg("Processing rejection with reason: %s", reason);
+        mReject.accept(reason, next);
 
-        public void run() {
-          try {
-            getLogger().dbg("Processing rejection with reason: %s", reason);
-            mReject.accept(reason, next);
-
-          } catch (final Throwable t) {
-            InterruptedExecutionException.throwIfInterrupt(t);
-            getLogger().err(t, "Error while processing rejection with reason: %s", reason);
-            next.reject(t);
-          }
-        }
-      });
+      } catch (final Throwable t) {
+        InterruptedExecutionException.throwIfInterrupt(t);
+        getLogger().err(t, "Error while processing rejection with reason: %s", reason);
+        next.reject(t);
+      }
     }
 
     @Override
     void resolve(final PromiseChain<R, ?> next, final O input) {
-      mPropagationType.execute(new Runnable() {
+      try {
+        getLogger().dbg("Processing resolution: %s", input);
+        mFulfill.accept(input, next);
 
-        public void run() {
-          try {
-            getLogger().dbg("Processing resolution: %s", input);
-            mFulfill.accept(input, next);
-
-          } catch (final Throwable t) {
-            InterruptedExecutionException.throwIfInterrupt(t);
-            getLogger().err(t, "Error while processing resolution: %s", input);
-            next.reject(t);
-          }
-        }
-      });
+      } catch (final Throwable t) {
+        InterruptedExecutionException.throwIfInterrupt(t);
+        getLogger().err(t, "Error while processing resolution: %s", input);
+        next.reject(t);
+      }
     }
   }
 
@@ -1059,14 +1039,13 @@ class DefaultPromise<O> implements Promise<O> {
 
     private transient volatile PromiseChain<O, ?> mNext;
 
-    void cancel() {
-      final CancellationException reason = new CancellationException();
+    boolean cancel(@Nullable final Throwable reason) {
       if (mInnerState.reject(reason)) {
         reject(mNext, reason);
-
-      } else {
-        mNext.cancel();
+        return true;
       }
+
+      return false;
     }
 
     @NotNull
@@ -1078,6 +1057,10 @@ class DefaultPromise<O> implements Promise<O> {
 
     void setLogger(@NotNull final Logger logger) {
       mLogger = logger.subContextLogger(this);
+    }
+
+    boolean isTail() {
+      return false;
     }
 
     abstract void reject(PromiseChain<O, ?> next, Throwable reason);
@@ -1166,10 +1149,9 @@ class DefaultPromise<O> implements Promise<O> {
 
   private static class PromiseProxy extends SerializableProxy {
 
-    private PromiseProxy(final Observer<? extends Callback<?>> observer,
-        final PropagationType propagationType, final Log log, final Level logLevel,
-        final List<PromiseChain<?, ?>> chains) {
-      super(proxy(observer), propagationType, log, logLevel, chains);
+    private PromiseProxy(final Observer<? extends Callback<?>> observer, final Log log,
+        final Level logLevel, final List<PromiseChain<?, ?>> chains) {
+      super(proxy(observer), log, logLevel, chains);
     }
 
     @SuppressWarnings("unchecked")
@@ -1178,14 +1160,13 @@ class DefaultPromise<O> implements Promise<O> {
         final Object[] args = deserializeArgs();
         final ChainHead<Object> head = new ChainHead<Object>();
         PromiseChain<?, ?> tail = head;
-        for (final PromiseChain<?, ?> chain : (List<PromiseChain<?, ?>>) args[4]) {
+        for (final PromiseChain<?, ?> chain : (List<PromiseChain<?, ?>>) args[3]) {
           ((PromiseChain<?, Object>) tail).setNext((PromiseChain<Object, ?>) chain);
           tail = chain;
         }
 
-        return new DefaultPromise<Object>((Observer<Callback<?>>) args[0],
-            (PropagationType) args[1], (Log) args[2], (Level) args[3], head,
-            (PromiseChain<?, Object>) tail);
+        return new DefaultPromise<Object>((Observer<Callback<?>>) args[0], (Log) args[1],
+            (Level) args[2], head, (PromiseChain<?, Object>) tail);
 
       } catch (final Throwable t) {
         throw new InvalidObjectException(t.getMessage());
@@ -1197,6 +1178,11 @@ class DefaultPromise<O> implements Promise<O> {
 
     private ChainTail() {
       setLogger(mLogger);
+    }
+
+    @Override
+    boolean isTail() {
+      return true;
     }
 
     @NotNull

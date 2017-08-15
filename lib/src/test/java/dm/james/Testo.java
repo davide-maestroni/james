@@ -186,7 +186,8 @@ public class Testo {
     final ObjectInputStream objectInputStream = new ObjectInputStream(byteInputStream);
     @SuppressWarnings("unchecked") final DeferredPromise<String, String> deserialized =
         (DeferredPromise<String, String>) objectInputStream.readObject();
-    assertThat(deserialized.resolved("test").get()).isEqualTo("TEST");
+    deserialized.resolve("test");
+    assertThat(deserialized.get()).isEqualTo("TEST");
   }
 
   @org.junit.Test

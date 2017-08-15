@@ -30,7 +30,7 @@ public interface Promise<O> extends Serializable {
   @NotNull
   <R> Promise<R> apply(@NotNull Mapper<Promise<O>, Promise<R>> mapper);
 
-  void cancel();
+  boolean cancel();
 
   @NotNull
   Promise<O> catchAny(@NotNull Mapper<Throwable, O> mapper);

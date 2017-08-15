@@ -215,6 +215,8 @@ public interface PromiseIterable<O> extends Promise<Iterable<O>>, Iterable<O> {
   @NotNull
   PromiseIterable<O> whenFulfilledEach(@NotNull Observer<O> observer);
 
+  // TODO: 15/08/2017 whenRejectedAny => StatefulHandler
+
   @NotNull
   PromiseIterable<O> whenRejectedEach(@NotNull Observer<Throwable> observer);
 

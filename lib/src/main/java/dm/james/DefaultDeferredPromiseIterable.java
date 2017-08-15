@@ -58,13 +58,10 @@ class DefaultDeferredPromiseIterable<I, O> implements DeferredPromiseIterable<I,
   private final StateHolder<I> mState;
 
   @SuppressWarnings("unchecked")
-  DefaultDeferredPromiseIterable(@Nullable final PropagationType propagationType,
-      @Nullable final Log log, @Nullable final Level level) {
+  DefaultDeferredPromiseIterable(@Nullable final Log log, @Nullable final Level level) {
     mLogger = Logger.newLogger(log, level, this);
     mState = new StateHolder<I>(log, level);
-    mPromise =
-        (DefaultPromiseIterable<O>) new DefaultPromiseIterable<I>(mState, propagationType, log,
-            level);
+    mPromise = (DefaultPromiseIterable<O>) new DefaultPromiseIterable<I>(mState, log, level);
   }
 
   private DefaultDeferredPromiseIterable(@NotNull final PromiseIterable<O> promise,
@@ -412,8 +409,8 @@ class DefaultDeferredPromiseIterable<I, O> implements DeferredPromiseIterable<I,
     return new WrappingDeferredPromise<Iterable<I>, R>(this, mPromise.apply(mapper));
   }
 
-  public void cancel() {
-    mPromise.cancel();
+  public boolean cancel() {
+    return mPromise.cancel();
   }
 
   public Iterable<O> get() {

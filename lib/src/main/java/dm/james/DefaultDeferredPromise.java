@@ -50,11 +50,10 @@ class DefaultDeferredPromise<I, O> implements DeferredPromise<I, O> {
   private final StateHolder<I> mState;
 
   @SuppressWarnings("unchecked")
-  DefaultDeferredPromise(@Nullable final PropagationType propagationType, @Nullable final Log log,
-      @Nullable final Level level) {
+  DefaultDeferredPromise(@Nullable final Log log, @Nullable final Level level) {
     mLogger = Logger.newLogger(log, level, this);
     mState = new StateHolder<I>();
-    mPromise = (DefaultPromise<O>) new DefaultPromise<I>(mState, propagationType, log, level);
+    mPromise = (DefaultPromise<O>) new DefaultPromise<I>(mState, log, level);
   }
 
   private DefaultDeferredPromise(@NotNull final Promise<O> promise, @Nullable final Log log,
@@ -156,8 +155,8 @@ class DefaultDeferredPromise<I, O> implements DeferredPromise<I, O> {
     }
   }
 
-  public void cancel() {
-    mPromise.cancel();
+  public boolean cancel() {
+    return mPromise.cancel();
   }
 
   public O get() {

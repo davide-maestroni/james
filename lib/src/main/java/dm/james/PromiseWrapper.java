@@ -45,8 +45,8 @@ abstract class PromiseWrapper<O> implements Promise<O>, Serializable {
     return newInstance(mPromise.apply(mapper));
   }
 
-  public void cancel() {
-    mPromise.cancel();
+  public boolean cancel() {
+    return mPromise.cancel();
   }
 
   @NotNull

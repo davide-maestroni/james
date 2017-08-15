@@ -104,8 +104,8 @@ class WrappingDeferredPromise<I, O> implements DeferredPromise<I, O>, Serializab
     mDeferred.resolve(input);
   }
 
-  public void cancel() {
-    mDeferred.cancel();
+  public boolean cancel() {
+    return mDeferred.cancel();
   }
 
   public O get() {

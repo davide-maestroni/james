@@ -19,15 +19,12 @@ package dm.james;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
-import java.io.InvalidObjectException;
-import java.io.ObjectStreamException;
 import java.io.Serializable;
-import java.lang.reflect.Method;
 import java.util.concurrent.Callable;
 import java.util.concurrent.Future;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import dm.james.executor.ScheduledExecutor;
-import dm.james.executor.ScheduledExecutors;
 import dm.james.handler.Handlers;
 import dm.james.io.Buffer;
 import dm.james.io.BufferOutputStream;
@@ -42,39 +39,28 @@ import dm.james.promise.Promise.Callback;
 import dm.james.promise.Promise.Handler;
 import dm.james.promise.PromiseIterable;
 import dm.james.promise.PromiseIterable.CallbackIterable;
-import dm.james.reflect.CallbackMapper;
-import dm.james.reflect.PromisifiedObject;
-import dm.james.reflect.SimpleCallbackMapper;
 import dm.james.util.ConstantConditions;
-import dm.james.util.ReflectionUtils;
-import dm.james.util.SerializableProxy;
 
 /**
  * Created by davide-maestroni on 06/30/2017.
  */
 public class Bond implements Serializable {
 
-  // TODO: 06/08/2017 ByteBuffer => Chunk => ChunkOutputStream => PromiseIterable
+  // TODO: 15/08/2017 race
   // TODO: 06/08/2017 Handlers
   // TODO: 08/08/2017 promisify
   // TODO: 08/08/2017 BinaryObserver??
   // TODO: 06/08/2017 james-android, james-retrofit, james-swagger
 
-  private static final NoMapper sNoMapper = new NoMapper();
-
   private final Log mLog;
 
   private final Level mLogLevel;
 
-  private final PropagationType mPropagationType;
-
   public Bond() {
-    this(null, null, null);
+    this(null, null);
   }
 
-  private Bond(@Nullable final PropagationType propagationType, @Nullable final Log log,
-      @Nullable final Level level) {
-    mPropagationType = propagationType;
+  private Bond(@Nullable final Log log, @Nullable final Level level) {
     mLog = log;
     mLogLevel = level;
   }
@@ -134,6 +120,8 @@ public class Bond implements Serializable {
     return each(executor, promise).any(IdentityMapper.<O>instance());
   }
 
+  // TODO: 15/08/2017 anySorted(Iterable), anySorted(ScheduledExecutor, Iterable) => eachSorted?
+
   @NotNull
   public BufferOutputStream bufferStream(@Nullable final AllocationType allocationType) {
     return new DefaultBufferOutputStream(this.<Buffer>deferredIterable(), allocationType);
@@ -159,12 +147,12 @@ public class Bond implements Serializable {
 
   @NotNull
   public <I> DeferredPromise<I, I> deferred() {
-    return new DefaultDeferredPromise<I, I>(mPropagationType, mLog, mLogLevel);
+    return new DefaultDeferredPromise<I, I>(mLog, mLogLevel);
   }
 
   @NotNull
   public <I> DeferredPromiseIterable<I, I> deferredIterable() {
-    return new DefaultDeferredPromiseIterable<I, I>(mPropagationType, mLog, mLogLevel);
+    return new DefaultDeferredPromiseIterable<I, I>(mLog, mLogLevel);
   }
 
   @NotNull
@@ -196,7 +184,13 @@ public class Bond implements Serializable {
 
   @NotNull
   public <O> Promise<O> from(@NotNull final Future<O> future) {
-    return promise(new FutureObserver<O>(future));
+    return from(future, false);
+  }
+
+  @NotNull
+  public <O> Promise<O> from(@NotNull final Future<O> future, final boolean mayInterruptIfRunning) {
+    return new FuturePromise<O>(promise(new FutureObserver<O>(future)), future,
+        mayInterruptIfRunning);
   }
 
   @NotNull
@@ -207,7 +201,14 @@ public class Bond implements Serializable {
   @NotNull
   public <O> Promise<O> from(@NotNull final ScheduledExecutor executor,
       @NotNull final Future<O> future) {
-    return promise(executor, new FutureObserver<O>(future));
+    return from(executor, future, false);
+  }
+
+  @NotNull
+  public <O> Promise<O> from(@NotNull final ScheduledExecutor executor,
+      @NotNull final Future<O> future, final boolean mayInterruptIfRunning) {
+    return new FuturePromise<O>(promise(executor, new FutureObserver<O>(future)), future,
+        mayInterruptIfRunning);
   }
 
   @NotNull
@@ -219,7 +220,7 @@ public class Bond implements Serializable {
   @NotNull
   public <O> PromiseIterable<O> iterable(
       @NotNull final Observer<? super CallbackIterable<O>> observer) {
-    return new DefaultPromiseIterable<O>(observer, mPropagationType, mLog, mLogLevel);
+    return new DefaultPromiseIterable<O>(observer, mLog, mLogLevel);
   }
 
   @NotNull
@@ -230,7 +231,7 @@ public class Bond implements Serializable {
 
   @NotNull
   public <O> Promise<O> promise(@NotNull final Observer<? super Callback<O>> observer) {
-    return new DefaultPromise<O>(observer, mPropagationType, mLog, mLogLevel);
+    return new DefaultPromise<O>(observer, mLog, mLogLevel);
   }
 
   @NotNull
@@ -239,53 +240,16 @@ public class Bond implements Serializable {
     return promise(new ScheduledObserver<O>(executor, observer));
   }
 
-  // TODO: 09/08/2017 remove all??
   @NotNull
-  public PromisifiedObject promisify(@NotNull final Class<?> target) {
-    return promisify(target, sNoMapper);
-  }
+  public <O> PromiseIterable<O> race(@NotNull final Iterable<? extends Promise<?>> promises) {
+    // TODO: 15/08/2017 race & cancel
+    final AtomicInteger atomicInteger = new AtomicInteger(-1);
+    int index = 0;
+    if (atomicInteger.compareAndSet(-1, index) || atomicInteger.get() == index) {
 
-  @NotNull
-  public PromisifiedObject promisify(@NotNull final Class<?> target,
-      @NotNull final CallbackMapper mapper) {
-    return promisify(ScheduledExecutors.immediateExecutor(), target, mapper);
+    }
+    return null;
   }
-
-  @NotNull
-  public PromisifiedObject promisify(@NotNull final Object target) {
-    return promisify(target, sNoMapper);
-  }
-
-  @NotNull
-  public PromisifiedObject promisify(@NotNull final Object target,
-      @NotNull final CallbackMapper mapper) {
-    return promisify(ScheduledExecutors.immediateExecutor(), target, mapper);
-  }
-
-  @NotNull
-  public PromisifiedObject promisify(@NotNull final ScheduledExecutor executor,
-      @NotNull final Class<?> target) {
-    return promisify(executor, target, sNoMapper);
-  }
-
-  @NotNull
-  public PromisifiedObject promisify(@NotNull final ScheduledExecutor executor,
-      @NotNull final Class<?> target, @NotNull final CallbackMapper mapper) {
-    return new DefaultPromisedObject(this, executor, null, target, mapper);
-  }
-
-  @NotNull
-  public PromisifiedObject promisify(@NotNull final ScheduledExecutor executor,
-      @NotNull final Object target) {
-    return promisify(executor, target, sNoMapper);
-  }
-
-  @NotNull
-  public PromisifiedObject promisify(@NotNull final ScheduledExecutor executor,
-      @NotNull final Object target, @NotNull final CallbackMapper mapper) {
-    return new DefaultPromisedObject(this, executor, target, target.getClass(), mapper);
-  }
-  // TODO: 09/08/2017 remove all??
 
   @NotNull
   public <O> Promise<O> rejected(final Throwable reason) {
@@ -309,32 +273,12 @@ public class Bond implements Serializable {
 
   @NotNull
   public Bond withLog(@Nullable final Log log) {
-    return new Bond(mPropagationType, log, mLogLevel);
+    return new Bond(log, mLogLevel);
   }
 
   @NotNull
   public Bond withLogLevel(@Nullable final Level level) {
-    return new Bond(mPropagationType, mLog, level);
-  }
-
-  @NotNull
-  public Bond withPropagation(@Nullable final PropagationType propagationType) {
-    return new Bond(propagationType, mLog, mLogLevel);
-  }
-
-  private Object writeReplace() throws ObjectStreamException {
-    final BondProxy proxy = new BondProxy();
-    proxy.setPropagationType(mPropagationType);
-    proxy.setLogLevel(mLogLevel);
-    final Log log = mLog;
-    if (log instanceof Serializable) {
-      proxy.setLog(log);
-
-    } else if (log != null) {
-      proxy.setLogClass(log.getClass());
-    }
-
-    return proxy;
+    return new Bond(mLog, level);
   }
 
   private static class APlusMapper implements Mapper<Promise<?>, Promise<?>>, Serializable {
@@ -351,66 +295,6 @@ public class Bond implements Serializable {
     }
   }
 
-  @SuppressWarnings("unused")
-  private static class BondProxy implements Serializable {
-
-    private Log mLog;
-
-    private Class<? extends Log> mLogClass;
-
-    private Level mLogLevel;
-
-    private PropagationType mPropagationType;
-
-    Log getLog() {
-      return mLog;
-    }
-
-    void setLog(final Log log) {
-      mLog = log;
-    }
-
-    Class<? extends Log> getLogClass() {
-      return mLogClass;
-    }
-
-    void setLogClass(final Class<? extends Log> logClass) {
-      mLogClass = logClass;
-    }
-
-    Level getLogLevel() {
-      return mLogLevel;
-    }
-
-    void setLogLevel(final Level logLevel) {
-      mLogLevel = logLevel;
-    }
-
-    PropagationType getPropagationType() {
-      return mPropagationType;
-    }
-
-    void setPropagationType(final PropagationType propagationType) {
-      mPropagationType = propagationType;
-    }
-
-    @SuppressWarnings("unchecked")
-    Object readResolve() throws ObjectStreamException {
-      try {
-        Log log = mLog;
-        final Class<? extends Log> logClass = mLogClass;
-        if ((log == null) && (logClass != null)) {
-          log = ReflectionUtils.getDefaultConstructor(logClass).newInstance();
-        }
-
-        return new Bond(mPropagationType, log, mLogLevel);
-
-      } catch (final Throwable t) {
-        throw new InvalidObjectException(t.getMessage());
-      }
-    }
-  }
-
   private static class CacheMapper<O> implements Mapper<Promise<O>, Promise<O>>, Serializable {
 
     private final DeferredPromise<O, O> mDeferred;
@@ -421,79 +305,6 @@ public class Bond implements Serializable {
 
     public Promise<O> apply(final Promise<O> promise) {
       return BoundPromise.create(promise, mDeferred);
-    }
-  }
-
-  private static class DefaultPromisedObject implements PromisifiedObject, Serializable {
-
-    private final Bond mBond;
-
-    private final ScheduledExecutor mExecutor;
-
-    private final CallbackMapper mMapper;
-
-    private final Object mTarget;
-
-    private final Class<?> mTargetClass;
-
-    DefaultPromisedObject(@NotNull final Bond bond, @NotNull final ScheduledExecutor executor,
-        final Object target, @NotNull final Class<?> targetClass,
-        @NotNull final CallbackMapper mapper) {
-      mExecutor = ConstantConditions.notNull("executor", executor);
-      mTargetClass = ConstantConditions.notNull("class", targetClass);
-      mMapper = ConstantConditions.notNull("mapper", mapper);
-      mTarget = target;
-      mBond = bond;
-    }
-
-    @NotNull
-    public <O> PromiseIterable<O> iterable(@NotNull final Method method,
-        @Nullable final Object... params) {
-      return mBond.iterable(mExecutor,
-          PromisifiedObservers.<O>iterableObserver(mTarget, method, params, mMapper));
-    }
-
-    @NotNull
-    public <O> PromiseIterable<O> iterable(@NotNull final String name,
-        @Nullable final Object... params) {
-      return mBond.iterable(mExecutor,
-          PromisifiedObservers.<O>iterableObserver(mTarget, mTargetClass, name, params, mMapper));
-    }
-
-    @NotNull
-    public <O> Promise<O> promise(@NotNull final Method method, @Nullable final Object... params) {
-      return mBond.promise(mExecutor,
-          PromisifiedObservers.<O>observer(mTarget, method, params, mMapper));
-    }
-
-    @NotNull
-    public <O> Promise<O> promise(@NotNull final String name, @Nullable final Object... params) {
-      return mBond.promise(mExecutor,
-          PromisifiedObservers.<O>observer(mTarget, mTargetClass, name, params, mMapper));
-    }
-
-    private Object writeReplace() throws ObjectStreamException {
-      return new ObjectProxy(mBond, mExecutor, mTarget, mTargetClass, mMapper);
-    }
-
-    private static class ObjectProxy extends SerializableProxy {
-
-      private ObjectProxy(final Bond bond, final ScheduledExecutor executor, final Object target,
-          final Class<?> targetClass, final CallbackMapper mapper) {
-        super(bond, executor, target, targetClass, proxy(mapper));
-      }
-
-      @SuppressWarnings("unchecked")
-      Object readResolve() throws ObjectStreamException {
-        try {
-          final Object[] args = deserializeArgs();
-          return new DefaultPromisedObject((Bond) args[0], (ScheduledExecutor) args[1], args[2],
-              (Class<?>) args[3], (CallbackMapper) args[4]);
-
-        } catch (final Throwable t) {
-          throw new InvalidObjectException(t.getMessage());
-        }
-      }
     }
   }
 
@@ -511,18 +322,6 @@ public class Bond implements Serializable {
     }
   }
 
-  private static class NoMapper extends SimpleCallbackMapper implements Serializable {
-
-    public boolean canMapCallback(@NotNull final Class<?> type) {
-      return false;
-    }
-
-    public Object mapCallback(@NotNull final Class<?> type,
-        @NotNull final Callback<Object> callback) {
-      return null;
-    }
-  }
-
   private static class PromisesHandler<O>
       implements Handler<Iterable<O>, CallbackIterable<O>>, Observer<CallbackIterable<O>>,
       Serializable {
@@ -534,8 +333,7 @@ public class Bond implements Serializable {
     }
 
     @SuppressWarnings("unchecked")
-    public void accept(final Iterable<O> input, final CallbackIterable<O> callback) throws
-        Exception {
+    public void accept(final Iterable<O> input, final CallbackIterable<O> callback) {
       for (final Promise<?> promise : mPromises) {
         if (promise instanceof PromiseIterable) {
           callback.addAllDeferred((PromiseIterable<O>) promise);

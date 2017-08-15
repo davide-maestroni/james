@@ -19,7 +19,6 @@ package dm.james.handler;
 import org.jetbrains.annotations.NotNull;
 
 import java.io.Serializable;
-import java.util.List;
 
 import dm.james.executor.ScheduledExecutor;
 import dm.james.math.Operation;
@@ -191,16 +190,6 @@ public class Handlers {
   public static <O> Observer<CallbackIterable<O>> sequence(@NotNull final O start, final long size,
       @NotNull final SequenceIncrement<O> next) {
     return new SequenceObserver<O>(start, size, next);
-  }
-
-  public interface ScheduledInputs<I> {
-
-    @NotNull
-    List<I> inputs();
-
-    int pending();
-
-    void retain();
   }
 
   private static class ScheduleFulfill<I> implements Handler<I, Callback<I>>, Serializable {
