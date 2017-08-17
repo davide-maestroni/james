@@ -106,7 +106,7 @@ public class Testo {
 
   @org.junit.Test(expected = IOException.class)
   public void testCannotSerializeThen() throws IOException, ClassNotFoundException {
-    final Promise<String> promise = createPromise().catchAny(new Mapper<Throwable, String>() {
+    final Promise<String> promise = createPromise().catchAll(new Mapper<Throwable, String>() {
 
       public String apply(final Throwable input) {
         return null;

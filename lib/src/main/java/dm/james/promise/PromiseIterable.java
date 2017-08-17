@@ -24,6 +24,8 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 
+import dm.james.executor.ScheduledExecutor;
+
 /**
  * Created by davide-maestroni on 07/21/2017.
  */
@@ -88,7 +90,11 @@ public interface PromiseIterable<O> extends Promise<Iterable<O>>, Iterable<O> {
   <R> PromiseIterable<R> applyEachSorted(@NotNull Mapper<Promise<O>, Promise<R>> mapper);
 
   @NotNull
-  PromiseIterable<O> catchAny(@NotNull Mapper<Throwable, Iterable<O>> mapper);
+  PromiseIterable<O> catchAll(@NotNull Mapper<Throwable, Iterable<O>> mapper);
+
+  @NotNull
+  PromiseIterable<O> scheduleAll(@Nullable ScheduledExecutor fulfillExecutor,
+      @Nullable ScheduledExecutor rejectExecutor);
 
   @NotNull
   PromiseIterable<O> whenFulfilled(@NotNull Observer<Iterable<O>> observer);
@@ -98,6 +104,9 @@ public interface PromiseIterable<O> extends Promise<Iterable<O>>, Iterable<O> {
 
   @NotNull
   PromiseIterable<O> whenResolved(@NotNull Action action);
+
+  @NotNull
+  PromiseIterable<O> catchAny(@NotNull Mapper<Throwable, O> mapper);
 
   @NotNull
   PromiseIterable<O> catchEach(int minBatchSize, @NotNull Mapper<Throwable, O> mapper);
@@ -180,6 +189,14 @@ public interface PromiseIterable<O> extends Promise<Iterable<O>>, Iterable<O> {
   List<O> removeAll(long timeout, @NotNull TimeUnit timeUnit);
 
   O removeOr(O other, long timeout, @NotNull TimeUnit timeUnit);
+
+  @NotNull
+  PromiseIterable<O> scheduleAny(@Nullable ScheduledExecutor fulfillExecutor,
+      @Nullable ScheduledExecutor rejectExecutor);
+
+  @NotNull
+  PromiseIterable<O> scheduleEach(@Nullable ScheduledExecutor fulfillExecutor,
+      @Nullable ScheduledExecutor rejectExecutor);
 
   @NotNull
   <R> PromiseIterable<R> then(@Nullable Handler<O, ? super CallbackIterable<R>> fulfill,

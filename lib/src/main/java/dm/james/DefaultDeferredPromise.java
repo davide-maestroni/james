@@ -26,6 +26,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 
+import dm.james.executor.ScheduledExecutor;
 import dm.james.log.Log;
 import dm.james.log.Log.Level;
 import dm.james.log.Logger;
@@ -78,8 +79,14 @@ class DefaultDeferredPromise<I, O> implements DeferredPromise<I, O> {
   }
 
   @NotNull
-  public DeferredPromise<I, O> catchAny(@NotNull final Mapper<Throwable, O> mapper) {
-    return newInstance(mPromise.catchAny(mapper));
+  public DeferredPromise<I, O> catchAll(@NotNull final Mapper<Throwable, O> mapper) {
+    return newInstance(mPromise.catchAll(mapper));
+  }
+
+  @NotNull
+  public DeferredPromise<I, O> scheduleAll(@Nullable final ScheduledExecutor fulfillExecutor,
+      @Nullable final ScheduledExecutor rejectExecutor) {
+    return newInstance(mPromise.scheduleAll(fulfillExecutor, rejectExecutor));
   }
 
   @NotNull

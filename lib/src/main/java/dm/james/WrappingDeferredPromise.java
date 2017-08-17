@@ -22,6 +22,7 @@ import org.jetbrains.annotations.Nullable;
 import java.io.Serializable;
 import java.util.concurrent.TimeUnit;
 
+import dm.james.executor.ScheduledExecutor;
 import dm.james.promise.Action;
 import dm.james.promise.DeferredPromise;
 import dm.james.promise.Mapper;
@@ -51,8 +52,14 @@ class WrappingDeferredPromise<I, O> implements DeferredPromise<I, O>, Serializab
   }
 
   @NotNull
-  public DeferredPromise<I, O> catchAny(@NotNull final Mapper<Throwable, O> mapper) {
-    return newInstance(mPromise.catchAny(mapper));
+  public DeferredPromise<I, O> catchAll(@NotNull final Mapper<Throwable, O> mapper) {
+    return newInstance(mPromise.catchAll(mapper));
+  }
+
+  @NotNull
+  public DeferredPromise<I, O> scheduleAll(@Nullable final ScheduledExecutor fulfillExecutor,
+      @Nullable final ScheduledExecutor rejectExecutor) {
+    return newInstance(mPromise.scheduleAll(fulfillExecutor, rejectExecutor));
   }
 
   @NotNull

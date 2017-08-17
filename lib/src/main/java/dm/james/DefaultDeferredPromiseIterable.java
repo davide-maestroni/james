@@ -219,9 +219,16 @@ class DefaultDeferredPromiseIterable<I, O> implements DeferredPromiseIterable<I,
   }
 
   @NotNull
-  public DeferredPromiseIterable<I, O> catchAny(
+  public DeferredPromiseIterable<I, O> catchAll(
       @NotNull final Mapper<Throwable, Iterable<O>> mapper) {
-    return newInstance(mPromise.catchAny(mapper));
+    return newInstance(mPromise.catchAll(mapper));
+  }
+
+  @NotNull
+  public DeferredPromiseIterable<I, O> scheduleAll(
+      @Nullable final ScheduledExecutor fulfillExecutor,
+      @Nullable final ScheduledExecutor rejectExecutor) {
+    return newInstance(mPromise.scheduleAll(fulfillExecutor, rejectExecutor));
   }
 
   @NotNull
@@ -238,6 +245,11 @@ class DefaultDeferredPromiseIterable<I, O> implements DeferredPromiseIterable<I,
   @NotNull
   public DeferredPromiseIterable<I, O> whenResolved(@NotNull final Action action) {
     return newInstance(mPromise.whenResolved(action));
+  }
+
+  @NotNull
+  public DeferredPromiseIterable<I, O> catchAny(@NotNull final Mapper<Throwable, O> mapper) {
+    return newInstance(mPromise.catchAny(mapper));
   }
 
   @NotNull
@@ -317,6 +329,20 @@ class DefaultDeferredPromiseIterable<I, O> implements DeferredPromiseIterable<I,
       @Nullable final Handler<O, ? super CallbackIterable<R>> fulfill,
       @Nullable final Handler<Throwable, ? super CallbackIterable<R>> reject) {
     return newInstance(mPromise.eachTrySorted(fulfill, reject));
+  }
+
+  @NotNull
+  public DeferredPromiseIterable<I, O> scheduleAny(
+      @Nullable final ScheduledExecutor fulfillExecutor,
+      @Nullable final ScheduledExecutor rejectExecutor) {
+    return newInstance(mPromise.scheduleAny(fulfillExecutor, rejectExecutor));
+  }
+
+  @NotNull
+  public DeferredPromiseIterable<I, O> scheduleEach(
+      @Nullable final ScheduledExecutor fulfillExecutor,
+      @Nullable final ScheduledExecutor rejectExecutor) {
+    return newInstance(mPromise.scheduleEach(fulfillExecutor, rejectExecutor));
   }
 
   @NotNull

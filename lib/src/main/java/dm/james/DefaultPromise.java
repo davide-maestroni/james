@@ -28,6 +28,8 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 
+import dm.james.executor.ScheduledExecutor;
+import dm.james.executor.ScheduledExecutors;
 import dm.james.log.Log;
 import dm.james.log.Log.Level;
 import dm.james.log.Logger;
@@ -50,6 +52,8 @@ import dm.james.util.TimeUtils.Condition;
  */
 class DefaultPromise<O> implements Promise<O> {
 
+  private final ScheduledExecutor mFulfillExecutor;
+
   private final ChainHead<?> mHead;
 
   private final Logger mLogger;
@@ -57,6 +61,8 @@ class DefaultPromise<O> implements Promise<O> {
   private final Object mMutex;
 
   private final Observer<Callback<?>> mObserver;
+
+  private final ScheduledExecutor mRejectExecutor;
 
   private final PromiseChain<?, O> mTail;
 
@@ -68,6 +74,8 @@ class DefaultPromise<O> implements Promise<O> {
   DefaultPromise(@NotNull final Observer<? super Callback<O>> observer, @Nullable final Log log,
       @Nullable final Level level) {
     mObserver = (Observer<Callback<?>>) ConstantConditions.notNull("observer", observer);
+    mFulfillExecutor = ScheduledExecutors.immediateExecutor();
+    mRejectExecutor = ScheduledExecutors.immediateExecutor();
     mLogger = Logger.newLogger(log, level, this);
     final ChainHead<O> head = new ChainHead<O>();
     head.setLogger(mLogger);
@@ -85,11 +93,15 @@ class DefaultPromise<O> implements Promise<O> {
   }
 
   @SuppressWarnings("unchecked")
-  private DefaultPromise(@NotNull final Observer<Callback<?>> observer, @Nullable final Log log,
+  private DefaultPromise(@NotNull final Observer<Callback<?>> observer,
+      @NotNull final ScheduledExecutor fulfillExecutor,
+      @NotNull final ScheduledExecutor rejectExecutor, @Nullable final Log log,
       @Nullable final Level level, @NotNull final ChainHead<?> head,
       @NotNull final PromiseChain<?, O> tail) {
     // serialization
     mObserver = observer;
+    mFulfillExecutor = fulfillExecutor;
+    mRejectExecutor = rejectExecutor;
     mLogger = Logger.newLogger(log, level, this);
     mMutex = head.getMutex();
     mHead = head;
@@ -112,10 +124,14 @@ class DefaultPromise<O> implements Promise<O> {
 
   @SuppressWarnings("unchecked")
   private DefaultPromise(@NotNull final Observer<Callback<?>> observer,
-      @NotNull final Logger logger, @NotNull final ChainHead<?> head,
-      @NotNull final PromiseChain<?, ?> tail, @NotNull final PromiseChain<?, O> chain) {
+      @NotNull final ScheduledExecutor fulfillExecutor,
+      @NotNull final ScheduledExecutor rejectExecutor, @NotNull final Logger logger,
+      @NotNull final ChainHead<?> head, @NotNull final PromiseChain<?, ?> tail,
+      @NotNull final PromiseChain<?, O> chain) {
     // bind
     mObserver = observer;
+    mFulfillExecutor = fulfillExecutor;
+    mRejectExecutor = rejectExecutor;
     mLogger = logger;
     mMutex = head.getMutex();
     mHead = head;
@@ -126,10 +142,13 @@ class DefaultPromise<O> implements Promise<O> {
 
   @SuppressWarnings("unchecked")
   private DefaultPromise(@NotNull final Observer<Callback<?>> observer,
-      @NotNull final Logger logger, @NotNull final ChainHead<?> head,
-      @NotNull final PromiseChain<?, O> tail) {
+      @NotNull final ScheduledExecutor fulfillExecutor,
+      @NotNull final ScheduledExecutor rejectExecutor, @NotNull final Logger logger,
+      @NotNull final ChainHead<?> head, @NotNull final PromiseChain<?, O> tail) {
     // copy
     mObserver = observer;
+    mFulfillExecutor = fulfillExecutor;
+    mRejectExecutor = rejectExecutor;
     mLogger = logger;
     mMutex = head.getMutex();
     mHead = head;
@@ -184,7 +203,7 @@ class DefaultPromise<O> implements Promise<O> {
   }
 
   @NotNull
-  public Promise<O> catchAny(@NotNull final Mapper<Throwable, O> mapper) {
+  public Promise<O> catchAll(@NotNull final Mapper<Throwable, O> mapper) {
     return then(null, new HandlerCatch<O>(mapper));
   }
 
@@ -326,6 +345,21 @@ class DefaultPromise<O> implements Promise<O> {
   }
 
   @NotNull
+  public Promise<O> scheduleAll(@Nullable ScheduledExecutor fulfillExecutor,
+      @Nullable ScheduledExecutor rejectExecutor) {
+    if (fulfillExecutor == null) {
+      fulfillExecutor = mFulfillExecutor;
+    }
+
+    if (rejectExecutor == null) {
+      rejectExecutor = mRejectExecutor;
+    }
+
+    return chain(new ChainHandler<O, O>(new ScheduleFulfill<O>(fulfillExecutor),
+        new ScheduleReject<O>(rejectExecutor)), fulfillExecutor, rejectExecutor);
+  }
+
+  @NotNull
   public <R> Promise<R> then(@Nullable final Handler<O, ? super Callback<R>> fulfill,
       @Nullable final Handler<Throwable, ? super Callback<R>> reject) {
     return chain(new ChainHandler<O, R>(fulfill, reject));
@@ -393,6 +427,13 @@ class DefaultPromise<O> implements Promise<O> {
 
   @NotNull
   private <R> Promise<R> chain(@NotNull final PromiseChain<O, R> chain) {
+    return chain(chain, mFulfillExecutor, mRejectExecutor);
+  }
+
+  @NotNull
+  private <R> Promise<R> chain(@NotNull final PromiseChain<O, R> chain,
+      @NotNull final ScheduledExecutor fulfillExecutor,
+      @NotNull final ScheduledExecutor rejectExecutor) {
     final ChainHead<?> head = mHead;
     final Logger logger = mLogger;
     final boolean isBound;
@@ -405,7 +446,7 @@ class DefaultPromise<O> implements Promise<O> {
       } else {
         isBound = false;
         chain.setLogger(logger);
-        binding = head.bind(chain);
+        binding = head.bind(chain, mFulfillExecutor, mRejectExecutor);
         mBond = chain;
         mMutex.notifyAll();
       }
@@ -416,7 +457,9 @@ class DefaultPromise<O> implements Promise<O> {
 
     }
 
-    final DefaultPromise<R> promise = new DefaultPromise<R>(mObserver, logger, head, mTail, chain);
+    final DefaultPromise<R> promise =
+        new DefaultPromise<R>(mObserver, fulfillExecutor, rejectExecutor, logger, head, mTail,
+            chain);
     if (binding != null) {
       binding.run();
     }
@@ -446,7 +489,8 @@ class DefaultPromise<O> implements Promise<O> {
       newTail = chain;
     }
 
-    return new DefaultPromise<O>(mObserver, logger, newHead, (PromiseChain<?, O>) newTail);
+    return new DefaultPromise<O>(mObserver, mFulfillExecutor, mRejectExecutor, logger, newHead,
+        (PromiseChain<?, O>) newTail);
   }
 
   private void deadLockWarning(final long waitTime) {
@@ -477,7 +521,8 @@ class DefaultPromise<O> implements Promise<O> {
     }
 
     final Logger logger = mLogger;
-    return new PromiseProxy(mObserver, logger.getLog(), logger.getLogLevel(), chains);
+    return new PromiseProxy(mObserver, mFulfillExecutor, mRejectExecutor, logger.getLog(),
+        logger.getLogLevel(), chains);
   }
 
   private enum PromiseState {
@@ -578,8 +623,10 @@ class DefaultPromise<O> implements Promise<O> {
     private PromiseState mState = PromiseState.Pending;
 
     @Nullable
-    Runnable bind(@NotNull final PromiseChain<?, ?> bond) {
-      final Runnable binding = mInnerState.bind(bond);
+    Runnable bind(@NotNull final PromiseChain<?, ?> bond,
+        @NotNull final ScheduledExecutor fulfillExecutor,
+        @NotNull final ScheduledExecutor rejectExecutor) {
+      final Runnable binding = mInnerState.bind(bond, fulfillExecutor, rejectExecutor);
       mState = PromiseState.Pending;
       return binding;
     }
@@ -617,16 +664,23 @@ class DefaultPromise<O> implements Promise<O> {
 
       @Nullable
       @Override
-      Runnable bind(@NotNull final PromiseChain<?, ?> bond) {
+      Runnable bind(@NotNull final PromiseChain<?, ?> bond,
+          @NotNull final ScheduledExecutor fulfillExecutor,
+          @NotNull final ScheduledExecutor rejectExecutor) {
         getLogger().dbg("Binding promise [%s => %s]", PromiseState.Fulfilled, PromiseState.Pending);
         final Object output = mOutput;
         mOutput = null;
         mInnerState = new StatePending();
         return new Runnable() {
 
-          @SuppressWarnings("unchecked")
           public void run() {
-            ((PromiseChain<Object, ?>) bond).resolve(output);
+            fulfillExecutor.execute(new Runnable() {
+
+              @SuppressWarnings("unchecked")
+              public void run() {
+                ((PromiseChain<Object, ?>) bond).resolve(output);
+              }
+            });
           }
         };
       }
@@ -650,7 +704,9 @@ class DefaultPromise<O> implements Promise<O> {
     private class StatePending {
 
       @Nullable
-      Runnable bind(@NotNull final PromiseChain<?, ?> bond) {
+      Runnable bind(@NotNull final PromiseChain<?, ?> bond,
+          @NotNull final ScheduledExecutor fulfillExecutor,
+          @NotNull final ScheduledExecutor rejectExecutor) {
         return null;
       }
 
@@ -687,7 +743,9 @@ class DefaultPromise<O> implements Promise<O> {
 
       @Nullable
       @Override
-      Runnable bind(@NotNull final PromiseChain<?, ?> bond) {
+      Runnable bind(@NotNull final PromiseChain<?, ?> bond,
+          @NotNull final ScheduledExecutor fulfillExecutor,
+          @NotNull final ScheduledExecutor rejectExecutor) {
         getLogger().dbg("Binding promise [%s => %s]", PromiseState.Rejected, PromiseState.Pending);
         final Throwable exception = mException;
         mException = null;
@@ -695,7 +753,12 @@ class DefaultPromise<O> implements Promise<O> {
         return new Runnable() {
 
           public void run() {
-            bond.reject(exception);
+            rejectExecutor.execute(new Runnable() {
+
+              public void run() {
+                bond.reject(exception);
+              }
+            });
           }
         };
       }
@@ -766,6 +829,7 @@ class DefaultPromise<O> implements Promise<O> {
         }
       }
     }
+
   }
 
   private static class HandlerFulfilled<O> implements Handler<O, Callback<O>>, Serializable {
@@ -1149,9 +1213,10 @@ class DefaultPromise<O> implements Promise<O> {
 
   private static class PromiseProxy extends SerializableProxy {
 
-    private PromiseProxy(final Observer<? extends Callback<?>> observer, final Log log,
-        final Level logLevel, final List<PromiseChain<?, ?>> chains) {
-      super(proxy(observer), log, logLevel, chains);
+    private PromiseProxy(final Observer<? extends Callback<?>> observer,
+        final ScheduledExecutor fulfillExecutor, final ScheduledExecutor rejectExecutor,
+        final Log log, final Level logLevel, final List<PromiseChain<?, ?>> chains) {
+      super(proxy(observer), fulfillExecutor, rejectExecutor, log, logLevel, chains);
     }
 
     @SuppressWarnings("unchecked")
@@ -1160,17 +1225,59 @@ class DefaultPromise<O> implements Promise<O> {
         final Object[] args = deserializeArgs();
         final ChainHead<Object> head = new ChainHead<Object>();
         PromiseChain<?, ?> tail = head;
-        for (final PromiseChain<?, ?> chain : (List<PromiseChain<?, ?>>) args[3]) {
+        for (final PromiseChain<?, ?> chain : (List<PromiseChain<?, ?>>) args[5]) {
           ((PromiseChain<?, Object>) tail).setNext((PromiseChain<Object, ?>) chain);
           tail = chain;
         }
 
-        return new DefaultPromise<Object>((Observer<Callback<?>>) args[0], (Log) args[1],
-            (Level) args[2], head, (PromiseChain<?, Object>) tail);
+        return new DefaultPromise<Object>((Observer<Callback<?>>) args[0],
+            (ScheduledExecutor) args[1], (ScheduledExecutor) args[2], (Log) args[3],
+            (Level) args[4], head, (PromiseChain<?, Object>) tail);
 
       } catch (final Throwable t) {
         throw new InvalidObjectException(t.getMessage());
       }
+    }
+  }
+
+  private static class ScheduleFulfill<I> implements Handler<I, Callback<I>>, Serializable {
+
+    private final ScheduledExecutor mExecutor;
+
+    private ScheduleFulfill(@NotNull final ScheduledExecutor executor) {
+      mExecutor = executor;
+    }
+
+    public void accept(final I input, final Callback<I> callback) throws Exception {
+      mExecutor.execute(new Runnable() {
+
+        public void run() {
+          try {
+            callback.resolve(input);
+
+          } catch (final Throwable t) {
+            InterruptedExecutionException.throwIfInterrupt(t);
+          }
+        }
+      });
+    }
+  }
+
+  private static class ScheduleReject<I> implements Handler<Throwable, Callback<I>>, Serializable {
+
+    private final ScheduledExecutor mExecutor;
+
+    private ScheduleReject(@NotNull final ScheduledExecutor executor) {
+      mExecutor = executor;
+    }
+
+    public void accept(final Throwable input, final Callback<I> callback) throws Exception {
+      mExecutor.execute(new Runnable() {
+
+        public void run() {
+          callback.reject(input);
+        }
+      });
     }
   }
 

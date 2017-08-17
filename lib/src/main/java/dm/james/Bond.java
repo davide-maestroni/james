@@ -308,6 +308,32 @@ public class Bond implements Serializable {
     }
   }
 
+  private static class FuturePromise<O> extends PromiseWrapper<O> {
+
+    private final Future<?> mFuture;
+
+    private final boolean mMayInterruptIfRunning;
+
+    private FuturePromise(@NotNull final Promise<O> promise, @NotNull final Future<?> future,
+        final boolean mayInterruptIfRunning) {
+      super(promise);
+      mFuture = future;
+      mMayInterruptIfRunning = mayInterruptIfRunning;
+    }
+
+    @Override
+    public boolean cancel() {
+      final boolean cancelled = super.cancel();
+      mFuture.cancel(mMayInterruptIfRunning);
+      return cancelled;
+    }
+
+    @NotNull
+    protected <R> Promise<R> newInstance(@NotNull final Promise<R> promise) {
+      return new FuturePromise<R>(promise, mFuture, mMayInterruptIfRunning);
+    }
+  }
+
   private static class IterableObserver<O> implements Observer<CallbackIterable<O>>, Serializable {
 
     private final Promise<? extends Iterable<O>> mPromise;

@@ -22,6 +22,8 @@ import org.jetbrains.annotations.Nullable;
 import java.io.Serializable;
 import java.util.concurrent.TimeUnit;
 
+import dm.james.executor.ScheduledExecutor;
+
 /**
  * Created by davide-maestroni on 07/17/2017.
  */
@@ -33,7 +35,7 @@ public interface Promise<O> extends Serializable {
   boolean cancel();
 
   @NotNull
-  Promise<O> catchAny(@NotNull Mapper<Throwable, O> mapper);
+  Promise<O> catchAll(@NotNull Mapper<Throwable, O> mapper);
 
   O get();
 
@@ -50,7 +52,7 @@ public interface Promise<O> extends Serializable {
   RejectionException getReasonOr(RejectionException other, long timeout,
       @NotNull TimeUnit timeUnit);
 
-  boolean isBound();
+  boolean isBound(); // TODO: 17/08/2017 rename
 
   boolean isFulfilled();
 
@@ -59,6 +61,10 @@ public interface Promise<O> extends Serializable {
   boolean isRejected();
 
   boolean isResolved();
+
+  @NotNull
+  Promise<O> scheduleAll(@Nullable ScheduledExecutor fulfillExecutor,
+      @Nullable ScheduledExecutor rejectExecutor);
 
   @NotNull
   <R> Promise<R> then(@Nullable Handler<O, ? super Callback<R>> fulfill,

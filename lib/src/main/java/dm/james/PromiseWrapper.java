@@ -22,6 +22,7 @@ import org.jetbrains.annotations.Nullable;
 import java.io.Serializable;
 import java.util.concurrent.TimeUnit;
 
+import dm.james.executor.ScheduledExecutor;
 import dm.james.promise.Action;
 import dm.james.promise.Mapper;
 import dm.james.promise.Observer;
@@ -50,8 +51,8 @@ abstract class PromiseWrapper<O> implements Promise<O>, Serializable {
   }
 
   @NotNull
-  public Promise<O> catchAny(@NotNull final Mapper<Throwable, O> mapper) {
-    return newInstance(mPromise.catchAny(mapper));
+  public Promise<O> catchAll(@NotNull final Mapper<Throwable, O> mapper) {
+    return newInstance(mPromise.catchAll(mapper));
   }
 
   public O get() {
@@ -99,6 +100,12 @@ abstract class PromiseWrapper<O> implements Promise<O>, Serializable {
 
   public boolean isResolved() {
     return mPromise.isResolved();
+  }
+
+  @NotNull
+  public Promise<O> scheduleAll(@Nullable final ScheduledExecutor fulfillExecutor,
+      @Nullable final ScheduledExecutor rejectExecutor) {
+    return newInstance(mPromise.scheduleAll(fulfillExecutor, rejectExecutor));
   }
 
   @NotNull

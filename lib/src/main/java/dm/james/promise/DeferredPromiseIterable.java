@@ -21,6 +21,8 @@ import org.jetbrains.annotations.Nullable;
 
 import java.io.Closeable;
 
+import dm.james.executor.ScheduledExecutor;
+
 /**
  * Created by davide-maestroni on 08/01/2017.
  */
@@ -104,7 +106,11 @@ public interface DeferredPromiseIterable<I, O>
   <R> DeferredPromiseIterable<I, R> applyEachSorted(@NotNull Mapper<Promise<O>, Promise<R>> mapper);
 
   @NotNull
-  DeferredPromiseIterable<I, O> catchAny(@NotNull Mapper<Throwable, Iterable<O>> mapper);
+  DeferredPromiseIterable<I, O> catchAll(@NotNull Mapper<Throwable, Iterable<O>> mapper);
+
+  @NotNull
+  DeferredPromiseIterable<I, O> scheduleAll(@Nullable ScheduledExecutor fulfillExecutor,
+      @Nullable ScheduledExecutor rejectExecutor);
 
   @NotNull
   DeferredPromiseIterable<I, O> whenFulfilled(@NotNull Observer<Iterable<O>> observer);
@@ -114,6 +120,9 @@ public interface DeferredPromiseIterable<I, O>
 
   @NotNull
   DeferredPromiseIterable<I, O> whenResolved(@NotNull Action action);
+
+  @NotNull
+  DeferredPromiseIterable<I, O> catchAny(@NotNull Mapper<Throwable, O> mapper);
 
   @NotNull
   DeferredPromiseIterable<I, O> catchEach(int minBatchSize, @NotNull Mapper<Throwable, O> mapper);
@@ -160,6 +169,14 @@ public interface DeferredPromiseIterable<I, O>
   <R> DeferredPromiseIterable<I, R> eachTrySorted(
       @Nullable Handler<O, ? super CallbackIterable<R>> fulfill,
       @Nullable Handler<Throwable, ? super CallbackIterable<R>> reject);
+
+  @NotNull
+  DeferredPromiseIterable<I, O> scheduleAny(@Nullable ScheduledExecutor fulfillExecutor,
+      @Nullable ScheduledExecutor rejectExecutor);
+
+  @NotNull
+  DeferredPromiseIterable<I, O> scheduleEach(@Nullable ScheduledExecutor fulfillExecutor,
+      @Nullable ScheduledExecutor rejectExecutor);
 
   @NotNull
   <R> DeferredPromiseIterable<I, R> then(@Nullable Handler<O, ? super CallbackIterable<R>> fulfill,

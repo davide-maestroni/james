@@ -19,6 +19,8 @@ package dm.james.promise;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
+import dm.james.executor.ScheduledExecutor;
+
 /**
  * Created by davide-maestroni on 07/19/2017.
  */
@@ -28,7 +30,11 @@ public interface DeferredPromise<I, O> extends Promise<O> {
   <R> DeferredPromise<I, R> apply(@NotNull Mapper<Promise<O>, Promise<R>> mapper);
 
   @NotNull
-  DeferredPromise<I, O> catchAny(@NotNull Mapper<Throwable, O> mapper);
+  DeferredPromise<I, O> catchAll(@NotNull Mapper<Throwable, O> mapper);
+
+  @NotNull
+  DeferredPromise<I, O> scheduleAll(@Nullable ScheduledExecutor fulfillExecutor,
+      @Nullable ScheduledExecutor rejectExecutor);
 
   @NotNull
   <R> DeferredPromise<I, R> then(@Nullable Handler<O, ? super Callback<R>> fulfill,

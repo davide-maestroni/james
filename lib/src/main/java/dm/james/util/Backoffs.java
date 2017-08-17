@@ -23,8 +23,6 @@ import java.util.Random;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 
-import dm.james.promise.Mapper;
-
 /**
  * A builder of backoff instances.
  * <br>
@@ -60,9 +58,9 @@ public class Backoffs {
    * @throws IllegalArgumentException if the delay is negative.
    */
   @NotNull
-  public static <T> Backoff<T> constantDelay(@NotNull final Mapper<T, Integer> mapper,
+  public static <T> Backoff<T> constantDelay(@NotNull final IntConverter<T> converter,
       final int offset, final long delay, @NotNull final TimeUnit timeUnit) {
-    return new ConstantBackoff<T>(mapper, offset, timeUnit.toMillis(delay));
+    return new ConstantBackoff<T>(converter, offset, timeUnit.toMillis(delay));
   }
 
   /**
@@ -76,9 +74,9 @@ public class Backoffs {
    * @throws IllegalArgumentException if the delay is negative.
    */
   @NotNull
-  public static <T> Backoff<T> exponentialDelay(@NotNull final Mapper<T, Integer> mapper,
+  public static <T> Backoff<T> exponentialDelay(@NotNull final IntConverter<T> converter,
       final int offset, final long delay, @NotNull final TimeUnit timeUnit) {
-    return new ExponentialBackoff<T>(mapper, offset, timeUnit.toMillis(delay));
+    return new ExponentialBackoff<T>(converter, offset, timeUnit.toMillis(delay));
   }
 
   /**
@@ -94,9 +92,9 @@ public class Backoffs {
    * @throws IllegalArgumentException if the delay is negative.
    */
   @NotNull
-  public static <T> Backoff<T> jitterDelay(@NotNull final Mapper<T, Integer> mapper,
+  public static <T> Backoff<T> jitterDelay(@NotNull final IntConverter<T> converter,
       final int offset, final long delay, @NotNull final TimeUnit timeUnit) {
-    return new DecorrelatedJitterBackoff<T>(mapper, offset, timeUnit.toMillis(delay));
+    return new DecorrelatedJitterBackoff<T>(converter, offset, timeUnit.toMillis(delay));
   }
 
   /**
@@ -110,9 +108,9 @@ public class Backoffs {
    * @throws IllegalArgumentException if the delay is negative.
    */
   @NotNull
-  public static <T> Backoff<T> linearDelay(@NotNull final Mapper<T, Integer> mapper,
+  public static <T> Backoff<T> linearDelay(@NotNull final IntConverter<T> converter,
       final int offset, final long delay, @NotNull final TimeUnit timeUnit) {
-    return new LinearBackoff<T>(mapper, offset, timeUnit.toMillis(delay));
+    return new LinearBackoff<T>(converter, offset, timeUnit.toMillis(delay));
   }
 
   /**
@@ -171,6 +169,11 @@ public class Backoffs {
     return new JitterBackoff<T>(wrapped, percentage);
   }
 
+  public interface IntConverter<T> {
+
+    int toInt(T input);
+  }
+
   /**
    * Capped delay backoff policy.
    */
@@ -201,9 +204,9 @@ public class Backoffs {
    */
   private static class ConstantBackoff<T> implements Backoff<T>, Serializable {
 
-    private final long mDelay;
+    private final IntConverter<T> mConverter;
 
-    private final Mapper<T, Integer> mMapper;
+    private final long mDelay;
 
     private final int mOffset;
 
@@ -214,15 +217,15 @@ public class Backoffs {
      * @param delayMillis the delay in milliseconds.
      * @throws IllegalArgumentException if the delay is negative.
      */
-    private ConstantBackoff(@NotNull final Mapper<T, Integer> mapper, final int offset,
+    private ConstantBackoff(@NotNull final IntConverter<T> converter, final int offset,
         final long delayMillis) {
-      mMapper = ConstantConditions.notNull("mapper", mapper);
+      mConverter = ConstantConditions.notNull("converter", converter);
       mDelay = ConstantConditions.notNegative("backoff delay", delayMillis);
       mOffset = offset;
     }
 
     public long getDelay(@NotNull final T t) throws Exception {
-      if (mMapper.apply(t) <= mOffset) {
+      if (mConverter.toInt(t) <= mOffset) {
         return -1;
       }
 
@@ -235,11 +238,11 @@ public class Backoffs {
    */
   private static class DecorrelatedJitterBackoff<T> implements Backoff<T>, Serializable {
 
+    private final IntConverter<T> mConverter;
+
     private final long mDelay;
 
     private final AtomicLong mLast = new AtomicLong();
-
-    private final Mapper<T, Integer> mMapper;
 
     private final int mOffset;
 
@@ -251,16 +254,16 @@ public class Backoffs {
      * @param offset      the offset count;
      * @param delayMillis the delay in milliseconds.
      */
-    private DecorrelatedJitterBackoff(@NotNull final Mapper<T, Integer> mapper, final int offset,
+    private DecorrelatedJitterBackoff(@NotNull final IntConverter<T> converter, final int offset,
         final long delayMillis) {
-      mMapper = ConstantConditions.notNull("mapper", mapper);
+      mConverter = ConstantConditions.notNull("converter", converter);
       mDelay = ConstantConditions.notNegative("backoff delay", delayMillis);
       mOffset = offset;
       mLast.set(delayMillis);
     }
 
     public long getDelay(@NotNull final T t) throws Exception {
-      final int excess = mMapper.apply(t) - mOffset;
+      final int excess = mConverter.toInt(t) - mOffset;
       if (excess <= 0) {
         return -1;
       }
@@ -278,9 +281,9 @@ public class Backoffs {
    */
   private static class ExponentialBackoff<T> implements Backoff<T>, Serializable {
 
-    private final long mDelay;
+    private final IntConverter<T> mConverter;
 
-    private final Mapper<T, Integer> mMapper;
+    private final long mDelay;
 
     private final int mOffset;
 
@@ -290,15 +293,15 @@ public class Backoffs {
      * @param offset      the offset count;
      * @param delayMillis the delay in milliseconds.
      */
-    private ExponentialBackoff(@NotNull final Mapper<T, Integer> mapper, final int offset,
+    private ExponentialBackoff(@NotNull final IntConverter<T> converter, final int offset,
         final long delayMillis) {
-      mMapper = ConstantConditions.notNull("mapper", mapper);
+      mConverter = ConstantConditions.notNull("converter", converter);
       mDelay = ConstantConditions.notNegative("backoff delay", delayMillis);
       mOffset = offset;
     }
 
     public long getDelay(@NotNull final T t) throws Exception {
-      final int excess = mMapper.apply(t) - mOffset;
+      final int excess = mConverter.toInt(t) - mOffset;
       if (excess <= 0) {
         return -1;
       }
@@ -351,9 +354,9 @@ public class Backoffs {
    */
   private static class LinearBackoff<T> implements Backoff<T>, Serializable {
 
-    private final long mDelay;
+    private final IntConverter<T> mConverter;
 
-    private final Mapper<T, Integer> mMapper;
+    private final long mDelay;
 
     private final int mOffset;
 
@@ -363,15 +366,15 @@ public class Backoffs {
      * @param offset      the offset count;
      * @param delayMillis the delay in milliseconds.
      */
-    private LinearBackoff(@NotNull final Mapper<T, Integer> mapper, final int offset,
+    private LinearBackoff(@NotNull final IntConverter<T> converter, final int offset,
         final long delayMillis) {
-      mMapper = ConstantConditions.notNull("mapper", mapper);
+      mConverter = ConstantConditions.notNull("converter", converter);
       mDelay = ConstantConditions.notNegative("backoff delay", delayMillis);
       mOffset = offset;
     }
 
     public long getDelay(@NotNull final T t) throws Exception {
-      final int excess = mMapper.apply(t) - mOffset;
+      final int excess = mConverter.toInt(t) - mOffset;
       if (excess <= 0) {
         return -1;
       }
