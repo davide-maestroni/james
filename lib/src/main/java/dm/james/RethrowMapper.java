@@ -40,8 +40,8 @@ class RethrowMapper<T> implements Mapper<Throwable, T>, Serializable {
     return (Mapper<Throwable, T>) sMapper;
   }
 
-  public T apply(final Throwable t) {
-    throw RejectionException.wrapIfNot(RuntimeException.class, t);
+  public T apply(final Throwable t) throws Exception {
+    throw RejectionException.wrapIfNotException(t);
   }
 
   Object readResolve() throws ObjectStreamException {

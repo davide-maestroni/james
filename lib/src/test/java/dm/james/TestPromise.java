@@ -27,7 +27,6 @@ import java.io.ObjectOutputStream;
 import java.util.Random;
 import java.util.concurrent.TimeUnit;
 
-import dm.james.handler.Handlers;
 import dm.james.promise.Mapper;
 import dm.james.promise.Observer;
 import dm.james.promise.Promise;
@@ -162,10 +161,8 @@ public class TestPromise {
       public void accept(final Callback<String> callback) {
         callback.resolve("test");
       }
-    })
-                         .then(Handlers.<String>fulfillOn(
-                             withDelay(defaultExecutor(), 100, TimeUnit.MILLISECONDS)), null)
-                         .get()).isEqualTo("test");
+    }).scheduleAll(withDelay(defaultExecutor(), 100, TimeUnit.MILLISECONDS), null).get()).isEqualTo(
+        "test");
   }
 
   @Test

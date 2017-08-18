@@ -32,10 +32,7 @@ import java.nio.ByteBuffer;
 import java.nio.channels.ReadableByteChannel;
 import java.nio.channels.WritableByteChannel;
 
-import dm.james.io.Buffer;
-import dm.james.io.BufferOutputStream;
 import dm.james.promise.DeferredPromiseIterable;
-import dm.james.promise.PromiseIterable;
 import dm.james.util.ConstantConditions;
 import dm.james.util.DoubleQueue;
 import dm.james.util.SerializableProxy;
@@ -43,7 +40,7 @@ import dm.james.util.SerializableProxy;
 /**
  * Created by davide-maestroni on 08/10/2017.
  */
-class DefaultBufferOutputStream extends BufferOutputStream implements Serializable {
+class BufferOutputStream extends OutputStream implements Serializable {
 
   private static final int DEFAULT_BUFFER_SIZE = 16 << 10;
 
@@ -65,66 +62,50 @@ class DefaultBufferOutputStream extends BufferOutputStream implements Serializab
 
   private boolean mIsClosed;
 
-  DefaultBufferOutputStream(@NotNull final DeferredPromiseIterable<Buffer, Buffer> iterable,
+  BufferOutputStream(@NotNull final DeferredPromiseIterable<Buffer, Buffer> iterable,
       @Nullable final AllocationType allocationType) {
     this(iterable, allocationType, DEFAULT_BUFFER_SIZE, DEFAULT_POOL_SIZE);
   }
 
-  DefaultBufferOutputStream(@NotNull final DeferredPromiseIterable<Buffer, Buffer> iterable,
+  BufferOutputStream(@NotNull final DeferredPromiseIterable<Buffer, Buffer> iterable,
       @Nullable final AllocationType allocationType, final int coreSize) {
     mIterable = ConstantConditions.notNull(iterable);
     mAllocation = (allocationType != null) ? allocationType : AllocationType.HEAP;
-    final int poolSize = (mCorePoolSize =
-        ConstantConditions.notNegative("coreSize", coreSize) / DEFAULT_BUFFER_SIZE);
+    final int poolSize =
+        (mCorePoolSize = ConstantConditions.positive("coreSize", coreSize) / DEFAULT_BUFFER_SIZE);
     mMaxBufferSize = DEFAULT_BUFFER_SIZE;
     mPool = new DoubleQueue<ByteBuffer>(Math.max(poolSize, 1));
   }
 
-  DefaultBufferOutputStream(@NotNull final DeferredPromiseIterable<Buffer, Buffer> iterable,
+  BufferOutputStream(@NotNull final DeferredPromiseIterable<Buffer, Buffer> iterable,
       @Nullable final AllocationType allocationType, final int bufferSize, final int poolSize) {
     mIterable = ConstantConditions.notNull(iterable);
     mAllocation = (allocationType != null) ? allocationType : AllocationType.HEAP;
-    mCorePoolSize = ConstantConditions.notNegative("poolSize", poolSize);
-    mMaxBufferSize = ConstantConditions.notNegative("bufferSize", bufferSize);
-    mPool = new DoubleQueue<ByteBuffer>(Math.max(poolSize, 1));
+    mCorePoolSize = ConstantConditions.positive("poolSize", poolSize);
+    mMaxBufferSize = ConstantConditions.positive("bufferSize", bufferSize);
+    mPool = new DoubleQueue<ByteBuffer>(poolSize);
   }
 
   private static boolean outOfBound(final int off, final int len, final int bytes) {
     return (off < 0) || (len < 0) || (len > bytes - off) || ((off + len) < 0);
   }
 
-  @Override
-  public void flush() {
-    final ByteBuffer byteBuffer;
-    synchronized (mMutex) {
-      byteBuffer = getBuffer();
-      if (byteBuffer.position() == 0) {
-        return;
-      }
-
-      mBuffer = null;
+  /**
+   * Transfers all the bytes from the specified input stream.
+   *
+   * @param in the input stream.
+   * @return the total number of bytes written.
+   * @throws java.io.IOException If the first byte cannot be read for any reason other than
+   *                             end of file, or if the input stream has been closed, or if
+   *                             some other I/O error occurs.
+   */
+  public long transfer(@NotNull final InputStream in) throws IOException {
+    long count = 0;
+    for (int b; (b = write(in)) > 0; ) {
+      count += b;
     }
 
-    mIterable.add(new DefaultBuffer(byteBuffer));
-  }
-
-  @Override
-  public void close() {
-    synchronized (mMutex) {
-      if (mIsClosed) {
-        return;
-      }
-
-      mIsClosed = true;
-    }
-
-    flush();
-    mIterable.resolve();
-  }
-
-  @NotNull
-  public PromiseIterable<Buffer> iterable() {
-    return mIterable;
+    return count;
   }
 
   public long transfer(@NotNull final ReadableByteChannel channel) throws IOException {
@@ -253,6 +234,19 @@ class DefaultBufferOutputStream extends BufferOutputStream implements Serializab
     return read;
   }
 
+  /**
+   * Writes up to {@code limit} bytes into the output stream by reading them from the specified
+   * input stream.
+   *
+   * @param in    the input stream.
+   * @param limit the maximum number of bytes to write.
+   * @return the total number of bytes written into the chunk, or {@code -1} if there is no more
+   * data because the end of the stream has been reached.
+   * @throws java.lang.IllegalArgumentException if the limit is negative.
+   * @throws java.io.IOException                If the first byte cannot be read for any reason
+   *                                            other than end of file, or if the input stream has
+   *                                            been closed, or if some other I/O error occurs.
+   */
   public int write(@NotNull final InputStream in, final int limit) throws IOException {
     if (ConstantConditions.notNegative("limit", limit) == 0) {
       return 0;
@@ -299,8 +293,45 @@ class DefaultBufferOutputStream extends BufferOutputStream implements Serializab
     return read;
   }
 
+  /**
+   * Writes some bytes into the output stream by reading them from the specified input stream.
+   *
+   * @param in the input stream.
+   * @return the total number of bytes written into the chunk, or {@code -1} if there is no more
+   * data because the end of the stream has been reached.
+   * @throws java.io.IOException If the first byte cannot be read for any reason other than end of
+   *                             file, or if the input stream has been closed, or if some other
+   *                             I/O error occurs.
+   */
   public int write(@NotNull final InputStream in) throws IOException {
     return write(in, Integer.MAX_VALUE);
+  }
+
+  public int write(@NotNull final ReadableByteChannel channel) throws IOException {
+    final int read;
+    final boolean isAdd;
+    final ByteBuffer byteBuffer;
+    synchronized (mMutex) {
+      if (mIsClosed) {
+        throw new IOException("cannot write into a closed output stream");
+      }
+
+      byteBuffer = getBuffer();
+      read = channel.read(byteBuffer);
+      if (byteBuffer.remaining() == 0) {
+        isAdd = true;
+        mBuffer = null;
+
+      } else {
+        isAdd = false;
+      }
+    }
+
+    if (isAdd) {
+      mIterable.add(new DefaultBuffer(byteBuffer));
+    }
+
+    return read;
   }
 
   public void write(final int b) throws IOException {
@@ -401,6 +432,35 @@ class DefaultBufferOutputStream extends BufferOutputStream implements Serializab
       }
 
     } while (written < len);
+  }
+
+  @Override
+  public void flush() {
+    final ByteBuffer byteBuffer;
+    synchronized (mMutex) {
+      byteBuffer = getBuffer();
+      if (byteBuffer.position() == 0) {
+        return;
+      }
+
+      mBuffer = null;
+    }
+
+    mIterable.add(new DefaultBuffer(byteBuffer));
+  }
+
+  @Override
+  public void close() {
+    synchronized (mMutex) {
+      if (mIsClosed) {
+        return;
+      }
+
+      mIsClosed = true;
+    }
+
+    flush();
+    mIterable.resolve();
   }
 
   @NotNull
@@ -557,7 +617,7 @@ class DefaultBufferOutputStream extends BufferOutputStream implements Serializab
     Object readResolve() throws ObjectStreamException {
       try {
         final Object[] args = deserializeArgs();
-        return new DefaultBufferOutputStream((DeferredPromiseIterable<Buffer, Buffer>) args[0],
+        return new BufferOutputStream((DeferredPromiseIterable<Buffer, Buffer>) args[0],
             (AllocationType) args[1], (Integer) args[2], (Integer) args[3]);
 
       } catch (final Throwable t) {
@@ -598,7 +658,7 @@ class DefaultBufferOutputStream extends BufferOutputStream implements Serializab
         return new SerializableBuffer(bytes);
 
       } finally {
-        DefaultBufferOutputStream.this.release(byteBuffer);
+        BufferOutputStream.this.release(byteBuffer);
       }
     }
 
@@ -675,7 +735,7 @@ class DefaultBufferOutputStream extends BufferOutputStream implements Serializab
         }
 
       } finally {
-        DefaultBufferOutputStream.this.release(byteBuffer);
+        BufferOutputStream.this.release(byteBuffer);
       }
 
       return remaining;
@@ -697,7 +757,7 @@ class DefaultBufferOutputStream extends BufferOutputStream implements Serializab
         buffer.put(byteBuffer);
 
       } finally {
-        DefaultBufferOutputStream.this.release(byteBuffer);
+        BufferOutputStream.this.release(byteBuffer);
       }
 
       return remaining;
@@ -721,7 +781,7 @@ class DefaultBufferOutputStream extends BufferOutputStream implements Serializab
         }
 
       } finally {
-        DefaultBufferOutputStream.this.release(byteBuffer);
+        BufferOutputStream.this.release(byteBuffer);
       }
 
       return remaining;
@@ -735,7 +795,7 @@ class DefaultBufferOutputStream extends BufferOutputStream implements Serializab
       }
 
       if (byteBuffer != null) {
-        DefaultBufferOutputStream.this.release(byteBuffer);
+        BufferOutputStream.this.release(byteBuffer);
       }
     }
   }

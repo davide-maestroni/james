@@ -25,11 +25,15 @@ import java.util.List;
 import java.util.concurrent.TimeUnit;
 
 import dm.james.executor.ScheduledExecutor;
+import dm.james.util.Backoff;
 
 /**
  * Created by davide-maestroni on 07/21/2017.
  */
 public interface PromiseIterable<O> extends Promise<Iterable<O>>, Iterable<O> {
+
+  @NotNull
+  PromiseIterable<O> all();
 
   @NotNull
   <R> PromiseIterable<R> all(@Nullable Handler<Iterable<O>, ? super CallbackIterable<R>> fulfill,
@@ -54,6 +58,9 @@ public interface PromiseIterable<O> extends Promise<Iterable<O>>, Iterable<O> {
   <R> PromiseIterable<R> allTrySorted(
       @Nullable Handler<Iterable<O>, ? super CallbackIterable<R>> fulfill,
       @Nullable Handler<Throwable, ? super CallbackIterable<R>> reject);
+
+  @NotNull
+  PromiseIterable<O> any();
 
   @NotNull
   <R> PromiseIterable<R> any(@Nullable Handler<O, ? super CallbackIterable<R>> fulfill,
@@ -199,6 +206,18 @@ public interface PromiseIterable<O> extends Promise<Iterable<O>>, Iterable<O> {
       @Nullable ScheduledExecutor rejectExecutor);
 
   @NotNull
+  PromiseIterable<O> scheduleEachSorted(@Nullable ScheduledExecutor fulfillExecutor,
+      @Nullable ScheduledExecutor rejectExecutor);
+
+  @NotNull
+  PromiseIterable<O> scheduleOn(@NotNull ScheduledExecutor executor,
+      @NotNull Backoff<ScheduledOutputs<O>> backoff);
+
+  @NotNull
+  PromiseIterable<O> scheduleOnSorted(@NotNull ScheduledExecutor executor,
+      @NotNull Backoff<ScheduledOutputs<O>> backoff);
+
+  @NotNull
   <R> PromiseIterable<R> then(@Nullable Handler<O, ? super CallbackIterable<R>> fulfill,
       @Nullable Handler<Throwable, ? super CallbackIterable<R>> reject,
       @Nullable Observer<? super CallbackIterable<R>> resolve);
@@ -207,10 +226,20 @@ public interface PromiseIterable<O> extends Promise<Iterable<O>>, Iterable<O> {
   <R, S> PromiseIterable<R> then(@NotNull StatefulHandler<O, R, S> handler);
 
   @NotNull
+  <R> PromiseIterable<R> thenSorted(@Nullable Handler<O, ? super CallbackIterable<R>> fulfill,
+      @Nullable Handler<Throwable, ? super CallbackIterable<R>> reject,
+      @Nullable Observer<? super CallbackIterable<R>> resolve);
+
+  @NotNull
   <R, S> PromiseIterable<R> thenSorted(@NotNull StatefulHandler<O, R, S> handler);
 
   @NotNull
   <R> PromiseIterable<R> thenTry(@Nullable Handler<O, ? super CallbackIterable<R>> fulfill,
+      @Nullable Handler<Throwable, ? super CallbackIterable<R>> reject,
+      @Nullable Observer<? super CallbackIterable<R>> resolve);
+
+  @NotNull
+  <R> PromiseIterable<R> thenTrySorted(@Nullable Handler<O, ? super CallbackIterable<R>> fulfill,
       @Nullable Handler<Throwable, ? super CallbackIterable<R>> reject,
       @Nullable Observer<? super CallbackIterable<R>> resolve);
 
@@ -232,7 +261,8 @@ public interface PromiseIterable<O> extends Promise<Iterable<O>>, Iterable<O> {
   @NotNull
   PromiseIterable<O> whenFulfilledEach(@NotNull Observer<O> observer);
 
-  // TODO: 15/08/2017 whenRejectedAny => StatefulHandler
+  @NotNull
+  PromiseIterable<O> whenRejectedAny(@NotNull Observer<Throwable> observer);
 
   @NotNull
   PromiseIterable<O> whenRejectedEach(@NotNull Observer<Throwable> observer);

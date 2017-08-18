@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package dm.james.io;
+package dm.james;
 
 import org.jetbrains.annotations.NotNull;
 

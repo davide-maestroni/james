@@ -19,17 +19,20 @@ package dm.james;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
+import java.io.Closeable;
+import java.io.IOException;
+import java.io.InputStream;
 import java.io.Serializable;
+import java.nio.ByteBuffer;
+import java.nio.channels.ReadableByteChannel;
 import java.util.concurrent.Callable;
 import java.util.concurrent.Future;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import dm.james.executor.ScheduledExecutor;
-import dm.james.handler.Handlers;
-import dm.james.io.Buffer;
-import dm.james.io.BufferOutputStream;
 import dm.james.log.Log;
 import dm.james.log.Log.Level;
+import dm.james.log.Logger;
 import dm.james.promise.DeferredPromise;
 import dm.james.promise.DeferredPromiseIterable;
 import dm.james.promise.Mapper;
@@ -39,6 +42,8 @@ import dm.james.promise.Promise.Callback;
 import dm.james.promise.Promise.Handler;
 import dm.james.promise.PromiseIterable;
 import dm.james.promise.PromiseIterable.CallbackIterable;
+import dm.james.promise.PromiseIterable.StatefulHandler;
+import dm.james.promise.RejectionException;
 import dm.james.util.ConstantConditions;
 
 /**
@@ -77,67 +82,14 @@ public class Bond implements Serializable {
 
   @NotNull
   public <O> PromiseIterable<O> all(@NotNull final Iterable<? extends Promise<?>> promises) {
-    return this.<O>resolvedIterable(null).allSorted(new PromisesHandler<O>(promises), null);
-  }
-
-  @NotNull
-  public <O> PromiseIterable<O> all(@NotNull final Promise<? extends Iterable<O>> promise) {
-    return each(promise).all(IdentityMapper.<Iterable<O>>instance());
+    return resolvedIterable(null).anySorted(new PromisesHandler<O>(promises), null);
   }
 
   @NotNull
   public <O> PromiseIterable<O> all(@NotNull final ScheduledExecutor executor,
       @NotNull final Iterable<? extends Promise<?>> promises) {
-    return this.<O>resolvedIterable(null).then(null, null, Handlers.<O>resolveOn(executor))
-                                         .allSorted(new PromisesHandler<O>(promises), null);
-  }
-
-  @NotNull
-  public <O> PromiseIterable<O> all(@NotNull final ScheduledExecutor executor,
-      @NotNull final Promise<? extends Iterable<O>> promise) {
-    return each(executor, promise).all(IdentityMapper.<Iterable<O>>instance());
-  }
-
-  @NotNull
-  public <O> PromiseIterable<O> any(@NotNull final Iterable<? extends Promise<?>> promises) {
-    return this.<O>each(promises).any(IdentityMapper.<O>instance());
-  }
-
-  @NotNull
-  public <O> PromiseIterable<O> any(@NotNull final Promise<? extends Iterable<O>> promise) {
-    return each(promise).any(IdentityMapper.<O>instance());
-  }
-
-  @NotNull
-  public <O> PromiseIterable<O> any(@NotNull final ScheduledExecutor executor,
-      @NotNull final Iterable<? extends Promise<?>> promises) {
-    return this.<O>each(executor, promises).any(IdentityMapper.<O>instance());
-  }
-
-  @NotNull
-  public <O> PromiseIterable<O> any(@NotNull final ScheduledExecutor executor,
-      @NotNull final Promise<? extends Iterable<O>> promise) {
-    return each(executor, promise).any(IdentityMapper.<O>instance());
-  }
-
-  // TODO: 15/08/2017 anySorted(Iterable), anySorted(ScheduledExecutor, Iterable) => eachSorted?
-
-  @NotNull
-  public BufferOutputStream bufferStream(@Nullable final AllocationType allocationType) {
-    return new DefaultBufferOutputStream(this.<Buffer>deferredIterable(), allocationType);
-  }
-
-  @NotNull
-  public BufferOutputStream bufferStream(@Nullable final AllocationType allocationType,
-      final int coreSize) {
-    return new DefaultBufferOutputStream(this.<Buffer>deferredIterable(), allocationType, coreSize);
-  }
-
-  @NotNull
-  public BufferOutputStream bufferStream(@Nullable final AllocationType allocationType,
-      final int bufferSize, final int poolSize) {
-    return new DefaultBufferOutputStream(this.<Buffer>deferredIterable(), allocationType,
-        bufferSize, poolSize);
+    return resolvedIterable(null).scheduleAny(executor, null)
+                                 .anySorted(new PromisesHandler<O>(promises), null);
   }
 
   @NotNull
@@ -243,12 +195,13 @@ public class Bond implements Serializable {
   @NotNull
   public <O> PromiseIterable<O> race(@NotNull final Iterable<? extends Promise<?>> promises) {
     // TODO: 15/08/2017 race & cancel
-    final AtomicInteger atomicInteger = new AtomicInteger(-1);
-    int index = 0;
-    if (atomicInteger.compareAndSet(-1, index) || atomicInteger.get() == index) {
+    return iterable(new RaceObserver<O>(this.<O>deferredIterable(), promises));
+  }
 
-    }
-    return null;
+  @NotNull
+  public <O> PromiseIterable<O> race(@NotNull final ScheduledExecutor executor,
+      @NotNull final Iterable<? extends Promise<?>> promises) {
+    return iterable(executor, new RaceObserver<O>(this.<O>deferredIterable(), promises));
   }
 
   @NotNull
@@ -272,6 +225,24 @@ public class Bond implements Serializable {
   }
 
   @NotNull
+  public <O> Mapper<PromiseIterable<O>, PromiseIterable<Buffer>> toBuffer(
+      @Nullable final AllocationType allocationType) {
+    return new BufferMapper<O>(this, allocationType);
+  }
+
+  @NotNull
+  public <O> Mapper<PromiseIterable<O>, PromiseIterable<Buffer>> toBuffer(
+      @Nullable final AllocationType allocationType, final int coreSize) {
+    return new BufferMapper<O>(this, allocationType, coreSize);
+  }
+
+  @NotNull
+  public <O> Mapper<PromiseIterable<O>, PromiseIterable<Buffer>> toBuffer(
+      @Nullable final AllocationType allocationType, final int bufferSize, final int poolSize) {
+    return new BufferMapper<O>(this, allocationType, bufferSize, poolSize);
+  }
+
+  @NotNull
   public Bond withLog(@Nullable final Log log) {
     return new Bond(log, mLogLevel);
   }
@@ -279,6 +250,15 @@ public class Bond implements Serializable {
   @NotNull
   public Bond withLogLevel(@Nullable final Level level) {
     return new Bond(mLog, level);
+  }
+
+  private void safeClose(@NotNull final Closeable closeable) {
+    try {
+      closeable.close();
+
+    } catch (final IOException e) {
+      Logger.newLogger(mLog, mLogLevel, this).wrn(e, "Suppressed exception");
+    }
   }
 
   private static class APlusMapper implements Mapper<Promise<?>, Promise<?>>, Serializable {
@@ -292,6 +272,139 @@ public class Bond implements Serializable {
     @SuppressWarnings("unchecked")
     public Promise<?> apply(final Promise<?> promise) {
       return ((Promise<Object>) promise).apply(mBond.cache());
+    }
+  }
+
+  private static class BufferHandler<O>
+      implements StatefulHandler<O, Buffer, BufferOutputStream>, Serializable {
+
+    private final AllocationType mAllocationType;
+
+    private final Bond mBond;
+
+    private final int mBufferSize;
+
+    private final int mCoreSize;
+
+    private final int mPoolSize;
+
+    private BufferHandler(@NotNull final Bond bond, @Nullable final AllocationType allocationType,
+        final int coreSize, final int bufferSize, final int poolSize) {
+      mBond = bond;
+      mAllocationType = allocationType;
+      mCoreSize = coreSize;
+      mBufferSize = bufferSize;
+      mPoolSize = poolSize;
+    }
+
+    public BufferOutputStream create(@NotNull final CallbackIterable<Buffer> callback) {
+      final DeferredPromiseIterable<Buffer, Buffer> deferred = mBond.deferredIterable();
+      final int coreSize = mCoreSize;
+      final int bufferSize = mBufferSize;
+      final BufferOutputStream outputStream;
+      if (coreSize > 0) {
+        outputStream = new BufferOutputStream(deferred, mAllocationType, coreSize);
+
+      } else if (bufferSize > 0) {
+        outputStream = new BufferOutputStream(deferred, mAllocationType, bufferSize, mPoolSize);
+
+      } else {
+        outputStream = new BufferOutputStream(deferred, mAllocationType);
+      }
+
+      callback.addAllDeferred(deferred);
+      return outputStream;
+    }
+
+    public BufferOutputStream fulfill(final BufferOutputStream state, final O input,
+        @NotNull final CallbackIterable<Buffer> callback) throws Exception {
+      if (input instanceof InputStream) {
+        final InputStream inputStream = (InputStream) input;
+        try {
+          state.transfer(inputStream);
+
+        } finally {
+          mBond.safeClose(inputStream);
+        }
+
+      } else if (input instanceof ReadableByteChannel) {
+        final ReadableByteChannel channel = (ReadableByteChannel) input;
+        try {
+          state.transfer(channel);
+
+        } finally {
+          mBond.safeClose(channel);
+        }
+
+      } else if (input instanceof ByteBuffer) {
+        state.write((ByteBuffer) input);
+
+      } else if (input instanceof Buffer) {
+        state.write((Buffer) input);
+
+      } else if (input instanceof byte[]) {
+        state.write((byte[]) input);
+
+      } else {
+        throw new IllegalArgumentException("unsupported input type: " + input);
+      }
+
+      return state;
+    }
+
+    public BufferOutputStream reject(final BufferOutputStream state, final Throwable reason,
+        @NotNull final CallbackIterable<Buffer> callback) throws Exception {
+      throw RejectionException.wrapIfNotException(reason);
+    }
+
+    public void resolve(final BufferOutputStream state,
+        @NotNull final CallbackIterable<Buffer> callback) {
+      callback.resolve();
+    }
+  }
+
+  private static class BufferMapper<O>
+      implements Mapper<PromiseIterable<O>, PromiseIterable<Buffer>>, Serializable {
+
+    private final AllocationType mAllocationType;
+
+    private final Bond mBond;
+
+    private final int mBufferSize;
+
+    private final int mCoreSize;
+
+    private final int mPoolSize;
+
+    private BufferMapper(@NotNull final Bond bond, @Nullable final AllocationType allocationType) {
+      mBond = bond;
+      mAllocationType = allocationType;
+      mCoreSize = -1;
+      mBufferSize = -1;
+      mPoolSize = -1;
+    }
+
+    private BufferMapper(@NotNull final Bond bond, @Nullable final AllocationType allocationType,
+        final int coreSize) {
+      mBond = bond;
+      mAllocationType = allocationType;
+      mCoreSize = ConstantConditions.positive("coreSize", coreSize);
+      mBufferSize = -1;
+      mPoolSize = -1;
+    }
+
+    private BufferMapper(@NotNull final Bond bond, @Nullable final AllocationType allocationType,
+        final int bufferSize, final int poolSize) {
+      mBond = bond;
+      mAllocationType = allocationType;
+      mCoreSize = -1;
+      mBufferSize = ConstantConditions.positive("bufferSize", bufferSize);
+      mPoolSize = ConstantConditions.positive("poolSize", poolSize);
+    }
+
+    public PromiseIterable<Buffer> apply(final PromiseIterable<O> promise) {
+      return promise.thenTryState(
+          new BufferHandler<O>(mBond, mAllocationType, mCoreSize, mBufferSize, mPoolSize));
     }
   }
 
@@ -349,8 +462,7 @@ public class Bond implements Serializable {
   }
 
   private static class PromisesHandler<O>
-      implements Handler<Iterable<O>, CallbackIterable<O>>, Observer<CallbackIterable<O>>,
-      Serializable {
+      implements Handler<Object, CallbackIterable<O>>, Observer<CallbackIterable<O>>, Serializable {
 
     private final Iterable<? extends Promise<?>> mPromises;
 
@@ -359,7 +471,7 @@ public class Bond implements Serializable {
     }
 
     @SuppressWarnings("unchecked")
-    public void accept(final Iterable<O> input, final CallbackIterable<O> callback) {
+    public void accept(final Object input, final CallbackIterable<O> callback) {
       for (final Promise<?> promise : mPromises) {
         if (promise instanceof PromiseIterable) {
           callback.addAllDeferred((PromiseIterable<O>) promise);
@@ -384,6 +496,113 @@ public class Bond implements Serializable {
       }
 
       callback.resolve();
+    }
+  }
+
+  private static class RaceFulfillHandler<O> implements Handler<O, Callback<Void>> {
+
+    private final int mIndex;
+
+    private final DeferredPromiseIterable<O, ?> mPromise;
+
+    private final AtomicInteger mWinner;
+
+    private RaceFulfillHandler(@NotNull final DeferredPromiseIterable<O, ?> promise,
+        @NotNull final AtomicInteger winner, final int index) {
+      mPromise = promise;
+      mWinner = winner;
+      mIndex = index;
+    }
+
+    public void accept(final O input, final Callback<Void> callback) {
+      final int index = mIndex;
+      final AtomicInteger winner = mWinner;
+      if (winner.compareAndSet(-1, index) || (winner.get() == index)) {
+        final DeferredPromiseIterable<O, ?> promise = mPromise;
+        promise.add(input);
+        promise.resolve();
+      }
+    }
+  }
+
+  private static class RaceObserver<O> implements Observer<CallbackIterable<O>> {
+
+    private final DeferredPromiseIterable<O, ?> mDeferred;
+
+    private final Iterable<? extends Promise<?>> mPromises;
+
+    private RaceObserver(@NotNull final DeferredPromiseIterable<O, ?> deferred,
+        @NotNull final Iterable<? extends Promise<?>> promises) {
+      mPromises = ConstantConditions.notNull("promises", promises);
+      mDeferred = deferred;
+    }
+
+    @SuppressWarnings("unchecked")
+    public void accept(final CallbackIterable<O> input) throws Exception {
+      final DeferredPromiseIterable<O, ?> deferred = mDeferred;
+      final AtomicInteger winner = new AtomicInteger(-1);
+      int i = 0;
+      for (final Promise<?> promise : mPromises) {
+        if (promise instanceof PromiseIterable) {
+          final int index = i++;
+          ((PromiseIterable<O>) promise).then(new RaceFulfillHandler<O>(deferred, winner, index),
+              new RaceRejectHandler(deferred, winner, index),
+              new RaceResolveHandler(deferred, winner, index));
+
+        } else {
+          final int index = i++;
+          ((Promise<O>) promise).then(new RaceFulfillHandler<O>(deferred, winner, index),
+              new RaceRejectHandler(deferred, winner, index));
+        }
+      }
+    }
+  }
+
+  private static class RaceRejectHandler implements Handler<Throwable, Callback<Void>> {
+
+    private final int mIndex;
+
+    private final DeferredPromiseIterable<?, ?> mPromise;
+
+    private final AtomicInteger mWinner;
+
+    private RaceRejectHandler(@NotNull final DeferredPromiseIterable<?, ?> promise,
+        @NotNull final AtomicInteger winner, final int index) {
+      mPromise = promise;
+      mWinner = winner;
+      mIndex = index;
+    }
+
+    public void accept(final Throwable reason, final Callback<Void> callback) {
+      final int index = mIndex;
+      final AtomicInteger winner = mWinner;
+      if (winner.compareAndSet(-1, index) || (winner.get() == index)) {
+        mPromise.reject(reason);
+      }
+    }
+  }
+
+  private static class RaceResolveHandler implements Observer<Callback<Void>> {
+
+    private final int mIndex;
+
+    private final DeferredPromiseIterable<?, ?> mPromise;
+
+    private final AtomicInteger mWinner;
+
+    private RaceResolveHandler(@NotNull final DeferredPromiseIterable<?, ?> promise,
+        @NotNull final AtomicInteger winner, final int index) {
+      mPromise = promise;
+      mWinner = winner;
+      mIndex = index;
+    }
+
+    public void accept(final Callback<Void> callback) {
+      final int index = mIndex;
+      final AtomicInteger winner = mWinner;
+      if (winner.compareAndSet(-1, index) || (winner.get() == index)) {
+        mPromise.resolve();
+      }
     }
   }
 }

@@ -217,8 +217,7 @@ public class Testo {
   @org.junit.Test
   public void testS() throws IOException, ClassNotFoundException {
     final ScheduledExecutor executor = ScheduledExecutors.newPoolExecutor(2);
-    final Promise<String> promise = createPromise().then(Handlers.<String>fulfillOn(executor),
-        Handlers.<String>rejectOn(executor));
+    final Promise<String> promise = createPromise().scheduleAll(executor, executor);
     final ByteArrayOutputStream byteOutputStream = new ByteArrayOutputStream();
     final ObjectOutputStream objectOutputStream = new ObjectOutputStream(byteOutputStream);
     objectOutputStream.writeObject(promise);

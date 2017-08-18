@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package dm.james.handler;
+package dm.james.promise;
 
 import org.jetbrains.annotations.NotNull;
 
@@ -23,10 +23,10 @@ import java.util.List;
 /**
  * Created by davide-maestroni on 08/15/2017.
  */
-public interface ScheduledInputs<I> {
+public interface ScheduledOutputs<O> {
 
   @NotNull
-  List<I> inputs();
+  List<O> outputs();
 
   int pending();
 

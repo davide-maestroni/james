@@ -42,6 +42,8 @@ import dm.james.promise.Observer;
 import dm.james.promise.Promise;
 import dm.james.promise.PromiseIterable;
 import dm.james.promise.RejectionException;
+import dm.james.promise.ScheduledOutputs;
+import dm.james.util.Backoff;
 import dm.james.util.ConstantConditions;
 import dm.james.util.DoubleQueue;
 import dm.james.util.SerializableProxy;
@@ -117,6 +119,11 @@ class DefaultDeferredPromiseIterable<I, O> implements DeferredPromiseIterable<I,
   }
 
   @NotNull
+  public DeferredPromiseIterable<I, O> all() {
+    return newInstance(mPromise.all());
+  }
+
+  @NotNull
   public <R> DeferredPromiseIterable<I, R> all(
       @Nullable final Handler<Iterable<O>, ? super CallbackIterable<R>> fulfill,
       @Nullable final Handler<Throwable, ? super CallbackIterable<R>> reject) {
@@ -154,6 +161,11 @@ class DefaultDeferredPromiseIterable<I, O> implements DeferredPromiseIterable<I,
       @Nullable final Handler<Iterable<O>, ? super CallbackIterable<R>> fulfill,
       @Nullable final Handler<Throwable, ? super CallbackIterable<R>> reject) {
     return newInstance(mPromise.allTrySorted(fulfill, reject));
+  }
+
+  @NotNull
+  public DeferredPromiseIterable<I, O> any() {
+    return newInstance(mPromise.any());
   }
 
   @NotNull
@@ -346,6 +358,25 @@ class DefaultDeferredPromiseIterable<I, O> implements DeferredPromiseIterable<I,
   }
 
   @NotNull
+  public DeferredPromiseIterable<I, O> scheduleEachSorted(
+      @Nullable final ScheduledExecutor fulfillExecutor,
+      @Nullable final ScheduledExecutor rejectExecutor) {
+    return newInstance(mPromise.scheduleEachSorted(fulfillExecutor, rejectExecutor));
+  }
+
+  @NotNull
+  public DeferredPromiseIterable<I, O> scheduleOn(@NotNull final ScheduledExecutor executor,
+      @NotNull final Backoff<ScheduledOutputs<O>> backoff) {
+    return newInstance(mPromise.scheduleOn(executor, backoff));
+  }
+
+  @NotNull
+  public DeferredPromiseIterable<I, O> scheduleOnSorted(@NotNull final ScheduledExecutor executor,
+      @NotNull final Backoff<ScheduledOutputs<O>> backoff) {
+    return newInstance(mPromise.scheduleOnSorted(executor, backoff));
+  }
+
+  @NotNull
   public <R> DeferredPromiseIterable<I, R> then(
       @Nullable final Handler<O, ? super CallbackIterable<R>> fulfill,
       @Nullable final Handler<Throwable, ? super CallbackIterable<R>> reject,
@@ -360,6 +391,14 @@ class DefaultDeferredPromiseIterable<I, O> implements DeferredPromiseIterable<I,
   }
 
   @NotNull
+  public <R> DeferredPromiseIterable<I, R> thenSorted(
+      @Nullable final Handler<O, ? super CallbackIterable<R>> fulfill,
+      @Nullable final Handler<Throwable, ? super CallbackIterable<R>> reject,
+      @Nullable final Observer<? super CallbackIterable<R>> resolve) {
+    return newInstance(mPromise.thenSorted(fulfill, reject, resolve));
+  }
+
+  @NotNull
   public <R, S> DeferredPromiseIterable<I, R> thenSorted(
       @NotNull final StatefulHandler<O, R, S> handler) {
     return newInstance(mPromise.thenSorted(handler));
@@ -371,6 +410,14 @@ class DefaultDeferredPromiseIterable<I, O> implements DeferredPromiseIterable<I,
       @Nullable final Handler<Throwable, ? super CallbackIterable<R>> reject,
       @Nullable final Observer<? super CallbackIterable<R>> resolve) {
     return newInstance(mPromise.thenTry(fulfill, reject, resolve));
+  }
+
+  @NotNull
+  public <R> DeferredPromiseIterable<I, R> thenTrySorted(
+      @Nullable final Handler<O, ? super CallbackIterable<R>> fulfill,
+      @Nullable final Handler<Throwable, ? super CallbackIterable<R>> reject,
+      @Nullable final Observer<? super CallbackIterable<R>> resolve) {
+    return newInstance(mPromise.thenTrySorted(fulfill, reject, resolve));
   }
 
   @NotNull
@@ -393,6 +440,12 @@ class DefaultDeferredPromiseIterable<I, O> implements DeferredPromiseIterable<I,
   @NotNull
   public DeferredPromiseIterable<I, O> whenFulfilledEach(@NotNull final Observer<O> observer) {
     return newInstance(mPromise.whenFulfilledEach(observer));
+  }
+
+  @NotNull
+  public DeferredPromiseIterable<I, O> whenRejectedAny(
+      @NotNull final Observer<Throwable> observer) {
+    return newInstance(mPromise.whenRejectedAny(observer));
   }
 
   @NotNull

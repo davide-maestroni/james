@@ -65,6 +65,21 @@ public class Iterables {
     return toSet(iterable);
   }
 
+  @SuppressWarnings("unchecked")
+  public static <T> T get(@NotNull final Iterable<T> iterable, final int index) {
+    if (iterable instanceof List) {
+      return ((List<T>) iterable).get(index);
+    }
+
+    final Iterator<T> iterator = iterable.iterator();
+    int i = 0;
+    while (++i < index) {
+      iterator.next();
+    }
+
+    return iterator.next();
+  }
+
   public static int size(@NotNull final Iterable<?> iterable) {
     int size;
     if (iterable instanceof Collection) {

@@ -18,21 +18,13 @@ package dm.james.handler;
 
 import org.jetbrains.annotations.NotNull;
 
-import java.io.Serializable;
-
-import dm.james.executor.ScheduledExecutor;
 import dm.james.math.Operation;
 import dm.james.promise.Mapper;
 import dm.james.promise.Observer;
-import dm.james.promise.Promise.Callback;
-import dm.james.promise.Promise.Handler;
 import dm.james.promise.PromiseIterable.CallbackIterable;
-import dm.james.promise.PromiseIterable.StatefulHandler;
 import dm.james.range.EndpointsType;
 import dm.james.range.SequenceIncrement;
-import dm.james.util.Backoff;
 import dm.james.util.ConstantConditions;
-import dm.james.util.InterruptedExecutionException;
 
 import static dm.james.math.Numbers.getHigherPrecisionOperation;
 import static dm.james.math.Numbers.getOperation;
@@ -49,11 +41,6 @@ public class Handlers {
    */
   protected Handlers() {
     ConstantConditions.avoid();
-  }
-
-  @NotNull
-  public static <I> Handler<I, Callback<I>> fulfillOn(@NotNull final ScheduledExecutor executor) {
-    return new ScheduleFulfill<I>(executor);
   }
 
   /**
@@ -150,29 +137,6 @@ public class Handlers {
     return range(DEFAULT_ENDPOINTS, start, end, increment);
   }
 
-  @NotNull
-  public static <I> Handler<Throwable, Callback<I>> rejectOn(
-      @NotNull final ScheduledExecutor executor) {
-    return new ScheduleReject<I>(executor);
-  }
-
-  @NotNull
-  public static <I> Observer<CallbackIterable<I>> resolveOn(
-      @NotNull final ScheduledExecutor executor) {
-    return new ScheduleResolve<I>(executor);
-  }
-
-  @NotNull
-  public static <I> StatefulHandler<I, I, ?> scheduleOn(@NotNull final ScheduledExecutor executor) {
-    return new ScheduleHandler<I>(executor);
-  }
-
-  @NotNull
-  public static <I> StatefulHandler<I, I, ?> scheduleOn(@NotNull final ScheduledExecutor executor,
-      @NotNull final Backoff<ScheduledInputs<I>> backoff) {
-    return new BackoffHandler<I>(executor, backoff);
-  }
-
   /**
    * Returns a consumer generating the specified sequence of data.
    * <br>
@@ -190,69 +154,5 @@ public class Handlers {
   public static <O> Observer<CallbackIterable<O>> sequence(@NotNull final O start, final long size,
       @NotNull final SequenceIncrement<O> next) {
     return new SequenceObserver<O>(start, size, next);
-  }
-
-  private static class ScheduleFulfill<I> implements Handler<I, Callback<I>>, Serializable {
-
-    private final ScheduledExecutor mExecutor;
-
-    private ScheduleFulfill(@NotNull final ScheduledExecutor executor) {
-      mExecutor = executor;
-    }
-
-    public void accept(final I input, final Callback<I> callback) throws Exception {
-      mExecutor.execute(new Runnable() {
-
-        public void run() {
-          try {
-            callback.resolve(input);
-
-          } catch (final Throwable t) {
-            InterruptedExecutionException.throwIfInterrupt(t);
-          }
-        }
-      });
-    }
-  }
-
-  private static class ScheduleReject<I> implements Handler<Throwable, Callback<I>>, Serializable {
-
-    private final ScheduledExecutor mExecutor;
-
-    private ScheduleReject(@NotNull final ScheduledExecutor executor) {
-      mExecutor = executor;
-    }
-
-    public void accept(final Throwable input, final Callback<I> callback) throws Exception {
-      mExecutor.execute(new Runnable() {
-
-        public void run() {
-          callback.reject(input);
-        }
-      });
-    }
-  }
-
-  private static class ScheduleResolve<I> implements Observer<CallbackIterable<I>>, Serializable {
-
-    private final ScheduledExecutor mExecutor;
-
-    private ScheduleResolve(@NotNull final ScheduledExecutor executor) {
-      mExecutor = executor;
-    }
-
-    public void accept(final CallbackIterable<I> callback) throws Exception {
-      mExecutor.execute(new Runnable() {
-
-        public void run() {
-          try {
-            callback.resolve();
-
-          } catch (final Throwable t) {
-            InterruptedExecutionException.throwIfInterrupt(t);
-          }
-        }
-      });
-    }
   }
 }

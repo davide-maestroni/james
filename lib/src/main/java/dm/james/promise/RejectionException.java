@@ -45,6 +45,15 @@ public class RejectionException extends RuntimeException {
   }
 
   @NotNull
+  public static Exception wrapIfNotException(@Nullable final Throwable t) {
+    if ((t == null) || !(t instanceof Exception)) {
+      return new RejectionException(t);
+    }
+
+    return (Exception) t;
+  }
+
+  @NotNull
   public static RejectionException wrapIfNotRejectionException(@Nullable final Throwable t) {
     return (RejectionException) wrapIfNot(RejectionException.class, t);
   }

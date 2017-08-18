@@ -22,6 +22,7 @@ import org.jetbrains.annotations.Nullable;
 import java.io.Closeable;
 
 import dm.james.executor.ScheduledExecutor;
+import dm.james.util.Backoff;
 
 /**
  * Created by davide-maestroni on 08/01/2017.
@@ -40,6 +41,9 @@ public interface DeferredPromiseIterable<I, O>
   void addDeferred(@NotNull Promise<I> promise);
 
   void addRejection(Throwable reason);
+
+  @NotNull
+  DeferredPromiseIterable<I, O> all();
 
   @NotNull
   <R> DeferredPromiseIterable<I, R> all(
@@ -66,6 +70,9 @@ public interface DeferredPromiseIterable<I, O>
   <R> DeferredPromiseIterable<I, R> allTrySorted(
       @Nullable Handler<Iterable<O>, ? super CallbackIterable<R>> fulfill,
       @Nullable Handler<Throwable, ? super CallbackIterable<R>> reject);
+
+  @NotNull
+  DeferredPromiseIterable<I, O> any();
 
   @NotNull
   <R> DeferredPromiseIterable<I, R> any(@Nullable Handler<O, ? super CallbackIterable<R>> fulfill,
@@ -179,6 +186,18 @@ public interface DeferredPromiseIterable<I, O>
       @Nullable ScheduledExecutor rejectExecutor);
 
   @NotNull
+  DeferredPromiseIterable<I, O> scheduleEachSorted(@Nullable ScheduledExecutor fulfillExecutor,
+      @Nullable ScheduledExecutor rejectExecutor);
+
+  @NotNull
+  DeferredPromiseIterable<I, O> scheduleOn(@NotNull ScheduledExecutor executor,
+      @NotNull Backoff<ScheduledOutputs<O>> backoff);
+
+  @NotNull
+  DeferredPromiseIterable<I, O> scheduleOnSorted(@NotNull ScheduledExecutor executor,
+      @NotNull Backoff<ScheduledOutputs<O>> backoff);
+
+  @NotNull
   <R> DeferredPromiseIterable<I, R> then(@Nullable Handler<O, ? super CallbackIterable<R>> fulfill,
       @Nullable Handler<Throwable, ? super CallbackIterable<R>> reject,
       @Nullable Observer<? super CallbackIterable<R>> resolve);
@@ -187,10 +206,22 @@ public interface DeferredPromiseIterable<I, O>
   <R, S> DeferredPromiseIterable<I, R> then(@NotNull StatefulHandler<O, R, S> handler);
 
   @NotNull
+  <R> DeferredPromiseIterable<I, R> thenSorted(
+      @Nullable Handler<O, ? super CallbackIterable<R>> fulfill,
+      @Nullable Handler<Throwable, ? super CallbackIterable<R>> reject,
+      @Nullable Observer<? super CallbackIterable<R>> resolve);
+
+  @NotNull
   <R, S> DeferredPromiseIterable<I, R> thenSorted(@NotNull StatefulHandler<O, R, S> handler);
 
   @NotNull
   <R> DeferredPromiseIterable<I, R> thenTry(
+      @Nullable Handler<O, ? super CallbackIterable<R>> fulfill,
+      @Nullable Handler<Throwable, ? super CallbackIterable<R>> reject,
+      @Nullable Observer<? super CallbackIterable<R>> resolve);
+
+  @NotNull
+  <R> DeferredPromiseIterable<I, R> thenTrySorted(
       @Nullable Handler<O, ? super CallbackIterable<R>> fulfill,
       @Nullable Handler<Throwable, ? super CallbackIterable<R>> reject,
       @Nullable Observer<? super CallbackIterable<R>> resolve);
@@ -208,6 +239,9 @@ public interface DeferredPromiseIterable<I, O>
 
   @NotNull
   DeferredPromiseIterable<I, O> whenFulfilledEach(@NotNull Observer<O> observer);
+
+  @NotNull
+  DeferredPromiseIterable<I, O> whenRejectedAny(@NotNull Observer<Throwable> observer);
 
   @NotNull
   DeferredPromiseIterable<I, O> whenRejectedEach(@NotNull Observer<Throwable> observer);

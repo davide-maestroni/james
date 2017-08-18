@@ -163,6 +163,21 @@ class DefaultPromise<O> implements Promise<O> {
     }
   }
 
+  private static void close(@Nullable final Object object, @NotNull final Logger logger) throws
+      RejectionException {
+    if (!(object instanceof Closeable)) {
+      return;
+    }
+
+    try {
+      ((Closeable) object).close();
+
+    } catch (final IOException e) {
+      logger.err(e, "Error while closing closeable: " + object);
+      throw new RejectionException(e);
+    }
+  }
+
   private static void safeClose(@Nullable final Object object, @NotNull final Logger logger) {
     if (!(object instanceof Closeable)) {
       return;
@@ -589,6 +604,10 @@ class DefaultPromise<O> implements Promise<O> {
         getLogger().dbg("Processing rejection with reason: %s", reason);
         mReject.accept(reason, next);
 
+      } catch (final CancellationException e) {
+        getLogger().wrn(e, "Promise has been cancelled");
+        next.reject(e);
+
       } catch (final Throwable t) {
         InterruptedExecutionException.throwIfInterrupt(t);
         getLogger().err(t, "Error while processing rejection with reason: %s", reason);
@@ -601,6 +620,10 @@ class DefaultPromise<O> implements Promise<O> {
       try {
         getLogger().dbg("Processing resolution: %s", input);
         mFulfill.accept(input, next);
+
+      } catch (final CancellationException e) {
+        getLogger().wrn(e, "Promise has been cancelled");
+        next.reject(e);
 
       } catch (final Throwable t) {
         InterruptedExecutionException.throwIfInterrupt(t);
@@ -1050,22 +1073,22 @@ class DefaultPromise<O> implements Promise<O> {
       }
     }
 
-    public void accept(final O input, final Callback<R> callback) {
+    public void accept(final O input, final Callback<R> callback) throws Exception {
       try {
         mHandler.accept(input, new Callback<R>() {
 
           public void defer(@NotNull final Promise<R> promise) {
-            safeClose(input, mLogger);
+            close(input, mLogger);
             callback.defer(promise);
           }
 
           public void reject(final Throwable reason) {
-            safeClose(input, mLogger);
+            close(input, mLogger);
             callback.reject(reason);
           }
 
           public void resolve(final R output) {
-            safeClose(input, mLogger);
+            close(input, mLogger);
             callback.resolve(output);
           }
         });
@@ -1073,7 +1096,7 @@ class DefaultPromise<O> implements Promise<O> {
       } catch (final Throwable t) {
         safeClose(input, mLogger);
         InterruptedExecutionException.throwIfInterrupt(t);
-        throw RejectionException.wrapIfNot(RuntimeException.class, t);
+        throw RejectionException.wrapIfNotException(t);
       }
     }
   }
