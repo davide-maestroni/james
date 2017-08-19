@@ -228,19 +228,19 @@ public class Bond implements Serializable {
   @NotNull
   public <O> Mapper<PromiseIterable<O>, PromiseIterable<Buffer>> toBuffer(
       @Nullable final AllocationType allocationType) {
-    return new BufferMapper<O>(this, allocationType);
+    return new BufferMapper<O>(allocationType, mLog, mLogLevel);
   }
 
   @NotNull
   public <O> Mapper<PromiseIterable<O>, PromiseIterable<Buffer>> toBuffer(
       @Nullable final AllocationType allocationType, final int coreSize) {
-    return new BufferMapper<O>(this, allocationType, coreSize);
+    return new BufferMapper<O>(allocationType, coreSize, mLog, mLogLevel);
   }
 
   @NotNull
   public <O> Mapper<PromiseIterable<O>, PromiseIterable<Buffer>> toBuffer(
       @Nullable final AllocationType allocationType, final int bufferSize, final int poolSize) {
-    return new BufferMapper<O>(this, allocationType, bufferSize, poolSize);
+    return new BufferMapper<O>(allocationType, bufferSize, poolSize, mLog, mLogLevel);
   }
 
   @NotNull
@@ -251,15 +251,6 @@ public class Bond implements Serializable {
   @NotNull
   public Bond withLogLevel(@Nullable final Level level) {
     return new Bond(mLog, level);
-  }
-
-  private void safeClose(@NotNull final Closeable closeable) {
-    try {
-      closeable.close();
-
-    } catch (final IOException e) {
-      Logger.newLogger(mLog, mLogLevel, this).wrn(e, "Suppressed exception");
-    }
   }
 
   private static class APlusMapper implements Mapper<Promise<?>, Promise<?>>, Serializable {
@@ -281,21 +272,22 @@ public class Bond implements Serializable {
 
     private final AllocationType mAllocationType;
 
-    private final Bond mBond;
-
     private final int mBufferSize;
 
     private final int mCoreSize;
 
+    private final Logger mLogger;
+
     private final int mPoolSize;
 
-    private BufferHandler(@NotNull final Bond bond, @Nullable final AllocationType allocationType,
-        final int coreSize, final int bufferSize, final int poolSize) {
-      mBond = bond;
+    private BufferHandler(@Nullable final AllocationType allocationType, final int coreSize,
+        final int bufferSize, final int poolSize, @Nullable final Log log,
+        @Nullable final Level level) {
       mAllocationType = allocationType;
       mCoreSize = coreSize;
       mBufferSize = bufferSize;
       mPoolSize = poolSize;
+      mLogger = Logger.newLogger(log, level, this);
     }
 
     public BufferOutputStream create(@NotNull final CallbackIterable<Buffer> callback) {
@@ -327,7 +319,7 @@ public class Bond implements Serializable {
           state.transfer(inputStream);
 
         } finally {
-          mBond.safeClose(inputStream);
+          safeClose(inputStream);
         }
 
       } else if (input instanceof ReadableByteChannel) {
@@ -336,7 +328,7 @@ public class Bond implements Serializable {
           state.transfer(channel);
 
         } finally {
-          mBond.safeClose(channel);
+          safeClose(channel);
         }
 
       } else if (input instanceof ByteBuffer) {
@@ -377,6 +369,15 @@ public class Bond implements Serializable {
         callback.resolve();
       }
     }
+
+    private void safeClose(@NotNull final Closeable closeable) {
+      try {
+        closeable.close();
+
+      } catch (final IOException e) {
+        mLogger.wrn(e, "Suppressed exception");
+      }
+    }
   }
 
   private static class BufferMapper<O>
@@ -384,43 +385,50 @@ public class Bond implements Serializable {
 
     private final AllocationType mAllocationType;
 
-    private final Bond mBond;
-
     private final int mBufferSize;
 
     private final int mCoreSize;
 
+    private final Log mLog;
+
+    private final Level mLogLevel;
+
     private final int mPoolSize;
 
-    private BufferMapper(@NotNull final Bond bond, @Nullable final AllocationType allocationType) {
-      mBond = bond;
+    private BufferMapper(@Nullable final AllocationType allocationType, @Nullable final Log log,
+        @Nullable final Level level) {
       mAllocationType = allocationType;
       mCoreSize = -1;
       mBufferSize = -1;
       mPoolSize = -1;
+      mLog = log;
+      mLogLevel = level;
     }
 
-    private BufferMapper(@NotNull final Bond bond, @Nullable final AllocationType allocationType,
-        final int coreSize) {
-      mBond = bond;
+    private BufferMapper(@Nullable final AllocationType allocationType, final int coreSize,
+        @Nullable final Log log, @Nullable final Level level) {
       mAllocationType = allocationType;
       mCoreSize = ConstantConditions.positive("coreSize", coreSize);
       mBufferSize = -1;
       mPoolSize = -1;
+      mLog = log;
+      mLogLevel = level;
     }
 
-    private BufferMapper(@NotNull final Bond bond, @Nullable final AllocationType allocationType,
-        final int bufferSize, final int poolSize) {
-      mBond = bond;
+    private BufferMapper(@Nullable final AllocationType allocationType, final int bufferSize,
+        final int poolSize, @Nullable final Log log, @Nullable final Level level) {
       mAllocationType = allocationType;
       mCoreSize = -1;
       mBufferSize = ConstantConditions.positive("bufferSize", bufferSize);
       mPoolSize = ConstantConditions.positive("poolSize", poolSize);
+      mLog = log;
+      mLogLevel = level;
     }
 
     public PromiseIterable<Buffer> apply(final PromiseIterable<O> promise) {
       return promise.then(
-          new BufferHandler<O>(mBond, mAllocationType, mCoreSize, mBufferSize, mPoolSize));
+          new BufferHandler<O>(mAllocationType, mCoreSize, mBufferSize, mPoolSize, mLog,
+              mLogLevel));
     }
   }
 
