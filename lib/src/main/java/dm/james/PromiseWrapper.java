@@ -82,8 +82,8 @@ abstract class PromiseWrapper<O> implements Promise<O>, Serializable {
     return mPromise.getReasonOr(other, timeout, timeUnit);
   }
 
-  public boolean isBound() {
-    return mPromise.isBound();
+  public boolean isChained() {
+    return mPromise.isChained();
   }
 
   public boolean isFulfilled() {

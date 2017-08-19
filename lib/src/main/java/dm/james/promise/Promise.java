@@ -52,7 +52,7 @@ public interface Promise<O> extends Serializable {
   RejectionException getReasonOr(RejectionException other, long timeout,
       @NotNull TimeUnit timeUnit);
 
-  boolean isBound(); // TODO: 17/08/2017 rename
+  boolean isChained();
 
   boolean isFulfilled();
 
@@ -79,6 +79,9 @@ public interface Promise<O> extends Serializable {
 
   @NotNull
   <R> Promise<R> thenTry(@NotNull Mapper<O, R> mapper);
+
+  // TODO: 18/08/2017 thenFulfill(R), thenReject(Throwable)?
+  // TODO: 18/08/2017 catchFulfill(R), catchReject(Throwable)?
 
   void waitResolved();
 

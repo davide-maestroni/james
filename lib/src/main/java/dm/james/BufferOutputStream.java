@@ -22,7 +22,6 @@ import org.jetbrains.annotations.Nullable;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.InvalidObjectException;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.io.ObjectStreamException;
@@ -32,15 +31,16 @@ import java.nio.ByteBuffer;
 import java.nio.channels.ReadableByteChannel;
 import java.nio.channels.WritableByteChannel;
 
-import dm.james.promise.DeferredPromiseIterable;
+import dm.james.io.AllocationType;
+import dm.james.io.Buffer;
+import dm.james.promise.PromiseIterable.CallbackIterable;
 import dm.james.util.ConstantConditions;
 import dm.james.util.DoubleQueue;
-import dm.james.util.SerializableProxy;
 
 /**
  * Created by davide-maestroni on 08/10/2017.
  */
-class BufferOutputStream extends OutputStream implements Serializable {
+class BufferOutputStream extends OutputStream {
 
   private static final int DEFAULT_BUFFER_SIZE = 16 << 10;
 
@@ -48,13 +48,11 @@ class BufferOutputStream extends OutputStream implements Serializable {
 
   private final AllocationType mAllocation;
 
+  private final CallbackIterable<Buffer> mCallback;
+
   private final int mCorePoolSize;
 
-  private final DeferredPromiseIterable<Buffer, Buffer> mIterable;
-
   private final int mMaxBufferSize;
-
-  private final Object mMutex = new Object();
 
   private final DoubleQueue<ByteBuffer> mPool;
 
@@ -62,27 +60,27 @@ class BufferOutputStream extends OutputStream implements Serializable {
 
   private boolean mIsClosed;
 
-  BufferOutputStream(@NotNull final DeferredPromiseIterable<Buffer, Buffer> iterable,
+  BufferOutputStream(@NotNull final CallbackIterable<Buffer> callback,
       @Nullable final AllocationType allocationType) {
-    this(iterable, allocationType, DEFAULT_BUFFER_SIZE, DEFAULT_POOL_SIZE);
+    this(callback, allocationType, DEFAULT_BUFFER_SIZE, DEFAULT_POOL_SIZE);
   }
 
-  BufferOutputStream(@NotNull final DeferredPromiseIterable<Buffer, Buffer> iterable,
+  BufferOutputStream(@NotNull final CallbackIterable<Buffer> callback,
       @Nullable final AllocationType allocationType, final int coreSize) {
-    mIterable = ConstantConditions.notNull(iterable);
-    mAllocation = (allocationType != null) ? allocationType : AllocationType.HEAP;
+    mCallback = ConstantConditions.notNull("callback", callback);
     final int poolSize =
         (mCorePoolSize = ConstantConditions.positive("coreSize", coreSize) / DEFAULT_BUFFER_SIZE);
     mMaxBufferSize = DEFAULT_BUFFER_SIZE;
+    mAllocation = (allocationType != null) ? allocationType : AllocationType.HEAP;
     mPool = new DoubleQueue<ByteBuffer>(Math.max(poolSize, 1));
   }
 
-  BufferOutputStream(@NotNull final DeferredPromiseIterable<Buffer, Buffer> iterable,
+  BufferOutputStream(@NotNull final CallbackIterable<Buffer> callback,
       @Nullable final AllocationType allocationType, final int bufferSize, final int poolSize) {
-    mIterable = ConstantConditions.notNull(iterable);
-    mAllocation = (allocationType != null) ? allocationType : AllocationType.HEAP;
+    mCallback = ConstantConditions.notNull("callback", callback);
     mCorePoolSize = ConstantConditions.positive("poolSize", poolSize);
     mMaxBufferSize = ConstantConditions.positive("bufferSize", bufferSize);
+    mAllocation = (allocationType != null) ? allocationType : AllocationType.HEAP;
     mPool = new DoubleQueue<ByteBuffer>(poolSize);
   }
 
@@ -109,30 +107,19 @@ class BufferOutputStream extends OutputStream implements Serializable {
   }
 
   public long transfer(@NotNull final ReadableByteChannel channel) throws IOException {
+    if (mIsClosed) {
+      throw new IOException("cannot write into a closed output stream");
+    }
+
     int count;
     long written = 0;
     do {
-      final boolean isAdd;
-      final ByteBuffer byteBuffer;
-      synchronized (mMutex) {
-        if (mIsClosed) {
-          throw new IOException("cannot write into a closed output stream");
-        }
-
-        byteBuffer = getBuffer();
-        count = channel.read(byteBuffer);
-        written += Math.min(0, count);
-        if (byteBuffer.remaining() == 0) {
-          isAdd = true;
-          mBuffer = null;
-
-        } else {
-          isAdd = false;
-        }
-      }
-
-      if (isAdd) {
-        mIterable.add(new DefaultBuffer(byteBuffer));
+      final ByteBuffer byteBuffer = getBuffer();
+      count = channel.read(byteBuffer);
+      written += Math.min(0, count);
+      if (byteBuffer.remaining() == 0) {
+        mBuffer = null;
+        mCallback.add(new DefaultBuffer(byteBuffer));
       }
 
     } while (count >= 0);
@@ -141,6 +128,10 @@ class BufferOutputStream extends OutputStream implements Serializable {
   }
 
   public int write(@NotNull final ByteBuffer buffer) throws IOException {
+    if (mIsClosed) {
+      throw new IOException("cannot write into a closed output stream");
+    }
+
     final int len = buffer.remaining();
     if (len == 0) {
       return 0;
@@ -148,44 +139,29 @@ class BufferOutputStream extends OutputStream implements Serializable {
 
     int written = 0;
     do {
-      final boolean isAdd;
-      final ByteBuffer byteBuffer;
-      synchronized (mMutex) {
-        if (mIsClosed) {
-          throw new IOException("cannot write into a closed output stream");
-        }
+      final ByteBuffer byteBuffer = getBuffer();
+      final int remaining = byteBuffer.remaining();
+      final int count = Math.min(len - written, remaining);
+      if (byteBuffer.hasArray()) {
+        final int position = byteBuffer.position();
+        buffer.get(byteBuffer.array(), position, count);
+        byteBuffer.position(position + count);
 
-        byteBuffer = getBuffer();
-        final int remaining = byteBuffer.remaining();
-        final int count = Math.min(len - written, remaining);
-        if (byteBuffer.hasArray()) {
-          final int position = byteBuffer.position();
-          buffer.get(byteBuffer.array(), position, count);
-          byteBuffer.position(position + count);
+      } else if (buffer.hasArray()) {
+        final int position = buffer.position();
+        byteBuffer.put(buffer.array(), position, count);
+        buffer.position(position + count);
 
-        } else if (buffer.hasArray()) {
-          final int position = buffer.position();
-          byteBuffer.put(buffer.array(), position, count);
-          buffer.position(position + count);
-
-        } else {
-          final byte[] bytes = new byte[count];
-          buffer.get(bytes);
-          byteBuffer.put(bytes);
-        }
-
-        written += count;
-        if (byteBuffer.remaining() == 0) {
-          isAdd = true;
-          mBuffer = null;
-
-        } else {
-          isAdd = false;
-        }
+      } else {
+        final byte[] bytes = new byte[count];
+        buffer.get(bytes);
+        byteBuffer.put(bytes);
       }
 
-      if (isAdd) {
-        mIterable.add(new DefaultBuffer(byteBuffer));
+      written += count;
+      if (byteBuffer.remaining() == 0) {
+        mBuffer = null;
+        mCallback.add(new DefaultBuffer(byteBuffer));
       }
 
     } while (written < len);
@@ -194,41 +170,25 @@ class BufferOutputStream extends OutputStream implements Serializable {
   }
 
   public int write(@NotNull final Buffer buffer) throws IOException {
-    final int read;
-    final boolean isAdd;
-    final ByteBuffer byteBuffer;
-    final ByteArrayOutputStream outputStream;
-    synchronized (mMutex) {
-      if (mIsClosed) {
-        throw new IOException("cannot write into a closed output stream");
-      }
-
-      byteBuffer = getBuffer();
-      final int remaining = byteBuffer.remaining();
-      if (buffer.available() > remaining) {
-        outputStream = new ByteArrayOutputStream(buffer.available());
-        buffer.read(outputStream);
-        read = outputStream.size();
-
-      } else {
-        outputStream = null;
-        read = buffer.read(byteBuffer);
-      }
-
-      if (byteBuffer.remaining() == 0) {
-        isAdd = true;
-        mBuffer = null;
-
-      } else {
-        isAdd = false;
-      }
+    if (mIsClosed) {
+      throw new IOException("cannot write into a closed output stream");
     }
 
-    if (outputStream != null) {
+    final ByteBuffer byteBuffer = getBuffer();
+    final int remaining = byteBuffer.remaining();
+    final int read;
+    if (buffer.available() > remaining) {
+      final ByteArrayOutputStream outputStream = new ByteArrayOutputStream(buffer.available());
+      buffer.read(outputStream);
+      read = outputStream.size();
       write(outputStream.toByteArray());
 
-    } else if (isAdd) {
-      mIterable.add(new DefaultBuffer(byteBuffer));
+    } else {
+      read = buffer.read(byteBuffer);
+      if (byteBuffer.remaining() == 0) {
+        mBuffer = null;
+        mCallback.add(new DefaultBuffer(byteBuffer));
+      }
     }
 
     return read;
@@ -248,46 +208,35 @@ class BufferOutputStream extends OutputStream implements Serializable {
    *                                            been closed, or if some other I/O error occurs.
    */
   public int write(@NotNull final InputStream in, final int limit) throws IOException {
+    if (mIsClosed) {
+      throw new IOException("cannot write into a closed output stream");
+    }
+
     if (ConstantConditions.notNegative("limit", limit) == 0) {
       return 0;
     }
 
+    final ByteBuffer byteBuffer = getBuffer();
+    final int remaining = byteBuffer.remaining();
+    final int position = byteBuffer.position();
     final int read;
-    final boolean isAdd;
-    final ByteBuffer byteBuffer;
-    synchronized (mMutex) {
-      if (mIsClosed) {
-        throw new IOException("cannot write into a closed output stream");
+    if (byteBuffer.hasArray()) {
+      read = in.read(byteBuffer.array(), position, Math.min(remaining, limit));
+      if (read >= 0) {
+        byteBuffer.position(position + read);
       }
 
-      byteBuffer = getBuffer();
-      final int remaining = byteBuffer.remaining();
-      final int position = byteBuffer.position();
-      if (byteBuffer.hasArray()) {
-        read = in.read(byteBuffer.array(), position, Math.min(remaining, limit));
-        if (read >= 0) {
-          byteBuffer.position(position + read);
-        }
-
-      } else {
-        final byte[] bytes = new byte[Math.min(remaining, limit)];
-        read = in.read(bytes);
-        if (read > 0) {
-          byteBuffer.put(bytes, 0, read);
-        }
-      }
-
-      if (byteBuffer.remaining() == 0) {
-        isAdd = true;
-        mBuffer = null;
-
-      } else {
-        isAdd = false;
+    } else {
+      final byte[] bytes = new byte[Math.min(remaining, limit)];
+      read = in.read(bytes);
+      if (read > 0) {
+        byteBuffer.put(bytes, 0, read);
       }
     }
 
-    if (isAdd) {
-      mIterable.add(new DefaultBuffer(byteBuffer));
+    if (byteBuffer.remaining() == 0) {
+      mBuffer = null;
+      mCallback.add(new DefaultBuffer(byteBuffer));
     }
 
     return read;
@@ -308,58 +257,40 @@ class BufferOutputStream extends OutputStream implements Serializable {
   }
 
   public int write(@NotNull final ReadableByteChannel channel) throws IOException {
-    final int read;
-    final boolean isAdd;
-    final ByteBuffer byteBuffer;
-    synchronized (mMutex) {
-      if (mIsClosed) {
-        throw new IOException("cannot write into a closed output stream");
-      }
-
-      byteBuffer = getBuffer();
-      read = channel.read(byteBuffer);
-      if (byteBuffer.remaining() == 0) {
-        isAdd = true;
-        mBuffer = null;
-
-      } else {
-        isAdd = false;
-      }
+    if (mIsClosed) {
+      throw new IOException("cannot write into a closed output stream");
     }
 
-    if (isAdd) {
-      mIterable.add(new DefaultBuffer(byteBuffer));
+    final ByteBuffer byteBuffer = getBuffer();
+    final int read = channel.read(byteBuffer);
+    if (byteBuffer.remaining() == 0) {
+      mBuffer = null;
+      mCallback.add(new DefaultBuffer(byteBuffer));
     }
 
     return read;
   }
 
   public void write(final int b) throws IOException {
-    final boolean isAdd;
-    final ByteBuffer byteBuffer;
-    synchronized (mMutex) {
-      if (mIsClosed) {
-        throw new IOException("cannot write into a closed output stream");
-      }
-
-      byteBuffer = getBuffer();
-      byteBuffer.put((byte) b);
-      if (byteBuffer.remaining() == 0) {
-        isAdd = true;
-        mBuffer = null;
-
-      } else {
-        isAdd = false;
-      }
+    if (mIsClosed) {
+      throw new IOException("cannot write into a closed output stream");
     }
 
-    if (isAdd) {
-      mIterable.add(new DefaultBuffer(byteBuffer));
+    final ByteBuffer byteBuffer;
+    byteBuffer = getBuffer();
+    byteBuffer.put((byte) b);
+    if (byteBuffer.remaining() == 0) {
+      mBuffer = null;
+      mCallback.add(new DefaultBuffer(byteBuffer));
     }
   }
 
   @Override
   public void write(@NotNull final byte[] b) throws IOException {
+    if (mIsClosed) {
+      throw new IOException("cannot write into a closed output stream");
+    }
+
     final int len = b.length;
     if (len == 0) {
       return;
@@ -367,29 +298,14 @@ class BufferOutputStream extends OutputStream implements Serializable {
 
     int written = 0;
     do {
-      final boolean isAdd;
-      final ByteBuffer byteBuffer;
-      synchronized (mMutex) {
-        if (mIsClosed) {
-          throw new IOException("cannot write into a closed output stream");
-        }
-
-        byteBuffer = getBuffer();
-        final int remaining = byteBuffer.remaining();
-        final int count = Math.min(len - written, remaining);
-        byteBuffer.put(b, written, count);
-        written += count;
-        if (byteBuffer.remaining() == 0) {
-          isAdd = true;
-          mBuffer = null;
-
-        } else {
-          isAdd = false;
-        }
-      }
-
-      if (isAdd) {
-        mIterable.add(new DefaultBuffer(byteBuffer));
+      final ByteBuffer byteBuffer = getBuffer();
+      final int remaining = byteBuffer.remaining();
+      final int count = Math.min(len - written, remaining);
+      byteBuffer.put(b, written, count);
+      written += count;
+      if (byteBuffer.remaining() == 0) {
+        mBuffer = null;
+        mCallback.add(new DefaultBuffer(byteBuffer));
       }
 
     } while (written < len);
@@ -397,6 +313,10 @@ class BufferOutputStream extends OutputStream implements Serializable {
 
   @Override
   public void write(@NotNull final byte[] b, final int off, final int len) throws IOException {
+    if (mIsClosed) {
+      throw new IOException("cannot write into a closed output stream");
+    }
+
     if (outOfBound(off, len, b.length)) {
       throw new IndexOutOfBoundsException();
 
@@ -406,29 +326,14 @@ class BufferOutputStream extends OutputStream implements Serializable {
 
     int written = 0;
     do {
-      final boolean isAdd;
-      final ByteBuffer byteBuffer;
-      synchronized (mMutex) {
-        if (mIsClosed) {
-          throw new IOException("cannot write into a closed output stream");
-        }
-
-        byteBuffer = getBuffer();
-        final int remaining = byteBuffer.remaining();
-        final int count = Math.min(len - written, remaining);
-        byteBuffer.put(b, written, count);
-        written += count;
-        if (byteBuffer.remaining() == 0) {
-          isAdd = true;
-          mBuffer = null;
-
-        } else {
-          isAdd = false;
-        }
-      }
-
-      if (isAdd) {
-        mIterable.add(new DefaultBuffer(byteBuffer));
+      final ByteBuffer byteBuffer = getBuffer();
+      final int remaining = byteBuffer.remaining();
+      final int count = Math.min(len - written, remaining);
+      byteBuffer.put(b, written, count);
+      written += count;
+      if (byteBuffer.remaining() == 0) {
+        mBuffer = null;
+        mCallback.add(new DefaultBuffer(byteBuffer));
       }
 
     } while (written < len);
@@ -436,31 +341,21 @@ class BufferOutputStream extends OutputStream implements Serializable {
 
   @Override
   public void flush() {
-    final ByteBuffer byteBuffer;
-    synchronized (mMutex) {
-      byteBuffer = getBuffer();
-      if (byteBuffer.position() == 0) {
-        return;
-      }
-
+    final ByteBuffer byteBuffer = getBuffer();
+    if (byteBuffer.remaining() == 0) {
       mBuffer = null;
+      mCallback.add(new DefaultBuffer(byteBuffer));
     }
-
-    mIterable.add(new DefaultBuffer(byteBuffer));
   }
 
   @Override
   public void close() {
-    synchronized (mMutex) {
-      if (mIsClosed) {
-        return;
-      }
-
-      mIsClosed = true;
+    if (mIsClosed) {
+      return;
     }
 
     flush();
-    mIterable.resolve();
+    mIsClosed = true;
   }
 
   @NotNull
@@ -498,10 +393,6 @@ class BufferOutputStream extends OutputStream implements Serializable {
         pool.add(buffer);
       }
     }
-  }
-
-  private Object writeReplace() throws ObjectStreamException {
-    return new StreamProxy(mIterable, mAllocation, mMaxBufferSize, mCorePoolSize);
   }
 
   private static class SerializableBuffer implements Buffer, Serializable {
@@ -602,26 +493,6 @@ class BufferOutputStream extends OutputStream implements Serializable {
     public void release() {
       synchronized (mMutex) {
         mBuffer = EMPTY_BUFFER;
-      }
-    }
-  }
-
-  private static class StreamProxy extends SerializableProxy {
-
-    private StreamProxy(final DeferredPromiseIterable<Buffer, Buffer> iterable,
-        final AllocationType allocationType, final int bufferSize, final int poolSize) {
-      super(iterable, allocationType, bufferSize, poolSize);
-    }
-
-    @SuppressWarnings("unchecked")
-    Object readResolve() throws ObjectStreamException {
-      try {
-        final Object[] args = deserializeArgs();
-        return new BufferOutputStream((DeferredPromiseIterable<Buffer, Buffer>) args[0],
-            (AllocationType) args[1], (Integer) args[2], (Integer) args[3]);
-
-      } catch (final Throwable t) {
-        throw new InvalidObjectException(t.getMessage());
       }
     }
   }

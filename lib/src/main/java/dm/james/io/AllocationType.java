@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package dm.james;
+package dm.james.io;
 
 import org.jetbrains.annotations.NotNull;
 
@@ -47,7 +47,7 @@ public enum AllocationType {
   }
 
   @NotNull
-  ByteBuffer allocate(final int limit) {
+  public ByteBuffer allocate(final int limit) {
     try {
       return mMapper.apply(limit);
 

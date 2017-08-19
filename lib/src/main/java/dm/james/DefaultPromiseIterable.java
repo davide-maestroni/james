@@ -81,7 +81,7 @@ class DefaultPromiseIterable<O> implements PromiseIterable<O>, Serializable {
 
   private final PromiseChain<?, O> mTail;
 
-  private PromiseChain<O, ?> mBond;
+  private PromiseChain<O, ?> mChain;
 
   private PromiseState mState = PromiseState.Pending;
 
@@ -426,7 +426,7 @@ class DefaultPromiseIterable<O> implements PromiseIterable<O>, Serializable {
   public <R> PromiseIterable<R> each(
       @Nullable final Handler<O, ? super CallbackIterable<R>> fulfill,
       @Nullable final Handler<Throwable, ? super CallbackIterable<R>> reject) {
-    return chain(new ChainHandler<O, R>(fulfill, reject, null));
+    return then(fulfill, reject, null);
   }
 
   @NotNull
@@ -448,7 +448,7 @@ class DefaultPromiseIterable<O> implements PromiseIterable<O>, Serializable {
   public <R> PromiseIterable<R> eachSorted(
       @Nullable final Handler<O, ? super CallbackIterable<R>> fulfill,
       @Nullable final Handler<Throwable, ? super CallbackIterable<R>> reject) {
-    return chain(new ChainHandlerSorted<O, R>(fulfill, reject, null));
+    return thenSorted(fulfill, reject, null);
   }
 
   @NotNull
@@ -1005,9 +1005,9 @@ class DefaultPromiseIterable<O> implements PromiseIterable<O>, Serializable {
     return other;
   }
 
-  public boolean isBound() {
+  public boolean isChained() {
     synchronized (mMutex) {
-      return (mBond != null);
+      return (mChain != null);
     }
   }
 
@@ -1101,7 +1101,7 @@ class DefaultPromiseIterable<O> implements PromiseIterable<O>, Serializable {
     final boolean isBound;
     final Runnable binding;
     synchronized (mMutex) {
-      if (mBond != null) {
+      if (mChain != null) {
         isBound = true;
         binding = null;
 
@@ -1109,7 +1109,7 @@ class DefaultPromiseIterable<O> implements PromiseIterable<O>, Serializable {
         isBound = false;
         chain.setLogger(logger);
         binding = ((ChainHead<O>) head).bind(chain);
-        mBond = chain;
+        mChain = chain;
         mMutex.notifyAll();
       }
     }
@@ -1130,7 +1130,7 @@ class DefaultPromiseIterable<O> implements PromiseIterable<O>, Serializable {
   }
 
   private void checkBound() {
-    if (mBond != null) {
+    if (mChain != null) {
       throw new IllegalStateException("the promise has been bound");
     }
   }
@@ -1897,7 +1897,6 @@ class DefaultPromiseIterable<O> implements PromiseIterable<O>, Serializable {
     @Nullable
     Runnable bind(final PromiseChain<O, ?> chain) {
       final Runnable binding = mInnerState.bind(chain);
-      mInnerState = new StatePending();
       mState = PromiseState.Pending;
       return binding;
     }
@@ -1959,7 +1958,9 @@ class DefaultPromiseIterable<O> implements PromiseIterable<O>, Serializable {
 
     void innerResolve() {
       mInnerState.innerResolve();
-      mState = PromiseState.Fulfilled;
+      if (mState == PromiseState.Pending) {
+        mState = PromiseState.Fulfilled;
+      }
     }
 
     boolean isComplete() {
@@ -1995,6 +1996,8 @@ class DefaultPromiseIterable<O> implements PromiseIterable<O>, Serializable {
       @Nullable
       @Override
       Runnable bind(final PromiseChain<O, ?> chain) {
+        getLogger().dbg("Binding promise [%s => %s]", PromiseState.Fulfilled, PromiseState.Pending);
+        mInnerState = new StatePending();
         chain.prepend(consumeOutputs());
         return new Runnable() {
 
@@ -4606,11 +4609,10 @@ class DefaultPromiseIterable<O> implements PromiseIterable<O>, Serializable {
 
     @Override
     void add(final PromiseChain<Object, ?> next, final O input) {
-      final PromiseChain<O, ?> bond;
+      final PromiseChain<O, ?> chain;
       synchronized (mMutex) {
         try {
-          mState = PromiseState.Fulfilled;
-          if ((bond = mBond) == null) {
+          if ((chain = mChain) == null) {
             mHead.innerAdd(input);
             return;
           }
@@ -4620,16 +4622,15 @@ class DefaultPromiseIterable<O> implements PromiseIterable<O>, Serializable {
         }
       }
 
-      bond.add(input);
+      chain.add(input);
     }
 
     @Override
     void addAll(final PromiseChain<Object, ?> next, final Iterable<O> inputs) {
-      final PromiseChain<O, ?> bond;
+      final PromiseChain<O, ?> chain;
       synchronized (mMutex) {
         try {
-          mState = PromiseState.Fulfilled;
-          if ((bond = mBond) == null) {
+          if ((chain = mChain) == null) {
             @SuppressWarnings("UnnecessaryLocalVariable") final ChainHead<O> head = mHead;
             for (final O input : inputs) {
               head.innerAdd(input);
@@ -4643,7 +4644,7 @@ class DefaultPromiseIterable<O> implements PromiseIterable<O>, Serializable {
         }
       }
 
-      bond.addAll(inputs);
+      chain.addAll(inputs);
     }
 
     @NotNull
@@ -4654,11 +4655,11 @@ class DefaultPromiseIterable<O> implements PromiseIterable<O>, Serializable {
 
     @Override
     void addRejection(final PromiseChain<Object, ?> next, final Throwable reason) {
-      final PromiseChain<O, ?> bond;
+      final PromiseChain<O, ?> chain;
       synchronized (mMutex) {
         try {
           mState = PromiseState.Rejected;
-          if ((bond = mBond) == null) {
+          if ((chain = mChain) == null) {
             mHead.innerAddRejection(reason);
             return;
           }
@@ -4668,16 +4669,19 @@ class DefaultPromiseIterable<O> implements PromiseIterable<O>, Serializable {
         }
       }
 
-      bond.addRejection(reason);
+      chain.addRejection(reason);
     }
 
     @Override
     void resolve(final PromiseChain<Object, ?> next) {
-      final PromiseChain<O, ?> bond;
+      final PromiseChain<O, ?> chain;
       synchronized (mMutex) {
         try {
-          mState = PromiseState.Fulfilled;
-          if ((bond = mBond) == null) {
+          if (mState == PromiseState.Pending) {
+            mState = PromiseState.Fulfilled;
+          }
+
+          if ((chain = mChain) == null) {
             mHead.innerResolve();
             return;
           }
@@ -4687,7 +4691,7 @@ class DefaultPromiseIterable<O> implements PromiseIterable<O>, Serializable {
         }
       }
 
-      bond.resolve();
+      chain.resolve();
     }
   }
 

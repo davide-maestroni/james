@@ -66,7 +66,7 @@ class DefaultPromise<O> implements Promise<O> {
 
   private final PromiseChain<?, O> mTail;
 
-  private PromiseChain<O, ?> mBond;
+  private PromiseChain<O, ?> mChain;
 
   private PromiseState mState = PromiseState.Pending;
 
@@ -329,9 +329,9 @@ class DefaultPromise<O> implements Promise<O> {
     return other;
   }
 
-  public boolean isBound() {
+  public boolean isChained() {
     synchronized (mMutex) {
-      return (mBond != null);
+      return (mChain != null);
     }
   }
 
@@ -454,7 +454,7 @@ class DefaultPromise<O> implements Promise<O> {
     final boolean isBound;
     final Runnable binding;
     synchronized (mMutex) {
-      if (mBond != null) {
+      if (mChain != null) {
         isBound = true;
         binding = null;
 
@@ -462,7 +462,7 @@ class DefaultPromise<O> implements Promise<O> {
         isBound = false;
         chain.setLogger(logger);
         binding = head.bind(chain, mFulfillExecutor, mRejectExecutor);
-        mBond = chain;
+        mChain = chain;
         mMutex.notifyAll();
       }
     }
@@ -483,7 +483,7 @@ class DefaultPromise<O> implements Promise<O> {
   }
 
   private void checkBound() {
-    if (mBond != null) {
+    if (mChain != null) {
       throw new IllegalStateException("the promise has been bound");
     }
   }
@@ -646,10 +646,10 @@ class DefaultPromise<O> implements Promise<O> {
     private PromiseState mState = PromiseState.Pending;
 
     @Nullable
-    Runnable bind(@NotNull final PromiseChain<?, ?> bond,
+    Runnable bind(@NotNull final PromiseChain<?, ?> chain,
         @NotNull final ScheduledExecutor fulfillExecutor,
         @NotNull final ScheduledExecutor rejectExecutor) {
-      final Runnable binding = mInnerState.bind(bond, fulfillExecutor, rejectExecutor);
+      final Runnable binding = mInnerState.bind(chain, fulfillExecutor, rejectExecutor);
       mState = PromiseState.Pending;
       return binding;
     }
@@ -687,7 +687,7 @@ class DefaultPromise<O> implements Promise<O> {
 
       @Nullable
       @Override
-      Runnable bind(@NotNull final PromiseChain<?, ?> bond,
+      Runnable bind(@NotNull final PromiseChain<?, ?> chain,
           @NotNull final ScheduledExecutor fulfillExecutor,
           @NotNull final ScheduledExecutor rejectExecutor) {
         getLogger().dbg("Binding promise [%s => %s]", PromiseState.Fulfilled, PromiseState.Pending);
@@ -701,7 +701,7 @@ class DefaultPromise<O> implements Promise<O> {
 
               @SuppressWarnings("unchecked")
               public void run() {
-                ((PromiseChain<Object, ?>) bond).resolve(output);
+                ((PromiseChain<Object, ?>) chain).resolve(output);
               }
             });
           }
@@ -727,7 +727,7 @@ class DefaultPromise<O> implements Promise<O> {
     private class StatePending {
 
       @Nullable
-      Runnable bind(@NotNull final PromiseChain<?, ?> bond,
+      Runnable bind(@NotNull final PromiseChain<?, ?> chain,
           @NotNull final ScheduledExecutor fulfillExecutor,
           @NotNull final ScheduledExecutor rejectExecutor) {
         return null;
@@ -766,7 +766,7 @@ class DefaultPromise<O> implements Promise<O> {
 
       @Nullable
       @Override
-      Runnable bind(@NotNull final PromiseChain<?, ?> bond,
+      Runnable bind(@NotNull final PromiseChain<?, ?> chain,
           @NotNull final ScheduledExecutor fulfillExecutor,
           @NotNull final ScheduledExecutor rejectExecutor) {
         getLogger().dbg("Binding promise [%s => %s]", PromiseState.Rejected, PromiseState.Pending);
@@ -779,7 +779,7 @@ class DefaultPromise<O> implements Promise<O> {
             rejectExecutor.execute(new Runnable() {
 
               public void run() {
-                bond.reject(exception);
+                chain.reject(exception);
               }
             });
           }
@@ -1187,7 +1187,7 @@ class DefaultPromise<O> implements Promise<O> {
       @Override
       void resolve() {
         final Throwable reason = mReason;
-        mLogger.wrn("Chain has been already rejected with reason: %s", reason);
+        mLogger.wrn("Promise has been already rejected with reason: %s", reason);
         throw RejectionException.wrapIfNotRejectionException(reason);
       }
     }
@@ -1196,8 +1196,8 @@ class DefaultPromise<O> implements Promise<O> {
 
       @Override
       void resolve() {
-        mLogger.wrn("Chain has been already resolved");
-        throw new IllegalStateException("chain has been already resolved");
+        mLogger.wrn("Promise has been already resolved");
+        throw new IllegalStateException("promise has been already resolved");
       }
 
       @Override
@@ -1323,11 +1323,11 @@ class DefaultPromise<O> implements Promise<O> {
 
     @Override
     void reject(final PromiseChain<Object, ?> next, final Throwable reason) {
-      final PromiseChain<O, ?> bond;
+      final PromiseChain<O, ?> chain;
       synchronized (mMutex) {
         try {
           mState = PromiseState.Rejected;
-          if ((bond = mBond) == null) {
+          if ((chain = mChain) == null) {
             mHead.innerReject(reason);
             return;
           }
@@ -1337,16 +1337,16 @@ class DefaultPromise<O> implements Promise<O> {
         }
       }
 
-      bond.reject(reason);
+      chain.reject(reason);
     }
 
     @Override
     void resolve(final PromiseChain<Object, ?> next, final O input) {
-      final PromiseChain<O, ?> bond;
+      final PromiseChain<O, ?> chain;
       synchronized (mMutex) {
         try {
           mState = PromiseState.Fulfilled;
-          if ((bond = mBond) == null) {
+          if ((chain = mChain) == null) {
             mHead.innerResolve(input);
             return;
           }
@@ -1356,7 +1356,7 @@ class DefaultPromise<O> implements Promise<O> {
         }
       }
 
-      bond.resolve(input);
+      chain.resolve(input);
     }
   }
 }

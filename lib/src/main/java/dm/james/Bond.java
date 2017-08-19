@@ -30,6 +30,8 @@ import java.util.concurrent.Future;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import dm.james.executor.ScheduledExecutor;
+import dm.james.io.AllocationType;
+import dm.james.io.Buffer;
 import dm.james.log.Log;
 import dm.james.log.Log.Level;
 import dm.james.log.Logger;
@@ -43,7 +45,6 @@ import dm.james.promise.Promise.Handler;
 import dm.james.promise.PromiseIterable;
 import dm.james.promise.PromiseIterable.CallbackIterable;
 import dm.james.promise.PromiseIterable.StatefulHandler;
-import dm.james.promise.RejectionException;
 import dm.james.util.ConstantConditions;
 
 /**
@@ -298,26 +299,28 @@ public class Bond implements Serializable {
     }
 
     public BufferOutputStream create(@NotNull final CallbackIterable<Buffer> callback) {
-      final DeferredPromiseIterable<Buffer, Buffer> deferred = mBond.deferredIterable();
       final int coreSize = mCoreSize;
       final int bufferSize = mBufferSize;
       final BufferOutputStream outputStream;
       if (coreSize > 0) {
-        outputStream = new BufferOutputStream(deferred, mAllocationType, coreSize);
+        outputStream = new BufferOutputStream(callback, mAllocationType, coreSize);
 
       } else if (bufferSize > 0) {
-        outputStream = new BufferOutputStream(deferred, mAllocationType, bufferSize, mPoolSize);
+        outputStream = new BufferOutputStream(callback, mAllocationType, bufferSize, mPoolSize);
 
       } else {
-        outputStream = new BufferOutputStream(deferred, mAllocationType);
+        outputStream = new BufferOutputStream(callback, mAllocationType);
       }
 
-      callback.addAllDeferred(deferred);
       return outputStream;
     }
 
     public BufferOutputStream fulfill(final BufferOutputStream state, final O input,
         @NotNull final CallbackIterable<Buffer> callback) throws Exception {
+      if (state == null) {
+        return null;
+      }
+
       if (input instanceof InputStream) {
         final InputStream inputStream = (InputStream) input;
         try {
@@ -345,8 +348,13 @@ public class Bond implements Serializable {
       } else if (input instanceof byte[]) {
         state.write((byte[]) input);
 
+      } else if (input instanceof Number) {
+        state.write(((Number) input).intValue());
+
       } else {
-        throw new IllegalArgumentException("unsupported input type: " + input);
+        state.close();
+        callback.reject(new IllegalArgumentException("unsupported input type: " + input));
+        return null;
       }
 
       return state;
@@ -354,12 +362,20 @@ public class Bond implements Serializable {
 
     public BufferOutputStream reject(final BufferOutputStream state, final Throwable reason,
         @NotNull final CallbackIterable<Buffer> callback) throws Exception {
-      throw RejectionException.wrapIfNotException(reason);
+      if (state != null) {
+        state.close();
+        callback.reject(reason);
+      }
+
+      return null;
     }
 
     public void resolve(final BufferOutputStream state,
         @NotNull final CallbackIterable<Buffer> callback) {
-      callback.resolve();
+      if (state != null) {
+        state.close();
+        callback.resolve();
+      }
     }
   }
 
@@ -403,7 +419,7 @@ public class Bond implements Serializable {
     }
 
     public PromiseIterable<Buffer> apply(final PromiseIterable<O> promise) {
-      return promise.thenTryState(
+      return promise.then(
           new BufferHandler<O>(mBond, mAllocationType, mCoreSize, mBufferSize, mPoolSize));
     }
   }
