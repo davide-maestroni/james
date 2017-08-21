@@ -150,9 +150,9 @@ public class Backoffs {
    * @throws IllegalArgumentException if the delay is negative.
    */
   @NotNull
-  public static <T> Backoff<T> withCap(@NotNull final Backoff<T> wrapped, final long value,
+  public static <T> Backoff<T> withCap(@NotNull final Backoff<T> backoff, final long value,
       @NotNull final TimeUnit unit) {
-    return new CappedBackoff<T>(wrapped, unit.toMillis(value));
+    return new CappedBackoff<T>(backoff, unit.toMillis(value));
   }
 
   /**
@@ -164,9 +164,9 @@ public class Backoffs {
    * @throws IllegalArgumentException if the percentage is outside the [0, 1] range.
    */
   @NotNull
-  public static <T> Backoff<T> withJitter(@NotNull final Backoff<T> wrapped,
+  public static <T> Backoff<T> withJitter(@NotNull final Backoff<T> backoff,
       final float percentage) {
-    return new JitterBackoff<T>(wrapped, percentage);
+    return new JitterBackoff<T>(backoff, percentage);
   }
 
   public interface IntConverter<T> {
@@ -186,12 +186,12 @@ public class Backoffs {
     /**
      * Constructor.
      *
-     * @param wrapped     the wrapped backoff instance.
+     * @param backoff     the wrapped backoff instance.
      * @param delayMillis the maximum delay in milliseconds.
      */
-    private CappedBackoff(@NotNull final Backoff<T> wrapped, final long delayMillis) {
-      mBackoff = wrapped;
-      mDelay = ConstantConditions.notNegative("backoff delay", delayMillis);
+    private CappedBackoff(@NotNull final Backoff<T> backoff, final long delayMillis) {
+      mBackoff = backoff;
+      mDelay = ConstantConditions.notNegative("delayMillis", delayMillis);
     }
 
     public long getDelay(@NotNull final T t) throws Exception {
@@ -220,7 +220,7 @@ public class Backoffs {
     private ConstantBackoff(@NotNull final IntConverter<T> converter, final int offset,
         final long delayMillis) {
       mConverter = ConstantConditions.notNull("converter", converter);
-      mDelay = ConstantConditions.notNegative("backoff delay", delayMillis);
+      mDelay = ConstantConditions.notNegative("delayMillis", delayMillis);
       mOffset = offset;
     }
 
@@ -257,7 +257,7 @@ public class Backoffs {
     private DecorrelatedJitterBackoff(@NotNull final IntConverter<T> converter, final int offset,
         final long delayMillis) {
       mConverter = ConstantConditions.notNull("converter", converter);
-      mDelay = ConstantConditions.notNegative("backoff delay", delayMillis);
+      mDelay = ConstantConditions.notNegative("delayMillis", delayMillis);
       mOffset = offset;
       mLast.set(delayMillis);
     }
@@ -296,7 +296,7 @@ public class Backoffs {
     private ExponentialBackoff(@NotNull final IntConverter<T> converter, final int offset,
         final long delayMillis) {
       mConverter = ConstantConditions.notNull("converter", converter);
-      mDelay = ConstantConditions.notNegative("backoff delay", delayMillis);
+      mDelay = ConstantConditions.notNegative("delayMillis", delayMillis);
       mOffset = offset;
     }
 
@@ -324,17 +324,17 @@ public class Backoffs {
     /**
      * Constructor.
      *
-     * @param wrapped    the wrapped backoff instance.
+     * @param backoff    the wrapped backoff instance.
      * @param percentage the percentage of delay to randomize.
      * @throws IllegalArgumentException if the percentage is outside the [0, 1] range.
      */
-    private JitterBackoff(@NotNull final Backoff<T> wrapped, final float percentage) {
+    private JitterBackoff(@NotNull final Backoff<T> backoff, final float percentage) {
       if ((percentage < 0) || (percentage > 1)) {
         throw new IllegalArgumentException(
             "the jitter percentage must be between 0 and 1, but is: " + percentage);
       }
 
-      mBackoff = wrapped;
+      mBackoff = backoff;
       mPercent = percentage;
     }
 
@@ -369,7 +369,7 @@ public class Backoffs {
     private LinearBackoff(@NotNull final IntConverter<T> converter, final int offset,
         final long delayMillis) {
       mConverter = ConstantConditions.notNull("converter", converter);
-      mDelay = ConstantConditions.notNegative("backoff delay", delayMillis);
+      mDelay = ConstantConditions.notNegative("delayMillis", delayMillis);
       mOffset = offset;
     }
 
@@ -399,8 +399,8 @@ public class Backoffs {
      * @param second the second backoff instance.
      */
     private SummedBackoff(@NotNull final Backoff<T> first, @NotNull final Backoff<T> second) {
-      mFirst = ConstantConditions.notNull("first backoff", first);
-      mOther = ConstantConditions.notNull("second backoff", second);
+      mFirst = ConstantConditions.notNull("first", first);
+      mOther = ConstantConditions.notNull("second", second);
     }
 
     public long getDelay(@NotNull final T t) throws Exception {

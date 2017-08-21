@@ -184,6 +184,9 @@ public interface DeferredPromiseIterable<I, O>
       @Nullable Handler<Throwable, ? super CallbackIterable<R>> reject);
 
   @NotNull
+  DeferredPromiseIterable<I, PromiseInspection<O>> inspectAll();
+
+  @NotNull
   DeferredPromiseIterable<I, O> scheduleAny(@Nullable ScheduledExecutor fulfillExecutor,
       @Nullable ScheduledExecutor rejectExecutor);
 

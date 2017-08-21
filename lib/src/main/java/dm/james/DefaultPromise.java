@@ -38,6 +38,7 @@ import dm.james.promise.CancellationException;
 import dm.james.promise.Mapper;
 import dm.james.promise.Observer;
 import dm.james.promise.Promise;
+import dm.james.promise.PromiseInspection;
 import dm.james.promise.RejectionException;
 import dm.james.promise.TimeoutException;
 import dm.james.util.ConstantConditions;
@@ -218,14 +219,14 @@ class DefaultPromise<O> implements Promise<O> {
   }
 
   @NotNull
-  public Promise<O> catchAll(@NotNull final Mapper<Throwable, O> mapper) {
-    return then(null, new HandlerCatch<O>(mapper));
-  }
-
-  @NotNull
   public Promise<O> catchAll(@NotNull final Iterable<Class<? extends Throwable>> errors,
       @NotNull final Mapper<Throwable, O> mapper) {
     return then(null, new HandlerCatchFiltered<O>(errors, mapper));
+  }
+
+  @NotNull
+  public Promise<O> catchAll(@NotNull final Mapper<Throwable, O> mapper) {
+    return then(null, new HandlerCatch<O>(mapper));
   }
 
   public O get() {
@@ -335,33 +336,14 @@ class DefaultPromise<O> implements Promise<O> {
     return other;
   }
 
+  @NotNull
+  public Promise<PromiseInspection<O>> inspect() {
+    return then(new HandlerInspectFulfill<O>(), new HandlerInspectReject<O>());
+  }
+
   public boolean isChained() {
     synchronized (mMutex) {
       return (mChain != null);
-    }
-  }
-
-  public boolean isFulfilled() {
-    synchronized (mMutex) {
-      return (mState == PromiseState.Fulfilled) || (mHead.getState() == PromiseState.Fulfilled);
-    }
-  }
-
-  public boolean isPending() {
-    synchronized (mMutex) {
-      return (mState == PromiseState.Pending) || (mHead.getState() == PromiseState.Pending);
-    }
-  }
-
-  public boolean isRejected() {
-    synchronized (mMutex) {
-      return (mState == PromiseState.Rejected) || (mHead.getState() == PromiseState.Rejected);
-    }
-  }
-
-  public boolean isResolved() {
-    synchronized (mMutex) {
-      return (mState.isResolved() || mHead.getState().isResolved());
     }
   }
 
@@ -444,6 +426,12 @@ class DefaultPromise<O> implements Promise<O> {
   @NotNull
   public Promise<O> whenResolved(@NotNull final Action action) {
     return then(new HandlerResolvedFulfill<O>(action), new HandlerResolvedReject<O>(action));
+  }
+
+  public boolean isFulfilled() {
+    synchronized (mMutex) {
+      return (mState == PromiseState.Fulfilled) || (mHead.getState() == PromiseState.Fulfilled);
+    }
   }
 
   @NotNull
@@ -570,9 +558,9 @@ class DefaultPromise<O> implements Promise<O> {
     private ChainHandler(@Nullable final Handler<O, ? super Callback<R>> fulfill,
         @Nullable final Handler<Throwable, ? super Callback<R>> reject) {
       mFulfill = (Handler<O, ? super Callback<R>>) ((fulfill != null) ? fulfill
-          : new PassThroughOutputHandler<O, R>());
+          : new HandlerFulfill<O, R>());
       mReject = (Handler<Throwable, ? super Callback<R>>) ((reject != null) ? reject
-          : new PassThroughErrorHandler<R>());
+          : new HandlerReject<R>());
     }
 
     @NotNull
@@ -624,7 +612,7 @@ class DefaultPromise<O> implements Promise<O> {
     @Override
     void resolve(final PromiseChain<R, ?> next, final O input) {
       try {
-        getLogger().dbg("Processing resolution: %s", input);
+        getLogger().dbg("Processing fulfillment: %s", input);
         mFulfill.accept(input, next);
 
       } catch (final CancellationException e) {
@@ -633,7 +621,7 @@ class DefaultPromise<O> implements Promise<O> {
 
       } catch (final Throwable t) {
         InterruptedExecutionException.throwIfInterrupt(t);
-        getLogger().err(t, "Error while processing resolution: %s", input);
+        getLogger().err(t, "Error while processing fulfillment: %s", input);
         next.reject(t);
       }
     }
@@ -858,6 +846,7 @@ class DefaultPromise<O> implements Promise<O> {
         }
       }
     }
+
   }
 
   private static class HandlerCatchFiltered<O>
@@ -909,6 +898,14 @@ class DefaultPromise<O> implements Promise<O> {
     }
   }
 
+  private static class HandlerFulfill<O, R> implements Handler<O, Callback<R>>, Serializable {
+
+    @SuppressWarnings("unchecked")
+    public void accept(final O input, @NotNull final Callback<R> callback) {
+      callback.resolve((R) input);
+    }
+  }
+
   private static class HandlerFulfilled<O> implements Handler<O, Callback<O>>, Serializable {
 
     private final Observer<O> mObserver;
@@ -945,6 +942,22 @@ class DefaultPromise<O> implements Promise<O> {
     }
   }
 
+  private static class HandlerInspectFulfill<O>
+      implements Handler<O, Callback<PromiseInspection<O>>>, Serializable {
+
+    public void accept(final O input, final Callback<PromiseInspection<O>> callback) {
+      callback.resolve(new PromiseInspectionFulfilled<O>(input));
+    }
+  }
+
+  private static class HandlerInspectReject<O>
+      implements Handler<Throwable, Callback<PromiseInspection<O>>>, Serializable {
+
+    public void accept(final Throwable reason, final Callback<PromiseInspection<O>> callback) {
+      callback.resolve(new PromiseInspectionRejected<O>(reason));
+    }
+  }
+
   private static class HandlerMap<O, R> implements Handler<O, Callback<R>>, Serializable {
 
     private final Mapper<O, R> mMapper;
@@ -977,6 +990,13 @@ class DefaultPromise<O> implements Promise<O> {
 
     public void accept(final O input, final Callback<R> callback) throws Exception {
       callback.resolve(mMapper.apply(input));
+    }
+  }
+
+  private static class HandlerReject<R> implements Handler<Throwable, Callback<R>>, Serializable {
+
+    public void accept(final Throwable input, @NotNull final Callback<R> callback) {
+      callback.reject(input);
     }
   }
 
@@ -1155,23 +1175,6 @@ class DefaultPromise<O> implements Promise<O> {
     }
   }
 
-  private static class PassThroughErrorHandler<R>
-      implements Handler<Throwable, Callback<R>>, Serializable {
-
-    public void accept(final Throwable input, @NotNull final Callback<R> callback) {
-      callback.reject(input);
-    }
-  }
-
-  private static class PassThroughOutputHandler<O, R>
-      implements Handler<O, Callback<R>>, Serializable {
-
-    @SuppressWarnings("unchecked")
-    public void accept(final O input, @NotNull final Callback<R> callback) {
-      callback.resolve((R) input);
-    }
-  }
-
   private static abstract class PromiseChain<I, O> implements Callback<I>, Serializable {
 
     private transient volatile StatePending mInnerState = new StatePending();
@@ -1285,6 +1288,72 @@ class DefaultPromise<O> implements Promise<O> {
     public final void resolve(final I output) {
       mInnerState.resolve();
       resolve(mNext, output);
+    }
+  }
+
+  private static class PromiseInspectionFulfilled<O> implements PromiseInspection<O>, Serializable {
+
+    private final O mOutput;
+
+    private PromiseInspectionFulfilled(final O output) {
+      mOutput = output;
+    }
+
+    public boolean isFulfilled() {
+      return true;
+    }
+
+    public boolean isPending() {
+      return false;
+    }
+
+    public boolean isRejected() {
+      return false;
+    }
+
+    public boolean isResolved() {
+      return true;
+    }
+
+    public Throwable reason() {
+      throw new IllegalStateException("the promise is not rejected");
+    }
+
+    public O value() {
+      return mOutput;
+    }
+  }
+
+  private static class PromiseInspectionRejected<O> implements PromiseInspection<O>, Serializable {
+
+    private final Throwable mReason;
+
+    private PromiseInspectionRejected(final Throwable reason) {
+      mReason = reason;
+    }
+
+    public boolean isFulfilled() {
+      return false;
+    }
+
+    public boolean isPending() {
+      return false;
+    }
+
+    public boolean isRejected() {
+      return true;
+    }
+
+    public boolean isResolved() {
+      return true;
+    }
+
+    public Throwable reason() {
+      return mReason;
+    }
+
+    public O value() {
+      throw new IllegalStateException("the promise is not fulfilled");
     }
   }
 
@@ -1411,6 +1480,46 @@ class DefaultPromise<O> implements Promise<O> {
       }
 
       chain.resolve(input);
+    }
+  }
+
+  public boolean isPending() {
+    synchronized (mMutex) {
+      return (mState == PromiseState.Pending) || (mHead.getState() == PromiseState.Pending);
+    }
+  }
+
+  public boolean isRejected() {
+    synchronized (mMutex) {
+      return (mState == PromiseState.Rejected) || (mHead.getState() == PromiseState.Rejected);
+    }
+  }
+
+  public boolean isResolved() {
+    synchronized (mMutex) {
+      return (mState.isResolved() || mHead.getState().isResolved());
+    }
+  }
+
+  public Throwable reason() {
+    synchronized (mMutex) {
+      if (!isRejected()) {
+        throw new IllegalStateException("the promise is not rejected");
+      }
+
+      @SuppressWarnings("ThrowableResultOfMethodCallIgnored") final RejectionException reason =
+          getReason(0, TimeUnit.MILLISECONDS);
+      return (reason != null) ? reason.getCause() : null;
+    }
+  }
+
+  public O value() {
+    synchronized (mMutex) {
+      if (!isFulfilled()) {
+        throw new IllegalStateException("the promise is not fulfilled");
+      }
+
+      return get(0, TimeUnit.MILLISECONDS);
     }
   }
 }

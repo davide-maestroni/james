@@ -244,10 +244,10 @@ class NestedQueue<E> {
     /**
      * Constructor.
      *
-     * @param wrapped the wrapped queue.
+     * @param queue the wrapped queue.
      */
-    private ReadOnlyQueue(@NotNull final DoubleQueue<E> wrapped) {
-      mQueue = wrapped;
+    private ReadOnlyQueue(@NotNull final DoubleQueue<E> queue) {
+      mQueue = queue;
     }
 
     @Override

@@ -28,6 +28,7 @@ import dm.james.promise.DeferredPromise;
 import dm.james.promise.Mapper;
 import dm.james.promise.Observer;
 import dm.james.promise.Promise;
+import dm.james.promise.PromiseInspection;
 import dm.james.promise.RejectionException;
 import dm.james.util.ConstantConditions;
 
@@ -60,6 +61,11 @@ class WrappingDeferredPromise<I, O> implements DeferredPromise<I, O>, Serializab
   @NotNull
   public DeferredPromise<I, O> catchAll(@NotNull final Mapper<Throwable, O> mapper) {
     return newInstance(mPromise.catchAll(mapper));
+  }
+
+  @NotNull
+  public DeferredPromise<I, PromiseInspection<O>> inspect() {
+    return newInstance(mPromise.inspect());
   }
 
   @NotNull
@@ -152,6 +158,14 @@ class WrappingDeferredPromise<I, O> implements DeferredPromise<I, O>, Serializab
     return mPromise.isChained();
   }
 
+  public void waitResolved() {
+    mPromise.waitResolved();
+  }
+
+  public boolean waitResolved(final long timeout, @NotNull final TimeUnit timeUnit) {
+    return mPromise.waitResolved(timeout, timeUnit);
+  }
+
   public boolean isFulfilled() {
     return mPromise.isFulfilled();
   }
@@ -168,12 +182,12 @@ class WrappingDeferredPromise<I, O> implements DeferredPromise<I, O>, Serializab
     return mPromise.isResolved();
   }
 
-  public void waitResolved() {
-    mPromise.waitResolved();
+  public Throwable reason() {
+    return mPromise.reason();
   }
 
-  public boolean waitResolved(final long timeout, @NotNull final TimeUnit timeUnit) {
-    return mPromise.waitResolved(timeout, timeUnit);
+  public O value() {
+    return mPromise.value();
   }
 
   @NotNull

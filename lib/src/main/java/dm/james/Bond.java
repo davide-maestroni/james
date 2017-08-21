@@ -472,7 +472,7 @@ public class Bond implements Serializable {
         public void run() {
           final CombinationState<S> state = mState;
           if (state.isRejected()) {
-            // TODO: 19/08/2017 log??
+            mLogger.wrn("Ignoring fulfillment: %s", input);
             return;
           }
 
@@ -486,7 +486,7 @@ public class Bond implements Serializable {
 
           } catch (final Throwable t) {
             InterruptedExecutionException.throwIfInterrupt(t);
-            mLogger.err(t, "Error while processing input: %s", input);
+            mLogger.err(t, "Error while processing fulfillment: %s", input);
             state.setRejected(true);
             mCallback.reject(t);
 
@@ -626,7 +626,7 @@ public class Bond implements Serializable {
         public void run() {
           final CombinationState<S> state = mState;
           if (state.isRejected()) {
-            // TODO: 19/08/2017 log??
+            mLogger.wrn(reason, "Ignoring rejection");
             return;
           }
 
@@ -688,14 +688,14 @@ public class Bond implements Serializable {
         public void run() {
           final CombinationState<S> state = mState;
           if (state.isRejected()) {
-            // TODO: 19/08/2017 log??
+            mLogger.wrn("Ignoring resolution");
             return;
           }
 
           try {
             state.set(mHandler.resolve(state.get(), mPromises, mIndex, mCallback));
             if (state.addResolved()) {
-              mHandler.resolve(state.get(), mPromises, mCallback);
+              mHandler.settle(state.get(), mPromises, mCallback);
             }
 
           } catch (final CancellationException e) {
@@ -870,7 +870,7 @@ public class Bond implements Serializable {
       return state;
     }
 
-    public void resolve(final Integer state, @NotNull final List<? extends Promise<?>> promises,
+    public void settle(final Integer state, @NotNull final List<? extends Promise<?>> promises,
         @NotNull final CallbackIterable<O> callback) throws Exception {
     }
   }
@@ -930,7 +930,7 @@ public class Bond implements Serializable {
       return state;
     }
 
-    public void resolve(final Integer state, @NotNull final List<? extends Promise<?>> promises,
+    public void settle(final Integer state, @NotNull final List<? extends Promise<?>> promises,
         @NotNull final CallbackIterable<O> callback) throws Exception {
     }
   }

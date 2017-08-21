@@ -57,27 +57,27 @@ class ThrottlingExecutor extends ScheduledExecutorDecorator implements Serializa
   /**
    * Constructor.
    *
-   * @param wrapped     the wrapped instance.
+   * @param executor    the wrapped instance.
    * @param maxCommands the maximum number of running commands.
    * @throws IllegalArgumentException if the specified max number is less than 1.
    */
-  private ThrottlingExecutor(@NotNull final ScheduledExecutor wrapped, final int maxCommands) {
-    super(wrapped);
-    mExecutor = wrapped;
-    mMaxRunning = ConstantConditions.positive("maximum number of running commands", maxCommands);
+  private ThrottlingExecutor(@NotNull final ScheduledExecutor executor, final int maxCommands) {
+    super(executor);
+    mExecutor = executor;
+    mMaxRunning = ConstantConditions.positive("maxCommands", maxCommands);
   }
 
   /**
    * Returns a new throttling executor instance.
    *
-   * @param wrapped     the wrapped instance.
+   * @param executor    the wrapped instance.
    * @param maxCommands the maximum number of running commands.
    * @return the executor instance.
    * @throws IllegalArgumentException if the specified max number is less than 1.
    */
   @NotNull
-  static ThrottlingExecutor of(@NotNull final ScheduledExecutor wrapped, final int maxCommands) {
-    return new ThrottlingExecutor(wrapped, maxCommands);
+  static ThrottlingExecutor of(@NotNull final ScheduledExecutor executor, final int maxCommands) {
+    return new ThrottlingExecutor(executor, maxCommands);
   }
 
   @Override
@@ -133,8 +133,8 @@ class ThrottlingExecutor extends ScheduledExecutorDecorator implements Serializa
 
   private static class ExecutorProxy extends SerializableProxy {
 
-    private ExecutorProxy(final ScheduledExecutor wrapped, final int maxCommands) {
-      super(wrapped, maxCommands);
+    private ExecutorProxy(final ScheduledExecutor executor, final int maxCommands) {
+      super(executor, maxCommands);
     }
 
     @SuppressWarnings("unchecked")

@@ -52,9 +52,9 @@ class SequenceObserver<O> implements Observer<CallbackIterable<O>>, Serializable
    */
   SequenceObserver(@NotNull final O start, final long size,
       @NotNull final SequenceIncrement<O> next) {
-    mStart = ConstantConditions.notNull("start element", start);
-    mSize = ConstantConditions.positive("sequence size", size);
-    mNext = ConstantConditions.notNull("next function", next);
+    mStart = ConstantConditions.notNull("start", start);
+    mSize = ConstantConditions.positive("size", size);
+    mNext = ConstantConditions.notNull("next", next);
   }
 
   public void accept(final CallbackIterable<O> callback) throws Exception {

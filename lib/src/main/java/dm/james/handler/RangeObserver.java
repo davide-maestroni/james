@@ -57,9 +57,9 @@ class RangeObserver<O extends Comparable<? super O>>
    */
   RangeObserver(@NotNull final EndpointsType endpoints, @NotNull final O start,
       @NotNull final O end, @NotNull final Mapper<O, O> increment) {
-    mEndpoints = ConstantConditions.notNull("endpoints type", endpoints);
-    mStart = ConstantConditions.notNull("start element", start);
-    mEnd = ConstantConditions.notNull("end element", end);
+    mEndpoints = ConstantConditions.notNull("endpoints", endpoints);
+    mStart = ConstantConditions.notNull("start", start);
+    mEnd = ConstantConditions.notNull("end", end);
     mIncrement = ConstantConditions.notNull("increment", increment);
   }
 

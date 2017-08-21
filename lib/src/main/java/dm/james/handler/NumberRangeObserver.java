@@ -60,9 +60,9 @@ class NumberRangeObserver<N extends Number> implements Observer<CallbackIterable
    */
   NumberRangeObserver(@NotNull final EndpointsType endpoints, @NotNull final N start,
       @NotNull final N end, @NotNull final N increment) {
-    mEndpoints = ConstantConditions.notNull("endpoints type", endpoints);
-    mStart = ConstantConditions.notNull("start element", start);
-    mEnd = ConstantConditions.notNull("end element", end);
+    mEndpoints = ConstantConditions.notNull("endpoints", endpoints);
+    mStart = ConstantConditions.notNull("start", start);
+    mEnd = ConstantConditions.notNull("end", end);
     mIncrement = ConstantConditions.notNull("increment", increment);
     mOperation = getHigherPrecisionOperation(
         getHigherPrecisionOperation(start.getClass(), increment.getClass()).convert(0).getClass(),

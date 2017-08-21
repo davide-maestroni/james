@@ -40,19 +40,16 @@ class ZeroDelayExecutor extends ScheduledExecutorDecorator implements Serializab
 
   private static final LoopExecutor sSyncExecutor = LoopExecutor.instance();
 
-  private final WeakIdentityHashMap<Runnable, WeakReference<RunnableDecorator>> mCommands =
-      new WeakIdentityHashMap<Runnable, WeakReference<RunnableDecorator>>();
-
   private final ScheduledExecutor mExecutor;
 
   /**
    * Constructor.
    *
-   * @param wrapped the wrapped instance.
+   * @param executor the wrapped instance.
    */
-  private ZeroDelayExecutor(@NotNull final ScheduledExecutor wrapped) {
-    super(wrapped);
-    mExecutor = wrapped;
+  private ZeroDelayExecutor(@NotNull final ScheduledExecutor executor) {
+    super(executor);
+    mExecutor = executor;
   }
 
   /**
@@ -85,7 +82,7 @@ class ZeroDelayExecutor extends ScheduledExecutorDecorator implements Serializab
   @Override
   public void execute(@NotNull final Runnable command) {
     if (isExecutionThread()) {
-      sSyncExecutor.execute(getRunnableDecorator(command));
+      sSyncExecutor.execute(command);
 
     } else {
       super.execute(command);
@@ -103,30 +100,14 @@ class ZeroDelayExecutor extends ScheduledExecutorDecorator implements Serializab
     }
   }
 
-  @NotNull
-  private RunnableDecorator getRunnableDecorator(@NotNull final Runnable command) {
-    RunnableDecorator decorator;
-    synchronized (mCommands) {
-      final WeakIdentityHashMap<Runnable, WeakReference<RunnableDecorator>> commands = mCommands;
-      final WeakReference<RunnableDecorator> reference = commands.get(command);
-      decorator = (reference != null) ? reference.get() : null;
-      if (decorator == null) {
-        decorator = new RunnableDecorator(command);
-        commands.put(command, new WeakReference<RunnableDecorator>(decorator));
-      }
-    }
-
-    return decorator;
-  }
-
   private Object writeReplace() throws ObjectStreamException {
     return new ExecutorProxy(mExecutor);
   }
 
   private static class ExecutorProxy extends SerializableProxy {
 
-    private ExecutorProxy(final ScheduledExecutor wrapped) {
-      super(wrapped);
+    private ExecutorProxy(final ScheduledExecutor executor) {
+      super(executor);
     }
 
     @SuppressWarnings("unchecked")

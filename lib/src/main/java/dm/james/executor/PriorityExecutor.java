@@ -83,10 +83,10 @@ class PriorityExecutor {
   /**
    * Constructor.
    *
-   * @param wrapped the wrapped instance.
+   * @param executor the wrapped instance.
    */
-  private PriorityExecutor(@NotNull final ScheduledExecutor wrapped) {
-    mExecutor = ConstantConditions.notNull("wrapped executor", wrapped);
+  private PriorityExecutor(@NotNull final ScheduledExecutor executor) {
+    mExecutor = ConstantConditions.notNull("executor", executor);
     mQueue = new PriorityBlockingQueue<PriorityCommand>(10, PRIORITY_COMMAND_COMPARATOR);
   }
 
@@ -95,13 +95,13 @@ class PriorityExecutor {
    * <p>
    * Note that wrapping a synchronous executor may lead to unpredictable results.
    *
-   * @param wrapped  the wrapped instance.
+   * @param executor the wrapped instance.
    * @param priority the commands priority.
    * @return the priority executor.
    */
   @NotNull
-  static ScheduledExecutor of(@NotNull final ScheduledExecutor wrapped, final int priority) {
-    return new SerializableExecutor(wrapped, priority);
+  static ScheduledExecutor of(@NotNull final ScheduledExecutor executor, final int priority) {
+    return new SerializableExecutor(executor, priority);
   }
 
   private static int compareLong(final long l1, final long l2) {
@@ -170,9 +170,9 @@ class PriorityExecutor {
 
     private final int mPriority;
 
-    private SerializableExecutor(@NotNull final ScheduledExecutor wrapped, final int priority) {
-      super(executor(wrapped).ofPriority(priority));
-      mExecutor = wrapped;
+    private SerializableExecutor(@NotNull final ScheduledExecutor executor, final int priority) {
+      super(executor(executor).ofPriority(priority));
+      mExecutor = executor;
       mPriority = priority;
     }
 
@@ -182,8 +182,8 @@ class PriorityExecutor {
 
     private static class ExecutorProxy extends SerializableProxy {
 
-      private ExecutorProxy(final ScheduledExecutor wrapped, final int priority) {
-        super(wrapped, priority);
+      private ExecutorProxy(final ScheduledExecutor executor, final int priority) {
+        super(executor, priority);
       }
 
       @SuppressWarnings("unchecked")

@@ -34,10 +34,10 @@ public class ScheduledExecutorDecorator implements ScheduledExecutor {
   /**
    * Constructor.
    *
-   * @param wrapped the wrapped instance.
+   * @param executor the wrapped instance.
    */
-  public ScheduledExecutorDecorator(@NotNull final ScheduledExecutor wrapped) {
-    mExecutor = ConstantConditions.notNull("executor", wrapped);
+  public ScheduledExecutorDecorator(@NotNull final ScheduledExecutor executor) {
+    mExecutor = ConstantConditions.notNull("executor", executor);
   }
 
   public void execute(@NotNull final Runnable command) {

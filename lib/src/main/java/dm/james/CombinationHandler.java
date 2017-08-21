@@ -40,6 +40,6 @@ public interface CombinationHandler<O, S> {
   S resolve(S state, @NotNull List<? extends Promise<?>> promises, int index,
       @NotNull CallbackIterable<O> callback) throws Exception;
 
-  void resolve(S state, @NotNull List<? extends Promise<?>> promises,
+  void settle(S state, @NotNull List<? extends Promise<?>> promises,
       @NotNull CallbackIterable<O> callback) throws Exception;
 }

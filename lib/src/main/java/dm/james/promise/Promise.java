@@ -27,7 +27,7 @@ import dm.james.executor.ScheduledExecutor;
 /**
  * Created by davide-maestroni on 07/17/2017.
  */
-public interface Promise<O> extends Serializable {
+public interface Promise<O> extends PromiseInspection<O>, Serializable {
 
   @NotNull
   <R> Promise<R> apply(@NotNull Mapper<Promise<O>, Promise<R>> mapper);
@@ -56,15 +56,10 @@ public interface Promise<O> extends Serializable {
   RejectionException getReasonOr(RejectionException other, long timeout,
       @NotNull TimeUnit timeUnit);
 
+  @NotNull
+  Promise<PromiseInspection<O>> inspect();
+
   boolean isChained();
-
-  boolean isFulfilled();
-
-  boolean isPending();
-
-  boolean isRejected();
-
-  boolean isResolved();
 
   @NotNull
   Promise<O> scheduleAll(@Nullable ScheduledExecutor fulfillExecutor,
@@ -83,9 +78,6 @@ public interface Promise<O> extends Serializable {
 
   @NotNull
   <R> Promise<R> thenTry(@NotNull Mapper<O, R> mapper);
-
-  // TODO: 18/08/2017 thenFulfill(R), thenReject(Throwable)?
-  // TODO: 18/08/2017 catchFulfill(R), catchReject(Throwable)?
 
   void waitResolved();
 

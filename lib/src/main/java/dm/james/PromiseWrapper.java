@@ -27,6 +27,7 @@ import dm.james.promise.Action;
 import dm.james.promise.Mapper;
 import dm.james.promise.Observer;
 import dm.james.promise.Promise;
+import dm.james.promise.PromiseInspection;
 import dm.james.promise.RejectionException;
 import dm.james.util.ConstantConditions;
 
@@ -88,24 +89,13 @@ abstract class PromiseWrapper<O> implements Promise<O>, Serializable {
     return mPromise.getReasonOr(other, timeout, timeUnit);
   }
 
+  @NotNull
+  public Promise<PromiseInspection<O>> inspect() {
+    return newInstance(mPromise.inspect());
+  }
+
   public boolean isChained() {
     return mPromise.isChained();
-  }
-
-  public boolean isFulfilled() {
-    return mPromise.isFulfilled();
-  }
-
-  public boolean isPending() {
-    return mPromise.isPending();
-  }
-
-  public boolean isRejected() {
-    return mPromise.isRejected();
-  }
-
-  public boolean isResolved() {
-    return mPromise.isResolved();
   }
 
   @NotNull
@@ -157,6 +147,30 @@ abstract class PromiseWrapper<O> implements Promise<O>, Serializable {
   @NotNull
   public Promise<O> whenResolved(@NotNull final Action action) {
     return newInstance(mPromise.whenResolved(action));
+  }
+
+  public boolean isFulfilled() {
+    return mPromise.isFulfilled();
+  }
+
+  public boolean isPending() {
+    return mPromise.isPending();
+  }
+
+  public boolean isRejected() {
+    return mPromise.isRejected();
+  }
+
+  public boolean isResolved() {
+    return mPromise.isResolved();
+  }
+
+  public Throwable reason() {
+    return mPromise.reason();
+  }
+
+  public O value() {
+    return mPromise.value();
   }
 
   @NotNull

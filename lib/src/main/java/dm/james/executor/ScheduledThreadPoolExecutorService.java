@@ -47,7 +47,7 @@ class ScheduledThreadPoolExecutorService extends ScheduledThreadPoolExecutor
    */
   ScheduledThreadPoolExecutorService(@NotNull final ExecutorService service) {
     super(1);
-    mExecutor = ConstantConditions.notNull("executor service", service);
+    mExecutor = ConstantConditions.notNull("service", service);
   }
 
   @Override

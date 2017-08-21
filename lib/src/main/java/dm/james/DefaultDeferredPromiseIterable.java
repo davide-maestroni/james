@@ -40,6 +40,7 @@ import dm.james.promise.DeferredPromiseIterable;
 import dm.james.promise.Mapper;
 import dm.james.promise.Observer;
 import dm.james.promise.Promise;
+import dm.james.promise.PromiseInspection;
 import dm.james.promise.PromiseIterable;
 import dm.james.promise.RejectionException;
 import dm.james.promise.ScheduledOutputs;
@@ -353,6 +354,11 @@ class DefaultDeferredPromiseIterable<I, O> implements DeferredPromiseIterable<I,
   }
 
   @NotNull
+  public DeferredPromiseIterable<I, PromiseInspection<O>> inspectAll() {
+    return newInstance(mPromise.inspectAll());
+  }
+
+  @NotNull
   public DeferredPromiseIterable<I, O> scheduleAny(
       @Nullable final ScheduledExecutor fulfillExecutor,
       @Nullable final ScheduledExecutor rejectExecutor) {
@@ -533,40 +539,12 @@ class DefaultDeferredPromiseIterable<I, O> implements DeferredPromiseIterable<I,
     return mPromise.isChained();
   }
 
-  public boolean isFulfilled() {
-    return mPromise.isFulfilled();
-  }
-
-  public boolean isPending() {
-    return mPromise.isPending();
-  }
-
-  public boolean isRejected() {
-    return mPromise.isRejected();
-  }
-
-  public boolean isResolved() {
-    return mPromise.isResolved();
-  }
-
   public void waitResolved() {
     mPromise.waitResolved();
   }
 
   public boolean waitResolved(final long timeout, @NotNull final TimeUnit timeUnit) {
     return mPromise.waitResolved(timeout, timeUnit);
-  }
-
-  public void defer(@NotNull final Promise<Iterable<I>> promise) {
-    mState.defer(promise);
-  }
-
-  public void reject(final Throwable reason) {
-    mState.reject(reason);
-  }
-
-  public void resolve(final Iterable<I> input) {
-    mState.resolve(input);
   }
 
   @NotNull
@@ -648,6 +626,48 @@ class DefaultDeferredPromiseIterable<I, O> implements DeferredPromiseIterable<I,
 
   public boolean waitSettled(final long timeout, @NotNull final TimeUnit timeUnit) {
     return mPromise.waitSettled(timeout, timeUnit);
+  }
+
+  @NotNull
+  public DeferredPromise<Iterable<I>, PromiseInspection<Iterable<O>>> inspect() {
+    return new WrappingDeferredPromise<Iterable<I>, PromiseInspection<Iterable<O>>>(this,
+        mPromise.inspect());
+  }
+
+  public void defer(@NotNull final Promise<Iterable<I>> promise) {
+    mState.defer(promise);
+  }
+
+  public void reject(final Throwable reason) {
+    mState.reject(reason);
+  }
+
+  public void resolve(final Iterable<I> input) {
+    mState.resolve(input);
+  }
+
+  public boolean isFulfilled() {
+    return mPromise.isFulfilled();
+  }
+
+  public boolean isPending() {
+    return mPromise.isPending();
+  }
+
+  public boolean isRejected() {
+    return mPromise.isRejected();
+  }
+
+  public boolean isResolved() {
+    return mPromise.isResolved();
+  }
+
+  public Throwable reason() {
+    return mPromise.reason();
+  }
+
+  public Iterable<O> value() {
+    return mPromise.value();
   }
 
   public Iterator<O> iterator() {

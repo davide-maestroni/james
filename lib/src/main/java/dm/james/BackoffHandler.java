@@ -214,8 +214,8 @@ class BackoffHandler<O> implements StatefulHandler<O, O, BackoffOutputs<O>>, Ser
 
   private static class ExecutorProxy extends SerializableProxy {
 
-    private ExecutorProxy(final ScheduledExecutor wrapped, final Backoff backoff) {
-      super(wrapped, backoff);
+    private ExecutorProxy(final ScheduledExecutor executor, final Backoff backoff) {
+      super(executor, backoff);
     }
 
     @SuppressWarnings("unchecked")

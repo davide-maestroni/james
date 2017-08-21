@@ -104,6 +104,9 @@ public interface PromiseIterable<O> extends Promise<Iterable<O>>, Iterable<O> {
   PromiseIterable<O> catchAll(@NotNull Mapper<Throwable, Iterable<O>> mapper);
 
   @NotNull
+  Promise<PromiseInspection<Iterable<O>>> inspect();
+
+  @NotNull
   PromiseIterable<O> scheduleAll(@Nullable ScheduledExecutor fulfillExecutor,
       @Nullable ScheduledExecutor rejectExecutor);
 
@@ -181,6 +184,9 @@ public interface PromiseIterable<O> extends Promise<Iterable<O>>, Iterable<O> {
   O getAny(long timeout, @NotNull TimeUnit timeUnit);
 
   O getAnyOr(O other, long timeout, @NotNull TimeUnit timeUnit);
+
+  @NotNull
+  PromiseIterable<PromiseInspection<O>> inspectAll();
 
   boolean isSettled();
 

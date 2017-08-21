@@ -90,7 +90,7 @@ public class Logger {
    * @param level the log level.
    */
   public static void setDefaultLevel(@NotNull final Level level) {
-    sLogLevel.set(ConstantConditions.notNull("default log level", level));
+    sLogLevel.set(ConstantConditions.notNull("level", level));
   }
 
   /**
@@ -109,7 +109,7 @@ public class Logger {
    * @param log the log instance.
    */
   public static void setDefaultLog(@NotNull final Log log) {
-    sLog.set(ConstantConditions.notNull("default log instance", log));
+    sLog.set(ConstantConditions.notNull("log", log));
   }
 
   /**
@@ -123,7 +123,7 @@ public class Logger {
   @NotNull
   public static Logger newLogger(@Nullable final Log log, @Nullable final Level level,
       @NotNull final Object context) {
-    return new Logger(asArgs(ConstantConditions.notNull("logger context", context)), log, level);
+    return new Logger(asArgs(ConstantConditions.notNull("context", context)), log, level);
   }
 
   /**
@@ -538,7 +538,7 @@ public class Logger {
    */
   @NotNull
   public Logger subContextLogger(@NotNull final Object context) {
-    ConstantConditions.notNull("logger context", context);
+    ConstantConditions.notNull("context", context);
     final Object[] thisContexts = mContexts;
     final int thisLength = thisContexts.length;
     final Object[] newContexts = new Object[thisLength + 1];

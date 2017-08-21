@@ -69,7 +69,7 @@ public class DoubleQueue<E> extends AbstractCollection<E> implements Queue<E> {
    */
   public DoubleQueue(final int minCapacity) {
     final int msb =
-        Integer.highestOneBit(ConstantConditions.positive("minimum capacity", minCapacity));
+        Integer.highestOneBit(ConstantConditions.positive("minCapacity", minCapacity));
     final int initialCapacity = (minCapacity == msb) ? msb : msb << 1;
     mData = new Object[initialCapacity];
     mMask = initialCapacity - 1;

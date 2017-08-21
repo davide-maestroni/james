@@ -141,4 +141,9 @@ public class Iterables {
   public static <T> Set<T> toSet(@NotNull final Iterable<T> iterable) {
     return addAll(iterable, new HashSet<T>());
   }
+
+  @NotNull
+  public static String toString(@NotNull final Iterable<?> iterable) {
+    return asList(iterable).toString();
+  }
 }

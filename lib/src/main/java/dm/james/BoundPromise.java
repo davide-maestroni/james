@@ -23,6 +23,7 @@ import java.io.Serializable;
 
 import dm.james.promise.DeferredPromise;
 import dm.james.promise.Promise;
+import dm.james.promise.PromiseIterable;
 import dm.james.util.ConstantConditions;
 
 /**
@@ -44,6 +45,16 @@ class BoundPromise<I, O> extends PromiseWrapper<O> implements Serializable {
     final BoundPromise<I, O> boundPromise =
         new BoundPromise<I, O>(ConstantConditions.notNull("promise", promise), deferred);
     promise.then(new DeferredHandlerFulfill<I>(deferred), new DeferredHandlerReject<I>(deferred));
+    return boundPromise;
+  }
+
+  @NotNull
+  static <I, O> BoundPromise<Iterable<I>, O> create(@NotNull final PromiseIterable<I> promise,
+      @NotNull final DeferredPromise<Iterable<I>, O> deferred) {
+    final BoundPromise<Iterable<I>, O> boundPromise =
+        new BoundPromise<Iterable<I>, O>(ConstantConditions.notNull("promise", promise), deferred);
+    promise.all(new DeferredHandlerFulfill<Iterable<I>>(deferred),
+        new DeferredHandlerReject<Iterable<I>>(deferred));
     return boundPromise;
   }
 

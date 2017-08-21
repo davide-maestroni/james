@@ -37,6 +37,9 @@ public interface DeferredPromise<I, O> extends Promise<O> {
   DeferredPromise<I, O> catchAll(@NotNull Mapper<Throwable, O> mapper);
 
   @NotNull
+  DeferredPromise<I, PromiseInspection<O>> inspect();
+
+  @NotNull
   DeferredPromise<I, O> scheduleAll(@Nullable ScheduledExecutor fulfillExecutor,
       @Nullable ScheduledExecutor rejectExecutor);
 

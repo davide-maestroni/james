@@ -273,14 +273,14 @@ public class ScheduledExecutors {
    * in different threads than the calling one, thus causing the results to be not immediately
    * available.
    *
-   * @param wrapped  the wrapped executor instance.
+   * @param executor  the wrapped executor instance.
    * @param priority the commands priority.
    * @return the executor instance.
    */
   @NotNull
-  public static ScheduledExecutor withPriority(@NotNull final ScheduledExecutor wrapped,
+  public static ScheduledExecutor withPriority(@NotNull final ScheduledExecutor executor,
       final int priority) {
-    return PriorityExecutor.of(wrapped, priority);
+    return PriorityExecutor.of(executor, priority);
   }
 
   /**
@@ -291,27 +291,27 @@ public class ScheduledExecutors {
    * in different threads than the calling one, thus causing the results to be not immediately
    * available.
    *
-   * @param wrapped       the wrapped instance.
+   * @param executor       the wrapped instance.
    * @param maxExecutions the maximum number of running executions.
    * @return the executor instance.
    * @throws IllegalArgumentException if the specified max number is less than 1.
    */
   @NotNull
-  public static ScheduledExecutor withThrottling(@NotNull final ScheduledExecutor wrapped,
+  public static ScheduledExecutor withThrottling(@NotNull final ScheduledExecutor executor,
       final int maxExecutions) {
-    return ThrottlingExecutor.of(wrapped, maxExecutions);
+    return ThrottlingExecutor.of(executor, maxExecutions);
   }
 
   /**
    * Returns an executor employing a shared synchronous one when executions are enqueued with a 0
    * delay on one of the managed threads.
    *
-   * @param wrapped the wrapped instance.
+   * @param executor the wrapped instance.
    * @return the executor instance.
    */
   @NotNull
-  public static ScheduledExecutor withZeroDelay(@NotNull final ScheduledExecutor wrapped) {
-    return ZeroDelayExecutor.of(wrapped);
+  public static ScheduledExecutor withZeroDelay(@NotNull final ScheduledExecutor executor) {
+    return ZeroDelayExecutor.of(executor);
   }
 
   @NotNull

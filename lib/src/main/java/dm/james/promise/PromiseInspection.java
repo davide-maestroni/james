@@ -14,31 +14,22 @@
  * limitations under the License.
  */
 
-package dm.james.executor;
-
-import org.jetbrains.annotations.NotNull;
-
-import dm.james.util.ConstantConditions;
+package dm.james.promise;
 
 /**
- * Runnable decorator implementation.
- * <p>
- * Created by davide-maestroni on 04/09/2016.
+ * Created by davide-maestroni on 08/21/2017.
  */
-public class RunnableDecorator implements Runnable {
+public interface PromiseInspection<O> {
 
-  private final Runnable mCommand;
+  boolean isFulfilled();
 
-  /**
-   * Constructor.
-   *
-   * @param wrapped the wrapped instance.
-   */
-  public RunnableDecorator(@NotNull final Runnable wrapped) {
-    mCommand = ConstantConditions.notNull("runnable instance", wrapped);
-  }
+  boolean isPending();
 
-  public void run() {
-    mCommand.run();
-  }
+  boolean isRejected();
+
+  boolean isResolved();
+
+  Throwable reason();
+
+  O value();
 }

@@ -40,20 +40,20 @@ class DelayedExecutor extends ScheduledExecutorDecorator implements Serializable
   /**
    * Constructor.
    *
-   * @param wrapped the wrapped instance.
+   * @param executor the wrapped instance.
    */
-  private DelayedExecutor(@NotNull final ScheduledExecutor wrapped, final long delay,
+  private DelayedExecutor(@NotNull final ScheduledExecutor executor, final long delay,
       @NotNull final TimeUnit timeUnit) {
-    super(wrapped);
-    mExecutor = wrapped;
-    mTimeUnit = ConstantConditions.notNull("time unit", timeUnit);
+    super(executor);
+    mExecutor = executor;
+    mTimeUnit = ConstantConditions.notNull("timeUnit", timeUnit);
     mDelay = ConstantConditions.notNegative("delay", delay);
   }
 
   @NotNull
-  static DelayedExecutor of(@NotNull final ScheduledExecutor wrapped, final long delay,
+  static DelayedExecutor of(@NotNull final ScheduledExecutor executor, final long delay,
       @NotNull final TimeUnit timeUnit) {
-    return new DelayedExecutor(wrapped, delay, timeUnit);
+    return new DelayedExecutor(executor, delay, timeUnit);
   }
 
   @Override
@@ -86,9 +86,9 @@ class DelayedExecutor extends ScheduledExecutorDecorator implements Serializable
 
   private static class ExecutorProxy extends SerializableProxy {
 
-    private ExecutorProxy(final ScheduledExecutor wrapped, final long delay,
+    private ExecutorProxy(final ScheduledExecutor executor, final long delay,
         final TimeUnit timeUnit) {
-      super(wrapped, delay, timeUnit);
+      super(executor, delay, timeUnit);
     }
 
     @SuppressWarnings("unchecked")

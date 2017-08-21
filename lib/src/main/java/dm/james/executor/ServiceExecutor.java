@@ -49,7 +49,7 @@ class ServiceExecutor extends AsyncExecutor implements Serializable {
    * @param service the executor service.
    */
   private ServiceExecutor(@NotNull final ScheduledExecutorService service) {
-    mService = ConstantConditions.notNull("executor service", service);
+    mService = ConstantConditions.notNull("service", service);
   }
 
   /**
@@ -157,10 +157,10 @@ class ServiceExecutor extends AsyncExecutor implements Serializable {
     /**
      * Constructor.
      *
-     * @param wrapped the wrapped command.
+     * @param command the wrapped command.
      */
-    private RunnableWrapper(@NotNull final Runnable wrapped) {
-      mCommand = wrapped;
+    private RunnableWrapper(@NotNull final Runnable command) {
+      mCommand = command;
       mCurrentThreadId = Thread.currentThread().getId();
     }
 
