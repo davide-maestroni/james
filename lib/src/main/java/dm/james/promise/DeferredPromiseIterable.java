@@ -113,6 +113,10 @@ public interface DeferredPromiseIterable<I, O>
   <R> DeferredPromiseIterable<I, R> applyEachSorted(@NotNull Mapper<Promise<O>, Promise<R>> mapper);
 
   @NotNull
+  DeferredPromiseIterable<I, O> catchAll(@NotNull Iterable<Class<? extends Throwable>> errors,
+      @NotNull Mapper<Throwable, Iterable<O>> mapper);
+
+  @NotNull
   DeferredPromiseIterable<I, O> catchAll(@NotNull Mapper<Throwable, Iterable<O>> mapper);
 
   @NotNull
@@ -129,16 +133,18 @@ public interface DeferredPromiseIterable<I, O>
   DeferredPromiseIterable<I, O> whenResolved(@NotNull Action action);
 
   @NotNull
+  DeferredPromiseIterable<I, O> catchAny(@NotNull Iterable<Class<? extends Throwable>> errors,
+      @NotNull Mapper<Throwable, O> mapper);
+
+  @NotNull
   DeferredPromiseIterable<I, O> catchAny(@NotNull Mapper<Throwable, O> mapper);
 
   @NotNull
-  DeferredPromiseIterable<I, O> catchEach(int minBatchSize, @NotNull Mapper<Throwable, O> mapper);
+  DeferredPromiseIterable<I, O> catchEach(@NotNull Iterable<Class<? extends Throwable>> errors,
+      @NotNull Mapper<Throwable, O> mapper);
 
   @NotNull
   DeferredPromiseIterable<I, O> catchEach(@NotNull Mapper<Throwable, O> mapper);
-
-  @NotNull
-  DeferredPromiseIterable<I, O> catchEach(@NotNull Mapper<Throwable, O> mapper, int maxBatchSize);
 
   @NotNull
   <R> DeferredPromiseIterable<I, R> each(@Nullable Handler<O, ? super CallbackIterable<R>> fulfill,

@@ -222,6 +222,12 @@ class DefaultPromise<O> implements Promise<O> {
     return then(null, new HandlerCatch<O>(mapper));
   }
 
+  @NotNull
+  public Promise<O> catchAll(@NotNull final Iterable<Class<? extends Throwable>> errors,
+      @NotNull final Mapper<Throwable, O> mapper) {
+    return then(null, new HandlerCatchFiltered<O>(errors, mapper));
+  }
+
   public O get() {
     return get(-1, TimeUnit.MILLISECONDS);
   }
@@ -852,7 +858,55 @@ class DefaultPromise<O> implements Promise<O> {
         }
       }
     }
+  }
 
+  private static class HandlerCatchFiltered<O>
+      implements Handler<Throwable, Callback<O>>, Serializable {
+
+    private final Iterable<Class<? extends Throwable>> mErrors;
+
+    private final Mapper<Throwable, O> mMapper;
+
+    private HandlerCatchFiltered(@NotNull final Iterable<Class<? extends Throwable>> errors,
+        @NotNull final Mapper<Throwable, O> mapper) {
+      mErrors = ConstantConditions.notNull("errors", errors);
+      mMapper = ConstantConditions.notNull("mapper", mapper);
+    }
+
+    private Object writeReplace() throws ObjectStreamException {
+      return new HandlerProxy<O>(mErrors, mMapper);
+    }
+
+    private static class HandlerProxy<O> extends SerializableProxy {
+
+      private HandlerProxy(final Iterable<Class<? extends Throwable>> errors,
+          final Mapper<Throwable, O> mapper) {
+        super(errors, proxy(mapper));
+      }
+
+      @SuppressWarnings("unchecked")
+      Object readResolve() throws ObjectStreamException {
+        try {
+          final Object[] args = deserializeArgs();
+          return new HandlerCatchFiltered<O>((Iterable<Class<? extends Throwable>>) args[0],
+              (Mapper<Throwable, O>) args[1]);
+
+        } catch (final Throwable t) {
+          throw new InvalidObjectException(t.getMessage());
+        }
+      }
+    }
+
+    public void accept(final Throwable reason, final Callback<O> callback) throws Exception {
+      for (final Class<? extends Throwable> error : mErrors) {
+        if (error.isInstance(reason)) {
+          callback.resolve(mMapper.apply(reason));
+          return;
+        }
+      }
+
+      callback.reject(reason);
+    }
   }
 
   private static class HandlerFulfilled<O> implements Handler<O, Callback<O>>, Serializable {

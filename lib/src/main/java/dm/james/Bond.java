@@ -22,19 +22,25 @@ import org.jetbrains.annotations.Nullable;
 import java.io.Closeable;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.InvalidObjectException;
+import java.io.ObjectStreamException;
 import java.io.Serializable;
 import java.nio.ByteBuffer;
 import java.nio.channels.ReadableByteChannel;
+import java.util.Collections;
+import java.util.List;
 import java.util.concurrent.Callable;
 import java.util.concurrent.Future;
-import java.util.concurrent.atomic.AtomicInteger;
 
 import dm.james.executor.ScheduledExecutor;
+import dm.james.executor.ScheduledExecutors;
 import dm.james.io.AllocationType;
 import dm.james.io.Buffer;
 import dm.james.log.Log;
 import dm.james.log.Log.Level;
 import dm.james.log.Logger;
+import dm.james.promise.Action;
+import dm.james.promise.CancellationException;
 import dm.james.promise.DeferredPromise;
 import dm.james.promise.DeferredPromiseIterable;
 import dm.james.promise.Mapper;
@@ -46,16 +52,17 @@ import dm.james.promise.PromiseIterable;
 import dm.james.promise.PromiseIterable.CallbackIterable;
 import dm.james.promise.PromiseIterable.StatefulHandler;
 import dm.james.util.ConstantConditions;
+import dm.james.util.InterruptedExecutionException;
+import dm.james.util.Iterables;
+import dm.james.util.SerializableProxy;
 
 /**
  * Created by davide-maestroni on 06/30/2017.
  */
 public class Bond implements Serializable {
 
-  // TODO: 15/08/2017 race
   // TODO: 06/08/2017 Handlers
   // TODO: 08/08/2017 promisify
-  // TODO: 08/08/2017 BinaryObserver??
   // TODO: 06/08/2017 james-android, james-retrofit, james-swagger
 
   private final Log mLog;
@@ -83,19 +90,33 @@ public class Bond implements Serializable {
 
   @NotNull
   public <O> PromiseIterable<O> all(@NotNull final Iterable<? extends Promise<?>> promises) {
-    return resolvedIterable(null).anySorted(new PromisesHandler<O>(promises), null);
+    return iterable(new PromisesHandler<O>(promises));
   }
 
   @NotNull
-  public <O> PromiseIterable<O> all(@NotNull final ScheduledExecutor executor,
-      @NotNull final Iterable<? extends Promise<?>> promises) {
-    return resolvedIterable(null).scheduleAny(executor, null)
-                                 .anySorted(new PromisesHandler<O>(promises), null);
+  @SuppressWarnings("unchecked")
+  public <O> PromiseIterable<O> all(@NotNull final Promise<? extends Iterable<O>> promise) {
+    if (promise instanceof PromiseIterable) {
+      return (PromiseIterable<O>) promise;
+    }
+
+    return iterable(new IterableObserver<O>(promise));
+  }
+
+  @NotNull
+  public <O> PromiseIterable<O> allSorted(@NotNull final Iterable<? extends Promise<?>> promises) {
+    return resolvedIterable(null).anySorted(new PromisesHandler<O>(promises), null);
   }
 
   @NotNull
   public <O> Mapper<Promise<O>, Promise<O>> cache() {
     return new CacheMapper<O>(this.<O>deferred());
+  }
+
+  @NotNull
+  public <O, S> PromiseIterable<O> combine(@NotNull final Iterable<? extends Promise<?>> promises,
+      @NotNull final CombinationHandler<O, S> handler) {
+    return iterable(new CombinationObserver<O, S>(handler, promises, mLog, mLogLevel));
   }
 
   @NotNull
@@ -106,33 +127,6 @@ public class Bond implements Serializable {
   @NotNull
   public <I> DeferredPromiseIterable<I, I> deferredIterable() {
     return new DefaultDeferredPromiseIterable<I, I>(mLog, mLogLevel);
-  }
-
-  @NotNull
-  public <O> PromiseIterable<O> each(@NotNull final Iterable<? extends Promise<?>> promises) {
-    return iterable(new PromisesHandler<O>(promises));
-  }
-
-  @NotNull
-  @SuppressWarnings("unchecked")
-  public <O> PromiseIterable<O> each(@NotNull final Promise<? extends Iterable<O>> promise) {
-    if (promise instanceof PromiseIterable) {
-      return (PromiseIterable<O>) promise;
-    }
-
-    return iterable(new IterableObserver<O>(promise));
-  }
-
-  @NotNull
-  public <O> PromiseIterable<O> each(@NotNull final ScheduledExecutor executor,
-      @NotNull final Iterable<? extends Promise<?>> promises) {
-    return iterable(executor, new PromisesHandler<O>(promises));
-  }
-
-  @NotNull
-  public <O> PromiseIterable<O> each(@NotNull final ScheduledExecutor executor,
-      @NotNull final Promise<? extends Iterable<O>> promise) {
-    return iterable(executor, new IterableObserver<O>(promise));
   }
 
   @NotNull
@@ -193,16 +187,11 @@ public class Bond implements Serializable {
     return promise(new ScheduledObserver<O>(executor, observer));
   }
 
-  @NotNull
-  public <O> PromiseIterable<O> race(@NotNull final Iterable<? extends Promise<?>> promises) {
-    // TODO: 15/08/2017 race & cancel
-    return iterable(new RaceObserver<O>(this.<O>deferredIterable(), promises));
-  }
+  // TODO: 19/08/2017 join?? remove race and survive??
 
   @NotNull
-  public <O> PromiseIterable<O> race(@NotNull final ScheduledExecutor executor,
-      @NotNull final Iterable<? extends Promise<?>> promises) {
-    return iterable(executor, new RaceObserver<O>(this.<O>deferredIterable(), promises));
+  public <O> PromiseIterable<O> race(@NotNull final Iterable<? extends Promise<?>> promises) {
+    return combine(promises, new RaceHandler<O>());
   }
 
   @NotNull
@@ -223,6 +212,11 @@ public class Bond implements Serializable {
   @NotNull
   public <O> PromiseIterable<O> resolvedIterable(@Nullable final Iterable<O> outputs) {
     return iterable(new ResolvedIterableObserver<O>(outputs));
+  }
+
+  @NotNull
+  public <O> PromiseIterable<O> survive(@NotNull final Iterable<? extends Promise<?>> promises) {
+    return combine(promises, new SurviveHandler<O>());
   }
 
   @NotNull
@@ -344,9 +338,7 @@ public class Bond implements Serializable {
         state.write(((Number) input).intValue());
 
       } else {
-        state.close();
-        callback.reject(new IllegalArgumentException("unsupported input type: " + input));
-        return null;
+        callback.addRejection(new IllegalArgumentException("unsupported input type: " + input));
       }
 
       return state;
@@ -445,6 +437,322 @@ public class Bond implements Serializable {
     }
   }
 
+  private static class CombinationFulfillHandler<O, S> implements Handler<O, Callback<Void>> {
+
+    private final CallbackIterable<O> mCallback;
+
+    private final ScheduledExecutor mExecutor;
+
+    private final CombinationHandler<O, S> mHandler;
+
+    private final int mIndex;
+
+    private final Logger mLogger;
+
+    private final List<? extends Promise<?>> mPromises;
+
+    private final CombinationState<S> mState;
+
+    private CombinationFulfillHandler(@NotNull final CombinationState<S> state,
+        @NotNull final CombinationHandler<O, S> handler, @NotNull final ScheduledExecutor executor,
+        @NotNull final List<? extends Promise<?>> promises, final int index,
+        @NotNull final CallbackIterable<O> callback, @NotNull final Logger logger) {
+      mState = state;
+      mHandler = handler;
+      mExecutor = executor;
+      mPromises = promises;
+      mIndex = index;
+      mCallback = callback;
+      mLogger = logger;
+    }
+
+    public void accept(final O input, final Callback<Void> callback) {
+      mExecutor.execute(new Runnable() {
+
+        public void run() {
+          final CombinationState<S> state = mState;
+          if (state.isRejected()) {
+            // TODO: 19/08/2017 log??
+            return;
+          }
+
+          try {
+            state.set(mHandler.fulfill(state.get(), input, mPromises, mIndex, mCallback));
+
+          } catch (final CancellationException e) {
+            mLogger.wrn(e, "Promise has been cancelled");
+            state.setRejected(true);
+            mCallback.reject(e);
+
+          } catch (final Throwable t) {
+            InterruptedExecutionException.throwIfInterrupt(t);
+            mLogger.err(t, "Error while processing input: %s", input);
+            state.setRejected(true);
+            mCallback.reject(t);
+
+          } finally {
+            callback.reject(null);
+          }
+        }
+      });
+    }
+  }
+
+  private static class CombinationObserver<O, S>
+      implements Observer<CallbackIterable<O>>, Serializable {
+
+    private final ScheduledExecutor mExecutor;
+
+    private final CombinationHandler<O, S> mHandler;
+
+    private final Logger mLogger;
+
+    private final List<? extends Promise<?>> mPromises;
+
+    private CombinationObserver(@NotNull final CombinationHandler<O, S> handler,
+        @NotNull final Iterable<? extends Promise<?>> promises, @Nullable final Log log,
+        @Nullable final Level logLevel) {
+      mHandler = ConstantConditions.notNull("handler", handler);
+      mPromises = Collections.unmodifiableList(Iterables.toList(promises));
+      mExecutor = ScheduledExecutors.withThrottling(ScheduledExecutors.immediateExecutor(), 1);
+      mLogger = Logger.newLogger(log, logLevel, this);
+    }
+
+    @SuppressWarnings("unchecked")
+    public void accept(final CallbackIterable<O> callback) throws Exception {
+      int i = 0;
+      final Logger logger = mLogger;
+      final ScheduledExecutor executor = mExecutor;
+      final CombinationHandler<O, S> handler = mHandler;
+      final List<? extends Promise<?>> promises = mPromises;
+      final CombinationState<S> state = new CombinationState<S>(promises.size());
+      try {
+        state.set(handler.create(promises, callback));
+        for (final Promise<?> promise : promises) {
+          final int index = i++;
+          if (promise instanceof PromiseIterable) {
+            ((PromiseIterable<O>) promise).then(
+                new CombinationFulfillHandler<O, S>(state, handler, executor, promises, index,
+                    callback, logger),
+                new CombinationRejectHandler<O, S>(state, handler, executor, promises, index,
+                    callback, logger),
+                new CombinationResolveObserver<O, S>(state, handler, executor, promises, index,
+                    callback, logger));
+
+          } else {
+            ((Promise<O>) promise).then(
+                new CombinationFulfillHandler<O, S>(state, handler, executor, promises, index,
+                    callback, logger),
+                new CombinationRejectHandler<O, S>(state, handler, executor, promises, index,
+                    callback, logger))
+                                  .whenResolved(
+                                      new CombinationResolveObserver<O, S>(state, handler, executor,
+                                          promises, index, callback, logger));
+          }
+        }
+
+      } catch (final CancellationException e) {
+        mLogger.wrn(e, "Promise has been cancelled");
+        state.setRejected(true);
+        callback.reject(e);
+
+      } catch (final Throwable t) {
+        InterruptedExecutionException.throwIfInterrupt(t);
+        mLogger.err(t, "Error while initializing promise combination");
+        state.setRejected(true);
+        callback.reject(t);
+      }
+    }
+
+    private Object writeReplace() throws ObjectStreamException {
+      final Logger logger = mLogger;
+      return new ObserverProxy<O, S>(mHandler, mPromises, logger.getLog(), logger.getLogLevel());
+    }
+
+    private static class ObserverProxy<O, S> extends SerializableProxy {
+
+      private ObserverProxy(final CombinationHandler<O, S> handler,
+          final List<? extends Promise<?>> promises, final Log log, final Level logLevel) {
+        super(proxy(handler), promises, log, logLevel);
+      }
+
+      @SuppressWarnings("unchecked")
+      Object readResolve() throws ObjectStreamException {
+        try {
+          final Object[] args = deserializeArgs();
+          return new CombinationObserver<O, S>((CombinationHandler<O, S>) args[0],
+              (Iterable<? extends Promise<?>>) args[1], (Log) args[2], (Level) args[3]);
+
+        } catch (final Throwable t) {
+          throw new InvalidObjectException(t.getMessage());
+        }
+      }
+    }
+  }
+
+  private static class CombinationRejectHandler<O, S>
+      implements Handler<Throwable, Callback<Void>> {
+
+    private final CallbackIterable<O> mCallback;
+
+    private final ScheduledExecutor mExecutor;
+
+    private final CombinationHandler<O, S> mHandler;
+
+    private final int mIndex;
+
+    private final Logger mLogger;
+
+    private final List<? extends Promise<?>> mPromises;
+
+    private final CombinationState<S> mState;
+
+    private CombinationRejectHandler(@NotNull final CombinationState<S> state,
+        @NotNull final CombinationHandler<O, S> handler, @NotNull final ScheduledExecutor executor,
+        @NotNull final List<? extends Promise<?>> promises, final int index,
+        @NotNull final CallbackIterable<O> callback, @NotNull final Logger logger) {
+      mState = state;
+      mHandler = handler;
+      mExecutor = executor;
+      mPromises = promises;
+      mIndex = index;
+      mCallback = callback;
+      mLogger = logger;
+    }
+
+    public void accept(final Throwable reason, final Callback<Void> callback) {
+      mExecutor.execute(new Runnable() {
+
+        public void run() {
+          final CombinationState<S> state = mState;
+          if (state.isRejected()) {
+            // TODO: 19/08/2017 log??
+            return;
+          }
+
+          try {
+            state.set(mHandler.reject(state.get(), reason, mPromises, mIndex, mCallback));
+
+          } catch (final CancellationException e) {
+            mLogger.wrn(e, "Promise has been cancelled");
+            state.setRejected(true);
+            mCallback.reject(e);
+
+          } catch (final Throwable t) {
+            InterruptedExecutionException.throwIfInterrupt(t);
+            mLogger.err(t, "Error while processing rejection with reason: %s", reason);
+            state.setRejected(true);
+            mCallback.reject(t);
+
+          } finally {
+            callback.reject(null);
+          }
+        }
+      });
+    }
+  }
+
+  private static class CombinationResolveObserver<O, S>
+      implements Observer<Callback<Void>>, Action {
+
+    private final CallbackIterable<O> mCallback;
+
+    private final ScheduledExecutor mExecutor;
+
+    private final CombinationHandler<O, S> mHandler;
+
+    private final int mIndex;
+
+    private final Logger mLogger;
+
+    private final List<? extends Promise<?>> mPromises;
+
+    private final CombinationState<S> mState;
+
+    private CombinationResolveObserver(@NotNull final CombinationState<S> state,
+        @NotNull final CombinationHandler<O, S> handler, @NotNull final ScheduledExecutor executor,
+        @NotNull final List<? extends Promise<?>> promises, final int index,
+        @NotNull final CallbackIterable<O> callback, @NotNull final Logger logger) {
+      mState = state;
+      mHandler = handler;
+      mExecutor = executor;
+      mPromises = promises;
+      mIndex = index;
+      mCallback = callback;
+      mLogger = logger;
+    }
+
+    public void perform() {
+      mExecutor.execute(new Runnable() {
+
+        public void run() {
+          final CombinationState<S> state = mState;
+          if (state.isRejected()) {
+            // TODO: 19/08/2017 log??
+            return;
+          }
+
+          try {
+            state.set(mHandler.resolve(state.get(), mPromises, mIndex, mCallback));
+            if (state.addResolved()) {
+              mHandler.resolve(state.get(), mPromises, mCallback);
+            }
+
+          } catch (final CancellationException e) {
+            mLogger.wrn(e, "Promise has been cancelled");
+            state.setRejected(true);
+            mCallback.reject(e);
+
+          } catch (final Throwable t) {
+            InterruptedExecutionException.throwIfInterrupt(t);
+            mLogger.err(t, "Error while processing resolution");
+            state.setRejected(true);
+            mCallback.reject(t);
+          }
+        }
+      });
+    }
+
+    public void accept(final Callback<Void> callback) {
+      perform();
+    }
+  }
+
+  private static class CombinationState<S> {
+
+    private final int mCount;
+
+    private boolean mIsRejected;
+
+    private int mResolved;
+
+    private S mState;
+
+    private CombinationState(final int count) {
+      mCount = count;
+    }
+
+    boolean addResolved() {
+      return (++mResolved >= mCount);
+    }
+
+    S get() {
+      return mState;
+    }
+
+    boolean isRejected() {
+      return mIsRejected;
+    }
+
+    void setRejected(final boolean isRejected) {
+      mIsRejected = isRejected;
+    }
+
+    void set(final S state) {
+      mState = state;
+    }
+  }
+
   private static class FuturePromise<O> extends PromiseWrapper<O> {
 
     private final Future<?> mFuture;
@@ -523,110 +831,107 @@ public class Bond implements Serializable {
     }
   }
 
-  private static class RaceFulfillHandler<O> implements Handler<O, Callback<Void>> {
+  private static class RaceHandler<O> implements CombinationHandler<O, Integer>, Serializable {
 
-    private final int mIndex;
-
-    private final DeferredPromiseIterable<O, ?> mPromise;
-
-    private final AtomicInteger mWinner;
-
-    private RaceFulfillHandler(@NotNull final DeferredPromiseIterable<O, ?> promise,
-        @NotNull final AtomicInteger winner, final int index) {
-      mPromise = promise;
-      mWinner = winner;
-      mIndex = index;
+    public Integer create(@NotNull final List<? extends Promise<?>> promises,
+        @NotNull final CallbackIterable<O> callback) {
+      return null;
     }
 
-    public void accept(final O input, final Callback<Void> callback) {
-      final int index = mIndex;
-      final AtomicInteger winner = mWinner;
-      if (winner.compareAndSet(-1, index) || (winner.get() == index)) {
-        final DeferredPromiseIterable<O, ?> promise = mPromise;
-        promise.add(input);
-        promise.resolve();
+    public Integer fulfill(final Integer state, final O output,
+        @NotNull final List<? extends Promise<?>> promises, final int index,
+        @NotNull final CallbackIterable<O> callback) {
+      if ((state == null) || (state == index)) {
+        callback.add(output);
+        return index;
       }
+
+      return state;
+    }
+
+    public Integer reject(final Integer state, final Throwable reason,
+        @NotNull final List<? extends Promise<?>> promises, final int index,
+        @NotNull final CallbackIterable<O> callback) throws Exception {
+      if ((state == null) || (state == index)) {
+        callback.addRejection(reason);
+        return index;
+      }
+
+      return state;
+    }
+
+    public Integer resolve(final Integer state, @NotNull final List<? extends Promise<?>> promises,
+        final int index, @NotNull final CallbackIterable<O> callback) {
+      if ((state == null) || (state == index)) {
+        callback.resolve();
+        return index;
+      }
+
+      return state;
+    }
+
+    public void resolve(final Integer state, @NotNull final List<? extends Promise<?>> promises,
+        @NotNull final CallbackIterable<O> callback) throws Exception {
     }
   }
 
-  private static class RaceObserver<O> implements Observer<CallbackIterable<O>> {
+  private static class SurviveHandler<O> implements CombinationHandler<O, Integer>, Serializable {
 
-    private final DeferredPromiseIterable<O, ?> mDeferred;
-
-    private final Iterable<? extends Promise<?>> mPromises;
-
-    private RaceObserver(@NotNull final DeferredPromiseIterable<O, ?> deferred,
-        @NotNull final Iterable<? extends Promise<?>> promises) {
-      mPromises = ConstantConditions.notNull("promises", promises);
-      mDeferred = deferred;
-    }
-
-    @SuppressWarnings("unchecked")
-    public void accept(final CallbackIterable<O> input) throws Exception {
-      final DeferredPromiseIterable<O, ?> deferred = mDeferred;
-      final AtomicInteger winner = new AtomicInteger(-1);
-      int i = 0;
-      for (final Promise<?> promise : mPromises) {
-        if (promise instanceof PromiseIterable) {
-          final int index = i++;
-          ((PromiseIterable<O>) promise).then(new RaceFulfillHandler<O>(deferred, winner, index),
-              new RaceRejectHandler(deferred, winner, index),
-              new RaceResolveHandler(deferred, winner, index));
-
-        } else {
-          final int index = i++;
-          ((Promise<O>) promise).then(new RaceFulfillHandler<O>(deferred, winner, index),
-              new RaceRejectHandler(deferred, winner, index));
+    private int cancel(final Integer state, @NotNull final List<? extends Promise<?>> promises,
+        final int index) {
+      if (state == null) {
+        final Promise<?> winner = promises.get(index);
+        for (final Promise<?> promise : promises) {
+          if (promise != winner) {
+            promise.cancel();
+          }
         }
+
+        return index;
       }
-    }
-  }
 
-  private static class RaceRejectHandler implements Handler<Throwable, Callback<Void>> {
-
-    private final int mIndex;
-
-    private final DeferredPromiseIterable<?, ?> mPromise;
-
-    private final AtomicInteger mWinner;
-
-    private RaceRejectHandler(@NotNull final DeferredPromiseIterable<?, ?> promise,
-        @NotNull final AtomicInteger winner, final int index) {
-      mPromise = promise;
-      mWinner = winner;
-      mIndex = index;
+      return state;
     }
 
-    public void accept(final Throwable reason, final Callback<Void> callback) {
-      final int index = mIndex;
-      final AtomicInteger winner = mWinner;
-      if (winner.compareAndSet(-1, index) || (winner.get() == index)) {
-        mPromise.reject(reason);
+    public Integer create(@NotNull final List<? extends Promise<?>> promises,
+        @NotNull final CallbackIterable<O> callback) {
+      return null;
+    }
+
+    public Integer fulfill(Integer state, final O output,
+        @NotNull final List<? extends Promise<?>> promises, final int index,
+        @NotNull final CallbackIterable<O> callback) {
+      state = cancel(state, promises, index);
+      if (state == index) {
+        callback.add(output);
       }
-    }
-  }
 
-  private static class RaceResolveHandler implements Observer<Callback<Void>> {
-
-    private final int mIndex;
-
-    private final DeferredPromiseIterable<?, ?> mPromise;
-
-    private final AtomicInteger mWinner;
-
-    private RaceResolveHandler(@NotNull final DeferredPromiseIterable<?, ?> promise,
-        @NotNull final AtomicInteger winner, final int index) {
-      mPromise = promise;
-      mWinner = winner;
-      mIndex = index;
+      return state;
     }
 
-    public void accept(final Callback<Void> callback) {
-      final int index = mIndex;
-      final AtomicInteger winner = mWinner;
-      if (winner.compareAndSet(-1, index) || (winner.get() == index)) {
-        mPromise.resolve();
+    public Integer reject(Integer state, final Throwable reason,
+        @NotNull final List<? extends Promise<?>> promises, final int index,
+        @NotNull final CallbackIterable<O> callback) throws Exception {
+      state = cancel(state, promises, index);
+      if (state == index) {
+        callback.addRejection(reason);
       }
+
+      return state;
+    }
+
+    public Integer resolve(Integer state, @NotNull final List<? extends Promise<?>> promises,
+        final int index, @NotNull final CallbackIterable<O> callback) {
+      state = cancel(state, promises, index);
+      if (state == index) {
+        callback.resolve();
+      }
+
+      return state;
+    }
+
+    public void resolve(final Integer state, @NotNull final List<? extends Promise<?>> promises,
+        @NotNull final CallbackIterable<O> callback) throws Exception {
     }
   }
 }

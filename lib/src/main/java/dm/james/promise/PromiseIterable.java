@@ -97,6 +97,10 @@ public interface PromiseIterable<O> extends Promise<Iterable<O>>, Iterable<O> {
   <R> PromiseIterable<R> applyEachSorted(@NotNull Mapper<Promise<O>, Promise<R>> mapper);
 
   @NotNull
+  PromiseIterable<O> catchAll(@NotNull Iterable<Class<? extends Throwable>> errors,
+      @NotNull Mapper<Throwable, Iterable<O>> mapper);
+
+  @NotNull
   PromiseIterable<O> catchAll(@NotNull Mapper<Throwable, Iterable<O>> mapper);
 
   @NotNull
@@ -113,16 +117,18 @@ public interface PromiseIterable<O> extends Promise<Iterable<O>>, Iterable<O> {
   PromiseIterable<O> whenResolved(@NotNull Action action);
 
   @NotNull
+  PromiseIterable<O> catchAny(@NotNull Iterable<Class<? extends Throwable>> errors,
+      @NotNull Mapper<Throwable, O> mapper);
+
+  @NotNull
   PromiseIterable<O> catchAny(@NotNull Mapper<Throwable, O> mapper);
 
   @NotNull
-  PromiseIterable<O> catchEach(int minBatchSize, @NotNull Mapper<Throwable, O> mapper);
+  PromiseIterable<O> catchEach(@NotNull Iterable<Class<? extends Throwable>> errors,
+      @NotNull Mapper<Throwable, O> mapper);
 
   @NotNull
   PromiseIterable<O> catchEach(@NotNull Mapper<Throwable, O> mapper);
-
-  @NotNull
-  PromiseIterable<O> catchEach(@NotNull Mapper<Throwable, O> mapper, int maxBatchSize);
 
   @NotNull
   <R> PromiseIterable<R> each(@Nullable Handler<O, ? super CallbackIterable<R>> fulfill,
@@ -175,6 +181,8 @@ public interface PromiseIterable<O> extends Promise<Iterable<O>>, Iterable<O> {
   O getAny(long timeout, @NotNull TimeUnit timeUnit);
 
   O getAnyOr(O other, long timeout, @NotNull TimeUnit timeUnit);
+
+  boolean isSettled();
 
   @NotNull
   Iterator<O> iterator(long timeout, @NotNull TimeUnit timeUnit);
@@ -251,9 +259,9 @@ public interface PromiseIterable<O> extends Promise<Iterable<O>>, Iterable<O> {
   <R, S extends Closeable> PromiseIterable<R> thenTryStateSorted(
       @NotNull StatefulHandler<O, R, S> handler);
 
-  void waitComplete();
+  void waitSettled();
 
-  boolean waitComplete(long timeout, @NotNull TimeUnit timeUnit);
+  boolean waitSettled(long timeout, @NotNull TimeUnit timeUnit);
 
   @NotNull
   PromiseIterable<O> whenFulfilledAny(@NotNull Observer<O> observer);

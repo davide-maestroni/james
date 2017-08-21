@@ -79,6 +79,12 @@ class DefaultDeferredPromise<I, O> implements DeferredPromise<I, O> {
   }
 
   @NotNull
+  public DeferredPromise<I, O> catchAll(@NotNull final Iterable<Class<? extends Throwable>> errors,
+      @NotNull final Mapper<Throwable, O> mapper) {
+    return newInstance(mPromise.catchAll(errors, mapper));
+  }
+
+  @NotNull
   public DeferredPromise<I, O> catchAll(@NotNull final Mapper<Throwable, O> mapper) {
     return newInstance(mPromise.catchAll(mapper));
   }

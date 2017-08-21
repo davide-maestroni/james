@@ -363,6 +363,12 @@ class DefaultPromiseIterable<O> implements PromiseIterable<O>, Serializable {
   }
 
   @NotNull
+  public PromiseIterable<O> catchAll(@NotNull final Iterable<Class<? extends Throwable>> errors,
+      @NotNull final Mapper<Throwable, Iterable<O>> mapper) {
+    return all(null, new HandlerCatchAllFiltered<O>(errors, mapper));
+  }
+
+  @NotNull
   public PromiseIterable<O> catchAll(@NotNull final Mapper<Throwable, Iterable<O>> mapper) {
     return all(null, new HandlerCatchAll<O>(mapper));
   }
@@ -401,25 +407,26 @@ class DefaultPromiseIterable<O> implements PromiseIterable<O>, Serializable {
   }
 
   @NotNull
-  public PromiseIterable<O> catchAny(@NotNull final Mapper<Throwable, O> mapper) {
-    return any(null, new HandlerCatchAny<O>(mapper));
+  public PromiseIterable<O> catchAny(@NotNull final Iterable<Class<? extends Throwable>> errors,
+      @NotNull final Mapper<Throwable, O> mapper) {
+    return any(null, new HandlerCatchEachFiltered<O>(errors, mapper));
   }
 
   @NotNull
-  public PromiseIterable<O> catchEach(final int minBatchSize,
+  public PromiseIterable<O> catchAny(@NotNull final Mapper<Throwable, O> mapper) {
+    return any(null, new HandlerCatchEach<O>(mapper));
+  }
+
+  @NotNull
+  public PromiseIterable<O> catchEach(@NotNull final Iterable<Class<? extends Throwable>> errors,
       @NotNull final Mapper<Throwable, O> mapper) {
-    return chain(new ChainMapGroup<O, O>(null, mapper, minBatchSize));
+    return chain(new ChainMap<O, O>(null, new HandlerCatchEachFiltered<O>(errors, mapper),
+        Integer.MAX_VALUE));
   }
 
   @NotNull
   public PromiseIterable<O> catchEach(@NotNull final Mapper<Throwable, O> mapper) {
-    return catchEach(mapper, Integer.MAX_VALUE);
-  }
-
-  @NotNull
-  public PromiseIterable<O> catchEach(@NotNull final Mapper<Throwable, O> mapper,
-      final int maxBatchSize) {
-    return chain(new ChainMap<O, O>(null, mapper, maxBatchSize));
+    return chain(new ChainMap<O, O>(null, new HandlerCatchMap<O>(mapper), Integer.MAX_VALUE));
   }
 
   @NotNull
@@ -431,7 +438,7 @@ class DefaultPromiseIterable<O> implements PromiseIterable<O>, Serializable {
 
   @NotNull
   public <R> PromiseIterable<R> each(final int minBatchSize, @NotNull final Mapper<O, R> mapper) {
-    return chain(new ChainMapGroup<O, R>(mapper, null, minBatchSize));
+    return chain(new ChainMapGroup<O, R>(mapper, minBatchSize));
   }
 
   @NotNull
@@ -591,6 +598,12 @@ class DefaultPromiseIterable<O> implements PromiseIterable<O>, Serializable {
     }
 
     return other;
+  }
+
+  public boolean isSettled() {
+    synchronized (mMutex) {
+      return mHead.isSettled();
+    }
   }
 
   @NotNull
@@ -826,18 +839,18 @@ class DefaultPromiseIterable<O> implements PromiseIterable<O>, Serializable {
         new StatefulHandlerTry<O, R, S>(handler, logger.getLog(), logger.getLogLevel()));
   }
 
-  public void waitComplete() {
-    waitComplete(-1, TimeUnit.MILLISECONDS);
+  public void waitSettled() {
+    waitSettled(-1, TimeUnit.MILLISECONDS);
   }
 
-  public boolean waitComplete(final long timeout, @NotNull final TimeUnit timeUnit) {
+  public boolean waitSettled(final long timeout, @NotNull final TimeUnit timeUnit) {
     deadLockWarning(timeout);
     synchronized (mMutex) {
       try {
         if (TimeUtils.waitUntil(mMutex, new Condition() {
 
           public boolean isTrue() {
-            return mHead.isComplete();
+            return mHead.isSettled();
           }
         }, timeout, timeUnit)) {
           return true;
@@ -1963,7 +1976,7 @@ class DefaultPromiseIterable<O> implements PromiseIterable<O>, Serializable {
       }
     }
 
-    boolean isComplete() {
+    boolean isSettled() {
       return mInnerState.isComplete();
     }
 
@@ -2047,7 +2060,7 @@ class DefaultPromiseIterable<O> implements PromiseIterable<O>, Serializable {
 
   private static class ChainMap<O, R> extends PromiseChain<O, R> {
 
-    private final Mapper<Throwable, R> mErrorMapper;
+    private final Handler<Throwable, Callback<R>> mErrorHandler;
 
     private final int mMaxBatchSize;
 
@@ -2055,30 +2068,30 @@ class DefaultPromiseIterable<O> implements PromiseIterable<O>, Serializable {
 
     @SuppressWarnings("unchecked")
     private ChainMap(@Nullable final Mapper<O, R> outputMapper,
-        @Nullable final Mapper<Throwable, R> errorMapper, final int maxBatchSize) {
+        @Nullable final Handler<Throwable, Callback<R>> errorHandler, final int maxBatchSize) {
       mMaxBatchSize = ConstantConditions.positive("max batch size", maxBatchSize);
       mOutputMapper =
           (outputMapper != null) ? outputMapper : (Mapper<O, R>) IdentityMapper.instance();
-      mErrorMapper = (errorMapper != null) ? errorMapper : RethrowMapper.<R>instance();
+      mErrorHandler = (errorHandler != null) ? errorHandler : new PassThroughErrorHandler<R>();
     }
 
     private Object writeReplace() throws ObjectStreamException {
-      return new ChainProxy<O, R>(mOutputMapper, mErrorMapper, mMaxBatchSize);
+      return new ChainProxy<O, R>(mOutputMapper, mErrorHandler, mMaxBatchSize);
     }
 
     private static class ChainProxy<O, R> extends SerializableProxy {
 
-      private ChainProxy(final Mapper<O, R> outputMapper, final Mapper<Throwable, R> errorMapper,
-          final int maxBatchSize) {
-        super(proxy(outputMapper), proxy(errorMapper), maxBatchSize);
+      private ChainProxy(final Mapper<O, R> outputMapper,
+          final Handler<Throwable, Callback<R>> errorHandler, final int maxBatchSize) {
+        super(proxy(outputMapper), proxy(errorHandler), maxBatchSize);
       }
 
       @SuppressWarnings("unchecked")
       Object readResolve() throws ObjectStreamException {
         try {
           final Object[] args = deserializeArgs();
-          return new ChainMap<O, R>((Mapper<O, R>) args[0], (Mapper<Throwable, R>) args[1],
-              (Integer) args[2]);
+          return new ChainMap<O, R>((Mapper<O, R>) args[0],
+              (Handler<Throwable, Callback<R>>) args[1], (Integer) args[2]);
 
         } catch (final Throwable t) {
           throw new InvalidObjectException(t.getMessage());
@@ -2138,13 +2151,13 @@ class DefaultPromiseIterable<O> implements PromiseIterable<O>, Serializable {
     @NotNull
     @Override
     PromiseChain<O, R> copy() {
-      return new ChainMap<O, R>(mOutputMapper, mErrorMapper, mMaxBatchSize);
+      return new ChainMap<O, R>(mOutputMapper, mErrorHandler, mMaxBatchSize);
     }
 
     @Override
     void addRejection(final PromiseChain<R, ?> next, final Throwable reason) {
       try {
-        next.add(mErrorMapper.apply(reason));
+        mErrorHandler.accept(reason, next);
 
       } catch (final CancellationException e) {
         getLogger().wrn(e, "Promise has been cancelled");
@@ -2174,8 +2187,6 @@ class DefaultPromiseIterable<O> implements PromiseIterable<O>, Serializable {
 
   private static class ChainMapGroup<O, R> extends PromiseChain<O, R> {
 
-    private final Mapper<Throwable, R> mErrorMapper;
-
     private final int mMinBatchSize;
 
     private final Object mMutex = new Object();
@@ -2185,12 +2196,10 @@ class DefaultPromiseIterable<O> implements PromiseIterable<O>, Serializable {
     private DoubleQueue<R> mOutputs = new DoubleQueue<R>();
 
     @SuppressWarnings("unchecked")
-    private ChainMapGroup(@Nullable final Mapper<O, R> outputMapper,
-        @Nullable final Mapper<Throwable, R> errorMapper, final int minBatchSize) {
+    private ChainMapGroup(@Nullable final Mapper<O, R> outputMapper, final int minBatchSize) {
       mMinBatchSize = ConstantConditions.positive("min batch size", minBatchSize);
       mOutputMapper =
           (outputMapper != null) ? outputMapper : (Mapper<O, R>) IdentityMapper.instance();
-      mErrorMapper = (errorMapper != null) ? errorMapper : RethrowMapper.<R>instance();
     }
 
     private void flush(final PromiseChain<R, ?> next, final R result) {
@@ -2248,22 +2257,20 @@ class DefaultPromiseIterable<O> implements PromiseIterable<O>, Serializable {
     }
 
     private Object writeReplace() throws ObjectStreamException {
-      return new ChainProxy<O, R>(mOutputMapper, mErrorMapper, mMinBatchSize);
+      return new ChainProxy<O, R>(mOutputMapper, mMinBatchSize);
     }
 
     private static class ChainProxy<O, R> extends SerializableProxy {
 
-      private ChainProxy(final Mapper<O, R> outputMapper, final Mapper<Throwable, R> errorMapper,
-          final int minBatchSize) {
-        super(proxy(outputMapper), proxy(errorMapper), minBatchSize);
+      private ChainProxy(final Mapper<O, R> outputMapper, final int minBatchSize) {
+        super(proxy(outputMapper), minBatchSize);
       }
 
       @SuppressWarnings("unchecked")
       Object readResolve() throws ObjectStreamException {
         try {
           final Object[] args = deserializeArgs();
-          return new ChainMapGroup<O, R>((Mapper<O, R>) args[0], (Mapper<Throwable, R>) args[1],
-              (Integer) args[2]);
+          return new ChainMapGroup<O, R>((Mapper<O, R>) args[0], (Integer) args[1]);
 
         } catch (final Throwable t) {
           throw new InvalidObjectException(t.getMessage());
@@ -2319,23 +2326,22 @@ class DefaultPromiseIterable<O> implements PromiseIterable<O>, Serializable {
     @NotNull
     @Override
     PromiseChain<O, R> copy() {
-      return new ChainMapGroup<O, R>(mOutputMapper, mErrorMapper, mMinBatchSize);
+      return new ChainMapGroup<O, R>(mOutputMapper, mMinBatchSize);
     }
 
     @Override
     void addRejection(final PromiseChain<R, ?> next, final Throwable reason) {
       try {
-        flush(next, mErrorMapper.apply(reason));
+        flush(next);
+        next.addRejection(reason);
 
       } catch (final CancellationException e) {
         getLogger().wrn(e, "Promise has been cancelled");
-        flush(next);
         next.addRejectionSafe(e);
 
       } catch (final Throwable t) {
         InterruptedExecutionException.throwIfInterrupt(t);
         getLogger().err(t, "Error while processing rejection with reason: %s", reason);
-        flush(next);
         next.addRejectionSafe(t);
       }
     }
@@ -2407,6 +2413,7 @@ class DefaultPromiseIterable<O> implements PromiseIterable<O>, Serializable {
 
         public void run() {
           if (mIsRejected) {
+            // TODO: 19/08/2017 log??
             return;
           }
 
@@ -3264,12 +3271,63 @@ class DefaultPromiseIterable<O> implements PromiseIterable<O>, Serializable {
     }
   }
 
-  private static class HandlerCatchAny<O>
+  private static class HandlerCatchAllFiltered<O>
+      implements Handler<Throwable, CallbackIterable<O>>, Serializable {
+
+    private final Iterable<Class<? extends Throwable>> mErrors;
+
+    private final Mapper<Throwable, Iterable<O>> mMapper;
+
+    private HandlerCatchAllFiltered(@NotNull final Iterable<Class<? extends Throwable>> errors,
+        @NotNull final Mapper<Throwable, Iterable<O>> mapper) {
+      mErrors = ConstantConditions.notNull("errors", errors);
+      mMapper = ConstantConditions.notNull("mapper", mapper);
+    }
+
+    private Object writeReplace() throws ObjectStreamException {
+      return new HandlerProxy<O>(mErrors, mMapper);
+    }
+
+    private static class HandlerProxy<O> extends SerializableProxy {
+
+      private HandlerProxy(final Iterable<Class<? extends Throwable>> errors,
+          final Mapper<Throwable, Iterable<O>> mapper) {
+        super(errors, proxy(mapper));
+      }
+
+      @SuppressWarnings("unchecked")
+      Object readResolve() throws ObjectStreamException {
+        try {
+          final Object[] args = deserializeArgs();
+          return new HandlerCatchAllFiltered<O>((Iterable<Class<? extends Throwable>>) args[0],
+              (Mapper<Throwable, Iterable<O>>) args[1]);
+
+        } catch (final Throwable t) {
+          throw new InvalidObjectException(t.getMessage());
+        }
+      }
+    }
+
+    public void accept(final Throwable reason, final CallbackIterable<O> callback) throws
+        Exception {
+      for (final Class<? extends Throwable> error : mErrors) {
+        if (error.isInstance(reason)) {
+          callback.addAll(mMapper.apply(reason));
+          callback.resolve();
+          return;
+        }
+      }
+
+      callback.reject(reason);
+    }
+  }
+
+  private static class HandlerCatchEach<O>
       implements Handler<Throwable, CallbackIterable<O>>, Serializable {
 
     private final Mapper<Throwable, O> mMapper;
 
-    private HandlerCatchAny(@NotNull final Mapper<Throwable, O> mapper) {
+    private HandlerCatchEach(@NotNull final Mapper<Throwable, O> mapper) {
       mMapper = ConstantConditions.notNull("mapper", mapper);
     }
 
@@ -3287,7 +3345,7 @@ class DefaultPromiseIterable<O> implements PromiseIterable<O>, Serializable {
       Object readResolve() throws ObjectStreamException {
         try {
           final Object[] args = deserializeArgs();
-          return new HandlerCatchAny<O>((Mapper<Throwable, O>) args[0]);
+          return new HandlerCatchEach<O>((Mapper<Throwable, O>) args[0]);
 
         } catch (final Throwable t) {
           throw new InvalidObjectException(t.getMessage());
@@ -3297,8 +3355,91 @@ class DefaultPromiseIterable<O> implements PromiseIterable<O>, Serializable {
 
     public void accept(final Throwable reason, final CallbackIterable<O> callback) throws
         Exception {
-      callback.add(mMapper.apply(reason));
-      callback.resolve();
+      callback.resolve(mMapper.apply(reason));
+    }
+  }
+
+  private static class HandlerCatchEachFiltered<O>
+      implements Handler<Throwable, Callback<O>>, Serializable {
+
+    private final Iterable<Class<? extends Throwable>> mErrors;
+
+    private final Mapper<Throwable, O> mMapper;
+
+    private HandlerCatchEachFiltered(@NotNull final Iterable<Class<? extends Throwable>> errors,
+        @NotNull final Mapper<Throwable, O> mapper) {
+      mErrors = ConstantConditions.notNull("errors", errors);
+      mMapper = ConstantConditions.notNull("mapper", mapper);
+    }
+
+    private Object writeReplace() throws ObjectStreamException {
+      return new HandlerProxy<O>(mErrors, mMapper);
+    }
+
+    private static class HandlerProxy<O> extends SerializableProxy {
+
+      private HandlerProxy(final Iterable<Class<? extends Throwable>> errors,
+          final Mapper<Throwable, O> mapper) {
+        super(errors, proxy(mapper));
+      }
+
+      @SuppressWarnings("unchecked")
+      Object readResolve() throws ObjectStreamException {
+        try {
+          final Object[] args = deserializeArgs();
+          return new HandlerCatchEachFiltered<O>((Iterable<Class<? extends Throwable>>) args[0],
+              (Mapper<Throwable, O>) args[1]);
+
+        } catch (final Throwable t) {
+          throw new InvalidObjectException(t.getMessage());
+        }
+      }
+    }
+
+    public void accept(final Throwable reason, final Callback<O> callback) throws Exception {
+      for (final Class<? extends Throwable> error : mErrors) {
+        if (error.isInstance(reason)) {
+          callback.resolve(mMapper.apply(reason));
+          return;
+        }
+      }
+
+      callback.reject(reason);
+    }
+  }
+
+  private static class HandlerCatchMap<O> implements Handler<Throwable, Callback<O>>, Serializable {
+
+    private final Mapper<Throwable, O> mMapper;
+
+    private HandlerCatchMap(@NotNull final Mapper<Throwable, O> mapper) {
+      mMapper = ConstantConditions.notNull("mapper", mapper);
+    }
+
+    private Object writeReplace() throws ObjectStreamException {
+      return new HandlerProxy<O>(mMapper);
+    }
+
+    private static class HandlerProxy<O> extends SerializableProxy {
+
+      private HandlerProxy(final Mapper<Throwable, O> mapper) {
+        super(proxy(mapper));
+      }
+
+      @SuppressWarnings("unchecked")
+      Object readResolve() throws ObjectStreamException {
+        try {
+          final Object[] args = deserializeArgs();
+          return new HandlerCatchMap<O>((Mapper<Throwable, O>) args[0]);
+
+        } catch (final Throwable t) {
+          throw new InvalidObjectException(t.getMessage());
+        }
+      }
+    }
+
+    public void accept(final Throwable reason, final Callback<O> callback) throws Exception {
+      callback.resolve(mMapper.apply(reason));
     }
   }
 
@@ -4236,11 +4377,8 @@ class DefaultPromiseIterable<O> implements PromiseIterable<O>, Serializable {
     }
 
     private ResolutionOutputs(final Iterable<O> inputs) {
-      @SuppressWarnings("UnnecessaryLocalVariable") final DoubleQueue<O> outputs = mOutputs;
       if (inputs != null) {
-        for (final O input : inputs) {
-          outputs.add(input);
-        }
+        Iterables.addAll(inputs, mOutputs);
       }
     }
 

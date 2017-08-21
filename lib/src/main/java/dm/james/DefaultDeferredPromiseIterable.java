@@ -232,6 +232,13 @@ class DefaultDeferredPromiseIterable<I, O> implements DeferredPromiseIterable<I,
 
   @NotNull
   public DeferredPromiseIterable<I, O> catchAll(
+      @NotNull final Iterable<Class<? extends Throwable>> errors,
+      @NotNull final Mapper<Throwable, Iterable<O>> mapper) {
+    return newInstance(mPromise.catchAll(errors, mapper));
+  }
+
+  @NotNull
+  public DeferredPromiseIterable<I, O> catchAll(
       @NotNull final Mapper<Throwable, Iterable<O>> mapper) {
     return newInstance(mPromise.catchAll(mapper));
   }
@@ -260,25 +267,27 @@ class DefaultDeferredPromiseIterable<I, O> implements DeferredPromiseIterable<I,
   }
 
   @NotNull
+  public DeferredPromiseIterable<I, O> catchAny(
+      @NotNull final Iterable<Class<? extends Throwable>> errors,
+      @NotNull final Mapper<Throwable, O> mapper) {
+    return newInstance(mPromise.catchAny(errors, mapper));
+  }
+
+  @NotNull
   public DeferredPromiseIterable<I, O> catchAny(@NotNull final Mapper<Throwable, O> mapper) {
     return newInstance(mPromise.catchAny(mapper));
   }
 
   @NotNull
-  public DeferredPromiseIterable<I, O> catchEach(final int minBatchSize,
+  public DeferredPromiseIterable<I, O> catchEach(
+      @NotNull final Iterable<Class<? extends Throwable>> errors,
       @NotNull final Mapper<Throwable, O> mapper) {
-    return newInstance(mPromise.catchEach(minBatchSize, mapper));
+    return newInstance(mPromise.catchEach(errors, mapper));
   }
 
   @NotNull
   public DeferredPromiseIterable<I, O> catchEach(@NotNull final Mapper<Throwable, O> mapper) {
     return newInstance(mPromise.catchEach(mapper));
-  }
-
-  @NotNull
-  public DeferredPromiseIterable<I, O> catchEach(@NotNull final Mapper<Throwable, O> mapper,
-      final int maxBatchSize) {
-    return newInstance(mPromise.catchEach(mapper, maxBatchSize));
   }
 
   @NotNull
@@ -592,6 +601,10 @@ class DefaultDeferredPromiseIterable<I, O> implements DeferredPromiseIterable<I,
     return mPromise.getAnyOr(other, timeout, timeUnit);
   }
 
+  public boolean isSettled() {
+    return mPromise.isSettled();
+  }
+
   @NotNull
   public Iterator<O> iterator(final long timeout, @NotNull final TimeUnit timeUnit) {
     return mPromise.iterator(timeout, timeUnit);
@@ -629,12 +642,12 @@ class DefaultDeferredPromiseIterable<I, O> implements DeferredPromiseIterable<I,
     return mPromise.removeOr(other, timeout, timeUnit);
   }
 
-  public void waitComplete() {
-    mPromise.waitComplete();
+  public void waitSettled() {
+    mPromise.waitSettled();
   }
 
-  public boolean waitComplete(final long timeout, @NotNull final TimeUnit timeUnit) {
-    return mPromise.waitComplete(timeout, timeUnit);
+  public boolean waitSettled(final long timeout, @NotNull final TimeUnit timeUnit) {
+    return mPromise.waitSettled(timeout, timeUnit);
   }
 
   public Iterator<O> iterator() {

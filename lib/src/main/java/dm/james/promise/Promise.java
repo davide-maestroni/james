@@ -35,6 +35,10 @@ public interface Promise<O> extends Serializable {
   boolean cancel();
 
   @NotNull
+  Promise<O> catchAll(@NotNull Iterable<Class<? extends Throwable>> errors,
+      @NotNull Mapper<Throwable, O> mapper);
+
+  @NotNull
   Promise<O> catchAll(@NotNull Mapper<Throwable, O> mapper);
 
   O get();

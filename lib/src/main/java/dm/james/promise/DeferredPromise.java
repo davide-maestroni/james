@@ -30,6 +30,10 @@ public interface DeferredPromise<I, O> extends Promise<O> {
   <R> DeferredPromise<I, R> apply(@NotNull Mapper<Promise<O>, Promise<R>> mapper);
 
   @NotNull
+  DeferredPromise<I, O> catchAll(@NotNull Iterable<Class<? extends Throwable>> errors,
+      @NotNull Mapper<Throwable, O> mapper);
+
+  @NotNull
   DeferredPromise<I, O> catchAll(@NotNull Mapper<Throwable, O> mapper);
 
   @NotNull
