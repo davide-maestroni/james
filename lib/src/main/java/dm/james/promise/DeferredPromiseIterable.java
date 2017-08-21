@@ -34,11 +34,11 @@ public interface DeferredPromiseIterable<I, O>
 
   void addAll(@Nullable Iterable<I> inputs);
 
-  void addAllDeferred(@Nullable Iterable<? extends Promise<?>> promises);
+  void addAllDeferred(@Nullable Iterable<? extends Chainable<?>> chainables);
 
-  void addAllDeferred(@NotNull Promise<? extends Iterable<I>> promise);
+  void addAllDeferred(@NotNull Chainable<? extends Iterable<I>> chainable);
 
-  void addDeferred(@NotNull Promise<I> promise);
+  void addDeferred(@NotNull Chainable<I> chainable);
 
   void addRejection(Throwable reason);
 

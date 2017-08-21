@@ -21,7 +21,7 @@ import org.jetbrains.annotations.NotNull;
 import dm.james.math.Operation;
 import dm.james.promise.Mapper;
 import dm.james.promise.Observer;
-import dm.james.promise.PromiseIterable.CallbackIterable;
+import dm.james.promise.ChainableIterable.CallbackIterable;
 import dm.james.range.EndpointsType;
 import dm.james.range.SequenceIncrement;
 import dm.james.util.ConstantConditions;

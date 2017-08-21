@@ -14,25 +14,31 @@
  * limitations under the License.
  */
 
-package dm.james;
+package dm.james.promise;
 
-import java.io.Serializable;
-
-import dm.james.promise.Observer;
-import dm.james.promise.Promise.Callback;
+import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 
 /**
- * Created by davide-maestroni on 07/27/2017.
+ * Created by davide-maestroni on 08/21/2017.
  */
-class ResolvedObserver<O> implements Observer<Callback<O>>, Serializable {
+public interface Chainable<O> {
 
-  private final O mOutput;
+  @NotNull
+  <R> Chainable<R> then(@Nullable Handler<O, ? super Callback<R>> fulfill,
+      @Nullable Handler<Throwable, ? super Callback<R>> reject);
 
-  ResolvedObserver(final O output) {
-    mOutput = output;
+  interface Callback<O> {
+
+    void defer(@NotNull Chainable<O> chainable);
+
+    void reject(Throwable reason);
+
+    void resolve(O output);
   }
 
-  public void accept(final Callback<O> callback) {
-    callback.resolve(mOutput);
+  interface Handler<I, C> {
+
+    void accept(I input, C callback) throws Exception;
   }
 }

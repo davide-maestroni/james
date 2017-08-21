@@ -24,6 +24,7 @@ import java.util.concurrent.TimeUnit;
 
 import dm.james.executor.ScheduledExecutor;
 import dm.james.promise.Action;
+import dm.james.promise.Chainable;
 import dm.james.promise.DeferredPromise;
 import dm.james.promise.Mapper;
 import dm.james.promise.Observer;
@@ -111,8 +112,8 @@ class WrappingDeferredPromise<I, O> implements DeferredPromise<I, O>, Serializab
     return newInstance(mPromise.whenResolved(action));
   }
 
-  public void defer(@NotNull final Promise<I> promise) {
-    mDeferred.defer(promise);
+  public void defer(@NotNull final Chainable<I> chainable) {
+    mDeferred.defer(chainable);
   }
 
   public void reject(final Throwable reason) {

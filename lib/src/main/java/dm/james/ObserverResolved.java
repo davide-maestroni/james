@@ -19,20 +19,20 @@ package dm.james;
 import java.io.Serializable;
 
 import dm.james.promise.Observer;
-import dm.james.promise.Promise.Callback;
+import dm.james.promise.Chainable.Callback;
 
 /**
  * Created by davide-maestroni on 07/27/2017.
  */
-class RejectedObserver<O> implements Observer<Callback<O>>, Serializable {
+class ObserverResolved<O> implements Observer<Callback<O>>, Serializable {
 
-  private final Throwable mReason;
+  private final O mOutput;
 
-  RejectedObserver(final Throwable reason) {
-    mReason = reason;
+  ObserverResolved(final O output) {
+    mOutput = output;
   }
 
   public void accept(final Callback<O> callback) {
-    callback.reject(mReason);
+    callback.resolve(mOutput);
   }
 }

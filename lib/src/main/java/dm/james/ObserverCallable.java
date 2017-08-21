@@ -24,18 +24,18 @@ import java.io.Serializable;
 import java.util.concurrent.Callable;
 
 import dm.james.promise.Observer;
-import dm.james.promise.Promise.Callback;
+import dm.james.promise.Chainable.Callback;
 import dm.james.util.ConstantConditions;
 import dm.james.util.SerializableProxy;
 
 /**
  * Created by davide-maestroni on 08/07/2017.
  */
-class CallableObserver<O> implements Observer<Callback<O>>, Serializable {
+class ObserverCallable<O> implements Observer<Callback<O>>, Serializable {
 
   private final Callable<O> mCallable;
 
-  CallableObserver(@NotNull final Callable<O> callable) {
+  ObserverCallable(@NotNull final Callable<O> callable) {
     mCallable = ConstantConditions.notNull("callable", callable);
   }
 
@@ -57,7 +57,7 @@ class CallableObserver<O> implements Observer<Callback<O>>, Serializable {
     Object readResolve() throws ObjectStreamException {
       try {
         final Object[] args = deserializeArgs();
-        return new CallableObserver<O>((Callable<O>) args[0]);
+        return new ObserverCallable<O>((Callable<O>) args[0]);
 
       } catch (final Throwable t) {
         throw new InvalidObjectException(t.getMessage());

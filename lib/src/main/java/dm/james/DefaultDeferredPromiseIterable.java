@@ -35,6 +35,8 @@ import dm.james.log.Log;
 import dm.james.log.Log.Level;
 import dm.james.log.Logger;
 import dm.james.promise.Action;
+import dm.james.promise.Chainable;
+import dm.james.promise.ChainableIterable;
 import dm.james.promise.DeferredPromise;
 import dm.james.promise.DeferredPromiseIterable;
 import dm.james.promise.Mapper;
@@ -92,27 +94,27 @@ class DefaultDeferredPromiseIterable<I, O> implements DeferredPromiseIterable<I,
   }
 
   @SuppressWarnings("unchecked")
-  public void addAllDeferred(@Nullable final Iterable<? extends Promise<?>> promises) {
-    if (promises == null) {
+  public void addAllDeferred(@Nullable final Iterable<? extends Chainable<?>> chainables) {
+    if (chainables == null) {
       return;
     }
 
-    for (final Promise<?> promise : promises) {
-      if (promise instanceof PromiseIterable) {
-        addAllDeferred((Promise<? extends Iterable<I>>) promise);
+    for (final Chainable<?> chainable : chainables) {
+      if (chainable instanceof ChainableIterable) {
+        addAllDeferred((ChainableIterable<I>) chainable);
 
       } else {
-        addDeferred((Promise<I>) promise);
+        addDeferred((Chainable<I>) chainable);
       }
     }
   }
 
-  public void addAllDeferred(@NotNull final Promise<? extends Iterable<I>> promise) {
-    mState.addAllDeferred(promise);
+  public void addAllDeferred(@NotNull final Chainable<? extends Iterable<I>> chainable) {
+    mState.addAllDeferred(chainable);
   }
 
-  public void addDeferred(@NotNull final Promise<I> promise) {
-    mState.addDeferred(promise);
+  public void addDeferred(@NotNull final Chainable<I> chainable) {
+    mState.addDeferred(chainable);
   }
 
   public void addRejection(final Throwable reason) {
@@ -634,8 +636,8 @@ class DefaultDeferredPromiseIterable<I, O> implements DeferredPromiseIterable<I,
         mPromise.inspect());
   }
 
-  public void defer(@NotNull final Promise<Iterable<I>> promise) {
-    mState.defer(promise);
+  public void defer(@NotNull final Chainable<Iterable<I>> chainable) {
+    mState.defer(chainable);
   }
 
   public void reject(final Throwable reason) {
@@ -709,6 +711,32 @@ class DefaultDeferredPromiseIterable<I, O> implements DeferredPromiseIterable<I,
     }
   }
 
+  private static class ResolutionChainable<I> implements Resolution<I> {
+
+    private final Chainable<I> mChainable;
+
+    private ResolutionChainable(@NotNull final Chainable<I> chainable) {
+      mChainable = ConstantConditions.notNull("chainable", chainable);
+    }
+
+    public void consume(@NotNull final CallbackIterable<I> callback) {
+      callback.addDeferred(mChainable);
+    }
+  }
+
+  private static class ResolutionChainableIterable<I> implements Resolution<I> {
+
+    private final Chainable<? extends Iterable<I>> mChainable;
+
+    private ResolutionChainableIterable(@NotNull final Chainable<? extends Iterable<I>> chainable) {
+      mChainable = ConstantConditions.notNull("chainable", chainable);
+    }
+
+    public void consume(@NotNull final CallbackIterable<I> callback) {
+      callback.addAllDeferred(mChainable);
+    }
+  }
+
   private static class ResolutionInput<I> implements Resolution<I> {
 
     private final I mInput;
@@ -732,32 +760,6 @@ class DefaultDeferredPromiseIterable<I, O> implements DeferredPromiseIterable<I,
 
     public void consume(@NotNull final CallbackIterable<I> callback) {
       callback.addAll(mInputs);
-    }
-  }
-
-  private static class ResolutionPromise<I> implements Resolution<I> {
-
-    private final Promise<I> mPromise;
-
-    private ResolutionPromise(@NotNull final Promise<I> promise) {
-      mPromise = ConstantConditions.notNull("promise", promise);
-    }
-
-    public void consume(@NotNull final CallbackIterable<I> callback) {
-      callback.addDeferred(mPromise);
-    }
-  }
-
-  private static class ResolutionPromiseIterable<I> implements Resolution<I> {
-
-    private final Promise<? extends Iterable<I>> mPromise;
-
-    private ResolutionPromiseIterable(@NotNull final Promise<? extends Iterable<I>> promise) {
-      mPromise = ConstantConditions.notNull("promise", promise);
-    }
-
-    public void consume(@NotNull final CallbackIterable<I> callback) {
-      callback.addAllDeferred(mPromise);
     }
   }
 
@@ -862,17 +864,17 @@ class DefaultDeferredPromiseIterable<I, O> implements DeferredPromiseIterable<I,
       mStateExecutor.run();
     }
 
-    void addAllDeferred(@NotNull final Promise<? extends Iterable<I>> promise) {
+    void addAllDeferred(@NotNull final Chainable<? extends Iterable<I>> chainable) {
       synchronized (mMutex) {
-        mState.addAllDeferred(promise);
+        mState.addAllDeferred(chainable);
       }
 
       mStateExecutor.run();
     }
 
-    void addDeferred(@NotNull final Promise<I> promise) {
+    void addDeferred(@NotNull final Chainable<I> chainable) {
       synchronized (mMutex) {
-        mState.addDeferred(promise);
+        mState.addDeferred(chainable);
       }
 
       mStateExecutor.run();
@@ -886,9 +888,9 @@ class DefaultDeferredPromiseIterable<I, O> implements DeferredPromiseIterable<I,
       mStateExecutor.run();
     }
 
-    void defer(@NotNull final Promise<Iterable<I>> promise) {
+    void defer(@NotNull final Chainable<Iterable<I>> chainable) {
       synchronized (mMutex) {
-        mState.defer(promise);
+        mState.defer(chainable);
       }
 
       mStateExecutor.run();
@@ -970,25 +972,25 @@ class DefaultDeferredPromiseIterable<I, O> implements DeferredPromiseIterable<I,
         });
       }
 
-      void addAllDeferred(@NotNull final Promise<? extends Iterable<I>> promise) {
+      void addAllDeferred(@NotNull final Chainable<? extends Iterable<I>> chainable) {
         mExecutor.execute(new Runnable() {
 
           public void run() {
-            mInputs.add(new ResolutionPromiseIterable<I>(promise));
+            mInputs.add(new ResolutionChainableIterable<I>(chainable));
             for (final CallbackIterable<I> callback : mCallbacks) {
-              callback.addAllDeferred(promise);
+              callback.addAllDeferred(chainable);
             }
           }
         });
       }
 
-      void addDeferred(@NotNull final Promise<I> promise) {
+      void addDeferred(@NotNull final Chainable<I> chainable) {
         mExecutor.execute(new Runnable() {
 
           public void run() {
-            mInputs.add(new ResolutionPromise<I>(promise));
+            mInputs.add(new ResolutionChainable<I>(chainable));
             for (final CallbackIterable<I> callback : mCallbacks) {
-              callback.addDeferred(promise);
+              callback.addDeferred(chainable);
             }
           }
         });
@@ -1006,14 +1008,14 @@ class DefaultDeferredPromiseIterable<I, O> implements DeferredPromiseIterable<I,
         });
       }
 
-      void defer(@NotNull final Promise<Iterable<I>> promise) {
+      void defer(@NotNull final Chainable<Iterable<I>> chainable) {
         mState = new StateResolved("promise already resolved");
         mExecutor.execute(new Runnable() {
 
           public void run() {
-            mInputs.add(new ResolutionPromiseIterable<I>(promise));
+            mInputs.add(new ResolutionChainableIterable<I>(chainable));
             for (final CallbackIterable<I> callback : mCallbacks) {
-              callback.addAllDeferred(promise);
+              callback.addAllDeferred(chainable);
               callback.resolve();
             }
           }
@@ -1092,12 +1094,12 @@ class DefaultDeferredPromiseIterable<I, O> implements DeferredPromiseIterable<I,
       }
 
       @Override
-      void addAllDeferred(@NotNull final Promise<? extends Iterable<I>> promise) {
+      void addAllDeferred(@NotNull final Chainable<? extends Iterable<I>> chainable) {
         throw exception();
       }
 
       @Override
-      void addDeferred(@NotNull final Promise<I> promise) {
+      void addDeferred(@NotNull final Chainable<I> chainable) {
         throw exception();
       }
 
@@ -1107,7 +1109,7 @@ class DefaultDeferredPromiseIterable<I, O> implements DeferredPromiseIterable<I,
       }
 
       @Override
-      void defer(@NotNull final Promise<Iterable<I>> promise) {
+      void defer(@NotNull final Chainable<Iterable<I>> chainable) {
         throw exception();
       }
 

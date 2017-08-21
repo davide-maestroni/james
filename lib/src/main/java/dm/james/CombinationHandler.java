@@ -20,26 +20,26 @@ import org.jetbrains.annotations.NotNull;
 
 import java.util.List;
 
-import dm.james.promise.Promise;
-import dm.james.promise.PromiseIterable.CallbackIterable;
+import dm.james.promise.Chainable;
+import dm.james.promise.ChainableIterable.CallbackIterable;
 
 /**
  * Created by davide-maestroni on 08/19/2017.
  */
 public interface CombinationHandler<O, S> {
 
-  S create(@NotNull List<? extends Promise<?>> promises,
+  S create(@NotNull List<? extends Chainable<?>> chainables,
       @NotNull CallbackIterable<O> callback) throws Exception;
 
-  S fulfill(S state, O output, @NotNull List<? extends Promise<?>> promises, int index,
+  S fulfill(S state, O output, @NotNull List<? extends Chainable<?>> chainables, int index,
       @NotNull CallbackIterable<O> callback) throws Exception;
 
-  S reject(S state, Throwable reason, @NotNull List<? extends Promise<?>> promises, int index,
+  S reject(S state, Throwable reason, @NotNull List<? extends Chainable<?>> chainables, int index,
       @NotNull CallbackIterable<O> callback) throws Exception;
 
-  S resolve(S state, @NotNull List<? extends Promise<?>> promises, int index,
+  S resolve(S state, @NotNull List<? extends Chainable<?>> chainables, int index,
       @NotNull CallbackIterable<O> callback) throws Exception;
 
-  void settle(S state, @NotNull List<? extends Promise<?>> promises,
+  void settle(S state, @NotNull List<? extends Chainable<?>> chainables,
       @NotNull CallbackIterable<O> callback) throws Exception;
 }

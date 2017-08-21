@@ -31,6 +31,7 @@ import dm.james.log.Log;
 import dm.james.log.Log.Level;
 import dm.james.log.Logger;
 import dm.james.promise.Action;
+import dm.james.promise.Chainable;
 import dm.james.promise.DeferredPromise;
 import dm.james.promise.Mapper;
 import dm.james.promise.Observer;
@@ -138,10 +139,10 @@ class DefaultDeferredPromise<I, O> implements DeferredPromise<I, O> {
     return newInstance(mPromise.whenResolved(action));
   }
 
-  public void defer(@NotNull final Promise<I> promise) {
-    mLogger.dbg("Resolving deferred promise with deferred: %s", promise);
-    final List<Callback<I>> callbacks = mState.defer(promise);
-    promise.then(new Handler<I, Callback<Void>>() {
+  public void defer(@NotNull final Chainable<I> chainable) {
+    mLogger.dbg("Resolving deferred promise with deferred: %s", chainable);
+    final List<Callback<I>> callbacks = mState.defer(chainable);
+    chainable.then(new Handler<I, Callback<Void>>() {
 
       public void accept(final I input, final Callback<Void> ignored) {
         for (final Callback<I> callback : callbacks) {
@@ -291,9 +292,9 @@ class DefaultDeferredPromise<I, O> implements DeferredPromise<I, O> {
     }
 
     @NotNull
-    List<Callback<I>> defer(@NotNull final Promise<I> promise) {
+    List<Callback<I>> defer(@NotNull final Chainable<I> chainable) {
       synchronized (mMutex) {
-        return mState.defer(promise);
+        return mState.defer(chainable);
       }
     }
 
@@ -324,10 +325,10 @@ class DefaultDeferredPromise<I, O> implements DeferredPromise<I, O> {
 
     private class StateDeferred extends StatePending implements Observer<Callback<I>> {
 
-      private final Promise<I> mPromise;
+      private final Chainable<I> mChainable;
 
-      private StateDeferred(final Promise<I> promise) {
-        mPromise = ConstantConditions.notNull("promise", promise);
+      private StateDeferred(final Chainable<I> chainable) {
+        mChainable = ConstantConditions.notNull("chainable", chainable);
       }
 
       @Override
@@ -342,7 +343,7 @@ class DefaultDeferredPromise<I, O> implements DeferredPromise<I, O> {
 
       @NotNull
       @Override
-      List<Callback<I>> defer(@NotNull final Promise<I> promise) {
+      List<Callback<I>> defer(@NotNull final Chainable<I> chainable) {
         throw exception();
       }
 
@@ -359,7 +360,7 @@ class DefaultDeferredPromise<I, O> implements DeferredPromise<I, O> {
       }
 
       public void accept(final Callback<I> callback) {
-        callback.defer(mPromise);
+        callback.defer(mChainable);
       }
     }
 
@@ -371,8 +372,8 @@ class DefaultDeferredPromise<I, O> implements DeferredPromise<I, O> {
       }
 
       @NotNull
-      List<Callback<I>> defer(@NotNull final Promise<I> promise) {
-        mState = new StateDeferred(promise);
+      List<Callback<I>> defer(@NotNull final Chainable<I> chainable) {
+        mState = new StateDeferred(chainable);
         return mCallbacks;
       }
 
@@ -409,7 +410,7 @@ class DefaultDeferredPromise<I, O> implements DeferredPromise<I, O> {
 
       @NotNull
       @Override
-      List<Callback<I>> defer(@NotNull final Promise<I> promise) {
+      List<Callback<I>> defer(@NotNull final Chainable<I> chainable) {
         throw exception();
       }
 
@@ -450,7 +451,7 @@ class DefaultDeferredPromise<I, O> implements DeferredPromise<I, O> {
 
       @NotNull
       @Override
-      List<Callback<I>> defer(@NotNull final Promise<I> promise) {
+      List<Callback<I>> defer(@NotNull final Chainable<I> chainable) {
         throw exception();
       }
 

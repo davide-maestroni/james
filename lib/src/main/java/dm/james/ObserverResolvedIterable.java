@@ -16,26 +16,26 @@
 
 package dm.james;
 
-import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 
-import java.util.concurrent.Future;
+import java.io.Serializable;
 
 import dm.james.promise.Observer;
-import dm.james.promise.Promise.Callback;
-import dm.james.util.ConstantConditions;
+import dm.james.promise.ChainableIterable.CallbackIterable;
 
 /**
- * Created by davide-maestroni on 08/07/2017.
+ * Created by davide-maestroni on 07/27/2017.
  */
-class FutureObserver<O> implements Observer<Callback<O>> {
+class ObserverResolvedIterable<O> implements Observer<CallbackIterable<O>>, Serializable {
 
-  private final Future<O> mFuture;
+  private final Iterable<O> mOutputs;
 
-  FutureObserver(@NotNull final Future<O> future) {
-    mFuture = ConstantConditions.notNull("future", future);
+  ObserverResolvedIterable(@Nullable final Iterable<O> outputs) {
+    mOutputs = outputs;
   }
 
-  public void accept(final Callback<O> callback) throws Exception {
-    callback.resolve(mFuture.get());
+  public void accept(final CallbackIterable<O> callback) {
+    callback.addAll(mOutputs);
+    callback.resolve();
   }
 }

@@ -23,7 +23,7 @@ import java.io.ObjectStreamException;
 import java.io.Serializable;
 
 import dm.james.promise.Observer;
-import dm.james.promise.PromiseIterable.CallbackIterable;
+import dm.james.promise.ChainableIterable.CallbackIterable;
 import dm.james.range.SequenceIncrement;
 import dm.james.util.ConstantConditions;
 import dm.james.util.SerializableProxy;

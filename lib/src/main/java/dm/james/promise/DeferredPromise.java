@@ -66,7 +66,7 @@ public interface DeferredPromise<I, O> extends Promise<O> {
   @NotNull
   DeferredPromise<I, O> whenResolved(@NotNull Action action);
 
-  void defer(@NotNull Promise<I> promise);
+  void defer(@NotNull Chainable<I> chainable);
 
   void reject(Throwable reason);
 

@@ -24,7 +24,7 @@ import java.io.Serializable;
 
 import dm.james.executor.ScheduledExecutor;
 import dm.james.promise.Observer;
-import dm.james.promise.PromiseIterable.CallbackIterable;
+import dm.james.promise.ChainableIterable.CallbackIterable;
 import dm.james.util.ConstantConditions;
 import dm.james.util.InterruptedExecutionException;
 import dm.james.util.SerializableProxy;
@@ -32,13 +32,13 @@ import dm.james.util.SerializableProxy;
 /**
  * Created by davide-maestroni on 08/06/2017.
  */
-class ScheduledIterableObserver<O> implements Observer<CallbackIterable<O>>, Serializable {
+class ObserverScheduledIterable<O> implements Observer<CallbackIterable<O>>, Serializable {
 
   private final ScheduledExecutor mExecutor;
 
   private final Observer<? super CallbackIterable<O>> mObserver;
 
-  ScheduledIterableObserver(@NotNull final ScheduledExecutor executor,
+  ObserverScheduledIterable(@NotNull final ScheduledExecutor executor,
       @NotNull final Observer<? super CallbackIterable<O>> observer) {
     mExecutor = ConstantConditions.notNull("executor", executor);
     mObserver = ConstantConditions.notNull("observer", observer);
@@ -74,7 +74,7 @@ class ScheduledIterableObserver<O> implements Observer<CallbackIterable<O>>, Ser
     Object readResolve() throws ObjectStreamException {
       try {
         final Object[] args = deserializeArgs();
-        return new ScheduledIterableObserver<O>((ScheduledExecutor) args[0],
+        return new ObserverScheduledIterable<O>((ScheduledExecutor) args[0],
             (Observer<? super CallbackIterable<O>>) args[1]);
 
       } catch (final Throwable t) {

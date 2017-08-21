@@ -30,7 +30,8 @@ import dm.james.util.Backoff;
 /**
  * Created by davide-maestroni on 07/21/2017.
  */
-public interface PromiseIterable<O> extends Promise<Iterable<O>>, Iterable<O> {
+public interface PromiseIterable<O>
+    extends Promise<Iterable<O>>, ChainableIterable<O>, Iterable<O> {
 
   @NotNull
   PromiseIterable<O> all();
@@ -280,23 +281,6 @@ public interface PromiseIterable<O> extends Promise<Iterable<O>>, Iterable<O> {
 
   @NotNull
   PromiseIterable<O> whenRejectedEach(@NotNull Observer<Throwable> observer);
-
-  interface CallbackIterable<O> extends Callback<O> {
-
-    void add(O output);
-
-    void addAll(@Nullable Iterable<O> outputs);
-
-    void addAllDeferred(@Nullable Iterable<? extends Promise<?>> promises);
-
-    void addAllDeferred(@NotNull Promise<? extends Iterable<O>> promise);
-
-    void addDeferred(@NotNull Promise<O> promise);
-
-    void addRejection(Throwable reason);
-
-    void resolve();
-  }
 
   interface StatefulHandler<I, O, S> {
 

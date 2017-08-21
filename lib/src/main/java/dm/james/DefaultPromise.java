@@ -35,6 +35,7 @@ import dm.james.log.Log.Level;
 import dm.james.log.Logger;
 import dm.james.promise.Action;
 import dm.james.promise.CancellationException;
+import dm.james.promise.Chainable;
 import dm.james.promise.Mapper;
 import dm.james.promise.Observer;
 import dm.james.promise.Promise;
@@ -1151,9 +1152,9 @@ class DefaultPromise<O> implements Promise<O> {
       try {
         mHandler.accept(input, new Callback<R>() {
 
-          public void defer(@NotNull final Promise<R> promise) {
+          public void defer(@NotNull final Chainable<R> chainable) {
             close(input, mLogger);
-            callback.defer(promise);
+            callback.defer(chainable);
           }
 
           public void reject(final Throwable reason) {
@@ -1264,9 +1265,9 @@ class DefaultPromise<O> implements Promise<O> {
       }
     }
 
-    public final void defer(@NotNull final Promise<I> promise) {
+    public final void defer(@NotNull final Chainable<I> chainable) {
       mInnerState.resolve();
-      promise.then(new Handler<I, Callback<Void>>() {
+      chainable.then(new Handler<I, Callback<Void>>() {
 
         public void accept(final I input, final Callback<Void> callback) {
           resolve(mNext, input);

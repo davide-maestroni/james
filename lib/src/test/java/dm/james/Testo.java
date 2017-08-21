@@ -26,12 +26,11 @@ import java.util.Random;
 
 import dm.james.executor.ScheduledExecutor;
 import dm.james.executor.ScheduledExecutors;
-import dm.james.handler.Handlers;
 import dm.james.promise.DeferredPromise;
 import dm.james.promise.Mapper;
 import dm.james.promise.Observer;
 import dm.james.promise.Promise;
-import dm.james.promise.Promise.Callback;
+import dm.james.promise.Chainable.Callback;
 
 import static org.assertj.core.api.Assertions.assertThat;
 

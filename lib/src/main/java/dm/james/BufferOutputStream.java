@@ -33,7 +33,7 @@ import java.nio.channels.WritableByteChannel;
 
 import dm.james.io.AllocationType;
 import dm.james.io.Buffer;
-import dm.james.promise.PromiseIterable.CallbackIterable;
+import dm.james.promise.ChainableIterable.CallbackIterable;
 import dm.james.util.ConstantConditions;
 import dm.james.util.DoubleQueue;
 

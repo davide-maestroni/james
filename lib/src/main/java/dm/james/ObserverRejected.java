@@ -16,26 +16,23 @@
 
 package dm.james;
 
-import org.jetbrains.annotations.Nullable;
-
 import java.io.Serializable;
 
 import dm.james.promise.Observer;
-import dm.james.promise.PromiseIterable.CallbackIterable;
+import dm.james.promise.Chainable.Callback;
 
 /**
  * Created by davide-maestroni on 07/27/2017.
  */
-class ResolvedIterableObserver<O> implements Observer<CallbackIterable<O>>, Serializable {
+class ObserverRejected<O> implements Observer<Callback<O>>, Serializable {
 
-  private final Iterable<O> mOutputs;
+  private final Throwable mReason;
 
-  ResolvedIterableObserver(@Nullable final Iterable<O> outputs) {
-    mOutputs = outputs;
+  ObserverRejected(final Throwable reason) {
+    mReason = reason;
   }
 
-  public void accept(final CallbackIterable<O> callback) {
-    callback.addAll(mOutputs);
-    callback.resolve();
+  public void accept(final Callback<O> callback) {
+    callback.reject(mReason);
   }
 }

@@ -27,7 +27,7 @@ import dm.james.executor.ScheduledExecutor;
 /**
  * Created by davide-maestroni on 07/17/2017.
  */
-public interface Promise<O> extends PromiseInspection<O>, Serializable {
+public interface Promise<O> extends Chainable<O>, PromiseInspection<O>, Serializable {
 
   @NotNull
   <R> Promise<R> apply(@NotNull Mapper<Promise<O>, Promise<R>> mapper);
@@ -91,18 +91,4 @@ public interface Promise<O> extends PromiseInspection<O>, Serializable {
 
   @NotNull
   Promise<O> whenResolved(@NotNull Action action);
-
-  interface Callback<O> {
-
-    void defer(@NotNull Promise<O> promise);
-
-    void reject(Throwable reason);
-
-    void resolve(O output);
-  }
-
-  interface Handler<I, C> {
-
-    void accept(I input, C callback) throws Exception;
-  }
 }

@@ -30,7 +30,7 @@ import java.util.concurrent.TimeUnit;
 import dm.james.promise.Mapper;
 import dm.james.promise.Observer;
 import dm.james.promise.Promise;
-import dm.james.promise.Promise.Callback;
+import dm.james.promise.Chainable.Callback;
 
 import static dm.james.executor.ScheduledExecutors.defaultExecutor;
 import static dm.james.executor.ScheduledExecutors.withDelay;

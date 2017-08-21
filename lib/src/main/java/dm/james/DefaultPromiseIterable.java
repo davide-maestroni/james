@@ -42,6 +42,8 @@ import dm.james.log.Log.Level;
 import dm.james.log.Logger;
 import dm.james.promise.Action;
 import dm.james.promise.CancellationException;
+import dm.james.promise.Chainable;
+import dm.james.promise.ChainableIterable;
 import dm.james.promise.Mapper;
 import dm.james.promise.Observer;
 import dm.james.promise.Promise;
@@ -1364,8 +1366,8 @@ class DefaultPromiseIterable<O> implements PromiseIterable<O>, Serializable {
         mNext.add(output);
       }
 
-      public void defer(@NotNull final Promise<R> promise) {
-        addDeferred(promise);
+      public void defer(@NotNull final Chainable<R> chainable) {
+        addDeferred(chainable);
         innerResolve(mNext);
       }
 
@@ -1380,10 +1382,10 @@ class DefaultPromiseIterable<O> implements PromiseIterable<O>, Serializable {
       }
 
       @SuppressWarnings("unchecked")
-      public void addAllDeferred(@NotNull final Promise<? extends Iterable<R>> promise) {
-        if (promise instanceof PromiseIterable) {
+      public void addAllDeferred(@NotNull final Chainable<? extends Iterable<R>> chainable) {
+        if (chainable instanceof ChainableIterable) {
           mCallbackCount.incrementAndGet();
-          ((PromiseIterable<R>) promise).then(new Handler<R, Callback<Void>>() {
+          ((ChainableIterable<R>) chainable).then(new Handler<R, Callback<Void>>() {
 
             public void accept(final R input, final Callback<Void> callback) {
               mNext.add(input);
@@ -1402,7 +1404,7 @@ class DefaultPromiseIterable<O> implements PromiseIterable<O>, Serializable {
 
         } else {
           mCallbackCount.incrementAndGet();
-          ((Promise<Iterable<R>>) promise).then(new Handler<Iterable<R>, Callback<Void>>() {
+          ((Chainable<Iterable<R>>) chainable).then(new Handler<Iterable<R>, Callback<Void>>() {
 
             public void accept(final Iterable<R> input, final Callback<Void> callback) {
               mNext.addAll(input);
@@ -1419,17 +1421,17 @@ class DefaultPromiseIterable<O> implements PromiseIterable<O>, Serializable {
       }
 
       @SuppressWarnings("unchecked")
-      public void addAllDeferred(@Nullable final Iterable<? extends Promise<?>> promises) {
-        if (promises == null) {
+      public void addAllDeferred(@Nullable final Iterable<? extends Chainable<?>> chainables) {
+        if (chainables == null) {
           return;
         }
 
-        for (final Promise<?> promise : promises) {
-          if (promise instanceof PromiseIterable) {
-            addAllDeferred((Promise<? extends Iterable<R>>) promise);
+        for (final Chainable<?> chainable : chainables) {
+          if (chainable instanceof ChainableIterable) {
+            addAllDeferred((ChainableIterable<R>) chainable);
 
           } else {
-            addDeferred((Promise<R>) promise);
+            addDeferred((Chainable<R>) chainable);
           }
         }
       }
@@ -1438,9 +1440,9 @@ class DefaultPromiseIterable<O> implements PromiseIterable<O>, Serializable {
         mNext.addAll(outputs);
       }
 
-      public void addDeferred(@NotNull final Promise<R> promise) {
+      public void addDeferred(@NotNull final Chainable<R> chainable) {
         mCallbackCount.incrementAndGet();
-        promise.then(new Handler<R, Callback<Void>>() {
+        chainable.then(new Handler<R, Callback<Void>>() {
 
           public void accept(final R input, final Callback<Void> callback) {
             mNext.add(input);
@@ -1634,8 +1636,8 @@ class DefaultPromiseIterable<O> implements PromiseIterable<O>, Serializable {
         flushQueue(mNext);
       }
 
-      public void defer(@NotNull final Promise<R> promise) {
-        addDeferred(promise);
+      public void defer(@NotNull final Chainable<R> chainable) {
+        addDeferred(chainable);
         resolve();
       }
 
@@ -1645,15 +1647,15 @@ class DefaultPromiseIterable<O> implements PromiseIterable<O>, Serializable {
       }
 
       @SuppressWarnings("unchecked")
-      public void addAllDeferred(@NotNull final Promise<? extends Iterable<R>> promise) {
+      public void addAllDeferred(@NotNull final Chainable<? extends Iterable<R>> chainable) {
         final NestedQueue<Resolution<R>> queue;
         synchronized (mMutex) {
           queue = mQueue.addNested();
         }
 
         mCallbackCount.incrementAndGet();
-        if (promise instanceof PromiseIterable) {
-          ((PromiseIterable<R>) promise).then(new Handler<R, CallbackIterable<Void>>() {
+        if (chainable instanceof ChainableIterable) {
+          ((ChainableIterable<R>) chainable).then(new Handler<R, CallbackIterable<Void>>() {
 
             public void accept(final R input, final CallbackIterable<Void> callback) {
               synchronized (mMutex) {
@@ -1685,7 +1687,7 @@ class DefaultPromiseIterable<O> implements PromiseIterable<O>, Serializable {
           });
 
         } else {
-          ((Promise<Iterable<R>>) promise).then(new Handler<Iterable<R>, Callback<Void>>() {
+          ((Chainable<Iterable<R>>) chainable).then(new Handler<Iterable<R>, Callback<Void>>() {
 
             public void accept(final Iterable<R> input, final Callback<Void> callback) {
               synchronized (mMutex) {
@@ -1736,29 +1738,29 @@ class DefaultPromiseIterable<O> implements PromiseIterable<O>, Serializable {
       }
 
       @SuppressWarnings("unchecked")
-      public void addAllDeferred(@Nullable final Iterable<? extends Promise<?>> promises) {
-        if (promises == null) {
+      public void addAllDeferred(@Nullable final Iterable<? extends Chainable<?>> chainables) {
+        if (chainables == null) {
           return;
         }
 
-        for (final Promise<?> promise : promises) {
-          if (promise instanceof PromiseIterable) {
-            addAllDeferred((Promise<? extends Iterable<R>>) promise);
+        for (final Chainable<?> chainable : chainables) {
+          if (chainable instanceof PromiseIterable) {
+            addAllDeferred((ChainableIterable<R>) chainable);
 
           } else {
-            addDeferred((Promise<R>) promise);
+            addDeferred((Chainable<R>) chainable);
           }
         }
       }
 
-      public void addDeferred(@NotNull final Promise<R> promise) {
+      public void addDeferred(@NotNull final Chainable<R> chainable) {
         final NestedQueue<Resolution<R>> queue;
         synchronized (mMutex) {
           queue = mQueue.addNested();
         }
 
         mCallbackCount.incrementAndGet();
-        promise.then(new Handler<R, Callback<Void>>() {
+        chainable.then(new Handler<R, Callback<Void>>() {
 
           public void accept(final R input, final Callback<Void> callback) {
             synchronized (mMutex) {
@@ -2645,8 +2647,8 @@ class DefaultPromiseIterable<O> implements PromiseIterable<O>, Serializable {
         mNext = next;
       }
 
-      public void defer(@NotNull final Promise<R> promise) {
-        addDeferred(promise);
+      public void defer(@NotNull final Chainable<R> chainable) {
+        addDeferred(chainable);
         resolve();
       }
 
@@ -2688,14 +2690,14 @@ class DefaultPromiseIterable<O> implements PromiseIterable<O>, Serializable {
       }
 
       @SuppressWarnings("unchecked")
-      public void addAllDeferred(@NotNull final Promise<? extends Iterable<R>> promise) {
+      public void addAllDeferred(@NotNull final Chainable<? extends Iterable<R>> chainable) {
         final NestedQueue<Resolution<R>> queue;
         synchronized (mMutex) {
           queue = mQueue.addNested();
         }
 
-        if (promise instanceof PromiseIterable) {
-          ((PromiseIterable<R>) promise).then(new Handler<R, CallbackIterable<Void>>() {
+        if (chainable instanceof ChainableIterable) {
+          ((ChainableIterable<R>) chainable).then(new Handler<R, CallbackIterable<Void>>() {
 
             public void accept(final R input, final CallbackIterable<Void> callback) {
               synchronized (mMutex) {
@@ -2725,7 +2727,7 @@ class DefaultPromiseIterable<O> implements PromiseIterable<O>, Serializable {
           });
 
         } else {
-          ((Promise<Iterable<R>>) promise).then(new Handler<Iterable<R>, Callback<Void>>() {
+          ((Chainable<Iterable<R>>) chainable).then(new Handler<Iterable<R>, Callback<Void>>() {
 
             public void accept(final Iterable<R> input, final Callback<Void> callback) {
               synchronized (mMutex) {
@@ -2759,28 +2761,28 @@ class DefaultPromiseIterable<O> implements PromiseIterable<O>, Serializable {
       }
 
       @SuppressWarnings("unchecked")
-      public void addAllDeferred(@Nullable final Iterable<? extends Promise<?>> promises) {
-        if (promises == null) {
+      public void addAllDeferred(@Nullable final Iterable<? extends Chainable<?>> chainables) {
+        if (chainables == null) {
           return;
         }
 
-        for (final Promise<?> promise : promises) {
-          if (promise instanceof PromiseIterable) {
-            addAllDeferred((Promise<? extends Iterable<R>>) promise);
+        for (final Chainable<?> chainable : chainables) {
+          if (chainable instanceof ChainableIterable) {
+            addAllDeferred((ChainableIterable<R>) chainable);
 
           } else {
-            addDeferred((Promise<R>) promise);
+            addDeferred((Chainable<R>) chainable);
           }
         }
       }
 
-      public void addDeferred(@NotNull final Promise<R> promise) {
+      public void addDeferred(@NotNull final Chainable<R> chainable) {
         final NestedQueue<Resolution<R>> queue;
         synchronized (mMutex) {
           queue = mQueue.addNested();
         }
 
-        promise.then(new Handler<R, Callback<Void>>() {
+        chainable.then(new Handler<R, Callback<Void>>() {
 
           public void accept(final R input, final Callback<Void> callback) {
             synchronized (mMutex) {
@@ -3182,7 +3184,7 @@ class DefaultPromiseIterable<O> implements PromiseIterable<O>, Serializable {
 
     public void accept(final O input, final CallbackIterable<R> callback) throws Exception {
       callback.addDeferred(
-          mMapper.apply(new DefaultPromise<O>(new ResolvedObserver<O>(input), mLog, mLogLevel)));
+          mMapper.apply(new DefaultPromise<O>(new ObserverResolved<O>(input), mLog, mLogLevel)));
       callback.resolve();
     }
   }
@@ -3230,7 +3232,7 @@ class DefaultPromiseIterable<O> implements PromiseIterable<O>, Serializable {
     public void accept(final Throwable reason, final CallbackIterable<R> callback) throws
         Exception {
       callback.addDeferred(
-          mMapper.apply(new DefaultPromise<O>(new RejectedObserver<O>(reason), mLog, mLogLevel)));
+          mMapper.apply(new DefaultPromise<O>(new ObserverRejected<O>(reason), mLog, mLogLevel)));
       callback.resolve();
     }
   }
@@ -4142,8 +4144,8 @@ class DefaultPromiseIterable<O> implements PromiseIterable<O>, Serializable {
       }
     }
 
-    public final void defer(@NotNull final Promise<I> promise) {
-      addDeferred(promise);
+    public final void defer(@NotNull final Chainable<I> chainable) {
+      addDeferred(chainable);
       resolve();
     }
 
@@ -4200,23 +4202,23 @@ class DefaultPromiseIterable<O> implements PromiseIterable<O>, Serializable {
     }
 
     @SuppressWarnings("unchecked")
-    public void addAllDeferred(@Nullable final Iterable<? extends Promise<?>> promises) {
-      if (promises == null) {
+    public void addAllDeferred(@Nullable final Iterable<? extends Chainable<?>> chainables) {
+      if (chainables == null) {
         return;
       }
 
-      for (final Promise<?> promise : promises) {
-        if (promise instanceof PromiseIterable) {
-          addAllDeferred((Promise<? extends Iterable<I>>) promise);
+      for (final Chainable<?> chainable : chainables) {
+        if (chainable instanceof ChainableIterable) {
+          addAllDeferred((ChainableIterable<I>) chainable);
 
         } else {
-          addDeferred((Promise<I>) promise);
+          addDeferred((Chainable<I>) chainable);
         }
       }
     }
 
     @SuppressWarnings("unchecked")
-    public final void addAllDeferred(@NotNull final Promise<? extends Iterable<I>> promise) {
+    public final void addAllDeferred(@NotNull final Chainable<? extends Iterable<I>> chainable) {
       final Runnable command;
       synchronized (mMutex) {
         command = mInnerState.add();
@@ -4225,8 +4227,8 @@ class DefaultPromiseIterable<O> implements PromiseIterable<O>, Serializable {
 
       if (command != null) {
         command.run();
-        if (promise instanceof PromiseIterable) {
-          ((PromiseIterable<I>) promise).then(new Handler<I, CallbackIterable<Void>>() {
+        if (chainable instanceof ChainableIterable) {
+          ((ChainableIterable<I>) chainable).then(new Handler<I, CallbackIterable<Void>>() {
 
             public void accept(final I input, final CallbackIterable<Void> callback) {
               PromiseChain.this.add(mNext, input);
@@ -4244,7 +4246,7 @@ class DefaultPromiseIterable<O> implements PromiseIterable<O>, Serializable {
           });
 
         } else {
-          ((Promise<Iterable<I>>) promise).then(new Handler<Iterable<I>, Callback<Void>>() {
+          ((Chainable<Iterable<I>>) chainable).then(new Handler<Iterable<I>, Callback<Void>>() {
 
             public void accept(final Iterable<I> inputs, final Callback<Void> callback) {
               if (inputs != null) {
@@ -4264,7 +4266,7 @@ class DefaultPromiseIterable<O> implements PromiseIterable<O>, Serializable {
       }
     }
 
-    public final void addDeferred(@NotNull final Promise<I> promise) {
+    public final void addDeferred(@NotNull final Chainable<I> chainable) {
       final Runnable command;
       synchronized (mMutex) {
         command = mInnerState.add();
@@ -4273,7 +4275,7 @@ class DefaultPromiseIterable<O> implements PromiseIterable<O>, Serializable {
 
       if (command != null) {
         command.run();
-        promise.then(new Handler<I, Callback<Void>>() {
+        chainable.then(new Handler<I, Callback<Void>>() {
 
           public void accept(final I input, final Callback<Void> callback) {
             PromiseChain.this.add(mNext, input);
@@ -4708,9 +4710,9 @@ class DefaultPromiseIterable<O> implements PromiseIterable<O>, Serializable {
       mLogger = logger;
     }
 
-    public void defer(@NotNull final Promise<O> promise) {
+    public void defer(@NotNull final Chainable<O> chainable) {
       close(mCloseable, mLogger);
-      mCallback.defer(promise);
+      mCallback.defer(chainable);
     }
 
     public void resolve(final O output) {
@@ -4726,16 +4728,16 @@ class DefaultPromiseIterable<O> implements PromiseIterable<O>, Serializable {
       mCallback.addAll(outputs);
     }
 
-    public void addAllDeferred(@Nullable final Iterable<? extends Promise<?>> promises) {
-      mCallback.addAllDeferred(promises);
+    public void addAllDeferred(@Nullable final Iterable<? extends Chainable<?>> chainables) {
+      mCallback.addAllDeferred(chainables);
     }
 
-    public void addAllDeferred(@NotNull final Promise<? extends Iterable<O>> promise) {
-      mCallback.addAllDeferred(promise);
+    public void addAllDeferred(@NotNull final Chainable<? extends Iterable<O>> chainable) {
+      mCallback.addAllDeferred(chainable);
     }
 
-    public void addDeferred(@NotNull final Promise<O> promise) {
-      mCallback.addDeferred(promise);
+    public void addDeferred(@NotNull final Chainable<O> chainable) {
+      mCallback.addDeferred(chainable);
     }
 
     public void addRejection(final Throwable reason) {
@@ -4768,9 +4770,9 @@ class DefaultPromiseIterable<O> implements PromiseIterable<O>, Serializable {
       mLogger = logger;
     }
 
-    public void defer(@NotNull final Promise<O> promise) {
+    public void defer(@NotNull final Chainable<O> chainable) {
       close(mCloseables, mLogger);
-      mCallback.defer(promise);
+      mCallback.defer(chainable);
     }
 
     public void resolve(final O output) {
@@ -4786,16 +4788,16 @@ class DefaultPromiseIterable<O> implements PromiseIterable<O>, Serializable {
       mCallback.addAll(outputs);
     }
 
-    public void addAllDeferred(@Nullable final Iterable<? extends Promise<?>> promises) {
-      mCallback.addAllDeferred(promises);
+    public void addAllDeferred(@Nullable final Iterable<? extends Chainable<?>> chainables) {
+      mCallback.addAllDeferred(chainables);
     }
 
-    public void addAllDeferred(@NotNull final Promise<? extends Iterable<O>> promise) {
-      mCallback.addAllDeferred(promise);
+    public void addAllDeferred(@NotNull final Chainable<? extends Iterable<O>> chainable) {
+      mCallback.addAllDeferred(chainable);
     }
 
-    public void addDeferred(@NotNull final Promise<O> promise) {
-      mCallback.addDeferred(promise);
+    public void addDeferred(@NotNull final Chainable<O> chainable) {
+      mCallback.addDeferred(chainable);
     }
 
     public void addRejection(final Throwable reason) {

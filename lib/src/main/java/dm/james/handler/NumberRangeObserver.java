@@ -24,7 +24,7 @@ import java.io.Serializable;
 
 import dm.james.math.Operation;
 import dm.james.promise.Observer;
-import dm.james.promise.PromiseIterable.CallbackIterable;
+import dm.james.promise.ChainableIterable.CallbackIterable;
 import dm.james.range.EndpointsType;
 import dm.james.util.ConstantConditions;
 import dm.james.util.SerializableProxy;
