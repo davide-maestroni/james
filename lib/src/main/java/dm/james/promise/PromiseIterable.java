@@ -189,6 +189,12 @@ public interface PromiseIterable<O>
   @NotNull
   PromiseIterable<PromiseInspection<O>> inspectAll();
 
+  @NotNull
+  PromiseIterable<PromiseInspection<O>> inspectAny();
+
+  @NotNull
+  PromiseIterable<PromiseInspection<O>> inspectEach();
+
   boolean isSettled();
 
   @NotNull

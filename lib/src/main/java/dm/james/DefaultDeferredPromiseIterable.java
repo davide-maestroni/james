@@ -361,6 +361,16 @@ class DefaultDeferredPromiseIterable<I, O> implements DeferredPromiseIterable<I,
   }
 
   @NotNull
+  public DeferredPromiseIterable<I, PromiseInspection<O>> inspectAny() {
+    return newInstance(mPromise.inspectAny());
+  }
+
+  @NotNull
+  public DeferredPromiseIterable<I, PromiseInspection<O>> inspectEach() {
+    return newInstance(mPromise.inspectEach());
+  }
+
+  @NotNull
   public DeferredPromiseIterable<I, O> scheduleAny(
       @Nullable final ScheduledExecutor fulfillExecutor,
       @Nullable final ScheduledExecutor rejectExecutor) {

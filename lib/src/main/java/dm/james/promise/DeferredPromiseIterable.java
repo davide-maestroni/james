@@ -187,6 +187,12 @@ public interface DeferredPromiseIterable<I, O>
   DeferredPromiseIterable<I, PromiseInspection<O>> inspectAll();
 
   @NotNull
+  DeferredPromiseIterable<I, PromiseInspection<O>> inspectAny();
+
+  @NotNull
+  DeferredPromiseIterable<I, PromiseInspection<O>> inspectEach();
+
+  @NotNull
   DeferredPromiseIterable<I, O> scheduleAny(@Nullable ScheduledExecutor fulfillExecutor,
       @Nullable ScheduledExecutor rejectExecutor);
 

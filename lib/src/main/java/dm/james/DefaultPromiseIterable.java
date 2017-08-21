@@ -610,7 +610,17 @@ class DefaultPromiseIterable<O> implements PromiseIterable<O>, Serializable {
 
   @NotNull
   public PromiseIterable<PromiseInspection<O>> inspectAll() {
-    return eachSorted(new HandlerInspectFulfill<O>(), new HandlerInspectReject<O>());
+    return all(new HandlerInspectFulfillAll<O>(), new HandlerInspectReject<O>());
+  }
+
+  @NotNull
+  public PromiseIterable<PromiseInspection<O>> inspectAny() {
+    return any(new HandlerInspectFulfill<O>(), new HandlerInspectReject<O>());
+  }
+
+  @NotNull
+  public PromiseIterable<PromiseInspection<O>> inspectEach() {
+    return each(new HandlerInspectFulfill<O>(), new HandlerInspectReject<O>());
   }
 
   public boolean isSettled() {
@@ -3501,6 +3511,19 @@ class DefaultPromiseIterable<O> implements PromiseIterable<O>, Serializable {
     }
   }
 
+  private static class HandlerInspectFulfillAll<O>
+      implements Handler<Iterable<O>, CallbackIterable<PromiseInspection<O>>>, Serializable {
+
+    public void accept(final Iterable<O> inputs,
+        final CallbackIterable<PromiseInspection<O>> callback) {
+      for (final O input : inputs) {
+        callback.add(new PromiseInspectionFulfilled<O>(input));
+      }
+
+      callback.resolve();
+    }
+  }
+
   private static class HandlerInspectReject<O>
       implements Handler<Throwable, Callback<PromiseInspection<O>>>, Serializable {
 
@@ -4558,13 +4581,13 @@ class DefaultPromiseIterable<O> implements PromiseIterable<O>, Serializable {
       mExecutor = executor;
     }
 
-    public void accept(final Iterable<I> input, final CallbackIterable<I> callback) throws
+    public void accept(final Iterable<I> inputs, final CallbackIterable<I> callback) throws
         Exception {
       mExecutor.execute(new Runnable() {
 
         public void run() {
           try {
-            callback.addAll(input);
+            callback.addAll(inputs);
             callback.resolve();
 
           } catch (final Throwable t) {
