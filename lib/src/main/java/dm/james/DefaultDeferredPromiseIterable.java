@@ -45,7 +45,7 @@ import dm.james.promise.Promise;
 import dm.james.promise.PromiseInspection;
 import dm.james.promise.PromiseIterable;
 import dm.james.promise.RejectionException;
-import dm.james.promise.ScheduledOutputs;
+import dm.james.promise.ScheduledData;
 import dm.james.util.Backoff;
 import dm.james.util.ConstantConditions;
 import dm.james.util.DoubleQueue;
@@ -122,11 +122,6 @@ class DefaultDeferredPromiseIterable<I, O> implements DeferredPromiseIterable<I,
   }
 
   @NotNull
-  public DeferredPromiseIterable<I, O> all() {
-    return newInstance(mPromise.all());
-  }
-
-  @NotNull
   public <R> DeferredPromiseIterable<I, R> all(
       @Nullable final Handler<Iterable<O>, ? super CallbackIterable<R>> fulfill,
       @Nullable final Handler<Throwable, ? super CallbackIterable<R>> reject) {
@@ -164,11 +159,6 @@ class DefaultDeferredPromiseIterable<I, O> implements DeferredPromiseIterable<I,
       @Nullable final Handler<Iterable<O>, ? super CallbackIterable<R>> fulfill,
       @Nullable final Handler<Throwable, ? super CallbackIterable<R>> reject) {
     return newInstance(mPromise.allTrySorted(fulfill, reject));
-  }
-
-  @NotNull
-  public DeferredPromiseIterable<I, O> any() {
-    return newInstance(mPromise.any());
   }
 
   @NotNull
@@ -231,6 +221,12 @@ class DefaultDeferredPromiseIterable<I, O> implements DeferredPromiseIterable<I,
   public <R> DeferredPromiseIterable<I, R> applyEachSorted(
       @NotNull final Mapper<Promise<O>, Promise<R>> mapper) {
     return newInstance(mPromise.applyEachSorted(mapper));
+  }
+
+  @NotNull
+  public DeferredPromiseIterable<I, O> backoffOn(@NotNull final ScheduledExecutor executor,
+      @NotNull final Backoff<ScheduledData<O>> backoff) {
+    return newInstance(mPromise.backoffOn(executor, backoff));
   }
 
   @NotNull
@@ -389,18 +385,6 @@ class DefaultDeferredPromiseIterable<I, O> implements DeferredPromiseIterable<I,
       @Nullable final ScheduledExecutor fulfillExecutor,
       @Nullable final ScheduledExecutor rejectExecutor) {
     return newInstance(mPromise.scheduleEachSorted(fulfillExecutor, rejectExecutor));
-  }
-
-  @NotNull
-  public DeferredPromiseIterable<I, O> scheduleOn(@NotNull final ScheduledExecutor executor,
-      @NotNull final Backoff<ScheduledOutputs<O>> backoff) {
-    return newInstance(mPromise.scheduleOn(executor, backoff));
-  }
-
-  @NotNull
-  public DeferredPromiseIterable<I, O> scheduleOnSorted(@NotNull final ScheduledExecutor executor,
-      @NotNull final Backoff<ScheduledOutputs<O>> backoff) {
-    return newInstance(mPromise.scheduleOnSorted(executor, backoff));
   }
 
   @NotNull

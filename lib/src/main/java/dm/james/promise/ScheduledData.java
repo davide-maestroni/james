@@ -23,7 +23,7 @@ import java.util.List;
 /**
  * Created by davide-maestroni on 08/15/2017.
  */
-public interface ScheduledOutputs<O> {
+public interface ScheduledData<O> {
 
   @NotNull
   List<O> outputs();

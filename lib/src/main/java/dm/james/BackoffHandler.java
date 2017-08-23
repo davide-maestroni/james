@@ -26,12 +26,12 @@ import java.util.List;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.TimeUnit;
 
-import dm.james.BackoffHandler.BackoffOutputs;
+import dm.james.BackoffHandler.BackoffData;
 import dm.james.executor.ScheduledExecutor;
 import dm.james.promise.ChainableIterable.CallbackIterable;
 import dm.james.promise.PromiseIterable.StatefulHandler;
 import dm.james.promise.RejectionException;
-import dm.james.promise.ScheduledOutputs;
+import dm.james.promise.ScheduledData;
 import dm.james.util.Backoff;
 import dm.james.util.ConstantConditions;
 import dm.james.util.SerializableProxy;
@@ -41,9 +41,9 @@ import dm.james.util.TimeUtils.Condition;
 /**
  * Created by davide-maestroni on 08/03/2017.
  */
-class BackoffHandler<O> implements StatefulHandler<O, O, BackoffOutputs<O>>, Serializable {
+class BackoffHandler<O> implements StatefulHandler<O, O, BackoffData<O>>, Serializable {
 
-  private final Backoff<ScheduledOutputs<O>> mBackoff;
+  private final Backoff<ScheduledData<O>> mBackoff;
 
   private final ScheduledExecutor mExecutor;
 
@@ -51,16 +51,16 @@ class BackoffHandler<O> implements StatefulHandler<O, O, BackoffOutputs<O>>, Ser
    * Constructor.
    */
   BackoffHandler(@NotNull final ScheduledExecutor executor,
-      @NotNull final Backoff<ScheduledOutputs<O>> backoff) {
+      @NotNull final Backoff<ScheduledData<O>> backoff) {
     mExecutor = ConstantConditions.notNull("executor", executor);
     mBackoff = ConstantConditions.notNull("backoff", backoff);
   }
 
-  public BackoffOutputs<O> create(@NotNull final CallbackIterable<O> callback) {
-    return new BackoffOutputs<O>();
+  public BackoffData<O> create(@NotNull final CallbackIterable<O> callback) {
+    return new BackoffData<O>();
   }
 
-  public BackoffOutputs<O> fulfill(final BackoffOutputs<O> state, final O input,
+  public BackoffData<O> fulfill(final BackoffData<O> state, final O input,
       @NotNull final CallbackIterable<O> callback) throws Exception {
     state.outputs().add(input);
     applyBackoff(state);
@@ -82,7 +82,7 @@ class BackoffHandler<O> implements StatefulHandler<O, O, BackoffOutputs<O>>, Ser
     return state;
   }
 
-  public BackoffOutputs<O> reject(final BackoffOutputs<O> state, final Throwable reason,
+  public BackoffData<O> reject(final BackoffData<O> state, final Throwable reason,
       @NotNull final CallbackIterable<O> callback) throws Exception {
     applyBackoff(state);
     final List<O> outputs = state.resetOutputs();
@@ -102,7 +102,7 @@ class BackoffHandler<O> implements StatefulHandler<O, O, BackoffOutputs<O>>, Ser
     return state;
   }
 
-  public void resolve(final BackoffOutputs<O> state,
+  public void resolve(final BackoffData<O> state,
       @NotNull final CallbackIterable<O> callback) throws Exception {
     applyBackoff(state);
     final List<O> outputs = state.resetOutputs();
@@ -121,23 +121,24 @@ class BackoffHandler<O> implements StatefulHandler<O, O, BackoffOutputs<O>>, Ser
   }
 
   @SuppressWarnings("SynchronizationOnLocalVariableOrMethodParameter")
-  private void applyBackoff(@NotNull final BackoffOutputs<O> inputs) throws Exception {
+  private void applyBackoff(@NotNull final BackoffData<O> data) throws Exception {
     final ScheduledExecutor executor = mExecutor;
     if (executor.isExecutionThread()) {
       throw new RejectedExecutionException(
           "cannot wait on executor thread [" + Thread.currentThread() + " " + executor + "]");
     }
 
-    final Object mutex = inputs.getMutex();
+    final Object mutex = data.getMutex();
     synchronized (mutex) {
-      inputs.incrementPending();
-      final long delay = mBackoff.getDelay(inputs);
+      data.incrementPending();
+      final Backoff<ScheduledData<O>> backoff = mBackoff;
+      final long delay = backoff.getDelay(data);
       if (delay > 0) {
         TimeUtils.waitUntil(mutex, new Condition() {
 
           public boolean isTrue() {
             try {
-              return (mBackoff.getDelay(inputs) <= 0);
+              return (backoff.getDelay(data) < 0);
 
             } catch (final Exception e) {
               throw RejectionException.wrapIfNot(RuntimeException.class, e);
@@ -152,7 +153,7 @@ class BackoffHandler<O> implements StatefulHandler<O, O, BackoffOutputs<O>>, Ser
     return new ExecutorProxy(mExecutor, mBackoff);
   }
 
-  static class BackoffOutputs<I> implements ScheduledOutputs<I> {
+  static class BackoffData<I> implements ScheduledData<I> {
 
     private final ArrayList<I> mInputs = new ArrayList<I>();
 
@@ -162,7 +163,7 @@ class BackoffHandler<O> implements StatefulHandler<O, O, BackoffOutputs<O>>, Ser
 
     private boolean mIsRetain;
 
-    private BackoffOutputs() {
+    private BackoffData() {
     }
 
     @NotNull

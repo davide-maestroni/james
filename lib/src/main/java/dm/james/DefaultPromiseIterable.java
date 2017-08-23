@@ -34,7 +34,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 
-import dm.james.BackoffHandler.BackoffOutputs;
+import dm.james.BackoffHandler.BackoffData;
 import dm.james.executor.ScheduledExecutor;
 import dm.james.executor.ScheduledExecutors;
 import dm.james.log.Log;
@@ -51,7 +51,7 @@ import dm.james.promise.PromiseInspection;
 import dm.james.promise.PromiseIterable;
 import dm.james.promise.RejectionException;
 import dm.james.promise.RejectionIterableException;
-import dm.james.promise.ScheduledOutputs;
+import dm.james.promise.ScheduledData;
 import dm.james.promise.TimeoutException;
 import dm.james.util.Backoff;
 import dm.james.util.ConstantConditions;
@@ -226,11 +226,6 @@ class DefaultPromiseIterable<O> implements PromiseIterable<O>, Serializable {
   }
 
   @NotNull
-  public PromiseIterable<O> all() {
-    return all(IdentityMapper.<Iterable<O>>instance());
-  }
-
-  @NotNull
   public <R> PromiseIterable<R> all(
       @Nullable final Handler<Iterable<O>, ? super CallbackIterable<R>> fulfill,
       @Nullable final Handler<Throwable, ? super CallbackIterable<R>> reject) {
@@ -276,11 +271,6 @@ class DefaultPromiseIterable<O> implements PromiseIterable<O>, Serializable {
             logger.getLogLevel()) : null,
         (reject != null) ? new HandlerTry<Throwable, R>(reject, logger.getLog(),
             logger.getLogLevel()) : null);
-  }
-
-  @NotNull
-  public PromiseIterable<O> any() {
-    return any(IdentityMapper.<O>instance());
   }
 
   @NotNull
@@ -363,6 +353,14 @@ class DefaultPromiseIterable<O> implements PromiseIterable<O>, Serializable {
     final Logger logger = mLogger;
     return eachSorted(new HandlerApplyFulfill<O, R>(mapper, logger.getLog(), logger.getLogLevel()),
         new HandlerApplyReject<O, R>(mapper, logger.getLog(), logger.getLogLevel()));
+  }
+
+  @NotNull
+  public PromiseIterable<O> backoffOn(@NotNull final ScheduledExecutor executor,
+      @NotNull final Backoff<ScheduledData<O>> backoff) {
+    return chain(
+        new ChainStatefulSorted<O, O, BackoffData<O>>(new BackoffHandler<O>(executor, backoff)),
+        executor, executor);
   }
 
   @NotNull
@@ -781,22 +779,6 @@ class DefaultPromiseIterable<O> implements PromiseIterable<O>, Serializable {
     return chain(new ChainHandlerSorted<O, O>(new ScheduleFulfill<O>(fulfillExecutor),
             new ScheduleReject<O>(rejectExecutor), new ScheduleResolve<O>(fulfillExecutor)),
         fulfillExecutor, rejectExecutor);
-  }
-
-  @NotNull
-  public PromiseIterable<O> scheduleOn(@NotNull final ScheduledExecutor executor,
-      @NotNull final Backoff<ScheduledOutputs<O>> backoff) {
-    return chain(
-        new ChainStateful<O, O, BackoffOutputs<O>>(new BackoffHandler<O>(executor, backoff)),
-        executor, executor);
-  }
-
-  @NotNull
-  public PromiseIterable<O> scheduleOnSorted(@NotNull final ScheduledExecutor executor,
-      @NotNull final Backoff<ScheduledOutputs<O>> backoff) {
-    return chain(
-        new ChainStatefulSorted<O, O, BackoffOutputs<O>>(new BackoffHandler<O>(executor, backoff)),
-        executor, executor);
   }
 
   @NotNull

@@ -63,7 +63,7 @@ import dm.james.util.SerializableProxy;
  */
 public class Bond implements Serializable {
 
-  // TODO: 06/08/2017 Handlers
+  // TODO: 06/08/2017 Handlers => james-handler??
   // TODO: 08/08/2017 promisify
   // TODO: 06/08/2017 james-android, james-retrofit, james-swagger
 

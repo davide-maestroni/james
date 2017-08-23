@@ -43,9 +43,6 @@ public interface DeferredPromiseIterable<I, O>
   void addRejection(Throwable reason);
 
   @NotNull
-  DeferredPromiseIterable<I, O> all();
-
-  @NotNull
   <R> DeferredPromiseIterable<I, R> all(
       @Nullable Handler<Iterable<O>, ? super CallbackIterable<R>> fulfill,
       @Nullable Handler<Throwable, ? super CallbackIterable<R>> reject);
@@ -70,9 +67,6 @@ public interface DeferredPromiseIterable<I, O>
   <R> DeferredPromiseIterable<I, R> allTrySorted(
       @Nullable Handler<Iterable<O>, ? super CallbackIterable<R>> fulfill,
       @Nullable Handler<Throwable, ? super CallbackIterable<R>> reject);
-
-  @NotNull
-  DeferredPromiseIterable<I, O> any();
 
   @NotNull
   <R> DeferredPromiseIterable<I, R> any(@Nullable Handler<O, ? super CallbackIterable<R>> fulfill,
@@ -111,6 +105,10 @@ public interface DeferredPromiseIterable<I, O>
 
   @NotNull
   <R> DeferredPromiseIterable<I, R> applyEachSorted(@NotNull Mapper<Promise<O>, Promise<R>> mapper);
+
+  @NotNull
+  DeferredPromiseIterable<I, O> backoffOn(@NotNull ScheduledExecutor executor,
+      @NotNull Backoff<ScheduledData<O>> backoff);
 
   @NotNull
   DeferredPromiseIterable<I, O> catchAll(@NotNull Iterable<Class<? extends Throwable>> errors,
@@ -203,14 +201,6 @@ public interface DeferredPromiseIterable<I, O>
   @NotNull
   DeferredPromiseIterable<I, O> scheduleEachSorted(@Nullable ScheduledExecutor fulfillExecutor,
       @Nullable ScheduledExecutor rejectExecutor);
-
-  @NotNull
-  DeferredPromiseIterable<I, O> scheduleOn(@NotNull ScheduledExecutor executor,
-      @NotNull Backoff<ScheduledOutputs<O>> backoff);
-
-  @NotNull
-  DeferredPromiseIterable<I, O> scheduleOnSorted(@NotNull ScheduledExecutor executor,
-      @NotNull Backoff<ScheduledOutputs<O>> backoff);
 
   @NotNull
   <R> DeferredPromiseIterable<I, R> then(@Nullable Handler<O, ? super CallbackIterable<R>> fulfill,

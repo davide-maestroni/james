@@ -34,9 +34,6 @@ public interface PromiseIterable<O>
     extends Promise<Iterable<O>>, ChainableIterable<O>, Iterable<O> {
 
   @NotNull
-  PromiseIterable<O> all();
-
-  @NotNull
   <R> PromiseIterable<R> all(@Nullable Handler<Iterable<O>, ? super CallbackIterable<R>> fulfill,
       @Nullable Handler<Throwable, ? super CallbackIterable<R>> reject);
 
@@ -59,9 +56,6 @@ public interface PromiseIterable<O>
   <R> PromiseIterable<R> allTrySorted(
       @Nullable Handler<Iterable<O>, ? super CallbackIterable<R>> fulfill,
       @Nullable Handler<Throwable, ? super CallbackIterable<R>> reject);
-
-  @NotNull
-  PromiseIterable<O> any();
 
   @NotNull
   <R> PromiseIterable<R> any(@Nullable Handler<O, ? super CallbackIterable<R>> fulfill,
@@ -96,6 +90,10 @@ public interface PromiseIterable<O>
 
   @NotNull
   <R> PromiseIterable<R> applyEachSorted(@NotNull Mapper<Promise<O>, Promise<R>> mapper);
+
+  @NotNull
+  PromiseIterable<O> backoffOn(@NotNull ScheduledExecutor executor,
+      @NotNull Backoff<ScheduledData<O>> backoff);
 
   @NotNull
   PromiseIterable<O> catchAll(@NotNull Iterable<Class<? extends Throwable>> errors,
@@ -229,14 +227,6 @@ public interface PromiseIterable<O>
   @NotNull
   PromiseIterable<O> scheduleEachSorted(@Nullable ScheduledExecutor fulfillExecutor,
       @Nullable ScheduledExecutor rejectExecutor);
-
-  @NotNull
-  PromiseIterable<O> scheduleOn(@NotNull ScheduledExecutor executor,
-      @NotNull Backoff<ScheduledOutputs<O>> backoff);
-
-  @NotNull
-  PromiseIterable<O> scheduleOnSorted(@NotNull ScheduledExecutor executor,
-      @NotNull Backoff<ScheduledOutputs<O>> backoff);
 
   @NotNull
   <R> PromiseIterable<R> then(@Nullable Handler<O, ? super CallbackIterable<R>> fulfill,
