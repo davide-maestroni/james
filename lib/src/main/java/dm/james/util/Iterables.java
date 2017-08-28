@@ -65,6 +65,10 @@ public class Iterables {
     return toSet(iterable);
   }
 
+  public static <T> T first(@NotNull final Iterable<T> iterable) {
+    return get(iterable, 0);
+  }
+
   @SuppressWarnings("unchecked")
   public static <T> T get(@NotNull final Iterable<T> iterable, final int index) {
     if (iterable instanceof List) {

@@ -24,6 +24,7 @@ import java.util.concurrent.TimeUnit;
 
 import dm.james.executor.ScheduledExecutor;
 import dm.james.promise.Action;
+import dm.james.promise.Chainable;
 import dm.james.promise.Mapper;
 import dm.james.promise.Observer;
 import dm.james.promise.Promise;
@@ -60,6 +61,18 @@ abstract class PromiseWrapper<O> implements Promise<O>, Serializable {
   @NotNull
   public Promise<O> catchAll(@NotNull final Mapper<Throwable, O> mapper) {
     return newInstance(mPromise.catchAll(mapper));
+  }
+
+  @NotNull
+  public Promise<O> catchAllTrusted(@NotNull final Iterable<Class<? extends Throwable>> errors,
+      @NotNull final Mapper<Throwable, Chainable<? extends O>> mapper) {
+    return newInstance(mPromise.catchAllTrusted(errors, mapper));
+  }
+
+  @NotNull
+  public Promise<O> catchAllTrusted(
+      @NotNull final Mapper<Throwable, Chainable<? extends O>> mapper) {
+    return newInstance(mPromise.catchAllTrusted(mapper));
   }
 
   public O get() {
@@ -99,15 +112,13 @@ abstract class PromiseWrapper<O> implements Promise<O>, Serializable {
   }
 
   @NotNull
-  public Promise<O> scheduleAll(@Nullable final ScheduledExecutor fulfillExecutor,
-      @Nullable final ScheduledExecutor rejectExecutor) {
-    return newInstance(mPromise.scheduleAll(fulfillExecutor, rejectExecutor));
+  public Promise<O> scheduleAll(@NotNull final ScheduledExecutor executor) {
+    return newInstance(mPromise.scheduleAll(executor));
   }
 
   @NotNull
-  public <R> Promise<R> then(@Nullable final Handler<O, ? super Callback<R>> fulfill,
-      @Nullable final Handler<Throwable, ? super Callback<R>> reject) {
-    return newInstance(mPromise.then(fulfill, reject));
+  public <R> Promise<R> then(@NotNull final Handler<O, ? super Callback<R>> handler) {
+    return newInstance(mPromise.then(handler));
   }
 
   @NotNull
@@ -116,14 +127,23 @@ abstract class PromiseWrapper<O> implements Promise<O>, Serializable {
   }
 
   @NotNull
-  public <R> Promise<R> thenTry(@Nullable final Handler<O, ? super Callback<R>> fulfill,
-      @Nullable final Handler<Throwable, ? super Callback<R>> reject) {
-    return newInstance(mPromise.thenTry(fulfill, reject));
+  public <R> Promise<R> thenTrusted(@NotNull final Mapper<O, Chainable<? extends R>> mapper) {
+    return newInstance(mPromise.thenTrusted(mapper));
+  }
+
+  @NotNull
+  public <R> Promise<R> thenTry(@NotNull final Handler<O, ? super Callback<R>> handler) {
+    return newInstance(mPromise.thenTry(handler));
   }
 
   @NotNull
   public <R> Promise<R> thenTry(@NotNull final Mapper<O, R> mapper) {
     return newInstance(mPromise.thenTry(mapper));
+  }
+
+  @NotNull
+  public <R> Promise<R> thenTryTrusted(@NotNull final Mapper<O, Chainable<? extends R>> mapper) {
+    return newInstance(mPromise.thenTryTrusted(mapper));
   }
 
   public void waitResolved() {

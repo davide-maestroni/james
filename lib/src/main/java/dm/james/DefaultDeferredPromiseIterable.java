@@ -123,9 +123,8 @@ class DefaultDeferredPromiseIterable<I, O> implements DeferredPromiseIterable<I,
 
   @NotNull
   public <R> DeferredPromiseIterable<I, R> all(
-      @Nullable final Handler<Iterable<O>, ? super CallbackIterable<R>> fulfill,
-      @Nullable final Handler<Throwable, ? super CallbackIterable<R>> reject) {
-    return newInstance(mPromise.all(fulfill, reject));
+      @NotNull final Handler<Iterable<O>, ? super CallbackIterable<R>> handler) {
+    return newInstance(mPromise.all(handler));
   }
 
   @NotNull
@@ -136,16 +135,20 @@ class DefaultDeferredPromiseIterable<I, O> implements DeferredPromiseIterable<I,
 
   @NotNull
   public <R> DeferredPromiseIterable<I, R> allSorted(
-      @Nullable final Handler<Iterable<O>, ? super CallbackIterable<R>> fulfill,
-      @Nullable final Handler<Throwable, ? super CallbackIterable<R>> reject) {
-    return newInstance(mPromise.allSorted(fulfill, reject));
+      @NotNull final Handler<Iterable<O>, ? super CallbackIterable<R>> handler) {
+    return newInstance(mPromise.allSorted(handler));
+  }
+
+  @NotNull
+  public <R> PromiseIterable<R> allTrusted(
+      @NotNull final Mapper<Iterable<O>, Chainable<? extends Iterable<R>>> mapper) {
+    return newInstance(mPromise.allTrusted(mapper));
   }
 
   @NotNull
   public <R> DeferredPromiseIterable<I, R> allTry(
-      @Nullable final Handler<Iterable<O>, ? super CallbackIterable<R>> fulfill,
-      @Nullable final Handler<Throwable, ? super CallbackIterable<R>> reject) {
-    return newInstance(mPromise.allTry(fulfill, reject));
+      @NotNull final Handler<Iterable<O>, ? super CallbackIterable<R>> handler) {
+    return newInstance(mPromise.allTry(handler));
   }
 
   @NotNull
@@ -156,59 +159,20 @@ class DefaultDeferredPromiseIterable<I, O> implements DeferredPromiseIterable<I,
 
   @NotNull
   public <R> DeferredPromiseIterable<I, R> allTrySorted(
-      @Nullable final Handler<Iterable<O>, ? super CallbackIterable<R>> fulfill,
-      @Nullable final Handler<Throwable, ? super CallbackIterable<R>> reject) {
-    return newInstance(mPromise.allTrySorted(fulfill, reject));
+      @NotNull final Handler<Iterable<O>, ? super CallbackIterable<R>> handler) {
+    return newInstance(mPromise.allTrySorted(handler));
   }
 
   @NotNull
-  public <R> DeferredPromiseIterable<I, R> any(
-      @Nullable final Handler<O, ? super CallbackIterable<R>> fulfill,
-      @Nullable final Handler<Throwable, ? super CallbackIterable<R>> reject) {
-    return newInstance(mPromise.any(fulfill, reject));
-  }
-
-  @NotNull
-  public <R> DeferredPromiseIterable<I, R> any(@NotNull final Mapper<O, R> mapper) {
-    return newInstance(mPromise.any(mapper));
-  }
-
-  @NotNull
-  public <R> DeferredPromiseIterable<I, R> anySorted(
-      @Nullable final Handler<O, ? super CallbackIterable<R>> fulfill,
-      @Nullable final Handler<Throwable, ? super CallbackIterable<R>> reject) {
-    return newInstance(mPromise.anySorted(fulfill, reject));
-  }
-
-  @NotNull
-  public <R> DeferredPromiseIterable<I, R> anyTry(
-      @Nullable final Handler<O, ? super CallbackIterable<R>> fulfill,
-      @Nullable final Handler<Throwable, ? super CallbackIterable<R>> reject) {
-    return newInstance(mPromise.anyTry(fulfill, reject));
-  }
-
-  @NotNull
-  public <R> DeferredPromiseIterable<I, R> anyTry(@NotNull final Mapper<O, R> mapper) {
-    return newInstance(mPromise.anyTry(mapper));
-  }
-
-  @NotNull
-  public <R> DeferredPromiseIterable<I, R> anyTrySorted(
-      @Nullable final Handler<O, ? super CallbackIterable<R>> fulfill,
-      @Nullable final Handler<Throwable, ? super CallbackIterable<R>> reject) {
-    return newInstance(mPromise.anyTrySorted(fulfill, reject));
+  public <R> DeferredPromiseIterable<I, R> allTryTrusted(
+      @NotNull final Mapper<Iterable<O>, Chainable<? extends Iterable<R>>> mapper) {
+    return newInstance(mPromise.allTryTrusted(mapper));
   }
 
   @NotNull
   public <R> DeferredPromiseIterable<I, R> applyAll(
       @NotNull final Mapper<PromiseIterable<O>, PromiseIterable<R>> mapper) {
     return newInstance(mPromise.applyAll(mapper));
-  }
-
-  @NotNull
-  public <R> DeferredPromiseIterable<I, R> applyAny(
-      @NotNull final Mapper<Promise<O>, Promise<R>> mapper) {
-    return newInstance(mPromise.applyAny(mapper));
   }
 
   @NotNull
@@ -243,10 +207,21 @@ class DefaultDeferredPromiseIterable<I, O> implements DeferredPromiseIterable<I,
   }
 
   @NotNull
-  public DeferredPromiseIterable<I, O> scheduleAll(
-      @Nullable final ScheduledExecutor fulfillExecutor,
-      @Nullable final ScheduledExecutor rejectExecutor) {
-    return newInstance(mPromise.scheduleAll(fulfillExecutor, rejectExecutor));
+  public DeferredPromiseIterable<I, O> catchAllTrusted(
+      @NotNull final Iterable<Class<? extends Throwable>> errors,
+      @NotNull final Mapper<Throwable, Chainable<? extends Iterable<O>>> mapper) {
+    return newInstance(mPromise.catchAllTrusted(errors, mapper));
+  }
+
+  @NotNull
+  public DeferredPromiseIterable<I, O> catchAllTrusted(
+      @NotNull final Mapper<Throwable, Chainable<? extends Iterable<O>>> mapper) {
+    return newInstance(mPromise.catchAllTrusted(mapper));
+  }
+
+  @NotNull
+  public DeferredPromiseIterable<I, O> scheduleAll(@NotNull final ScheduledExecutor executor) {
+    return newInstance(mPromise.scheduleAll(executor));
   }
 
   @NotNull
@@ -266,18 +241,6 @@ class DefaultDeferredPromiseIterable<I, O> implements DeferredPromiseIterable<I,
   }
 
   @NotNull
-  public DeferredPromiseIterable<I, O> catchAny(
-      @NotNull final Iterable<Class<? extends Throwable>> errors,
-      @NotNull final Mapper<Throwable, O> mapper) {
-    return newInstance(mPromise.catchAny(errors, mapper));
-  }
-
-  @NotNull
-  public DeferredPromiseIterable<I, O> catchAny(@NotNull final Mapper<Throwable, O> mapper) {
-    return newInstance(mPromise.catchAny(mapper));
-  }
-
-  @NotNull
   public DeferredPromiseIterable<I, O> catchEach(
       @NotNull final Iterable<Class<? extends Throwable>> errors,
       @NotNull final Mapper<Throwable, O> mapper) {
@@ -290,10 +253,22 @@ class DefaultDeferredPromiseIterable<I, O> implements DeferredPromiseIterable<I,
   }
 
   @NotNull
+  public DeferredPromiseIterable<I, O> catchEachTrusted(
+      @NotNull final Iterable<Class<? extends Throwable>> errors,
+      @NotNull final Mapper<Throwable, Chainable<? extends O>> mapper) {
+    return newInstance(mPromise.catchEachTrusted(errors, mapper));
+  }
+
+  @NotNull
+  public DeferredPromiseIterable<I, O> catchEachTrusted(
+      @NotNull final Mapper<Throwable, Chainable<? extends O>> mapper) {
+    return newInstance(mPromise.catchEachTrusted(mapper));
+  }
+
+  @NotNull
   public <R> DeferredPromiseIterable<I, R> each(
-      @Nullable final Handler<O, ? super CallbackIterable<R>> fulfill,
-      @Nullable final Handler<Throwable, ? super CallbackIterable<R>> reject) {
-    return newInstance(mPromise.each(fulfill, reject));
+      @NotNull final Handler<O, ? super CallbackIterable<R>> handler) {
+    return newInstance(mPromise.each(handler));
   }
 
   @NotNull
@@ -315,16 +290,20 @@ class DefaultDeferredPromiseIterable<I, O> implements DeferredPromiseIterable<I,
 
   @NotNull
   public <R> DeferredPromiseIterable<I, R> eachSorted(
-      @Nullable final Handler<O, ? super CallbackIterable<R>> fulfill,
-      @Nullable final Handler<Throwable, ? super CallbackIterable<R>> reject) {
-    return newInstance(mPromise.eachSorted(fulfill, reject));
+      @NotNull final Handler<O, ? super CallbackIterable<R>> handler) {
+    return newInstance(mPromise.eachSorted(handler));
+  }
+
+  @NotNull
+  public <R> DeferredPromiseIterable<I, R> eachTrusted(
+      @NotNull final Mapper<O, Chainable<? extends R>> mapper) {
+    return newInstance(mPromise.eachTrusted(mapper));
   }
 
   @NotNull
   public <R> DeferredPromiseIterable<I, R> eachTry(
-      @Nullable final Handler<O, ? super CallbackIterable<R>> fulfill,
-      @Nullable final Handler<Throwable, ? super CallbackIterable<R>> reject) {
-    return newInstance(mPromise.eachTry(fulfill, reject));
+      @NotNull final Handler<O, ? super CallbackIterable<R>> handler) {
+    return newInstance(mPromise.eachTry(handler));
   }
 
   @NotNull
@@ -346,9 +325,14 @@ class DefaultDeferredPromiseIterable<I, O> implements DeferredPromiseIterable<I,
 
   @NotNull
   public <R> DeferredPromiseIterable<I, R> eachTrySorted(
-      @Nullable final Handler<O, ? super CallbackIterable<R>> fulfill,
-      @Nullable final Handler<Throwable, ? super CallbackIterable<R>> reject) {
-    return newInstance(mPromise.eachTrySorted(fulfill, reject));
+      @NotNull final Handler<O, ? super CallbackIterable<R>> handler) {
+    return newInstance(mPromise.eachTrySorted(handler));
+  }
+
+  @NotNull
+  public <R> DeferredPromiseIterable<I, R> eachTryTrusted(
+      @NotNull final Mapper<O, Chainable<? extends R>> mapper) {
+    return newInstance(mPromise.eachTryTrusted(mapper));
   }
 
   @NotNull
@@ -357,42 +341,19 @@ class DefaultDeferredPromiseIterable<I, O> implements DeferredPromiseIterable<I,
   }
 
   @NotNull
-  public DeferredPromiseIterable<I, PromiseInspection<O>> inspectAny() {
-    return newInstance(mPromise.inspectAny());
-  }
-
-  @NotNull
   public DeferredPromiseIterable<I, PromiseInspection<O>> inspectEach() {
     return newInstance(mPromise.inspectEach());
   }
 
   @NotNull
-  public DeferredPromiseIterable<I, O> scheduleAny(
-      @Nullable final ScheduledExecutor fulfillExecutor,
-      @Nullable final ScheduledExecutor rejectExecutor) {
-    return newInstance(mPromise.scheduleAny(fulfillExecutor, rejectExecutor));
-  }
-
-  @NotNull
-  public DeferredPromiseIterable<I, O> scheduleEach(
-      @Nullable final ScheduledExecutor fulfillExecutor,
-      @Nullable final ScheduledExecutor rejectExecutor) {
-    return newInstance(mPromise.scheduleEach(fulfillExecutor, rejectExecutor));
+  public DeferredPromiseIterable<I, O> scheduleEach(@NotNull final ScheduledExecutor executor) {
+    return newInstance(mPromise.scheduleEach(executor));
   }
 
   @NotNull
   public DeferredPromiseIterable<I, O> scheduleEachSorted(
-      @Nullable final ScheduledExecutor fulfillExecutor,
-      @Nullable final ScheduledExecutor rejectExecutor) {
-    return newInstance(mPromise.scheduleEachSorted(fulfillExecutor, rejectExecutor));
-  }
-
-  @NotNull
-  public <R> DeferredPromiseIterable<I, R> then(
-      @Nullable final Handler<O, ? super CallbackIterable<R>> fulfill,
-      @Nullable final Handler<Throwable, ? super CallbackIterable<R>> reject,
-      @Nullable final Observer<? super CallbackIterable<R>> resolve) {
-    return newInstance(mPromise.then(fulfill, reject, resolve));
+      @NotNull final ScheduledExecutor executor) {
+    return newInstance(mPromise.scheduleEachSorted(executor));
   }
 
   @NotNull
@@ -402,33 +363,9 @@ class DefaultDeferredPromiseIterable<I, O> implements DeferredPromiseIterable<I,
   }
 
   @NotNull
-  public <R> DeferredPromiseIterable<I, R> thenSorted(
-      @Nullable final Handler<O, ? super CallbackIterable<R>> fulfill,
-      @Nullable final Handler<Throwable, ? super CallbackIterable<R>> reject,
-      @Nullable final Observer<? super CallbackIterable<R>> resolve) {
-    return newInstance(mPromise.thenSorted(fulfill, reject, resolve));
-  }
-
-  @NotNull
   public <R, S> DeferredPromiseIterable<I, R> thenSorted(
       @NotNull final StatefulHandler<O, R, S> handler) {
     return newInstance(mPromise.thenSorted(handler));
-  }
-
-  @NotNull
-  public <R> DeferredPromiseIterable<I, R> thenTry(
-      @Nullable final Handler<O, ? super CallbackIterable<R>> fulfill,
-      @Nullable final Handler<Throwable, ? super CallbackIterable<R>> reject,
-      @Nullable final Observer<? super CallbackIterable<R>> resolve) {
-    return newInstance(mPromise.thenTry(fulfill, reject, resolve));
-  }
-
-  @NotNull
-  public <R> DeferredPromiseIterable<I, R> thenTrySorted(
-      @Nullable final Handler<O, ? super CallbackIterable<R>> fulfill,
-      @Nullable final Handler<Throwable, ? super CallbackIterable<R>> reject,
-      @Nullable final Observer<? super CallbackIterable<R>> resolve) {
-    return newInstance(mPromise.thenTrySorted(fulfill, reject, resolve));
   }
 
   @NotNull
@@ -444,19 +381,8 @@ class DefaultDeferredPromiseIterable<I, O> implements DeferredPromiseIterable<I,
   }
 
   @NotNull
-  public DeferredPromiseIterable<I, O> whenFulfilledAny(@NotNull final Observer<O> observer) {
-    return newInstance(mPromise.whenFulfilledAny(observer));
-  }
-
-  @NotNull
   public DeferredPromiseIterable<I, O> whenFulfilledEach(@NotNull final Observer<O> observer) {
     return newInstance(mPromise.whenFulfilledEach(observer));
-  }
-
-  @NotNull
-  public DeferredPromiseIterable<I, O> whenRejectedAny(
-      @NotNull final Observer<Throwable> observer) {
-    return newInstance(mPromise.whenRejectedAny(observer));
   }
 
   @NotNull
@@ -471,9 +397,8 @@ class DefaultDeferredPromiseIterable<I, O> implements DeferredPromiseIterable<I,
 
   @NotNull
   public <R> DeferredPromise<Iterable<I>, R> then(
-      @Nullable final Handler<Iterable<O>, ? super Callback<R>> fulfill,
-      @Nullable final Handler<Throwable, ? super Callback<R>> reject) {
-    return new WrappingDeferredPromise<Iterable<I>, R>(this, mPromise.then(fulfill, reject));
+      @NotNull final Handler<Iterable<O>, ? super Callback<R>> handler) {
+    return new WrappingDeferredPromise<Iterable<I>, R>(this, mPromise.then(handler));
   }
 
   @NotNull
@@ -483,9 +408,8 @@ class DefaultDeferredPromiseIterable<I, O> implements DeferredPromiseIterable<I,
 
   @NotNull
   public <R> DeferredPromise<Iterable<I>, R> thenTry(
-      @Nullable final Handler<Iterable<O>, ? super Callback<R>> fulfill,
-      @Nullable final Handler<Throwable, ? super Callback<R>> reject) {
-    return new WrappingDeferredPromise<Iterable<I>, R>(this, mPromise.thenTry(fulfill, reject));
+      @NotNull final Handler<Iterable<O>, ? super Callback<R>> handler) {
+    return new WrappingDeferredPromise<Iterable<I>, R>(this, mPromise.thenTry(handler));
   }
 
   @NotNull
@@ -533,6 +457,18 @@ class DefaultDeferredPromiseIterable<I, O> implements DeferredPromiseIterable<I,
 
   public boolean isChained() {
     return mPromise.isChained();
+  }
+
+  @NotNull
+  public <R> DeferredPromise<Iterable<I>, R> thenTrusted(
+      @NotNull final Mapper<Iterable<O>, Chainable<? extends R>> mapper) {
+    return new WrappingDeferredPromise<Iterable<I>, R>(this, mPromise.thenTrusted(mapper));
+  }
+
+  @NotNull
+  public <R> DeferredPromise<Iterable<I>, R> thenTryTrusted(
+      @NotNull final Mapper<Iterable<O>, Chainable<? extends R>> mapper) {
+    return new WrappingDeferredPromise<Iterable<I>, R>(this, mPromise.thenTryTrusted(mapper));
   }
 
   public void waitResolved() {

@@ -17,7 +17,6 @@
 package dm.james.promise;
 
 import org.jetbrains.annotations.NotNull;
-import org.jetbrains.annotations.Nullable;
 
 import dm.james.executor.ScheduledExecutor;
 
@@ -37,25 +36,35 @@ public interface DeferredPromise<I, O> extends Promise<O> {
   DeferredPromise<I, O> catchAll(@NotNull Mapper<Throwable, O> mapper);
 
   @NotNull
+  DeferredPromise<I, O> catchAllTrusted(@NotNull Iterable<Class<? extends Throwable>> errors,
+      @NotNull Mapper<Throwable, Chainable<? extends O>> mapper);
+
+  @NotNull
+  DeferredPromise<I, O> catchAllTrusted(@NotNull Mapper<Throwable, Chainable<? extends O>> mapper);
+
+  @NotNull
   DeferredPromise<I, PromiseInspection<O>> inspect();
 
   @NotNull
-  DeferredPromise<I, O> scheduleAll(@Nullable ScheduledExecutor fulfillExecutor,
-      @Nullable ScheduledExecutor rejectExecutor);
+  DeferredPromise<I, O> scheduleAll(@NotNull ScheduledExecutor executor);
 
   @NotNull
-  <R> DeferredPromise<I, R> then(@Nullable Handler<O, ? super Callback<R>> fulfill,
-      @Nullable Handler<Throwable, ? super Callback<R>> reject);
+  <R> DeferredPromise<I, R> then(@NotNull Handler<O, ? super Callback<R>> handler);
 
   @NotNull
   <R> DeferredPromise<I, R> then(@NotNull Mapper<O, R> mapper);
 
   @NotNull
-  <R> DeferredPromise<I, R> thenTry(@Nullable Handler<O, ? super Callback<R>> fulfill,
-      @Nullable Handler<Throwable, ? super Callback<R>> reject);
+  <R> DeferredPromise<I, R> thenTrusted(@NotNull Mapper<O, Chainable<? extends R>> mapper);
+
+  @NotNull
+  <R> DeferredPromise<I, R> thenTry(@NotNull Handler<O, ? super Callback<R>> handler);
 
   @NotNull
   <R> DeferredPromise<I, R> thenTry(@NotNull Mapper<O, R> mapper);
+
+  @NotNull
+  <R> DeferredPromise<I, R> thenTryTrusted(@NotNull Mapper<O, Chainable<? extends R>> mapper);
 
   @NotNull
   DeferredPromise<I, O> whenFulfilled(@NotNull Observer<O> observer);

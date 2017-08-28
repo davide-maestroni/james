@@ -161,7 +161,7 @@ public class TestPromise {
       public void accept(final Callback<String> callback) {
         callback.resolve("test");
       }
-    }).scheduleAll(withDelay(defaultExecutor(), 100, TimeUnit.MILLISECONDS), null).get()).isEqualTo(
+    }).scheduleAll(withDelay(defaultExecutor(), 100, TimeUnit.MILLISECONDS)).get()).isEqualTo(
         "test");
   }
 

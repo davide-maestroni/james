@@ -25,9 +25,7 @@ import org.jetbrains.annotations.Nullable;
 public interface ChainableIterable<O> extends Chainable<Iterable<O>> {
 
   @NotNull
-  <R> ChainableIterable<R> then(@Nullable Handler<O, ? super CallbackIterable<R>> fulfill,
-      @Nullable Handler<Throwable, ? super CallbackIterable<R>> reject,
-      @Nullable Observer<? super CallbackIterable<R>> resolve);
+  <R, S> ChainableIterable<R> then(@NotNull StatefulHandler<O, R, S> handler);
 
   interface CallbackIterable<O> extends Callback<O> {
 
@@ -44,5 +42,16 @@ public interface ChainableIterable<O> extends Chainable<Iterable<O>> {
     void addRejection(Throwable reason);
 
     void resolve();
+  }
+
+  interface StatefulHandler<I, O, S> {
+
+    S create(@NotNull CallbackIterable<O> callback) throws Exception;
+
+    S fulfill(S state, I input, @NotNull CallbackIterable<O> callback) throws Exception;
+
+    S reject(S state, Throwable reason, @NotNull CallbackIterable<O> callback) throws Exception;
+
+    void resolve(S state, @NotNull CallbackIterable<O> callback) throws Exception;
   }
 }

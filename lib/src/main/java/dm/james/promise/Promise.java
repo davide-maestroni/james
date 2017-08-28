@@ -41,6 +41,13 @@ public interface Promise<O> extends Chainable<O>, PromiseInspection<O>, Serializ
   @NotNull
   Promise<O> catchAll(@NotNull Mapper<Throwable, O> mapper);
 
+  @NotNull
+  Promise<O> catchAllTrusted(@NotNull Iterable<Class<? extends Throwable>> errors,
+      @NotNull Mapper<Throwable, Chainable<? extends O>> mapper);
+
+  @NotNull
+  Promise<O> catchAllTrusted(@NotNull Mapper<Throwable, Chainable<? extends O>> mapper);
+
   O get();
 
   O get(long timeout, @NotNull TimeUnit timeUnit);
@@ -62,22 +69,25 @@ public interface Promise<O> extends Chainable<O>, PromiseInspection<O>, Serializ
   boolean isChained();
 
   @NotNull
-  Promise<O> scheduleAll(@Nullable ScheduledExecutor fulfillExecutor,
-      @Nullable ScheduledExecutor rejectExecutor);
+  Promise<O> scheduleAll(@NotNull ScheduledExecutor executor);
 
   @NotNull
-  <R> Promise<R> then(@Nullable Handler<O, ? super Callback<R>> fulfill,
-      @Nullable Handler<Throwable, ? super Callback<R>> reject);
+  <R> Promise<R> then(@NotNull Handler<O, ? super Callback<R>> handler);
 
   @NotNull
   <R> Promise<R> then(@NotNull Mapper<O, R> mapper);
 
   @NotNull
-  <R> Promise<R> thenTry(@Nullable Handler<O, ? super Callback<R>> fulfill,
-      @Nullable Handler<Throwable, ? super Callback<R>> reject);
+  <R> Promise<R> thenTrusted(@NotNull Mapper<O, Chainable<? extends R>> mapper);
+
+  @NotNull
+  <R> Promise<R> thenTry(@NotNull Handler<O, ? super Callback<R>> handler);
 
   @NotNull
   <R> Promise<R> thenTry(@NotNull Mapper<O, R> mapper);
+
+  @NotNull
+  <R> Promise<R> thenTryTrusted(@NotNull Mapper<O, Chainable<? extends R>> mapper);
 
   void waitResolved();
 

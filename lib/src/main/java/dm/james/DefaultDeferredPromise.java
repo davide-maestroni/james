@@ -92,20 +92,31 @@ class DefaultDeferredPromise<I, O> implements DeferredPromise<I, O> {
   }
 
   @NotNull
+  public DeferredPromise<I, O> catchAllTrusted(
+      @NotNull final Iterable<Class<? extends Throwable>> errors,
+      @NotNull final Mapper<Throwable, Chainable<? extends O>> mapper) {
+    return newInstance(mPromise.catchAllTrusted(errors, mapper));
+  }
+
+  @NotNull
+  public DeferredPromise<I, O> catchAllTrusted(
+      @NotNull final Mapper<Throwable, Chainable<? extends O>> mapper) {
+    return newInstance(mPromise.catchAllTrusted(mapper));
+  }
+
+  @NotNull
   public DeferredPromise<I, PromiseInspection<O>> inspect() {
     return newInstance(mPromise.inspect());
   }
 
   @NotNull
-  public DeferredPromise<I, O> scheduleAll(@Nullable final ScheduledExecutor fulfillExecutor,
-      @Nullable final ScheduledExecutor rejectExecutor) {
-    return newInstance(mPromise.scheduleAll(fulfillExecutor, rejectExecutor));
+  public DeferredPromise<I, O> scheduleAll(@NotNull final ScheduledExecutor executor) {
+    return newInstance(mPromise.scheduleAll(executor));
   }
 
   @NotNull
-  public <R> DeferredPromise<I, R> then(@Nullable final Handler<O, ? super Callback<R>> fulfill,
-      @Nullable final Handler<Throwable, ? super Callback<R>> reject) {
-    return newInstance(mPromise.then(fulfill, reject));
+  public <R> DeferredPromise<I, R> then(@NotNull final Handler<O, ? super Callback<R>> handler) {
+    return newInstance(mPromise.then(handler));
   }
 
   @NotNull
@@ -114,14 +125,25 @@ class DefaultDeferredPromise<I, O> implements DeferredPromise<I, O> {
   }
 
   @NotNull
-  public <R> DeferredPromise<I, R> thenTry(@Nullable final Handler<O, ? super Callback<R>> fulfill,
-      @Nullable final Handler<Throwable, ? super Callback<R>> reject) {
-    return newInstance(mPromise.thenTry(fulfill, reject));
+  public <R> DeferredPromise<I, R> thenTrusted(
+      @NotNull final Mapper<O, Chainable<? extends R>> mapper) {
+    return newInstance(mPromise.thenTrusted(mapper));
+  }
+
+  @NotNull
+  public <R> DeferredPromise<I, R> thenTry(@NotNull final Handler<O, ? super Callback<R>> handler) {
+    return newInstance(mPromise.thenTry(handler));
   }
 
   @NotNull
   public <R> DeferredPromise<I, R> thenTry(@NotNull final Mapper<O, R> mapper) {
     return newInstance(mPromise.thenTry(mapper));
+  }
+
+  @NotNull
+  public <R> DeferredPromise<I, R> thenTryTrusted(
+      @NotNull final Mapper<O, Chainable<? extends R>> mapper) {
+    return newInstance(mPromise.thenTryTrusted(mapper));
   }
 
   @NotNull
@@ -144,14 +166,13 @@ class DefaultDeferredPromise<I, O> implements DeferredPromise<I, O> {
     final List<Callback<I>> callbacks = mState.defer(chainable);
     chainable.then(new Handler<I, Callback<Void>>() {
 
-      public void accept(final I input, final Callback<Void> ignored) {
+      public void fulfill(final I input, @NotNull final Callback<Void> ignored) {
         for (final Callback<I> callback : callbacks) {
           callback.resolve(input);
         }
       }
-    }, new Handler<Throwable, Callback<Void>>() {
 
-      public void accept(final Throwable reason, final Callback<Void> ignored) {
+      public void reject(final Throwable reason, @NotNull final Callback<Void> ignored) {
         for (final Callback<I> callback : callbacks) {
           callback.reject(reason);
         }

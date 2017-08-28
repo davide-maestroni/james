@@ -54,7 +54,7 @@ import dm.james.util.TimeUtils.Condition;
  */
 class DefaultPromise<O> implements Promise<O> {
 
-  private final ScheduledExecutor mFulfillExecutor;
+  private final ScheduledExecutor mExecutor;
 
   private final ChainHead<?> mHead;
 
@@ -63,8 +63,6 @@ class DefaultPromise<O> implements Promise<O> {
   private final Object mMutex;
 
   private final Observer<Callback<?>> mObserver;
-
-  private final ScheduledExecutor mRejectExecutor;
 
   private final PromiseChain<?, O> mTail;
 
@@ -76,8 +74,7 @@ class DefaultPromise<O> implements Promise<O> {
   DefaultPromise(@NotNull final Observer<? super Callback<O>> observer, @Nullable final Log log,
       @Nullable final Level level) {
     mObserver = (Observer<Callback<?>>) ConstantConditions.notNull("observer", observer);
-    mFulfillExecutor = ScheduledExecutors.immediateExecutor();
-    mRejectExecutor = ScheduledExecutors.immediateExecutor();
+    mExecutor = ScheduledExecutors.immediateExecutor();
     mLogger = Logger.newLogger(log, level, this);
     final ChainHead<O> head = new ChainHead<O>();
     head.setLogger(mLogger);
@@ -96,14 +93,12 @@ class DefaultPromise<O> implements Promise<O> {
 
   @SuppressWarnings("unchecked")
   private DefaultPromise(@NotNull final Observer<Callback<?>> observer,
-      @NotNull final ScheduledExecutor fulfillExecutor,
-      @NotNull final ScheduledExecutor rejectExecutor, @Nullable final Log log,
+      @NotNull final ScheduledExecutor executor, @Nullable final Log log,
       @Nullable final Level level, @NotNull final ChainHead<?> head,
       @NotNull final PromiseChain<?, O> tail) {
     // serialization
     mObserver = observer;
-    mFulfillExecutor = fulfillExecutor;
-    mRejectExecutor = rejectExecutor;
+    mExecutor = executor;
     mLogger = Logger.newLogger(log, level, this);
     mMutex = head.getMutex();
     mHead = head;
@@ -126,14 +121,12 @@ class DefaultPromise<O> implements Promise<O> {
 
   @SuppressWarnings("unchecked")
   private DefaultPromise(@NotNull final Observer<Callback<?>> observer,
-      @NotNull final ScheduledExecutor fulfillExecutor,
-      @NotNull final ScheduledExecutor rejectExecutor, @NotNull final Logger logger,
+      @NotNull final ScheduledExecutor executor, @NotNull final Logger logger,
       @NotNull final ChainHead<?> head, @NotNull final PromiseChain<?, ?> tail,
       @NotNull final PromiseChain<?, O> chain) {
     // bind
     mObserver = observer;
-    mFulfillExecutor = fulfillExecutor;
-    mRejectExecutor = rejectExecutor;
+    mExecutor = executor;
     mLogger = logger;
     mMutex = head.getMutex();
     mHead = head;
@@ -144,13 +137,11 @@ class DefaultPromise<O> implements Promise<O> {
 
   @SuppressWarnings("unchecked")
   private DefaultPromise(@NotNull final Observer<Callback<?>> observer,
-      @NotNull final ScheduledExecutor fulfillExecutor,
-      @NotNull final ScheduledExecutor rejectExecutor, @NotNull final Logger logger,
+      @NotNull final ScheduledExecutor executor, @NotNull final Logger logger,
       @NotNull final ChainHead<?> head, @NotNull final PromiseChain<?, O> tail) {
     // copy
     mObserver = observer;
-    mFulfillExecutor = fulfillExecutor;
-    mRejectExecutor = rejectExecutor;
+    mExecutor = executor;
     mLogger = logger;
     mMutex = head.getMutex();
     mHead = head;
@@ -222,12 +213,24 @@ class DefaultPromise<O> implements Promise<O> {
   @NotNull
   public Promise<O> catchAll(@NotNull final Iterable<Class<? extends Throwable>> errors,
       @NotNull final Mapper<Throwable, O> mapper) {
-    return then(null, new HandlerCatchFiltered<O>(errors, mapper));
+    return then(new HandlerCatchFiltered<O>(errors, mapper));
   }
 
   @NotNull
   public Promise<O> catchAll(@NotNull final Mapper<Throwable, O> mapper) {
-    return then(null, new HandlerCatch<O>(mapper));
+    return then(new HandlerCatch<O>(mapper));
+  }
+
+  @NotNull
+  public Promise<O> catchAllTrusted(@NotNull final Iterable<Class<? extends Throwable>> errors,
+      @NotNull final Mapper<Throwable, Chainable<? extends O>> mapper) {
+    return then(new HandlerCatchFilteredTrusted<O>(errors, mapper));
+  }
+
+  @NotNull
+  public Promise<O> catchAllTrusted(
+      @NotNull final Mapper<Throwable, Chainable<? extends O>> mapper) {
+    return then(new HandlerCatchTrusted<O>(mapper));
   }
 
   public O get() {
@@ -339,7 +342,7 @@ class DefaultPromise<O> implements Promise<O> {
 
   @NotNull
   public Promise<PromiseInspection<O>> inspect() {
-    return then(new HandlerInspectFulfill<O>(), new HandlerInspectReject<O>());
+    return then(new HandlerInspect<O>());
   }
 
   public boolean isChained() {
@@ -349,44 +352,39 @@ class DefaultPromise<O> implements Promise<O> {
   }
 
   @NotNull
-  public Promise<O> scheduleAll(@Nullable ScheduledExecutor fulfillExecutor,
-      @Nullable ScheduledExecutor rejectExecutor) {
-    if (fulfillExecutor == null) {
-      fulfillExecutor = mFulfillExecutor;
-    }
-
-    if (rejectExecutor == null) {
-      rejectExecutor = mRejectExecutor;
-    }
-
-    return chain(new ChainHandler<O, O>(new ScheduleFulfill<O>(fulfillExecutor),
-        new ScheduleReject<O>(rejectExecutor)), fulfillExecutor, rejectExecutor);
+  public Promise<O> scheduleAll(@NotNull final ScheduledExecutor executor) {
+    return chain(new ChainHandler<O, O>(new HandlerSchedule<O>(executor)), executor);
   }
 
   @NotNull
-  public <R> Promise<R> then(@Nullable final Handler<O, ? super Callback<R>> fulfill,
-      @Nullable final Handler<Throwable, ? super Callback<R>> reject) {
-    return chain(new ChainHandler<O, R>(fulfill, reject));
+  public <R> Promise<R> then(@NotNull final Handler<O, ? super Callback<R>> handler) {
+    return chain(new ChainHandler<O, R>(handler));
   }
 
   @NotNull
   public <R> Promise<R> then(@NotNull final Mapper<O, R> mapper) {
-    return then(new HandlerMap<O, R>(mapper), null);
+    return then(new HandlerMap<O, R>(mapper));
   }
 
   @NotNull
-  public <R> Promise<R> thenTry(@Nullable Handler<O, ? super Callback<R>> fulfill,
-      @Nullable Handler<Throwable, ? super Callback<R>> reject) {
+  public <R> Promise<R> thenTrusted(@NotNull final Mapper<O, Chainable<? extends R>> mapper) {
+    return then(new HandlerMapTrusted<O, R>(mapper));
+  }
+
+  @NotNull
+  public <R> Promise<R> thenTry(@NotNull final Handler<O, ? super Callback<R>> handler) {
     final Logger logger = mLogger;
-    return then(
-        (fulfill != null) ? new HandlerTry<O, R>(fulfill, logger.getLog(), logger.getLogLevel())
-            : null, (reject != null) ? new HandlerTry<Throwable, R>(reject, logger.getLog(),
-            logger.getLogLevel()) : null);
+    return then(new HandlerTry<O, R>(handler, logger.getLog(), logger.getLogLevel()));
   }
 
   @NotNull
   public <R> Promise<R> thenTry(@NotNull final Mapper<O, R> mapper) {
-    return thenTry(new HandlerMap<O, R>(mapper), null);
+    return thenTry(new HandlerMap<O, R>(mapper));
+  }
+
+  @NotNull
+  public <R> Promise<R> thenTryTrusted(@NotNull final Mapper<O, Chainable<? extends R>> mapper) {
+    return thenTry(new HandlerMapTrusted<O, R>(mapper));
   }
 
   public void waitResolved() {
@@ -416,17 +414,17 @@ class DefaultPromise<O> implements Promise<O> {
 
   @NotNull
   public Promise<O> whenFulfilled(@NotNull final Observer<O> observer) {
-    return then(new HandlerFulfilled<O>(observer), null);
+    return then(new HandlerFulfilled<O>(observer));
   }
 
   @NotNull
   public Promise<O> whenRejected(@NotNull final Observer<Throwable> observer) {
-    return then(null, new HandlerRejected<O>(observer));
+    return then(new HandlerRejected<O>(observer));
   }
 
   @NotNull
   public Promise<O> whenResolved(@NotNull final Action action) {
-    return then(new HandlerResolvedFulfill<O>(action), new HandlerResolvedReject<O>(action));
+    return then(new HandlerResolved<O>(action));
   }
 
   public boolean isFulfilled() {
@@ -437,13 +435,12 @@ class DefaultPromise<O> implements Promise<O> {
 
   @NotNull
   private <R> Promise<R> chain(@NotNull final PromiseChain<O, R> chain) {
-    return chain(chain, mFulfillExecutor, mRejectExecutor);
+    return chain(chain, mExecutor);
   }
 
   @NotNull
   private <R> Promise<R> chain(@NotNull final PromiseChain<O, R> chain,
-      @NotNull final ScheduledExecutor fulfillExecutor,
-      @NotNull final ScheduledExecutor rejectExecutor) {
+      @NotNull final ScheduledExecutor executor) {
     final ChainHead<?> head = mHead;
     final Logger logger = mLogger;
     final boolean isBound;
@@ -456,7 +453,7 @@ class DefaultPromise<O> implements Promise<O> {
       } else {
         isBound = false;
         chain.setLogger(logger);
-        binding = head.bind(chain, mFulfillExecutor, mRejectExecutor);
+        binding = head.bind(chain, mExecutor);
         mChain = chain;
         mMutex.notifyAll();
       }
@@ -468,8 +465,7 @@ class DefaultPromise<O> implements Promise<O> {
     }
 
     final DefaultPromise<R> promise =
-        new DefaultPromise<R>(mObserver, fulfillExecutor, rejectExecutor, logger, head, mTail,
-            chain);
+        new DefaultPromise<R>(mObserver, executor, logger, head, mTail, chain);
     if (binding != null) {
       binding.run();
     }
@@ -499,7 +495,7 @@ class DefaultPromise<O> implements Promise<O> {
       newTail = chain;
     }
 
-    return new DefaultPromise<O>(mObserver, mFulfillExecutor, mRejectExecutor, logger, newHead,
+    return new DefaultPromise<O>(mObserver, mExecutor, logger, newHead,
         (PromiseChain<?, O>) newTail);
   }
 
@@ -531,8 +527,7 @@ class DefaultPromise<O> implements Promise<O> {
     }
 
     final Logger logger = mLogger;
-    return new PromiseProxy(mObserver, mFulfillExecutor, mRejectExecutor, logger.getLog(),
-        logger.getLogLevel(), chains);
+    return new PromiseProxy(mObserver, mExecutor, logger.getLog(), logger.getLogLevel(), chains);
   }
 
   private enum PromiseState {
@@ -551,41 +546,33 @@ class DefaultPromise<O> implements Promise<O> {
 
   private static class ChainHandler<O, R> extends PromiseChain<O, R> {
 
-    private final Handler<O, ? super Callback<R>> mFulfill;
-
-    private final Handler<Throwable, ? super Callback<R>> mReject;
+    private final Handler<O, ? super Callback<R>> mHandler;
 
     @SuppressWarnings("unchecked")
-    private ChainHandler(@Nullable final Handler<O, ? super Callback<R>> fulfill,
-        @Nullable final Handler<Throwable, ? super Callback<R>> reject) {
-      mFulfill = (Handler<O, ? super Callback<R>>) ((fulfill != null) ? fulfill
-          : new HandlerFulfill<O, R>());
-      mReject = (Handler<Throwable, ? super Callback<R>>) ((reject != null) ? reject
-          : new HandlerReject<R>());
+    private ChainHandler(@NotNull final Handler<O, ? super Callback<R>> handler) {
+      mHandler = ConstantConditions.notNull("handler", handler);
     }
 
     @NotNull
     PromiseChain<O, R> copy() {
-      return new ChainHandler<O, R>(mFulfill, mReject);
+      return new ChainHandler<O, R>(mHandler);
     }
 
     private Object writeReplace() throws ObjectStreamException {
-      return new ChainProxy<O, R>(mFulfill, mReject);
+      return new ChainProxy<O, R>(mHandler);
     }
 
     private static class ChainProxy<O, R> extends SerializableProxy {
 
-      private ChainProxy(final Handler<O, ? super Callback<R>> fulfill,
-          final Handler<Throwable, ? super Callback<R>> reject) {
-        super(proxy(fulfill), proxy(reject));
+      private ChainProxy(Handler<O, ? super Callback<R>> handler) {
+        super(proxy(handler));
       }
 
       @SuppressWarnings("unchecked")
       Object readResolve() throws ObjectStreamException {
         try {
           final Object[] args = deserializeArgs();
-          return new ChainHandler<O, R>((Handler<O, ? super Callback<R>>) args[0],
-              (Handler<Throwable, ? super Callback<R>>) args[1]);
+          return new ChainHandler<O, R>((Handler<O, ? super Callback<R>>) args[0]);
 
         } catch (final Throwable t) {
           throw new InvalidObjectException(t.getMessage());
@@ -597,7 +584,7 @@ class DefaultPromise<O> implements Promise<O> {
     void reject(final PromiseChain<R, ?> next, final Throwable reason) {
       try {
         getLogger().dbg("Processing rejection with reason: %s", reason);
-        mReject.accept(reason, next);
+        mHandler.reject(reason, next);
 
       } catch (final CancellationException e) {
         getLogger().wrn(e, "Promise has been cancelled");
@@ -614,7 +601,7 @@ class DefaultPromise<O> implements Promise<O> {
     void resolve(final PromiseChain<R, ?> next, final O input) {
       try {
         getLogger().dbg("Processing fulfillment: %s", input);
-        mFulfill.accept(input, next);
+        mHandler.fulfill(input, next);
 
       } catch (final CancellationException e) {
         getLogger().wrn(e, "Promise has been cancelled");
@@ -642,9 +629,8 @@ class DefaultPromise<O> implements Promise<O> {
 
     @Nullable
     Runnable bind(@NotNull final PromiseChain<?, ?> chain,
-        @NotNull final ScheduledExecutor fulfillExecutor,
-        @NotNull final ScheduledExecutor rejectExecutor) {
-      final Runnable binding = mInnerState.bind(chain, fulfillExecutor, rejectExecutor);
+        @NotNull final ScheduledExecutor executor) {
+      final Runnable binding = mInnerState.bind(chain, executor);
       mState = PromiseState.Pending;
       return binding;
     }
@@ -683,8 +669,7 @@ class DefaultPromise<O> implements Promise<O> {
       @Nullable
       @Override
       Runnable bind(@NotNull final PromiseChain<?, ?> chain,
-          @NotNull final ScheduledExecutor fulfillExecutor,
-          @NotNull final ScheduledExecutor rejectExecutor) {
+          @NotNull final ScheduledExecutor executor) {
         getLogger().dbg("Binding promise [%s => %s]", PromiseState.Fulfilled, PromiseState.Pending);
         final Object output = mOutput;
         mOutput = null;
@@ -692,7 +677,7 @@ class DefaultPromise<O> implements Promise<O> {
         return new Runnable() {
 
           public void run() {
-            fulfillExecutor.execute(new Runnable() {
+            executor.execute(new Runnable() {
 
               @SuppressWarnings("unchecked")
               public void run() {
@@ -723,8 +708,7 @@ class DefaultPromise<O> implements Promise<O> {
 
       @Nullable
       Runnable bind(@NotNull final PromiseChain<?, ?> chain,
-          @NotNull final ScheduledExecutor fulfillExecutor,
-          @NotNull final ScheduledExecutor rejectExecutor) {
+          @NotNull final ScheduledExecutor executor) {
         return null;
       }
 
@@ -762,8 +746,7 @@ class DefaultPromise<O> implements Promise<O> {
       @Nullable
       @Override
       Runnable bind(@NotNull final PromiseChain<?, ?> chain,
-          @NotNull final ScheduledExecutor fulfillExecutor,
-          @NotNull final ScheduledExecutor rejectExecutor) {
+          @NotNull final ScheduledExecutor executor) {
         getLogger().dbg("Binding promise [%s => %s]", PromiseState.Rejected, PromiseState.Pending);
         final Throwable exception = mException;
         mException = null;
@@ -771,7 +754,7 @@ class DefaultPromise<O> implements Promise<O> {
         return new Runnable() {
 
           public void run() {
-            rejectExecutor.execute(new Runnable() {
+            executor.execute(new Runnable() {
 
               public void run() {
                 chain.reject(exception);
@@ -814,7 +797,7 @@ class DefaultPromise<O> implements Promise<O> {
     }
   }
 
-  private static class HandlerCatch<O> implements Handler<Throwable, Callback<O>>, Serializable {
+  private static class HandlerCatch<O> implements Handler<O, Callback<O>>, Serializable {
 
     private final Mapper<Throwable, O> mMapper;
 
@@ -822,8 +805,8 @@ class DefaultPromise<O> implements Promise<O> {
       mMapper = ConstantConditions.notNull("mapper", mapper);
     }
 
-    public void accept(final Throwable reason, final Callback<O> callback) throws Exception {
-      callback.resolve(mMapper.apply(reason));
+    public void fulfill(final O input, @NotNull final Callback<O> callback) {
+      callback.resolve(input);
     }
 
     private Object writeReplace() throws ObjectStreamException {
@@ -848,10 +831,13 @@ class DefaultPromise<O> implements Promise<O> {
       }
     }
 
+    public void reject(final Throwable reason, @NotNull final Callback<O> callback) throws
+        Exception {
+      callback.resolve(mMapper.apply(reason));
+    }
   }
 
-  private static class HandlerCatchFiltered<O>
-      implements Handler<Throwable, Callback<O>>, Serializable {
+  private static class HandlerCatchFiltered<O> implements Handler<O, Callback<O>>, Serializable {
 
     private final Iterable<Class<? extends Throwable>> mErrors;
 
@@ -887,7 +873,12 @@ class DefaultPromise<O> implements Promise<O> {
       }
     }
 
-    public void accept(final Throwable reason, final Callback<O> callback) throws Exception {
+    public void fulfill(final O input, @NotNull final Callback<O> callback) {
+      callback.resolve(input);
+    }
+
+    public void reject(final Throwable reason, @NotNull final Callback<O> callback) throws
+        Exception {
       for (final Class<? extends Throwable> error : mErrors) {
         if (error.isInstance(reason)) {
           callback.resolve(mMapper.apply(reason));
@@ -899,11 +890,99 @@ class DefaultPromise<O> implements Promise<O> {
     }
   }
 
-  private static class HandlerFulfill<O, R> implements Handler<O, Callback<R>>, Serializable {
+  private static class HandlerCatchFilteredTrusted<O>
+      implements Handler<O, Callback<O>>, Serializable {
+
+    private final Iterable<Class<? extends Throwable>> mErrors;
+
+    private final Mapper<Throwable, Chainable<? extends O>> mMapper;
+
+    private HandlerCatchFilteredTrusted(@NotNull final Iterable<Class<? extends Throwable>> errors,
+        @NotNull final Mapper<Throwable, Chainable<? extends O>> mapper) {
+      mErrors = ConstantConditions.notNull("errors", errors);
+      mMapper = ConstantConditions.notNull("mapper", mapper);
+    }
+
+    private Object writeReplace() throws ObjectStreamException {
+      return new HandlerProxy<O>(mErrors, mMapper);
+    }
+
+    private static class HandlerProxy<O> extends SerializableProxy {
+
+      private HandlerProxy(final Iterable<Class<? extends Throwable>> errors,
+          final Mapper<Throwable, Chainable<? extends O>> mapper) {
+        super(errors, proxy(mapper));
+      }
+
+      @SuppressWarnings("unchecked")
+      Object readResolve() throws ObjectStreamException {
+        try {
+          final Object[] args = deserializeArgs();
+          return new HandlerCatchFilteredTrusted<O>((Iterable<Class<? extends Throwable>>) args[0],
+              (Mapper<Throwable, Chainable<? extends O>>) args[1]);
+
+        } catch (final Throwable t) {
+          throw new InvalidObjectException(t.getMessage());
+        }
+      }
+    }
+
+    public void fulfill(final O input, @NotNull final Callback<O> callback) {
+      callback.resolve(input);
+    }
 
     @SuppressWarnings("unchecked")
-    public void accept(final O input, @NotNull final Callback<R> callback) {
-      callback.resolve((R) input);
+    public void reject(final Throwable reason, @NotNull final Callback<O> callback) throws
+        Exception {
+      for (final Class<? extends Throwable> error : mErrors) {
+        if (error.isInstance(reason)) {
+          callback.defer((Chainable<O>) mMapper.apply(reason));
+          return;
+        }
+      }
+
+      callback.reject(reason);
+    }
+  }
+
+  private static class HandlerCatchTrusted<O> implements Handler<O, Callback<O>>, Serializable {
+
+    private final Mapper<Throwable, Chainable<? extends O>> mMapper;
+
+    private HandlerCatchTrusted(@NotNull final Mapper<Throwable, Chainable<? extends O>> mapper) {
+      mMapper = ConstantConditions.notNull("mapper", mapper);
+    }
+
+    private Object writeReplace() throws ObjectStreamException {
+      return new HandlerProxy<O>(mMapper);
+    }
+
+    private static class HandlerProxy<O> extends SerializableProxy {
+
+      private HandlerProxy(final Mapper<Throwable, Chainable<? extends O>> mapper) {
+        super(proxy(mapper));
+      }
+
+      @SuppressWarnings("unchecked")
+      Object readResolve() throws ObjectStreamException {
+        try {
+          final Object[] args = deserializeArgs();
+          return new HandlerCatchTrusted<O>((Mapper<Throwable, Chainable<? extends O>>) args[0]);
+
+        } catch (final Throwable t) {
+          throw new InvalidObjectException(t.getMessage());
+        }
+      }
+    }
+
+    public void fulfill(final O input, @NotNull final Callback<O> callback) {
+      callback.resolve(input);
+    }
+
+    @SuppressWarnings("unchecked")
+    public void reject(final Throwable reason, @NotNull final Callback<O> callback) throws
+        Exception {
+      callback.defer((Chainable<O>) mMapper.apply(reason));
     }
   }
 
@@ -937,24 +1016,25 @@ class DefaultPromise<O> implements Promise<O> {
       }
     }
 
-    public void accept(final O input, final Callback<O> callback) throws Exception {
+    public void fulfill(final O input, @NotNull final Callback<O> callback) throws Exception {
       mObserver.accept(input);
       callback.resolve(input);
     }
-  }
 
-  private static class HandlerInspectFulfill<O>
-      implements Handler<O, Callback<PromiseInspection<O>>>, Serializable {
-
-    public void accept(final O input, final Callback<PromiseInspection<O>> callback) {
-      callback.resolve(new PromiseInspectionFulfilled<O>(input));
+    public void reject(final Throwable reason, @NotNull final Callback<O> callback) {
+      callback.reject(reason);
     }
   }
 
-  private static class HandlerInspectReject<O>
-      implements Handler<Throwable, Callback<PromiseInspection<O>>>, Serializable {
+  private static class HandlerInspect<O>
+      implements Handler<O, Callback<PromiseInspection<O>>>, Serializable {
 
-    public void accept(final Throwable reason, final Callback<PromiseInspection<O>> callback) {
+    public void fulfill(final O input, @NotNull final Callback<PromiseInspection<O>> callback) {
+      callback.resolve(new PromiseInspectionFulfilled<O>(input));
+    }
+
+    public void reject(final Throwable reason,
+        @NotNull final Callback<PromiseInspection<O>> callback) {
       callback.resolve(new PromiseInspectionRejected<O>(reason));
     }
   }
@@ -989,19 +1069,56 @@ class DefaultPromise<O> implements Promise<O> {
       }
     }
 
-    public void accept(final O input, final Callback<R> callback) throws Exception {
+    public void fulfill(final O input, @NotNull final Callback<R> callback) throws Exception {
       callback.resolve(mMapper.apply(input));
     }
-  }
 
-  private static class HandlerReject<R> implements Handler<Throwable, Callback<R>>, Serializable {
-
-    public void accept(final Throwable input, @NotNull final Callback<R> callback) {
-      callback.reject(input);
+    public void reject(final Throwable reason, @NotNull final Callback<R> callback) {
+      callback.reject(reason);
     }
   }
 
-  private static class HandlerRejected<O> implements Handler<Throwable, Callback<O>>, Serializable {
+  private static class HandlerMapTrusted<O, R> implements Handler<O, Callback<R>>, Serializable {
+
+    private final Mapper<O, Chainable<? extends R>> mMapper;
+
+    private HandlerMapTrusted(@NotNull final Mapper<O, Chainable<? extends R>> mapper) {
+      mMapper = ConstantConditions.notNull("mapper", mapper);
+    }
+
+    private Object writeReplace() throws ObjectStreamException {
+      return new HandlerProxy<O, R>(mMapper);
+    }
+
+    private static class HandlerProxy<O, R> extends SerializableProxy {
+
+      private HandlerProxy(final Mapper<O, Chainable<? extends R>> mapper) {
+        super(proxy(mapper));
+      }
+
+      @SuppressWarnings("unchecked")
+      Object readResolve() throws ObjectStreamException {
+        try {
+          final Object[] args = deserializeArgs();
+          return new HandlerMapTrusted<O, R>((Mapper<O, Chainable<? extends R>>) args[0]);
+
+        } catch (final Throwable t) {
+          throw new InvalidObjectException(t.getMessage());
+        }
+      }
+    }
+
+    @SuppressWarnings("unchecked")
+    public void fulfill(final O input, @NotNull final Callback<R> callback) throws Exception {
+      callback.defer((Chainable<R>) mMapper.apply(input));
+    }
+
+    public void reject(final Throwable reason, @NotNull final Callback<R> callback) {
+      callback.reject(reason);
+    }
+  }
+
+  private static class HandlerRejected<O> implements Handler<O, Callback<O>>, Serializable {
 
     private final Observer<Throwable> mObserver;
 
@@ -1031,17 +1148,22 @@ class DefaultPromise<O> implements Promise<O> {
       }
     }
 
-    public void accept(final Throwable reason, final Callback<O> callback) throws Exception {
+    public void fulfill(final O input, @NotNull final Callback<O> callback) {
+      callback.resolve(input);
+    }
+
+    public void reject(final Throwable reason, @NotNull final Callback<O> callback) throws
+        Exception {
       mObserver.accept(reason);
       callback.reject(reason);
     }
   }
 
-  private static class HandlerResolvedFulfill<O> implements Handler<O, Callback<O>>, Serializable {
+  private static class HandlerResolved<O> implements Handler<O, Callback<O>>, Serializable {
 
     private final Action mAction;
 
-    private HandlerResolvedFulfill(@NotNull final Action action) {
+    private HandlerResolved(@NotNull final Action action) {
       mAction = ConstantConditions.notNull("action", action);
     }
 
@@ -1059,7 +1181,7 @@ class DefaultPromise<O> implements Promise<O> {
       Object readResolve() throws ObjectStreamException {
         try {
           final Object[] args = deserializeArgs();
-          return new HandlerResolvedFulfill<O>((Action) args[0]);
+          return new HandlerResolved<O>((Action) args[0]);
 
         } catch (final Throwable t) {
           throw new InvalidObjectException(t.getMessage());
@@ -1067,46 +1189,52 @@ class DefaultPromise<O> implements Promise<O> {
       }
     }
 
-    public void accept(final O input, final Callback<O> callback) throws Exception {
+    public void fulfill(final O input, @NotNull final Callback<O> callback) throws Exception {
       mAction.perform();
       callback.resolve(input);
     }
-  }
 
-  private static class HandlerResolvedReject<O>
-      implements Handler<Throwable, Callback<O>>, Serializable {
-
-    private final Action mAction;
-
-    private HandlerResolvedReject(@NotNull final Action action) {
-      mAction = ConstantConditions.notNull("action", action);
-    }
-
-    private Object writeReplace() throws ObjectStreamException {
-      return new HandlerProxy<O>(mAction);
-    }
-
-    private static class HandlerProxy<O> extends SerializableProxy {
-
-      private HandlerProxy(final Action action) {
-        super(proxy(action));
-      }
-
-      @SuppressWarnings("unchecked")
-      Object readResolve() throws ObjectStreamException {
-        try {
-          final Object[] args = deserializeArgs();
-          return new HandlerResolvedReject<O>((Action) args[0]);
-
-        } catch (final Throwable t) {
-          throw new InvalidObjectException(t.getMessage());
-        }
-      }
-    }
-
-    public void accept(final Throwable reason, final Callback<O> callback) throws Exception {
+    public void reject(final Throwable reason, @NotNull final Callback<O> callback) throws
+        Exception {
       mAction.perform();
       callback.reject(reason);
+    }
+  }
+
+  private static class HandlerSchedule<I> implements Handler<I, Callback<I>>, Serializable {
+
+    private final ScheduledExecutor mExecutor;
+
+    private HandlerSchedule(@NotNull final ScheduledExecutor executor) {
+      mExecutor = ConstantConditions.notNull("executor", executor);
+    }
+
+    public void fulfill(final I input, @NotNull final Callback<I> callback) {
+      mExecutor.execute(new Runnable() {
+
+        public void run() {
+          try {
+            callback.resolve(input);
+
+          } catch (final Throwable t) {
+            InterruptedExecutionException.throwIfInterrupt(t);
+          }
+        }
+      });
+    }
+
+    public void reject(final Throwable reason, @NotNull final Callback<I> callback) {
+      if (reason instanceof CancellationException) {
+        callback.reject(reason);
+
+      } else {
+        mExecutor.execute(new Runnable() {
+
+          public void run() {
+            callback.reject(reason);
+          }
+        });
+      }
     }
   }
 
@@ -1148,9 +1276,9 @@ class DefaultPromise<O> implements Promise<O> {
       }
     }
 
-    public void accept(final O input, final Callback<R> callback) throws Exception {
+    public void fulfill(final O input, @NotNull final Callback<R> callback) throws Exception {
       try {
-        mHandler.accept(input, new Callback<R>() {
+        mHandler.fulfill(input, new Callback<R>() {
 
           public void defer(@NotNull final Chainable<R> chainable) {
             close(input, mLogger);
@@ -1170,6 +1298,17 @@ class DefaultPromise<O> implements Promise<O> {
 
       } catch (final Throwable t) {
         safeClose(input, mLogger);
+        InterruptedExecutionException.throwIfInterrupt(t);
+        throw RejectionException.wrapIfNotException(t);
+      }
+    }
+
+    public void reject(final Throwable reason, @NotNull final Callback<R> callback) throws
+        Exception {
+      try {
+        mHandler.reject(reason, callback);
+
+      } catch (final Throwable t) {
         InterruptedExecutionException.throwIfInterrupt(t);
         throw RejectionException.wrapIfNotException(t);
       }
@@ -1269,13 +1408,12 @@ class DefaultPromise<O> implements Promise<O> {
       mInnerState.resolve();
       chainable.then(new Handler<I, Callback<Void>>() {
 
-        public void accept(final I input, final Callback<Void> callback) {
+        public void fulfill(final I input, @NotNull final Callback<Void> callback) {
           resolve(mNext, input);
         }
-      }, new Handler<Throwable, Callback<Void>>() {
 
-        public void accept(final Throwable reason, final Callback<Void> callback) {
-          reject(mNext, reason);
+        public void reject(final Throwable reason, @NotNull final Callback<Void> callback) {
+          PromiseChain.this.reject(mNext, reason);
         }
       });
     }
@@ -1361,9 +1499,9 @@ class DefaultPromise<O> implements Promise<O> {
   private static class PromiseProxy extends SerializableProxy {
 
     private PromiseProxy(final Observer<? extends Callback<?>> observer,
-        final ScheduledExecutor fulfillExecutor, final ScheduledExecutor rejectExecutor,
-        final Log log, final Level logLevel, final List<PromiseChain<?, ?>> chains) {
-      super(proxy(observer), fulfillExecutor, rejectExecutor, log, logLevel, chains);
+        final ScheduledExecutor executor, final Log log, final Level logLevel,
+        final List<PromiseChain<?, ?>> chains) {
+      super(proxy(observer), executor, log, logLevel, chains);
     }
 
     @SuppressWarnings("unchecked")
@@ -1372,59 +1510,18 @@ class DefaultPromise<O> implements Promise<O> {
         final Object[] args = deserializeArgs();
         final ChainHead<Object> head = new ChainHead<Object>();
         PromiseChain<?, ?> tail = head;
-        for (final PromiseChain<?, ?> chain : (List<PromiseChain<?, ?>>) args[5]) {
+        for (final PromiseChain<?, ?> chain : (List<PromiseChain<?, ?>>) args[4]) {
           ((PromiseChain<?, Object>) tail).setNext((PromiseChain<Object, ?>) chain);
           tail = chain;
         }
 
         return new DefaultPromise<Object>((Observer<Callback<?>>) args[0],
-            (ScheduledExecutor) args[1], (ScheduledExecutor) args[2], (Log) args[3],
-            (Level) args[4], head, (PromiseChain<?, Object>) tail);
+            (ScheduledExecutor) args[1], (Log) args[2], (Level) args[3], head,
+            (PromiseChain<?, Object>) tail);
 
       } catch (final Throwable t) {
         throw new InvalidObjectException(t.getMessage());
       }
-    }
-  }
-
-  private static class ScheduleFulfill<I> implements Handler<I, Callback<I>>, Serializable {
-
-    private final ScheduledExecutor mExecutor;
-
-    private ScheduleFulfill(@NotNull final ScheduledExecutor executor) {
-      mExecutor = executor;
-    }
-
-    public void accept(final I input, final Callback<I> callback) throws Exception {
-      mExecutor.execute(new Runnable() {
-
-        public void run() {
-          try {
-            callback.resolve(input);
-
-          } catch (final Throwable t) {
-            InterruptedExecutionException.throwIfInterrupt(t);
-          }
-        }
-      });
-    }
-  }
-
-  private static class ScheduleReject<I> implements Handler<Throwable, Callback<I>>, Serializable {
-
-    private final ScheduledExecutor mExecutor;
-
-    private ScheduleReject(@NotNull final ScheduledExecutor executor) {
-      mExecutor = executor;
-    }
-
-    public void accept(final Throwable input, final Callback<I> callback) throws Exception {
-      mExecutor.execute(new Runnable() {
-
-        public void run() {
-          callback.reject(input);
-        }
-      });
     }
   }
 

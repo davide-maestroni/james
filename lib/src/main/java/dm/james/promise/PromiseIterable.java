@@ -17,7 +17,6 @@
 package dm.james.promise;
 
 import org.jetbrains.annotations.NotNull;
-import org.jetbrains.annotations.Nullable;
 
 import java.io.Closeable;
 import java.util.Iterator;
@@ -34,56 +33,35 @@ public interface PromiseIterable<O>
     extends Promise<Iterable<O>>, ChainableIterable<O>, Iterable<O> {
 
   @NotNull
-  <R> PromiseIterable<R> all(@Nullable Handler<Iterable<O>, ? super CallbackIterable<R>> fulfill,
-      @Nullable Handler<Throwable, ? super CallbackIterable<R>> reject);
+  <R> PromiseIterable<R> all(@NotNull Handler<Iterable<O>, ? super CallbackIterable<R>> handler);
 
   @NotNull
   <R> PromiseIterable<R> all(@NotNull Mapper<Iterable<O>, Iterable<R>> mapper);
 
   @NotNull
   <R> PromiseIterable<R> allSorted(
-      @Nullable Handler<Iterable<O>, ? super CallbackIterable<R>> fulfill,
-      @Nullable Handler<Throwable, ? super CallbackIterable<R>> reject);
+      @NotNull Handler<Iterable<O>, ? super CallbackIterable<R>> handler);
 
   @NotNull
-  <R> PromiseIterable<R> allTry(@Nullable Handler<Iterable<O>, ? super CallbackIterable<R>> fulfill,
-      @Nullable Handler<Throwable, ? super CallbackIterable<R>> reject);
+  <R> PromiseIterable<R> allTrusted(
+      @NotNull Mapper<Iterable<O>, Chainable<? extends Iterable<R>>> mapper);
+
+  @NotNull
+  <R> PromiseIterable<R> allTry(@NotNull Handler<Iterable<O>, ? super CallbackIterable<R>> handler);
 
   @NotNull
   <R> PromiseIterable<R> allTry(@NotNull Mapper<Iterable<O>, Iterable<R>> mapper);
 
   @NotNull
   <R> PromiseIterable<R> allTrySorted(
-      @Nullable Handler<Iterable<O>, ? super CallbackIterable<R>> fulfill,
-      @Nullable Handler<Throwable, ? super CallbackIterable<R>> reject);
+      @NotNull Handler<Iterable<O>, ? super CallbackIterable<R>> handler);
 
   @NotNull
-  <R> PromiseIterable<R> any(@Nullable Handler<O, ? super CallbackIterable<R>> fulfill,
-      @Nullable Handler<Throwable, ? super CallbackIterable<R>> reject);
-
-  @NotNull
-  <R> PromiseIterable<R> any(@NotNull Mapper<O, R> mapper);
-
-  @NotNull
-  <R> PromiseIterable<R> anySorted(@Nullable Handler<O, ? super CallbackIterable<R>> fulfill,
-      @Nullable Handler<Throwable, ? super CallbackIterable<R>> reject);
-
-  @NotNull
-  <R> PromiseIterable<R> anyTry(@Nullable Handler<O, ? super CallbackIterable<R>> fulfill,
-      @Nullable Handler<Throwable, ? super CallbackIterable<R>> reject);
-
-  @NotNull
-  <R> PromiseIterable<R> anyTry(@NotNull Mapper<O, R> mapper);
-
-  @NotNull
-  <R> PromiseIterable<R> anyTrySorted(@Nullable Handler<O, ? super CallbackIterable<R>> fulfill,
-      @Nullable Handler<Throwable, ? super CallbackIterable<R>> reject);
+  <R> PromiseIterable<R> allTryTrusted(
+      @NotNull Mapper<Iterable<O>, Chainable<? extends Iterable<R>>> mapper);
 
   @NotNull
   <R> PromiseIterable<R> applyAll(@NotNull Mapper<PromiseIterable<O>, PromiseIterable<R>> mapper);
-
-  @NotNull
-  <R> PromiseIterable<R> applyAny(@NotNull Mapper<Promise<O>, Promise<R>> mapper);
 
   @NotNull
   <R> PromiseIterable<R> applyEach(@NotNull Mapper<Promise<O>, Promise<R>> mapper);
@@ -103,11 +81,18 @@ public interface PromiseIterable<O>
   PromiseIterable<O> catchAll(@NotNull Mapper<Throwable, Iterable<O>> mapper);
 
   @NotNull
+  PromiseIterable<O> catchAllTrusted(@NotNull Iterable<Class<? extends Throwable>> errors,
+      @NotNull Mapper<Throwable, Chainable<? extends Iterable<O>>> mapper);
+
+  @NotNull
+  PromiseIterable<O> catchAllTrusted(
+      @NotNull Mapper<Throwable, Chainable<? extends Iterable<O>>> mapper);
+
+  @NotNull
   Promise<PromiseInspection<Iterable<O>>> inspect();
 
   @NotNull
-  PromiseIterable<O> scheduleAll(@Nullable ScheduledExecutor fulfillExecutor,
-      @Nullable ScheduledExecutor rejectExecutor);
+  PromiseIterable<O> scheduleAll(@NotNull ScheduledExecutor executor);
 
   @NotNull
   PromiseIterable<O> whenFulfilled(@NotNull Observer<Iterable<O>> observer);
@@ -119,13 +104,6 @@ public interface PromiseIterable<O>
   PromiseIterable<O> whenResolved(@NotNull Action action);
 
   @NotNull
-  PromiseIterable<O> catchAny(@NotNull Iterable<Class<? extends Throwable>> errors,
-      @NotNull Mapper<Throwable, O> mapper);
-
-  @NotNull
-  PromiseIterable<O> catchAny(@NotNull Mapper<Throwable, O> mapper);
-
-  @NotNull
   PromiseIterable<O> catchEach(@NotNull Iterable<Class<? extends Throwable>> errors,
       @NotNull Mapper<Throwable, O> mapper);
 
@@ -133,8 +111,14 @@ public interface PromiseIterable<O>
   PromiseIterable<O> catchEach(@NotNull Mapper<Throwable, O> mapper);
 
   @NotNull
-  <R> PromiseIterable<R> each(@Nullable Handler<O, ? super CallbackIterable<R>> fulfill,
-      @Nullable Handler<Throwable, ? super CallbackIterable<R>> reject);
+  PromiseIterable<O> catchEachTrusted(@NotNull Iterable<Class<? extends Throwable>> errors,
+      @NotNull Mapper<Throwable, Chainable<? extends O>> mapper);
+
+  @NotNull
+  PromiseIterable<O> catchEachTrusted(@NotNull Mapper<Throwable, Chainable<? extends O>> mapper);
+
+  @NotNull
+  <R> PromiseIterable<R> each(@NotNull Handler<O, ? super CallbackIterable<R>> handler);
 
   @NotNull
   <R> PromiseIterable<R> each(int minBatchSize, @NotNull Mapper<O, R> mapper);
@@ -146,12 +130,13 @@ public interface PromiseIterable<O>
   <R> PromiseIterable<R> each(@NotNull Mapper<O, R> mapper, int maxBatchSize);
 
   @NotNull
-  <R> PromiseIterable<R> eachSorted(@Nullable Handler<O, ? super CallbackIterable<R>> fulfill,
-      @Nullable Handler<Throwable, ? super CallbackIterable<R>> reject);
+  <R> PromiseIterable<R> eachSorted(@NotNull Handler<O, ? super CallbackIterable<R>> handler);
 
   @NotNull
-  <R> PromiseIterable<R> eachTry(@Nullable Handler<O, ? super CallbackIterable<R>> fulfill,
-      @Nullable Handler<Throwable, ? super CallbackIterable<R>> reject);
+  <R> PromiseIterable<R> eachTrusted(@NotNull Mapper<O, Chainable<? extends R>> mapper);
+
+  @NotNull
+  <R> PromiseIterable<R> eachTry(@NotNull Handler<O, ? super CallbackIterable<R>> handler);
 
   @NotNull
   <R> PromiseIterable<R> eachTry(int minBatchSize, @NotNull Mapper<O, R> mapper);
@@ -163,8 +148,10 @@ public interface PromiseIterable<O>
   <R> PromiseIterable<R> eachTry(@NotNull Mapper<O, R> mapper, int maxBatchSize);
 
   @NotNull
-  <R> PromiseIterable<R> eachTrySorted(@Nullable Handler<O, ? super CallbackIterable<R>> fulfill,
-      @Nullable Handler<Throwable, ? super CallbackIterable<R>> reject);
+  <R> PromiseIterable<R> eachTrySorted(@NotNull Handler<O, ? super CallbackIterable<R>> handler);
+
+  @NotNull
+  <R> PromiseIterable<R> eachTryTrusted(@NotNull Mapper<O, Chainable<? extends R>> mapper);
 
   @NotNull
   List<O> get(int maxSize);
@@ -186,9 +173,6 @@ public interface PromiseIterable<O>
 
   @NotNull
   PromiseIterable<PromiseInspection<O>> inspectAll();
-
-  @NotNull
-  PromiseIterable<PromiseInspection<O>> inspectAny();
 
   @NotNull
   PromiseIterable<PromiseInspection<O>> inspectEach();
@@ -217,42 +201,16 @@ public interface PromiseIterable<O>
   O removeOr(O other, long timeout, @NotNull TimeUnit timeUnit);
 
   @NotNull
-  PromiseIterable<O> scheduleAny(@Nullable ScheduledExecutor fulfillExecutor,
-      @Nullable ScheduledExecutor rejectExecutor);
+  PromiseIterable<O> scheduleEach(@NotNull ScheduledExecutor executor);
 
   @NotNull
-  PromiseIterable<O> scheduleEach(@Nullable ScheduledExecutor fulfillExecutor,
-      @Nullable ScheduledExecutor rejectExecutor);
-
-  @NotNull
-  PromiseIterable<O> scheduleEachSorted(@Nullable ScheduledExecutor fulfillExecutor,
-      @Nullable ScheduledExecutor rejectExecutor);
-
-  @NotNull
-  <R> PromiseIterable<R> then(@Nullable Handler<O, ? super CallbackIterable<R>> fulfill,
-      @Nullable Handler<Throwable, ? super CallbackIterable<R>> reject,
-      @Nullable Observer<? super CallbackIterable<R>> resolve);
+  PromiseIterable<O> scheduleEachSorted(@NotNull ScheduledExecutor executor);
 
   @NotNull
   <R, S> PromiseIterable<R> then(@NotNull StatefulHandler<O, R, S> handler);
 
   @NotNull
-  <R> PromiseIterable<R> thenSorted(@Nullable Handler<O, ? super CallbackIterable<R>> fulfill,
-      @Nullable Handler<Throwable, ? super CallbackIterable<R>> reject,
-      @Nullable Observer<? super CallbackIterable<R>> resolve);
-
-  @NotNull
   <R, S> PromiseIterable<R> thenSorted(@NotNull StatefulHandler<O, R, S> handler);
-
-  @NotNull
-  <R> PromiseIterable<R> thenTry(@Nullable Handler<O, ? super CallbackIterable<R>> fulfill,
-      @Nullable Handler<Throwable, ? super CallbackIterable<R>> reject,
-      @Nullable Observer<? super CallbackIterable<R>> resolve);
-
-  @NotNull
-  <R> PromiseIterable<R> thenTrySorted(@Nullable Handler<O, ? super CallbackIterable<R>> fulfill,
-      @Nullable Handler<Throwable, ? super CallbackIterable<R>> reject,
-      @Nullable Observer<? super CallbackIterable<R>> resolve);
 
   @NotNull
   <R, S extends Closeable> PromiseIterable<R> thenTryState(
@@ -267,25 +225,8 @@ public interface PromiseIterable<O>
   boolean waitSettled(long timeout, @NotNull TimeUnit timeUnit);
 
   @NotNull
-  PromiseIterable<O> whenFulfilledAny(@NotNull Observer<O> observer);
-
-  @NotNull
   PromiseIterable<O> whenFulfilledEach(@NotNull Observer<O> observer);
 
   @NotNull
-  PromiseIterable<O> whenRejectedAny(@NotNull Observer<Throwable> observer);
-
-  @NotNull
   PromiseIterable<O> whenRejectedEach(@NotNull Observer<Throwable> observer);
-
-  interface StatefulHandler<I, O, S> {
-
-    S create(@NotNull CallbackIterable<O> callback) throws Exception;
-
-    S fulfill(S state, I input, @NotNull CallbackIterable<O> callback) throws Exception;
-
-    S reject(S state, Throwable reason, @NotNull CallbackIterable<O> callback) throws Exception;
-
-    void resolve(S state, @NotNull CallbackIterable<O> callback) throws Exception;
-  }
 }

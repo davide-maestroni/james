@@ -44,7 +44,7 @@ class BoundPromise<I, O> extends PromiseWrapper<O> implements Serializable {
       @NotNull final DeferredPromise<I, O> deferred) {
     final BoundPromise<I, O> boundPromise =
         new BoundPromise<I, O>(ConstantConditions.notNull("promise", promise), deferred);
-    promise.then(new DeferredHandlerFulfill<I>(deferred), new DeferredHandlerReject<I>(deferred));
+    promise.then(new DeferredHandler<I>(deferred));
     return boundPromise;
   }
 
@@ -53,8 +53,7 @@ class BoundPromise<I, O> extends PromiseWrapper<O> implements Serializable {
       @NotNull final DeferredPromise<Iterable<I>, O> deferred) {
     final BoundPromise<Iterable<I>, O> boundPromise =
         new BoundPromise<Iterable<I>, O>(ConstantConditions.notNull("promise", promise), deferred);
-    promise.all(new DeferredHandlerFulfill<Iterable<I>>(deferred),
-        new DeferredHandlerReject<Iterable<I>>(deferred));
+    promise.all(new DeferredHandler<Iterable<I>>(deferred));
     return boundPromise;
   }
 
@@ -74,29 +73,19 @@ class BoundPromise<I, O> extends PromiseWrapper<O> implements Serializable {
     return new PromiseProxy<I, O>(mPromise, (DeferredPromise<I, O>) wrapped());
   }
 
-  private static class DeferredHandlerFulfill<O> implements Handler<O, Callback<O>>, Serializable {
+  private static class DeferredHandler<O> implements Handler<O, Callback<O>>, Serializable {
 
     private final DeferredPromise<O, ?> mDeferred;
 
-    private DeferredHandlerFulfill(@NotNull final DeferredPromise<O, ?> deferred) {
+    private DeferredHandler(@NotNull final DeferredPromise<O, ?> deferred) {
       mDeferred = deferred;
     }
 
-    public void accept(final O input, final Callback<O> callback) {
+    public void fulfill(final O input, @NotNull final Callback<O> callback) {
       mDeferred.resolve(input);
     }
-  }
 
-  private static class DeferredHandlerReject<O>
-      implements Handler<Throwable, Callback<O>>, Serializable {
-
-    private final DeferredPromise<O, ?> mDeferred;
-
-    private DeferredHandlerReject(@NotNull final DeferredPromise<O, ?> deferred) {
-      mDeferred = deferred;
-    }
-
-    public void accept(final Throwable reason, final Callback<O> callback) throws Exception {
+    public void reject(final Throwable reason, @NotNull final Callback<O> callback) {
       mDeferred.reject(reason);
     }
   }

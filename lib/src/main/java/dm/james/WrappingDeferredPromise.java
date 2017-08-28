@@ -65,20 +65,31 @@ class WrappingDeferredPromise<I, O> implements DeferredPromise<I, O>, Serializab
   }
 
   @NotNull
+  public DeferredPromise<I, O> catchAllTrusted(
+      @NotNull final Iterable<Class<? extends Throwable>> errors,
+      @NotNull final Mapper<Throwable, Chainable<? extends O>> mapper) {
+    return newInstance(mPromise.catchAllTrusted(errors, mapper));
+  }
+
+  @NotNull
+  public DeferredPromise<I, O> catchAllTrusted(
+      @NotNull final Mapper<Throwable, Chainable<? extends O>> mapper) {
+    return newInstance(mPromise.catchAllTrusted(mapper));
+  }
+
+  @NotNull
   public DeferredPromise<I, PromiseInspection<O>> inspect() {
     return newInstance(mPromise.inspect());
   }
 
   @NotNull
-  public DeferredPromise<I, O> scheduleAll(@Nullable final ScheduledExecutor fulfillExecutor,
-      @Nullable final ScheduledExecutor rejectExecutor) {
-    return newInstance(mPromise.scheduleAll(fulfillExecutor, rejectExecutor));
+  public DeferredPromise<I, O> scheduleAll(@NotNull final ScheduledExecutor executor) {
+    return newInstance(mPromise.scheduleAll(executor));
   }
 
   @NotNull
-  public <R> DeferredPromise<I, R> then(@Nullable final Handler<O, ? super Callback<R>> fulfill,
-      @Nullable final Handler<Throwable, ? super Callback<R>> reject) {
-    return newInstance(mPromise.then(fulfill, reject));
+  public <R> DeferredPromise<I, R> then(@NotNull final Handler<O, ? super Callback<R>> handler) {
+    return newInstance(mPromise.then(handler));
   }
 
   @NotNull
@@ -87,14 +98,25 @@ class WrappingDeferredPromise<I, O> implements DeferredPromise<I, O>, Serializab
   }
 
   @NotNull
-  public <R> DeferredPromise<I, R> thenTry(@Nullable final Handler<O, ? super Callback<R>> fulfill,
-      @Nullable final Handler<Throwable, ? super Callback<R>> reject) {
-    return newInstance(mPromise.thenTry(fulfill, reject));
+  public <R> DeferredPromise<I, R> thenTrusted(
+      @NotNull final Mapper<O, Chainable<? extends R>> mapper) {
+    return newInstance(mPromise.thenTrusted(mapper));
+  }
+
+  @NotNull
+  public <R> DeferredPromise<I, R> thenTry(@NotNull final Handler<O, ? super Callback<R>> handler) {
+    return newInstance(mPromise.thenTry(handler));
   }
 
   @NotNull
   public <R> DeferredPromise<I, R> thenTry(@NotNull final Mapper<O, R> mapper) {
     return newInstance(mPromise.thenTry(mapper));
+  }
+
+  @NotNull
+  public <R> DeferredPromise<I, R> thenTryTrusted(
+      @NotNull final Mapper<O, Chainable<? extends R>> mapper) {
+    return newInstance(mPromise.thenTryTrusted(mapper));
   }
 
   @NotNull

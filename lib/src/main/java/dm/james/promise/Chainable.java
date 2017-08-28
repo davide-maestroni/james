@@ -17,7 +17,6 @@
 package dm.james.promise;
 
 import org.jetbrains.annotations.NotNull;
-import org.jetbrains.annotations.Nullable;
 
 /**
  * Created by davide-maestroni on 08/21/2017.
@@ -25,8 +24,7 @@ import org.jetbrains.annotations.Nullable;
 public interface Chainable<O> {
 
   @NotNull
-  <R> Chainable<R> then(@Nullable Handler<O, ? super Callback<R>> fulfill,
-      @Nullable Handler<Throwable, ? super Callback<R>> reject);
+  <R> Chainable<R> then(@NotNull Handler<O, ? super Callback<R>> handler);
 
   interface Callback<O> {
 
@@ -39,6 +37,8 @@ public interface Chainable<O> {
 
   interface Handler<I, C> {
 
-    void accept(I input, C callback) throws Exception;
+    void fulfill(I input, @NotNull C callback) throws Exception;
+
+    void reject(Throwable reason, @NotNull C callback) throws Exception;
   }
 }
