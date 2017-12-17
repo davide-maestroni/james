@@ -34,8 +34,13 @@ class MappedPromise<O> extends PromiseWrapper<O> implements Serializable {
 
   MappedPromise(@NotNull final Mapper<Promise<?>, Promise<?>> mapper,
       @NotNull final Promise<O> promise) {
-    super(mapPromise(mapper, promise));
-    mMapper = ConstantConditions.notNull("mapper", mapper);
+    this(ConstantConditions.notNull("mapper", mapper), promise, false);
+  }
+
+  private MappedPromise(@NotNull final Mapper<Promise<?>, Promise<?>> mapper,
+      @NotNull final Promise<O> promise, final boolean renew) {
+    super(renew ? promise : mapPromise(mapper, promise));
+    mMapper = mapper;
   }
 
   @NotNull
@@ -48,6 +53,12 @@ class MappedPromise<O> extends PromiseWrapper<O> implements Serializable {
     } catch (final Exception e) {
       throw RejectionException.wrapIfNotRejectionException(e);
     }
+  }
+
+  @NotNull
+  @Override
+  public Promise<O> renew() {
+    return new MappedPromise<O>(mMapper, wrapped(), true);
   }
 
   @NotNull

@@ -43,36 +43,6 @@ public interface DeferredPromiseIterable<I, O>
   void addRejection(Throwable reason);
 
   @NotNull
-  <R> DeferredPromiseIterable<I, R> all(
-      @NotNull Handler<Iterable<O>, ? super CallbackIterable<R>> handler);
-
-  @NotNull
-  <R> DeferredPromiseIterable<I, R> all(@NotNull Mapper<Iterable<O>, Iterable<R>> mapper);
-
-  @NotNull
-  <R> DeferredPromiseIterable<I, R> allSorted(
-      @NotNull Handler<Iterable<O>, ? super CallbackIterable<R>> handler);
-
-  @NotNull
-  <R> PromiseIterable<R> allTrusted(
-      @NotNull Mapper<Iterable<O>, Chainable<? extends Iterable<R>>> mapper);
-
-  @NotNull
-  <R> DeferredPromiseIterable<I, R> allTry(
-      @NotNull Handler<Iterable<O>, ? super CallbackIterable<R>> handler);
-
-  @NotNull
-  <R> DeferredPromiseIterable<I, R> allTry(@NotNull Mapper<Iterable<O>, Iterable<R>> mapper);
-
-  @NotNull
-  <R> DeferredPromiseIterable<I, R> allTrySorted(
-      @NotNull Handler<Iterable<O>, ? super CallbackIterable<R>> handler);
-
-  @NotNull
-  <R> DeferredPromiseIterable<I, R> allTryTrusted(
-      @NotNull Mapper<Iterable<O>, Chainable<? extends Iterable<R>>> mapper);
-
-  @NotNull
   <R> DeferredPromiseIterable<I, R> applyAll(
       @NotNull Mapper<PromiseIterable<O>, PromiseIterable<R>> mapper);
 
@@ -83,7 +53,7 @@ public interface DeferredPromiseIterable<I, O>
   <R> DeferredPromiseIterable<I, R> applyEachSorted(@NotNull Mapper<Promise<O>, Promise<R>> mapper);
 
   @NotNull
-  DeferredPromiseIterable<I, O> backoffOn(@NotNull ScheduledExecutor executor,
+  DeferredPromiseIterable<I, O> backoffEach(@NotNull ScheduledExecutor executor,
       @NotNull Backoff<ScheduledData<O>> backoff);
 
   @NotNull
@@ -94,25 +64,28 @@ public interface DeferredPromiseIterable<I, O>
   DeferredPromiseIterable<I, O> catchAll(@NotNull Mapper<Throwable, Iterable<O>> mapper);
 
   @NotNull
-  DeferredPromiseIterable<I, O> catchAllTrusted(
+  DeferredPromiseIterable<I, O> catchAllFlat(
       @NotNull Iterable<Class<? extends Throwable>> errors,
       @NotNull Mapper<Throwable, Chainable<? extends Iterable<O>>> mapper);
 
   @NotNull
-  DeferredPromiseIterable<I, O> catchAllTrusted(
+  DeferredPromiseIterable<I, O> catchAllFlat(
       @NotNull Mapper<Throwable, Chainable<? extends Iterable<O>>> mapper);
+
+  @NotNull
+  DeferredPromiseIterable<I, O> renew();
 
   @NotNull
   DeferredPromiseIterable<I, O> scheduleAll(@NotNull ScheduledExecutor executor);
 
   @NotNull
-  DeferredPromiseIterable<I, O> whenFulfilled(@NotNull Observer<Iterable<O>> observer);
+  DeferredPromiseIterable<I, O> onFulfill(@NotNull Observer<Iterable<O>> observer);
 
   @NotNull
-  DeferredPromiseIterable<I, O> whenRejected(@NotNull Observer<Throwable> observer);
+  DeferredPromiseIterable<I, O> onReject(@NotNull Observer<Throwable> observer);
 
   @NotNull
-  DeferredPromiseIterable<I, O> whenResolved(@NotNull Action action);
+  DeferredPromiseIterable<I, O> onResolve(@NotNull Action action);
 
   @NotNull
   DeferredPromiseIterable<I, O> catchEach(@NotNull Iterable<Class<? extends Throwable>> errors,
@@ -122,6 +95,23 @@ public interface DeferredPromiseIterable<I, O>
   DeferredPromiseIterable<I, O> catchEach(@NotNull Mapper<Throwable, O> mapper);
 
   @NotNull
+  DeferredPromiseIterable<I, O> catchEachSpread(
+      @NotNull Iterable<Class<? extends Throwable>> errors,
+      @NotNull Mapper<Throwable, Iterable<O>> mapper);
+
+  @NotNull
+  DeferredPromiseIterable<I, O> catchEachSpread(@NotNull Mapper<Throwable, Iterable<O>> mapper);
+
+  @NotNull
+  DeferredPromiseIterable<I, O> catchEachSpreadTrusted(
+      @NotNull Iterable<Class<? extends Throwable>> errors,
+      @NotNull Mapper<Throwable, Chainable<? extends Iterable<O>>> mapper);
+
+  @NotNull
+  DeferredPromiseIterable<I, O> catchEachSpreadTrusted(
+      @NotNull Mapper<Throwable, Chainable<? extends Iterable<O>>> mapper);
+
+  @NotNull
   DeferredPromiseIterable<I, O> catchEachTrusted(
       @NotNull Iterable<Class<? extends Throwable>> errors,
       @NotNull Mapper<Throwable, Chainable<? extends O>> mapper);
@@ -131,44 +121,60 @@ public interface DeferredPromiseIterable<I, O>
       @NotNull Mapper<Throwable, Chainable<? extends O>> mapper);
 
   @NotNull
-  <R> DeferredPromiseIterable<I, R> each(@NotNull Handler<O, ? super CallbackIterable<R>> handler);
-
-  @NotNull
-  <R> DeferredPromiseIterable<I, R> each(int minBatchSize, @NotNull Mapper<O, R> mapper);
-
-  @NotNull
-  <R> DeferredPromiseIterable<I, R> each(@NotNull Mapper<O, R> mapper);
-
-  @NotNull
-  <R> DeferredPromiseIterable<I, R> each(@NotNull Mapper<O, R> mapper, int maxBatchSize);
-
-  @NotNull
-  <R> DeferredPromiseIterable<I, R> eachSorted(
+  <R> DeferredPromiseIterable<I, R> forEachSorted(
       @NotNull Handler<O, ? super CallbackIterable<R>> handler);
 
   @NotNull
-  <R> DeferredPromiseIterable<I, R> eachTrusted(@NotNull Mapper<O, Chainable<? extends R>> mapper);
+  <R> DeferredPromiseIterable<I, R> forEachSpread(@NotNull Mapper<O, Iterable<R>> mapper);
 
   @NotNull
-  <R> DeferredPromiseIterable<I, R> eachTry(
-      @NotNull Handler<O, ? super CallbackIterable<R>> handler);
+  <R> DeferredPromiseIterable<I, R> forEachSpreadTrusted(
+      @NotNull Mapper<O, Chainable<? extends Iterable<R>>> mapper);
 
   @NotNull
-  <R> DeferredPromiseIterable<I, R> eachTry(int minBatchSize, @NotNull Mapper<O, R> mapper);
-
-  @NotNull
-  <R> DeferredPromiseIterable<I, R> eachTry(@NotNull Mapper<O, R> mapper);
-
-  @NotNull
-  <R> DeferredPromiseIterable<I, R> eachTry(@NotNull Mapper<O, R> mapper, int maxBatchSize);
-
-  @NotNull
-  <R> DeferredPromiseIterable<I, R> eachTrySorted(
-      @NotNull Handler<O, ? super CallbackIterable<R>> handler);
-
-  @NotNull
-  <R> DeferredPromiseIterable<I, R> eachTryTrusted(
+  <R> DeferredPromiseIterable<I, R> forEachTrusted(
       @NotNull Mapper<O, Chainable<? extends R>> mapper);
+
+  @NotNull
+  <R> DeferredPromiseIterable<I, R> forEachTry(
+      @NotNull Handler<O, ? super CallbackIterable<R>> handler);
+
+  @NotNull
+  <R> DeferredPromiseIterable<I, R> forEachTry(int minBatchSize, @NotNull Mapper<O, R> mapper);
+
+  @NotNull
+  <R> DeferredPromiseIterable<I, R> forEachTry(@NotNull Mapper<O, R> mapper);
+
+  @NotNull
+  <R> DeferredPromiseIterable<I, R> forEachTry(@NotNull Mapper<O, R> mapper, int maxBatchSize);
+
+  @NotNull
+  <R> DeferredPromiseIterable<I, R> forEachTrySorted(
+      @NotNull Handler<O, ? super CallbackIterable<R>> handler);
+
+  @NotNull
+  <R> DeferredPromiseIterable<I, R> forEachTrySpread(@NotNull Mapper<O, Iterable<R>> mapper);
+
+  @NotNull
+  <R> DeferredPromiseIterable<I, R> forEachTrySpreadTrusted(
+      @NotNull Mapper<O, Chainable<? extends Iterable<R>>> mapper);
+
+  @NotNull
+  <R> DeferredPromiseIterable<I, R> forEachTryTrusted(
+      @NotNull Mapper<O, Chainable<? extends R>> mapper);
+
+  @NotNull
+  <R> DeferredPromiseIterable<I, R> forEachValue(
+      @NotNull Handler<O, ? super CallbackIterable<R>> handler);
+
+  @NotNull
+  <R> DeferredPromiseIterable<I, R> forEachValue(int minBatchSize, @NotNull Mapper<O, R> mapper);
+
+  @NotNull
+  <R> DeferredPromiseIterable<I, R> forEachValue(@NotNull Mapper<O, R> mapper);
+
+  @NotNull
+  <R> DeferredPromiseIterable<I, R> forEachValue(@NotNull Mapper<O, R> mapper, int maxBatchSize);
 
   @NotNull
   DeferredPromiseIterable<I, PromiseInspection<O>> inspectAll();
@@ -184,6 +190,36 @@ public interface DeferredPromiseIterable<I, O>
 
   @NotNull
   <R, S> DeferredPromiseIterable<I, R> then(@NotNull StatefulHandler<O, R, S> handler);
+
+  @NotNull
+  <R> DeferredPromiseIterable<I, R> thenAll(
+      @NotNull Handler<Iterable<O>, ? super CallbackIterable<R>> handler);
+
+  @NotNull
+  <R> DeferredPromiseIterable<I, R> thenAll(@NotNull Mapper<Iterable<O>, Iterable<R>> mapper);
+
+  @NotNull
+  <R> DeferredPromiseIterable<I, R> thenAllSorted(
+      @NotNull Handler<Iterable<O>, ? super CallbackIterable<R>> handler);
+
+  @NotNull
+  <R> PromiseIterable<R> thenAllTrusted(
+      @NotNull Mapper<Iterable<O>, Chainable<? extends Iterable<R>>> mapper);
+
+  @NotNull
+  <R> DeferredPromiseIterable<I, R> thenAllTry(
+      @NotNull Handler<Iterable<O>, ? super CallbackIterable<R>> handler);
+
+  @NotNull
+  <R> DeferredPromiseIterable<I, R> thenAllTry(@NotNull Mapper<Iterable<O>, Iterable<R>> mapper);
+
+  @NotNull
+  <R> DeferredPromiseIterable<I, R> thenAllTrySorted(
+      @NotNull Handler<Iterable<O>, ? super CallbackIterable<R>> handler);
+
+  @NotNull
+  <R> DeferredPromiseIterable<I, R> thenAllTryTrusted(
+      @NotNull Mapper<Iterable<O>, Chainable<? extends Iterable<R>>> mapper);
 
   @NotNull
   <R, S> DeferredPromiseIterable<I, R> thenSorted(@NotNull StatefulHandler<O, R, S> handler);

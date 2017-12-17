@@ -222,13 +222,13 @@ class DefaultPromise<O> implements Promise<O> {
   }
 
   @NotNull
-  public Promise<O> catchAllTrusted(@NotNull final Iterable<Class<? extends Throwable>> errors,
+  public Promise<O> catchAllFlat(@NotNull final Iterable<Class<? extends Throwable>> errors,
       @NotNull final Mapper<Throwable, Chainable<? extends O>> mapper) {
     return then(new HandlerCatchFilteredTrusted<O>(errors, mapper));
   }
 
   @NotNull
-  public Promise<O> catchAllTrusted(
+  public Promise<O> catchAllFlat(
       @NotNull final Mapper<Throwable, Chainable<? extends O>> mapper) {
     return then(new HandlerCatchTrusted<O>(mapper));
   }
@@ -342,7 +342,8 @@ class DefaultPromise<O> implements Promise<O> {
 
   @NotNull
   public Promise<PromiseInspection<O>> inspect() {
-    return then(new HandlerInspect<O>());
+    return chain(new ChainHandler<O, PromiseInspection<O>>(new HandlerInspect<O>()),
+        ScheduledExecutors.immediateExecutor(), ScheduledExecutors.immediateExecutor());
   }
 
   public boolean isChained() {
@@ -352,8 +353,13 @@ class DefaultPromise<O> implements Promise<O> {
   }
 
   @NotNull
+  public Promise<O> renew() {
+    return copy();
+  }
+
+  @NotNull
   public Promise<O> scheduleAll(@NotNull final ScheduledExecutor executor) {
-    return chain(new ChainHandler<O, O>(new HandlerSchedule<O>(executor)), executor);
+    return chain(new ChainHandler<O, O>(new HandlerSchedule<O>(executor)), mExecutor, executor);
   }
 
   @NotNull
@@ -367,7 +373,7 @@ class DefaultPromise<O> implements Promise<O> {
   }
 
   @NotNull
-  public <R> Promise<R> thenTrusted(@NotNull final Mapper<O, Chainable<? extends R>> mapper) {
+  public <R> Promise<R> thenFlat(@NotNull final Mapper<O, Chainable<? extends R>> mapper) {
     return then(new HandlerMapTrusted<O, R>(mapper));
   }
 
@@ -383,7 +389,7 @@ class DefaultPromise<O> implements Promise<O> {
   }
 
   @NotNull
-  public <R> Promise<R> thenTryTrusted(@NotNull final Mapper<O, Chainable<? extends R>> mapper) {
+  public <R> Promise<R> thenTryFlat(@NotNull final Mapper<O, Chainable<? extends R>> mapper) {
     return thenTry(new HandlerMapTrusted<O, R>(mapper));
   }
 
@@ -413,17 +419,17 @@ class DefaultPromise<O> implements Promise<O> {
   }
 
   @NotNull
-  public Promise<O> whenFulfilled(@NotNull final Observer<O> observer) {
+  public Promise<O> onFulfill(@NotNull final Observer<O> observer) {
     return then(new HandlerFulfilled<O>(observer));
   }
 
   @NotNull
-  public Promise<O> whenRejected(@NotNull final Observer<Throwable> observer) {
+  public Promise<O> onReject(@NotNull final Observer<Throwable> observer) {
     return then(new HandlerRejected<O>(observer));
   }
 
   @NotNull
-  public Promise<O> whenResolved(@NotNull final Action action) {
+  public Promise<O> onResolve(@NotNull final Action action) {
     return then(new HandlerResolved<O>(action));
   }
 
@@ -435,12 +441,13 @@ class DefaultPromise<O> implements Promise<O> {
 
   @NotNull
   private <R> Promise<R> chain(@NotNull final PromiseChain<O, R> chain) {
-    return chain(chain, mExecutor);
+    return chain(chain, mExecutor, mExecutor);
   }
 
   @NotNull
   private <R> Promise<R> chain(@NotNull final PromiseChain<O, R> chain,
-      @NotNull final ScheduledExecutor executor) {
+      @NotNull final ScheduledExecutor chainExecutor,
+      @NotNull final ScheduledExecutor newExecutor) {
     final ChainHead<?> head = mHead;
     final Logger logger = mLogger;
     final boolean isBound;
@@ -453,7 +460,7 @@ class DefaultPromise<O> implements Promise<O> {
       } else {
         isBound = false;
         chain.setLogger(logger);
-        binding = head.bind(chain, mExecutor);
+        binding = head.bind(chain, chainExecutor);
         mChain = chain;
         mMutex.notifyAll();
       }
@@ -465,7 +472,7 @@ class DefaultPromise<O> implements Promise<O> {
     }
 
     final DefaultPromise<R> promise =
-        new DefaultPromise<R>(mObserver, executor, logger, head, mTail, chain);
+        new DefaultPromise<R>(mObserver, newExecutor, logger, head, mTail, chain);
     if (binding != null) {
       binding.run();
     }

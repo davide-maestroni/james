@@ -14,23 +14,31 @@
  * limitations under the License.
  */
 
-package dm.james.promise;
+package dm.james.promise2;
 
 import org.jetbrains.annotations.NotNull;
-
-import java.util.List;
+import org.jetbrains.annotations.Nullable;
 
 /**
- * Created by davide-maestroni on 08/15/2017.
+ * Created by davide-maestroni on 11/16/2017.
  */
-public interface ScheduledData<O> {
+public interface Thenable<V> {
 
   @NotNull
-  List<O> outputs();
+  <R> Thenable<R> then(@Nullable CallbackHandler<V, R, ? super Callback<R>> fulfill,
+      @Nullable CallbackHandler<Throwable, R, ? super Callback<R>> reject);
 
-  int pending();
+  interface Callback<V> {
 
-  void retain(int count);
+    void fulfill(V value);
 
-  void retainAll();
+    void reject(Throwable reason);
+
+    void resolve(@NotNull Thenable<? extends V> thenable);
+  }
+
+  interface CallbackHandler<V, R, C extends Callback<R>> {
+
+    void accept(V value, @NotNull C callback) throws Exception;
+  }
 }

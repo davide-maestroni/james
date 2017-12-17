@@ -49,7 +49,6 @@ import dm.james.promise.Promise;
 import dm.james.promise.PromiseInspection;
 import dm.james.promise.PromiseIterable;
 import dm.james.promise.RejectionException;
-import dm.james.promise.RejectionIterableException;
 import dm.james.promise.ScheduledData;
 import dm.james.promise.TimeoutException;
 import dm.james.util.Backoff;
@@ -218,533 +217,6 @@ class DefaultPromiseIterable<O> implements PromiseIterable<O>, Serializable {
   }
 
   @NotNull
-  public <R> PromiseIterable<R> all(
-      @NotNull final Handler<Iterable<O>, ? super CallbackIterable<R>> handler) {
-    final Logger logger = mLogger;
-    return then(new HandlerAll<O, R>(handler, logger.getLog(), logger.getLogLevel()));
-  }
-
-  @NotNull
-  public <R> PromiseIterable<R> all(@NotNull final Mapper<Iterable<O>, Iterable<R>> mapper) {
-    return all(new HandlerMapAll<O, R>(mapper));
-  }
-
-  @NotNull
-  public <R> PromiseIterable<R> allSorted(
-      @NotNull final Handler<Iterable<O>, ? super CallbackIterable<R>> handler) {
-    final Logger logger = mLogger;
-    return thenSorted(new HandlerAll<O, R>(handler, logger.getLog(), logger.getLogLevel()));
-  }
-
-  @NotNull
-  public <R> PromiseIterable<R> allTrusted(
-      @NotNull final Mapper<Iterable<O>, Chainable<? extends Iterable<R>>> mapper) {
-    return all(new HandlerMapAllTrusted<O, R>(mapper));
-  }
-
-  @NotNull
-  public <R> PromiseIterable<R> allTry(
-      @NotNull final Handler<Iterable<O>, ? super CallbackIterable<R>> handler) {
-    final Logger logger = mLogger;
-    return all(new HandlerTryIterable<O, R>(handler, logger.getLog(), logger.getLogLevel()));
-  }
-
-  @NotNull
-  public <R> PromiseIterable<R> allTry(@NotNull final Mapper<Iterable<O>, Iterable<R>> mapper) {
-    return allTry(new HandlerMapAll<O, R>(mapper));
-  }
-
-  @NotNull
-  public <R> PromiseIterable<R> allTrySorted(
-      @NotNull final Handler<Iterable<O>, ? super CallbackIterable<R>> handler) {
-    final Logger logger = mLogger;
-    return allSorted(new HandlerTryIterable<O, R>(handler, logger.getLog(), logger.getLogLevel()));
-  }
-
-  @NotNull
-  public <R> PromiseIterable<R> allTryTrusted(
-      @NotNull final Mapper<Iterable<O>, Chainable<? extends Iterable<R>>> mapper) {
-    return allTry(new HandlerMapAllTrusted<O, R>(mapper));
-  }
-
-  @NotNull
-  public <R> PromiseIterable<R> applyAll(
-      @NotNull final Mapper<PromiseIterable<O>, PromiseIterable<R>> mapper) {
-    try {
-      return ConstantConditions.notNull("promise", mapper.apply(this));
-
-    } catch (final Throwable t) {
-      InterruptedExecutionException.throwIfInterrupt(t);
-      mLogger.err(t, "Error while applying promise transformation");
-      throw RejectionException.wrapIfNotRejectionException(t);
-    }
-  }
-
-  @NotNull
-  public <R> PromiseIterable<R> applyEach(@NotNull final Mapper<Promise<O>, Promise<R>> mapper) {
-    final Logger logger = mLogger;
-    return each(new HandlerApply<O, R>(mapper, logger.getLog(), logger.getLogLevel()));
-  }
-
-  @NotNull
-  public <R> PromiseIterable<R> applyEachSorted(
-      @NotNull final Mapper<Promise<O>, Promise<R>> mapper) {
-    final Logger logger = mLogger;
-    return eachSorted(new HandlerApply<O, R>(mapper, logger.getLog(), logger.getLogLevel()));
-  }
-
-  @NotNull
-  public PromiseIterable<O> backoffOn(@NotNull final ScheduledExecutor executor,
-      @NotNull final Backoff<ScheduledData<O>> backoff) {
-    return chain(
-        new ChainStatefulSorted<O, O, BackoffData<O>>(new BackoffHandler<O>(executor, backoff)),
-        executor);
-  }
-
-  @NotNull
-  public PromiseIterable<O> catchAll(@NotNull final Iterable<Class<? extends Throwable>> errors,
-      @NotNull final Mapper<Throwable, Iterable<O>> mapper) {
-    return all(new HandlerCatchAllFiltered<O>(errors, mapper));
-  }
-
-  @NotNull
-  public PromiseIterable<O> catchAll(@NotNull final Mapper<Throwable, Iterable<O>> mapper) {
-    return all(new HandlerCatchAll<O>(mapper));
-  }
-
-  @NotNull
-  public PromiseIterable<O> catchAllTrusted(
-      @NotNull final Iterable<Class<? extends Throwable>> errors,
-      @NotNull final Mapper<Throwable, Chainable<? extends Iterable<O>>> mapper) {
-    return all(new HandlerCatchAllTrustedFiltered<O>(errors, mapper));
-  }
-
-  @NotNull
-  public PromiseIterable<O> catchAllTrusted(
-      @NotNull final Mapper<Throwable, Chainable<? extends Iterable<O>>> mapper) {
-    return all(new HandlerCatchAllTrusted<O>(mapper));
-  }
-
-  @NotNull
-  public Promise<PromiseInspection<Iterable<O>>> inspect() {
-    return toPromise().inspect();
-  }
-
-  @NotNull
-  public PromiseIterable<O> scheduleAll(@NotNull final ScheduledExecutor executor) {
-    final Logger logger = mLogger;
-    final HandlerAll<O, O> handler =
-        new HandlerAll<O, O>(new HandlerScheduleAll<O>(executor), logger.getLog(),
-            logger.getLogLevel());
-    return chain(new ChainStateful<O, O, ArrayList<O>>(handler), executor);
-  }
-
-  @NotNull
-  public PromiseIterable<O> whenFulfilled(@NotNull final Observer<Iterable<O>> observer) {
-    return all(new HandlerFulfilledAll<O>(observer));
-  }
-
-  @NotNull
-  public PromiseIterable<O> whenRejected(@NotNull final Observer<Throwable> observer) {
-    return all(new HandlerRejectedAll<O>(observer));
-  }
-
-  @NotNull
-  public PromiseIterable<O> whenResolved(@NotNull final Action action) {
-    return then(new HandlerResolved<O>(action));
-  }
-
-  @NotNull
-  public PromiseIterable<O> catchEach(@NotNull final Iterable<Class<? extends Throwable>> errors,
-      @NotNull final Mapper<Throwable, O> mapper) {
-    return chain(new ChainMapCatch<O>(ConstantConditions.notNull("errors", errors), mapper));
-  }
-
-  @NotNull
-  public PromiseIterable<O> catchEach(@NotNull final Mapper<Throwable, O> mapper) {
-    return chain(new ChainMapCatch<O>(null, mapper));
-  }
-
-  @NotNull
-  public PromiseIterable<O> catchEachTrusted(
-      @NotNull final Iterable<Class<? extends Throwable>> errors,
-      @NotNull final Mapper<Throwable, Chainable<? extends O>> mapper) {
-    return chain(new ChainMapCatchTrusted<O>(ConstantConditions.notNull("errors", errors), mapper));
-  }
-
-  @NotNull
-  public PromiseIterable<O> catchEachTrusted(
-      @NotNull final Mapper<Throwable, Chainable<? extends O>> mapper) {
-    return chain(new ChainMapCatchTrusted<O>(null, mapper));
-  }
-
-  @NotNull
-  public <R> PromiseIterable<R> each(
-      @NotNull final Handler<O, ? super CallbackIterable<R>> handler) {
-    return chain(new ChainHandler<O, R>(handler));
-  }
-
-  @NotNull
-  public <R> PromiseIterable<R> each(final int minBatchSize, @NotNull final Mapper<O, R> mapper) {
-    return chain(new ChainMapGroup<O, R>(mapper, minBatchSize));
-  }
-
-  @NotNull
-  public <R> PromiseIterable<R> each(@NotNull final Mapper<O, R> mapper) {
-    return each(mapper, Integer.MAX_VALUE);
-  }
-
-  @NotNull
-  public <R> PromiseIterable<R> each(@NotNull final Mapper<O, R> mapper, final int maxBatchSize) {
-    return chain(new ChainMap<O, R>(mapper, maxBatchSize));
-  }
-
-  @NotNull
-  public <R> PromiseIterable<R> eachSorted(
-      @NotNull final Handler<O, ? super CallbackIterable<R>> handler) {
-    return chain(new ChainHandlerSorted<O, R>(handler));
-  }
-
-  @NotNull
-  public <R> PromiseIterable<R> eachTrusted(
-      @NotNull final Mapper<O, Chainable<? extends R>> mapper) {
-    return each(new HandlerEachTrusted<O, R>(mapper));
-  }
-
-  @NotNull
-  public <R> PromiseIterable<R> eachTry(
-      @NotNull final Handler<O, ? super CallbackIterable<R>> handler) {
-    final Logger logger = mLogger;
-    return each(new HandlerTry<O, R>(handler, logger.getLog(), logger.getLogLevel()));
-  }
-
-  @NotNull
-  public <R> PromiseIterable<R> eachTry(final int minBatchSize,
-      @NotNull final Mapper<O, R> mapper) {
-    final Logger logger = mLogger;
-    return each(minBatchSize, new MapperTry<O, R>(mapper, logger.getLog(), logger.getLogLevel()));
-  }
-
-  @NotNull
-  public <R> PromiseIterable<R> eachTry(@NotNull final Mapper<O, R> mapper) {
-    return eachTry(mapper, Integer.MAX_VALUE);
-  }
-
-  @NotNull
-  public <R> PromiseIterable<R> eachTry(@NotNull final Mapper<O, R> mapper,
-      final int maxBatchSize) {
-    final Logger logger = mLogger;
-    return each(new MapperTry<O, R>(mapper, logger.getLog(), logger.getLogLevel()), maxBatchSize);
-  }
-
-  @NotNull
-  public <R> PromiseIterable<R> eachTrySorted(
-      @NotNull final Handler<O, ? super CallbackIterable<R>> handler) {
-    final Logger logger = mLogger;
-    return eachSorted(new HandlerTry<O, R>(handler, logger.getLog(), logger.getLogLevel()));
-  }
-
-  @NotNull
-  public <R> PromiseIterable<R> eachTryTrusted(
-      @NotNull final Mapper<O, Chainable<? extends R>> mapper) {
-    final Logger logger = mLogger;
-    return eachTrusted(
-        new MapperTry<O, Chainable<? extends R>>(mapper, logger.getLog(), logger.getLogLevel()));
-  }
-
-  @NotNull
-  public List<O> get(final int maxSize) {
-    return get(maxSize, -1, TimeUnit.MILLISECONDS);
-  }
-
-  @NotNull
-  @SuppressWarnings("unchecked")
-  public List<O> get(final int maxSize, final long timeout, @NotNull final TimeUnit timeUnit) {
-    deadLockWarning(timeout);
-    final ChainHead<?> head = mHead;
-    synchronized (mMutex) {
-      try {
-        if (TimeUtils.waitUntil(mMutex, new Condition() {
-
-          public boolean isTrue() {
-            checkBound();
-            return ((head.getOutputs().size() >= maxSize) || head.getState().isResolved());
-          }
-        }, timeout, timeUnit)) {
-          final DoubleQueue<O> outputs = (DoubleQueue<O>) head.getOutputs();
-          final Iterator<O> iterator = outputs.iterator();
-          final ArrayList<O> result = new ArrayList<O>();
-          for (int i = 0; (i < maxSize) && iterator.hasNext(); ++i) {
-            result.add(iterator.next());
-          }
-
-          return result;
-        }
-
-      } catch (final InterruptedException e) {
-        throw new InterruptedExecutionException(e);
-      }
-    }
-
-    throw new TimeoutException(
-        "timeout while waiting for promise resolution [" + timeout + " " + timeUnit + "]");
-  }
-
-  @NotNull
-  public List<O> getAll() {
-    return getAll(-1, TimeUnit.MILLISECONDS);
-  }
-
-  @NotNull
-  public List<O> getAll(final long timeout, @NotNull final TimeUnit timeUnit) {
-    return get(Integer.MAX_VALUE, timeout, timeUnit);
-  }
-
-  public O getAny() {
-    return getAny(-1, TimeUnit.MILLISECONDS);
-  }
-
-  @SuppressWarnings("unchecked")
-  public O getAny(final long timeout, @NotNull final TimeUnit timeUnit) {
-    deadLockWarning(timeout);
-    final ChainHead<?> head = mHead;
-    synchronized (mMutex) {
-      try {
-        if (TimeUtils.waitUntil(mMutex, new Condition() {
-
-          public boolean isTrue() {
-            checkBound();
-            return (!head.getOutputs().isEmpty() || head.getState().isResolved());
-          }
-        }, timeout, timeUnit)) {
-          return ((DoubleQueue<O>) head.getOutputs()).peekFirst();
-        }
-
-      } catch (final InterruptedException e) {
-        throw new InterruptedExecutionException(e);
-      }
-    }
-
-    throw new TimeoutException(
-        "timeout while waiting for promise resolution [" + timeout + " " + timeUnit + "]");
-  }
-
-  @SuppressWarnings("unchecked")
-  public O getAnyOr(final O other, final long timeout, @NotNull final TimeUnit timeUnit) {
-    deadLockWarning(timeout);
-    final ChainHead<?> head = mHead;
-    synchronized (mMutex) {
-      try {
-        if (TimeUtils.waitUntil(mMutex, new Condition() {
-
-          public boolean isTrue() {
-            checkBound();
-            return (!head.getOutputs().isEmpty() || head.getState().isResolved());
-          }
-        }, timeout, timeUnit)) {
-          return ((DoubleQueue<O>) head.getOutputs()).peekFirst();
-        }
-
-      } catch (final InterruptedException e) {
-        throw new InterruptedExecutionException(e);
-      }
-    }
-
-    return other;
-  }
-
-  @NotNull
-  public PromiseIterable<PromiseInspection<O>> inspectAll() {
-    return all(new HandlerInspectAll<O>());
-  }
-
-  @NotNull
-  public PromiseIterable<PromiseInspection<O>> inspectEach() {
-    return each(new HandlerInspectEach<O>());
-  }
-
-  public boolean isSettled() {
-    synchronized (mMutex) {
-      return mHead.isSettled();
-    }
-  }
-
-  @NotNull
-  public Iterator<O> iterator(final long timeout, @NotNull final TimeUnit timeUnit) {
-    return new PromiseIterator(timeout, timeUnit);
-  }
-
-  public O remove() {
-    return remove(-1, TimeUnit.MILLISECONDS);
-  }
-
-  @NotNull
-  public List<O> remove(final int maxSize) {
-    return remove(maxSize, -1, TimeUnit.MILLISECONDS);
-  }
-
-  @NotNull
-  @SuppressWarnings("unchecked")
-  public List<O> remove(final int maxSize, final long timeout, @NotNull final TimeUnit timeUnit) {
-    deadLockWarning(timeout);
-    final ChainHead<?> head = mHead;
-    synchronized (mMutex) {
-      try {
-        if (TimeUtils.waitUntil(mMutex, new Condition() {
-
-          public boolean isTrue() {
-            checkBound();
-            return ((head.getOutputs().size() >= maxSize) || head.getState().isResolved());
-          }
-        }, timeout, timeUnit)) {
-          final DoubleQueue<O> outputs = (DoubleQueue<O>) head.getOutputs();
-          final ArrayList<O> removed = new ArrayList<O>();
-          for (int i = 0; (i < maxSize) && !outputs.isEmpty(); --i) {
-            removed.add(outputs.removeFirst());
-          }
-
-          return removed;
-        }
-
-      } catch (final InterruptedException e) {
-        throw new InterruptedExecutionException(e);
-      }
-    }
-
-    throw new TimeoutException(
-        "timeout while waiting for promise resolution [" + timeout + " " + timeUnit + "]");
-  }
-
-  @SuppressWarnings("unchecked")
-  public O remove(final long timeout, @NotNull final TimeUnit timeUnit) {
-    deadLockWarning(timeout);
-    final ChainHead<?> head = mHead;
-    synchronized (mMutex) {
-      try {
-        if (TimeUtils.waitUntil(mMutex, new Condition() {
-
-          public boolean isTrue() {
-            checkBound();
-            return (!head.getOutputs().isEmpty() || head.getState().isResolved());
-          }
-        }, timeout, timeUnit)) {
-          return ((DoubleQueue<O>) head.getOutputs()).removeFirst();
-        }
-
-      } catch (final InterruptedException e) {
-        throw new InterruptedExecutionException(e);
-      }
-    }
-
-    throw new TimeoutException(
-        "timeout while waiting for promise resolution [" + timeout + " " + timeUnit + "]");
-  }
-
-  @NotNull
-  public List<O> removeAll() {
-    return remove(Integer.MAX_VALUE);
-  }
-
-  @NotNull
-  public List<O> removeAll(final long timeout, @NotNull final TimeUnit timeUnit) {
-    return remove(Integer.MAX_VALUE, timeout, timeUnit);
-  }
-
-  @SuppressWarnings("unchecked")
-  public O removeOr(final O other, final long timeout, @NotNull final TimeUnit timeUnit) {
-    deadLockWarning(timeout);
-    final ChainHead<?> head = mHead;
-    synchronized (mMutex) {
-      try {
-        if (TimeUtils.waitUntil(mMutex, new Condition() {
-
-          public boolean isTrue() {
-            checkBound();
-            return (!head.getOutputs().isEmpty() || head.getState().isResolved());
-          }
-        }, timeout, timeUnit)) {
-          return ((DoubleQueue<O>) head.getOutputs()).removeFirst();
-        }
-
-      } catch (final InterruptedException e) {
-        throw new InterruptedExecutionException(e);
-      }
-    }
-
-    return other;
-  }
-
-  @NotNull
-  public PromiseIterable<O> scheduleEach(@NotNull final ScheduledExecutor executor) {
-    return chain(new ChainHandler<O, O>(new HandlerSchedule<O>(executor)), executor);
-  }
-
-  @NotNull
-  public PromiseIterable<O> scheduleEachSorted(@NotNull final ScheduledExecutor executor) {
-    return chain(new ChainHandlerSorted<O, O>(new HandlerSchedule<O>(executor)), executor);
-  }
-
-  @NotNull
-  public <R, S> PromiseIterable<R> then(@NotNull final StatefulHandler<O, R, S> handler) {
-    return chain(new ChainStateful<O, R, S>(handler));
-  }
-
-  @NotNull
-  public <R, S> PromiseIterable<R> thenSorted(@NotNull final StatefulHandler<O, R, S> handler) {
-    return chain(new ChainStatefulSorted<O, R, S>(handler));
-  }
-
-  @NotNull
-  public <R, S extends Closeable> PromiseIterable<R> thenTryState(
-      @NotNull final StatefulHandler<O, R, S> handler) {
-    final Logger logger = mLogger;
-    return then(new StatefulHandlerTry<O, R, S>(handler, logger.getLog(), logger.getLogLevel()));
-  }
-
-  @NotNull
-  public <R, S extends Closeable> PromiseIterable<R> thenTryStateSorted(
-      @NotNull final StatefulHandler<O, R, S> handler) {
-    final Logger logger = mLogger;
-    return thenSorted(
-        new StatefulHandlerTry<O, R, S>(handler, logger.getLog(), logger.getLogLevel()));
-  }
-
-  public void waitSettled() {
-    waitSettled(-1, TimeUnit.MILLISECONDS);
-  }
-
-  public boolean waitSettled(final long timeout, @NotNull final TimeUnit timeUnit) {
-    deadLockWarning(timeout);
-    synchronized (mMutex) {
-      try {
-        if (TimeUtils.waitUntil(mMutex, new Condition() {
-
-          public boolean isTrue() {
-            return mHead.isSettled();
-          }
-        }, timeout, timeUnit)) {
-          return true;
-        }
-
-      } catch (final InterruptedException e) {
-        throw new InterruptedExecutionException(e);
-      }
-    }
-
-    return false;
-  }
-
-  @NotNull
-  public PromiseIterable<O> whenFulfilledEach(@NotNull final Observer<O> observer) {
-    return each(new MapperFulfilledEach<O>(observer));
-  }
-
-  @NotNull
-  public PromiseIterable<O> whenRejectedEach(@NotNull final Observer<Throwable> observer) {
-    return each(new HandlerRejectedEach<O>(observer));
-  }
-
-  @NotNull
   public <R> Promise<R> apply(@NotNull final Mapper<Promise<Iterable<O>>, Promise<R>> mapper) {
     try {
       return ConstantConditions.notNull("promise", mapper.apply(this));
@@ -895,9 +367,9 @@ class DefaultPromiseIterable<O> implements PromiseIterable<O>, Serializable {
   }
 
   @NotNull
-  public <R> Promise<R> thenTrusted(
+  public <R> Promise<R> thenFlat(
       @NotNull final Mapper<Iterable<O>, Chainable<? extends R>> mapper) {
-    return toPromise().thenTrusted(mapper);
+    return toPromise().thenFlat(mapper);
   }
 
   @NotNull
@@ -911,9 +383,9 @@ class DefaultPromiseIterable<O> implements PromiseIterable<O>, Serializable {
   }
 
   @NotNull
-  public <R> Promise<R> thenTryTrusted(
+  public <R> Promise<R> thenTryFlat(
       @NotNull final Mapper<Iterable<O>, Chainable<? extends R>> mapper) {
-    return toPromise().thenTryTrusted(mapper);
+    return toPromise().thenTryFlat(mapper);
   }
 
   public void waitResolved() {
@@ -939,6 +411,596 @@ class DefaultPromiseIterable<O> implements PromiseIterable<O>, Serializable {
     }
 
     return false;
+  }
+
+  @NotNull
+  public <R> PromiseIterable<R> applyAll(
+      @NotNull final Mapper<PromiseIterable<O>, PromiseIterable<R>> mapper) {
+    try {
+      return ConstantConditions.notNull("promise", mapper.apply(this));
+
+    } catch (final Throwable t) {
+      InterruptedExecutionException.throwIfInterrupt(t);
+      mLogger.err(t, "Error while applying promise transformation");
+      throw RejectionException.wrapIfNotRejectionException(t);
+    }
+  }
+
+  @NotNull
+  public <R> PromiseIterable<R> applyEach(@NotNull final Mapper<Promise<O>, Promise<R>> mapper) {
+    final Logger logger = mLogger;
+    return forEachValue(new HandlerApply<O, R>(mapper, logger.getLog(), logger.getLogLevel()));
+  }
+
+  @NotNull
+  public <R> PromiseIterable<R> applyEachSorted(
+      @NotNull final Mapper<Promise<O>, Promise<R>> mapper) {
+    final Logger logger = mLogger;
+    return forEachSorted(new HandlerApply<O, R>(mapper, logger.getLog(), logger.getLogLevel()));
+  }
+
+  @NotNull
+  public PromiseIterable<O> backoffEach(@NotNull final ScheduledExecutor executor,
+      @NotNull final Backoff<ScheduledData<O>> backoff) {
+    return chain(
+        new ChainStatefulSorted<O, O, BackoffData<O>>(new BackoffHandler<O>(executor, backoff)),
+        executor);
+  }
+
+  @NotNull
+  public PromiseIterable<O> catchAll(@NotNull final Iterable<Class<? extends Throwable>> errors,
+      @NotNull final Mapper<Throwable, Iterable<O>> mapper) {
+    return thenAll(new HandlerCatchAllFiltered<O>(errors, mapper));
+  }
+
+  @NotNull
+  public PromiseIterable<O> catchAll(@NotNull final Mapper<Throwable, Iterable<O>> mapper) {
+    return thenAll(new HandlerCatchAll<O>(mapper));
+  }
+
+  @NotNull
+  public PromiseIterable<O> catchAllFlat(
+      @NotNull final Iterable<Class<? extends Throwable>> errors,
+      @NotNull final Mapper<Throwable, Chainable<? extends Iterable<O>>> mapper) {
+    return thenAll(new HandlerCatchAllTrustedFiltered<O>(errors, mapper));
+  }
+
+  @NotNull
+  public PromiseIterable<O> catchAllFlat(
+      @NotNull final Mapper<Throwable, Chainable<? extends Iterable<O>>> mapper) {
+    return thenAll(new HandlerCatchAllTrusted<O>(mapper));
+  }
+
+  @NotNull
+  public Promise<PromiseInspection<Iterable<O>>> inspect() {
+    return toPromise().inspect();
+  }
+
+  @NotNull
+  public PromiseIterable<O> renew() {
+    return copy();
+  }
+
+  @NotNull
+  public PromiseIterable<O> scheduleAll(@NotNull final ScheduledExecutor executor) {
+    final Logger logger = mLogger;
+    final HandlerAll<O, O> handler =
+        new HandlerAll<O, O>(new HandlerScheduleAll<O>(executor), logger.getLog(),
+            logger.getLogLevel());
+    return chain(new ChainStateful<O, O, ArrayList<O>>(handler), executor);
+  }
+
+  @NotNull
+  public PromiseIterable<O> onFulfill(@NotNull final Observer<Iterable<O>> observer) {
+    return thenAll(new HandlerFulfilledAll<O>(observer));
+  }
+
+  @NotNull
+  public PromiseIterable<O> onReject(@NotNull final Observer<Throwable> observer) {
+    return thenAll(new HandlerRejectedAll<O>(observer));
+  }
+
+  @NotNull
+  public PromiseIterable<O> onResolve(@NotNull final Action action) {
+    return then(new HandlerResolved<O>(action));
+  }
+
+  @NotNull
+  public PromiseIterable<O> catchEach(@NotNull final Iterable<Class<? extends Throwable>> errors,
+      @NotNull final Mapper<Throwable, O> mapper) {
+    return chain(new ChainMapCatch<O>(ConstantConditions.notNull("errors", errors), mapper));
+  }
+
+  @NotNull
+  public PromiseIterable<O> catchEach(@NotNull final Mapper<Throwable, O> mapper) {
+    return chain(new ChainMapCatch<O>(null, mapper));
+  }
+
+  @NotNull
+  public PromiseIterable<O> catchEachSpread(
+      @NotNull final Iterable<Class<? extends Throwable>> errors,
+      @NotNull final Mapper<Throwable, Iterable<O>> mapper) {
+    return chain(new ChainMapCatchSpread<O>(ConstantConditions.notNull("errors", errors), mapper));
+  }
+
+  @NotNull
+  public PromiseIterable<O> catchEachSpread(@NotNull final Mapper<Throwable, Iterable<O>> mapper) {
+    return chain(new ChainMapCatchSpread<O>(null, mapper));
+  }
+
+  @NotNull
+  public PromiseIterable<O> catchEachSpreadTrusted(
+      @NotNull final Iterable<Class<? extends Throwable>> errors,
+      @NotNull final Mapper<Throwable, Chainable<? extends Iterable<O>>> mapper) {
+    return chain(
+        new ChainMapCatchSpreadTrusted<O>(ConstantConditions.notNull("errors", errors), mapper));
+  }
+
+  @NotNull
+  public PromiseIterable<O> catchEachSpreadTrusted(
+      @NotNull final Mapper<Throwable, Chainable<? extends Iterable<O>>> mapper) {
+    return chain(new ChainMapCatchSpreadTrusted<O>(null, mapper));
+  }
+
+  @NotNull
+  public PromiseIterable<O> catchEachTrusted(
+      @NotNull final Iterable<Class<? extends Throwable>> errors,
+      @NotNull final Mapper<Throwable, Chainable<? extends O>> mapper) {
+    return chain(new ChainMapCatchTrusted<O>(ConstantConditions.notNull("errors", errors), mapper));
+  }
+
+  @NotNull
+  public PromiseIterable<O> catchEachTrusted(
+      @NotNull final Mapper<Throwable, Chainable<? extends O>> mapper) {
+    return chain(new ChainMapCatchTrusted<O>(null, mapper));
+  }
+
+  @NotNull
+  public <R> PromiseIterable<R> forEachSorted(
+      @NotNull final Handler<O, ? super CallbackIterable<R>> handler) {
+    return chain(new ChainHandlerSorted<O, R>(handler));
+  }
+
+  @NotNull
+  public <R> PromiseIterable<R> forEachSpread(@NotNull final Mapper<O, Iterable<R>> mapper) {
+    return forEachValue(new HandlerEachSpread<O, R>(mapper));
+  }
+
+  @NotNull
+  public <R> PromiseIterable<R> forEachSpreadTrusted(
+      @NotNull final Mapper<O, Chainable<? extends Iterable<R>>> mapper) {
+    return forEachValue(new HandlerEachSpreadTrusted<O, R>(mapper));
+  }
+
+  @NotNull
+  public <R> PromiseIterable<R> forEachTrusted(
+      @NotNull final Mapper<O, Chainable<? extends R>> mapper) {
+    return forEachValue(new HandlerEachTrusted<O, R>(mapper));
+  }
+
+  @NotNull
+  public <R> PromiseIterable<R> forEachTry(
+      @NotNull final Handler<O, ? super CallbackIterable<R>> handler) {
+    final Logger logger = mLogger;
+    return forEachValue(new HandlerTry<O, R>(handler, logger.getLog(), logger.getLogLevel()));
+  }
+
+  @NotNull
+  public <R> PromiseIterable<R> forEachTry(final int minBatchSize,
+      @NotNull final Mapper<O, R> mapper) {
+    final Logger logger = mLogger;
+    return forEachValue(minBatchSize,
+        new MapperTry<O, R>(mapper, logger.getLog(), logger.getLogLevel()));
+  }
+
+  @NotNull
+  public <R> PromiseIterable<R> forEachTry(@NotNull final Mapper<O, R> mapper) {
+    return forEachTry(mapper, Integer.MAX_VALUE);
+  }
+
+  @NotNull
+  public <R> PromiseIterable<R> forEachTry(@NotNull final Mapper<O, R> mapper,
+      final int maxBatchSize) {
+    final Logger logger = mLogger;
+    return forEachValue(new MapperTry<O, R>(mapper, logger.getLog(), logger.getLogLevel()),
+        maxBatchSize);
+  }
+
+  @NotNull
+  public <R> PromiseIterable<R> forEachTrySorted(
+      @NotNull final Handler<O, ? super CallbackIterable<R>> handler) {
+    final Logger logger = mLogger;
+    return forEachSorted(new HandlerTry<O, R>(handler, logger.getLog(), logger.getLogLevel()));
+  }
+
+  @NotNull
+  public <R> PromiseIterable<R> forEachTrySpread(@NotNull final Mapper<O, Iterable<R>> mapper) {
+    final Logger logger = mLogger;
+    return forEachSpread(
+        new MapperTry<O, Iterable<R>>(mapper, logger.getLog(), logger.getLogLevel()));
+  }
+
+  @NotNull
+  public <R> PromiseIterable<R> forEachTrySpreadTrusted(
+      @NotNull final Mapper<O, Chainable<? extends Iterable<R>>> mapper) {
+    final Logger logger = mLogger;
+    return forEachSpreadTrusted(
+        new MapperTry<O, Chainable<? extends Iterable<R>>>(mapper, logger.getLog(),
+            logger.getLogLevel()));
+  }
+
+  @NotNull
+  public <R> PromiseIterable<R> forEachTryTrusted(
+      @NotNull final Mapper<O, Chainable<? extends R>> mapper) {
+    final Logger logger = mLogger;
+    return forEachTrusted(
+        new MapperTry<O, Chainable<? extends R>>(mapper, logger.getLog(), logger.getLogLevel()));
+  }
+
+  @NotNull
+  public <R> PromiseIterable<R> forEachValue(
+      @NotNull final Handler<O, ? super CallbackIterable<R>> handler) {
+    return chain(new ChainHandler<O, R>(handler));
+  }
+
+  @NotNull
+  public <R> PromiseIterable<R> forEachValue(final int minBatchSize,
+      @NotNull final Mapper<O, R> mapper) {
+    return chain(new ChainMapGroup<O, R>(mapper, minBatchSize));
+  }
+
+  @NotNull
+  public <R> PromiseIterable<R> forEachValue(@NotNull final Mapper<O, R> mapper) {
+    return forEachValue(mapper, Integer.MAX_VALUE);
+  }
+
+  @NotNull
+  public <R> PromiseIterable<R> forEachValue(@NotNull final Mapper<O, R> mapper,
+      final int maxBatchSize) {
+    return chain(new ChainMap<O, R>(mapper, maxBatchSize));
+  }
+
+  @NotNull
+  public List<O> get(final int maxSize) {
+    return get(maxSize, -1, TimeUnit.MILLISECONDS);
+  }
+
+  @NotNull
+  @SuppressWarnings("unchecked")
+  public List<O> get(final int maxSize, final long timeout, @NotNull final TimeUnit timeUnit) {
+    deadLockWarning(timeout);
+    final ChainHead<?> head = mHead;
+    synchronized (mMutex) {
+      try {
+        if (TimeUtils.waitUntil(mMutex, new Condition() {
+
+          public boolean isTrue() {
+            checkBound();
+            return ((head.getOutputs().size() >= maxSize) || head.getState().isResolved());
+          }
+        }, timeout, timeUnit)) {
+          final DoubleQueue<O> outputs = (DoubleQueue<O>) head.getOutputs();
+          final Iterator<O> iterator = outputs.iterator();
+          final ArrayList<O> result = new ArrayList<O>();
+          for (int i = 0; (i < maxSize) && iterator.hasNext(); ++i) {
+            result.add(iterator.next());
+          }
+
+          return result;
+        }
+
+      } catch (final InterruptedException e) {
+        throw new InterruptedExecutionException(e);
+      }
+    }
+
+    throw new TimeoutException(
+        "timeout while waiting for promise resolution [" + timeout + " " + timeUnit + "]");
+  }
+
+  @NotNull
+  public List<O> getAll() {
+    return getAll(-1, TimeUnit.MILLISECONDS);
+  }
+
+  @NotNull
+  public List<O> getAll(final long timeout, @NotNull final TimeUnit timeUnit) {
+    return get(Integer.MAX_VALUE, timeout, timeUnit);
+  }
+
+  public O getAny() {
+    return getAny(-1, TimeUnit.MILLISECONDS);
+  }
+
+  @SuppressWarnings("unchecked")
+  public O getAny(final long timeout, @NotNull final TimeUnit timeUnit) {
+    deadLockWarning(timeout);
+    final ChainHead<?> head = mHead;
+    synchronized (mMutex) {
+      try {
+        if (TimeUtils.waitUntil(mMutex, new Condition() {
+
+          public boolean isTrue() {
+            checkBound();
+            return (!head.getOutputs().isEmpty() || head.getState().isResolved());
+          }
+        }, timeout, timeUnit)) {
+          return ((DoubleQueue<O>) head.getOutputs()).peekFirst();
+        }
+
+      } catch (final InterruptedException e) {
+        throw new InterruptedExecutionException(e);
+      }
+    }
+
+    throw new TimeoutException(
+        "timeout while waiting for promise resolution [" + timeout + " " + timeUnit + "]");
+  }
+
+  @SuppressWarnings("unchecked")
+  public O getAnyOr(final O other, final long timeout, @NotNull final TimeUnit timeUnit) {
+    deadLockWarning(timeout);
+    final ChainHead<?> head = mHead;
+    synchronized (mMutex) {
+      try {
+        if (TimeUtils.waitUntil(mMutex, new Condition() {
+
+          public boolean isTrue() {
+            checkBound();
+            return (!head.getOutputs().isEmpty() || head.getState().isResolved());
+          }
+        }, timeout, timeUnit)) {
+          return ((DoubleQueue<O>) head.getOutputs()).peekFirst();
+        }
+
+      } catch (final InterruptedException e) {
+        throw new InterruptedExecutionException(e);
+      }
+    }
+
+    return other;
+  }
+
+  @NotNull
+  public PromiseIterable<PromiseInspection<O>> inspectAll() {
+    return thenAll(new HandlerInspectAll<O>());
+  }
+
+  @NotNull
+  public PromiseIterable<PromiseInspection<O>> inspectEach() {
+    return forEachValue(new HandlerInspectEach<O>());
+  }
+
+  public boolean isSettled() {
+    synchronized (mMutex) {
+      return mHead.isSettled();
+    }
+  }
+
+  @NotNull
+  public Iterator<O> iterator(final long timeout, @NotNull final TimeUnit timeUnit) {
+    return new PromiseIterator(timeout, timeUnit);
+  }
+
+  public O remove() {
+    return remove(-1, TimeUnit.MILLISECONDS);
+  }
+
+  @NotNull
+  public List<O> remove(final int maxSize) {
+    return remove(maxSize, -1, TimeUnit.MILLISECONDS);
+  }
+
+  @NotNull
+  @SuppressWarnings("unchecked")
+  public List<O> remove(final int maxSize, final long timeout, @NotNull final TimeUnit timeUnit) {
+    deadLockWarning(timeout);
+    final ChainHead<?> head = mHead;
+    synchronized (mMutex) {
+      try {
+        if (TimeUtils.waitUntil(mMutex, new Condition() {
+
+          public boolean isTrue() {
+            checkBound();
+            return ((head.getOutputs().size() >= maxSize) || head.getState().isResolved());
+          }
+        }, timeout, timeUnit)) {
+          final DoubleQueue<O> outputs = (DoubleQueue<O>) head.getOutputs();
+          final ArrayList<O> removed = new ArrayList<O>();
+          for (int i = 0; (i < maxSize) && !outputs.isEmpty(); --i) {
+            removed.add(outputs.removeFirst());
+          }
+
+          return removed;
+        }
+
+      } catch (final InterruptedException e) {
+        throw new InterruptedExecutionException(e);
+      }
+    }
+
+    throw new TimeoutException(
+        "timeout while waiting for promise resolution [" + timeout + " " + timeUnit + "]");
+  }
+
+  @SuppressWarnings("unchecked")
+  public O remove(final long timeout, @NotNull final TimeUnit timeUnit) {
+    deadLockWarning(timeout);
+    final ChainHead<?> head = mHead;
+    synchronized (mMutex) {
+      try {
+        if (TimeUtils.waitUntil(mMutex, new Condition() {
+
+          public boolean isTrue() {
+            checkBound();
+            return (!head.getOutputs().isEmpty() || head.getState().isResolved());
+          }
+        }, timeout, timeUnit)) {
+          return ((DoubleQueue<O>) head.getOutputs()).removeFirst();
+        }
+
+      } catch (final InterruptedException e) {
+        throw new InterruptedExecutionException(e);
+      }
+    }
+
+    throw new TimeoutException(
+        "timeout while waiting for promise resolution [" + timeout + " " + timeUnit + "]");
+  }
+
+  @NotNull
+  public List<O> removeAll() {
+    return remove(Integer.MAX_VALUE);
+  }
+
+  @NotNull
+  public List<O> removeAll(final long timeout, @NotNull final TimeUnit timeUnit) {
+    return remove(Integer.MAX_VALUE, timeout, timeUnit);
+  }
+
+  @SuppressWarnings("unchecked")
+  public O removeOr(final O other, final long timeout, @NotNull final TimeUnit timeUnit) {
+    deadLockWarning(timeout);
+    final ChainHead<?> head = mHead;
+    synchronized (mMutex) {
+      try {
+        if (TimeUtils.waitUntil(mMutex, new Condition() {
+
+          public boolean isTrue() {
+            checkBound();
+            return (!head.getOutputs().isEmpty() || head.getState().isResolved());
+          }
+        }, timeout, timeUnit)) {
+          return ((DoubleQueue<O>) head.getOutputs()).removeFirst();
+        }
+
+      } catch (final InterruptedException e) {
+        throw new InterruptedExecutionException(e);
+      }
+    }
+
+    return other;
+  }
+
+  @NotNull
+  public PromiseIterable<O> scheduleEach(@NotNull final ScheduledExecutor executor) {
+    return chain(new ChainHandler<O, O>(new HandlerSchedule<O>(executor)), executor);
+  }
+
+  @NotNull
+  public PromiseIterable<O> scheduleEachSorted(@NotNull final ScheduledExecutor executor) {
+    return chain(new ChainHandlerSorted<O, O>(new HandlerSchedule<O>(executor)), executor);
+  }
+
+  @NotNull
+  public <R, S> PromiseIterable<R> then(@NotNull final StatefulHandler<O, R, S> handler) {
+    return chain(new ChainStateful<O, R, S>(handler));
+  }
+
+  @NotNull
+  public <R> PromiseIterable<R> thenAll(
+      @NotNull final Handler<Iterable<O>, ? super CallbackIterable<R>> handler) {
+    final Logger logger = mLogger;
+    return then(new HandlerAll<O, R>(handler, logger.getLog(), logger.getLogLevel()));
+  }
+
+  @NotNull
+  public <R> PromiseIterable<R> thenAll(@NotNull final Mapper<Iterable<O>, Iterable<R>> mapper) {
+    return thenAll(new HandlerMapAll<O, R>(mapper));
+  }
+
+  @NotNull
+  public <R> PromiseIterable<R> thenAllSorted(
+      @NotNull final Handler<Iterable<O>, ? super CallbackIterable<R>> handler) {
+    final Logger logger = mLogger;
+    return thenSorted(new HandlerAll<O, R>(handler, logger.getLog(), logger.getLogLevel()));
+  }
+
+  @NotNull
+  public <R> PromiseIterable<R> thenAllTrusted(
+      @NotNull final Mapper<Iterable<O>, Chainable<? extends Iterable<R>>> mapper) {
+    return thenAll(new HandlerMapAllTrusted<O, R>(mapper));
+  }
+
+  @NotNull
+  public <R> PromiseIterable<R> thenAllTry(
+      @NotNull final Handler<Iterable<O>, ? super CallbackIterable<R>> handler) {
+    final Logger logger = mLogger;
+    return thenAll(new HandlerTryIterable<O, R>(handler, logger.getLog(), logger.getLogLevel()));
+  }
+
+  @NotNull
+  public <R> PromiseIterable<R> thenAllTry(@NotNull final Mapper<Iterable<O>, Iterable<R>> mapper) {
+    return thenAllTry(new HandlerMapAll<O, R>(mapper));
+  }
+
+  @NotNull
+  public <R> PromiseIterable<R> thenAllTrySorted(
+      @NotNull final Handler<Iterable<O>, ? super CallbackIterable<R>> handler) {
+    final Logger logger = mLogger;
+    return thenAllSorted(
+        new HandlerTryIterable<O, R>(handler, logger.getLog(), logger.getLogLevel()));
+  }
+
+  @NotNull
+  public <R> PromiseIterable<R> thenAllTryTrusted(
+      @NotNull final Mapper<Iterable<O>, Chainable<? extends Iterable<R>>> mapper) {
+    return thenAllTry(new HandlerMapAllTrusted<O, R>(mapper));
+  }
+
+  @NotNull
+  public <R, S> PromiseIterable<R> thenSorted(@NotNull final StatefulHandler<O, R, S> handler) {
+    return chain(new ChainStatefulSorted<O, R, S>(handler));
+  }
+
+  @NotNull
+  public <R, S extends Closeable> PromiseIterable<R> thenTryState(
+      @NotNull final StatefulHandler<O, R, S> handler) {
+    final Logger logger = mLogger;
+    return then(new StatefulHandlerTry<O, R, S>(handler, logger.getLog(), logger.getLogLevel()));
+  }
+
+  @NotNull
+  public <R, S extends Closeable> PromiseIterable<R> thenTryStateSorted(
+      @NotNull final StatefulHandler<O, R, S> handler) {
+    final Logger logger = mLogger;
+    return thenSorted(
+        new StatefulHandlerTry<O, R, S>(handler, logger.getLog(), logger.getLogLevel()));
+  }
+
+  public void waitSettled() {
+    waitSettled(-1, TimeUnit.MILLISECONDS);
+  }
+
+  public boolean waitSettled(final long timeout, @NotNull final TimeUnit timeUnit) {
+    deadLockWarning(timeout);
+    synchronized (mMutex) {
+      try {
+        if (TimeUtils.waitUntil(mMutex, new Condition() {
+
+          public boolean isTrue() {
+            return mHead.isSettled();
+          }
+        }, timeout, timeUnit)) {
+          return true;
+        }
+
+      } catch (final InterruptedException e) {
+        throw new InterruptedExecutionException(e);
+      }
+    }
+
+    return false;
+  }
+
+  @NotNull
+  public PromiseIterable<O> whenFulfilledEach(@NotNull final Observer<O> observer) {
+    return forEachValue(new MapperFulfilledEach<O>(observer));
+  }
+
+  @NotNull
+  public PromiseIterable<O> whenRejectedEach(@NotNull final Observer<Throwable> observer) {
+    return forEachValue(new HandlerRejectedEach<O>(observer));
   }
 
   public boolean isFulfilled() {
@@ -1033,8 +1095,8 @@ class DefaultPromiseIterable<O> implements PromiseIterable<O>, Serializable {
   private Promise<Iterable<O>> toPromise() {
     final Logger logger = mLogger;
     return BoundPromise.create(this,
-        new DefaultDeferredPromise<Iterable<O>, Iterable<O>>(logger.getLog(),
-            logger.getLogLevel()));
+        new DefaultDeferredPromise<Iterable<O>, Iterable<O>>(logger.getLog(), logger.getLogLevel()))
+                       .scheduleAll(mExecutor);
   }
 
   private Object writeReplace() throws ObjectStreamException {
@@ -1071,14 +1133,6 @@ class DefaultPromiseIterable<O> implements PromiseIterable<O>, Serializable {
     }
   }
 
-  private interface AnyState<R> {
-
-    boolean isRejection();
-
-    void resolve(@NotNull Handler<?, ? super CallbackIterable<R>> handler,
-        @NotNull CallbackIterable<R> callback) throws Exception;
-  }
-
   private interface Resolution<O> {
 
     void consume(@NotNull PromiseChain<O, ?> chain);
@@ -1090,40 +1144,6 @@ class DefaultPromiseIterable<O> implements PromiseIterable<O>, Serializable {
     DoubleQueue<O> getOutputs();
 
     void throwError();
-  }
-
-  private static class AnyStateRejected<R> implements AnyState<R> {
-
-    private final ArrayList<Throwable> mReasons = new ArrayList<Throwable>();
-
-    private AnyStateRejected(final Throwable reason) {
-      mReasons.add(reason);
-    }
-
-    public boolean isRejection() {
-      return true;
-    }
-
-    void add(final Throwable reason) {
-      mReasons.add(reason);
-    }
-
-    public void resolve(@NotNull final Handler<?, ? super CallbackIterable<R>> handler,
-        @NotNull final CallbackIterable<R> callback) throws Exception {
-      handler.reject(new RejectionIterableException(mReasons), callback);
-    }
-
-  }
-
-  private static class AnyStateResolved<R> implements AnyState<R> {
-
-    public void resolve(@NotNull final Handler<?, ? super CallbackIterable<R>> handler,
-        @NotNull final CallbackIterable<R> callback) {
-    }
-
-    public boolean isRejection() {
-      return false;
-    }
   }
 
   private static class ChainHandler<O, R> extends PromiseChain<O, R> {
@@ -2197,6 +2217,255 @@ class DefaultPromiseIterable<O> implements PromiseIterable<O>, Serializable {
     }
   }
 
+  private static class ChainMapCatchSpread<O> extends PromiseChain<O, O> {
+
+    private final Iterable<Class<? extends Throwable>> mErrors;
+
+    private final Mapper<Throwable, Iterable<O>> mMapper;
+
+    @SuppressWarnings("unchecked")
+    private ChainMapCatchSpread(@Nullable final Iterable<Class<? extends Throwable>> errors,
+        @NotNull final Mapper<Throwable, Iterable<O>> mapper) {
+      mMapper = ConstantConditions.notNull("mapper", mapper);
+      mErrors = errors;
+    }
+
+    private Object writeReplace() throws ObjectStreamException {
+      return new ChainProxy<O>(mErrors, mMapper);
+    }
+
+    private static class ChainProxy<O> extends SerializableProxy {
+
+      private ChainProxy(final Iterable<Class<? extends Throwable>> errors,
+          final Mapper<Throwable, Iterable<O>> mapper) {
+        super(errors, proxy(mapper));
+      }
+
+      @SuppressWarnings("unchecked")
+      Object readResolve() throws ObjectStreamException {
+        try {
+          final Object[] args = deserializeArgs();
+          return new ChainMapCatchSpread<O>((Iterable<Class<? extends Throwable>>) args[0],
+              (Mapper<Throwable, Iterable<O>>) args[1]);
+
+        } catch (final Throwable t) {
+          throw new InvalidObjectException(t.getMessage());
+        }
+      }
+    }
+
+    @Override
+    void add(final PromiseChain<O, ?> next, final O input) {
+      try {
+        next.add(input);
+
+      } catch (final CancellationException e) {
+        getLogger().wrn(e, "Promise has been cancelled");
+        next.addRejectionSafe(e);
+
+      } catch (final Throwable t) {
+        InterruptedExecutionException.throwIfInterrupt(t);
+        getLogger().err(t, "Error while processing input: %s", input);
+        next.addRejectionSafe(t);
+      }
+    }
+
+    @Override
+    void addAll(final PromiseChain<O, ?> next, final Iterable<O> inputs) {
+      try {
+        next.addAll(inputs);
+
+      } catch (final CancellationException e) {
+        getLogger().wrn(e, "Promise has been cancelled");
+        next.addRejectionSafe(e);
+
+      } catch (final Throwable t) {
+        InterruptedExecutionException.throwIfInterrupt(t);
+        getLogger().err(t, "Error while processing inputs: %s", Iterables.toString(inputs));
+        next.addRejectionSafe(t);
+      }
+    }
+
+    @NotNull
+    @Override
+    PromiseChain<O, O> copy() {
+      return new ChainMapCatchSpread<O>(mErrors, mMapper);
+    }
+
+    @Override
+    void addRejection(final PromiseChain<O, ?> next, final Throwable reason) {
+      boolean isHandled = false;
+      if (mErrors == null) {
+        isHandled = true;
+
+      } else {
+        for (final Class<? extends Throwable> error : mErrors) {
+          if (error.isInstance(reason)) {
+            isHandled = true;
+            break;
+          }
+        }
+      }
+
+      try {
+        if (isHandled) {
+          next.addAll(mMapper.apply(reason));
+
+        } else {
+          next.addRejection(reason);
+        }
+
+      } catch (final CancellationException e) {
+        getLogger().wrn(e, "Promise has been cancelled");
+        next.addRejectionSafe(e);
+
+      } catch (final Throwable t) {
+        InterruptedExecutionException.throwIfInterrupt(t);
+        getLogger().err(t, "Error while processing rejection with reason: %s", reason);
+        next.addRejectionSafe(t);
+      }
+    }
+
+    @Override
+    void resolve(final PromiseChain<O, ?> next) {
+      try {
+        next.resolve();
+
+      } catch (final CancellationException e) {
+        getLogger().wrn(e, "Promise has been cancelled");
+
+      } catch (final Throwable t) {
+        InterruptedExecutionException.throwIfInterrupt(t);
+        getLogger().err(t, "Error while propagating resolution");
+      }
+    }
+  }
+
+  private static class ChainMapCatchSpreadTrusted<O> extends PromiseChain<O, O> {
+
+    private final Iterable<Class<? extends Throwable>> mErrors;
+
+    private final Mapper<Throwable, Chainable<? extends Iterable<O>>> mMapper;
+
+    @SuppressWarnings("unchecked")
+    private ChainMapCatchSpreadTrusted(@Nullable final Iterable<Class<? extends Throwable>> errors,
+        @NotNull final Mapper<Throwable, Chainable<? extends Iterable<O>>> mapper) {
+      mMapper = ConstantConditions.notNull("mapper", mapper);
+      mErrors = errors;
+    }
+
+    private Object writeReplace() throws ObjectStreamException {
+      return new ChainProxy<O>(mErrors, mMapper);
+    }
+
+    private static class ChainProxy<O> extends SerializableProxy {
+
+      private ChainProxy(final Iterable<Class<? extends Throwable>> errors,
+          final Mapper<Throwable, Chainable<? extends Iterable<O>>> mapper) {
+        super(errors, proxy(mapper));
+      }
+
+      @SuppressWarnings("unchecked")
+      Object readResolve() throws ObjectStreamException {
+        try {
+          final Object[] args = deserializeArgs();
+          return new ChainMapCatchSpreadTrusted<O>((Iterable<Class<? extends Throwable>>) args[0],
+              (Mapper<Throwable, Chainable<? extends Iterable<O>>>) args[1]);
+
+        } catch (final Throwable t) {
+          throw new InvalidObjectException(t.getMessage());
+        }
+      }
+    }
+
+    @Override
+    void add(final PromiseChain<O, ?> next, final O input) {
+      try {
+        next.add(input);
+
+      } catch (final CancellationException e) {
+        getLogger().wrn(e, "Promise has been cancelled");
+        next.addRejectionSafe(e);
+
+      } catch (final Throwable t) {
+        InterruptedExecutionException.throwIfInterrupt(t);
+        getLogger().err(t, "Error while processing input: %s", input);
+        next.addRejectionSafe(t);
+      }
+    }
+
+    @Override
+    void addAll(final PromiseChain<O, ?> next, final Iterable<O> inputs) {
+      try {
+        next.addAll(inputs);
+
+      } catch (final CancellationException e) {
+        getLogger().wrn(e, "Promise has been cancelled");
+        next.addRejectionSafe(e);
+
+      } catch (final Throwable t) {
+        InterruptedExecutionException.throwIfInterrupt(t);
+        getLogger().err(t, "Error while processing inputs: %s", Iterables.toString(inputs));
+        next.addRejectionSafe(t);
+      }
+    }
+
+    @NotNull
+    @Override
+    PromiseChain<O, O> copy() {
+      return new ChainMapCatchSpreadTrusted<O>(mErrors, mMapper);
+    }
+
+    @Override
+    @SuppressWarnings("unchecked")
+    void addRejection(final PromiseChain<O, ?> next, final Throwable reason) {
+      boolean isHandled = false;
+      if (mErrors == null) {
+        isHandled = true;
+
+      } else {
+        for (final Class<? extends Throwable> error : mErrors) {
+          if (error.isInstance(reason)) {
+            isHandled = true;
+            break;
+          }
+        }
+      }
+
+      try {
+        if (isHandled) {
+          next.addAllDeferred(mMapper.apply(reason));
+
+        } else {
+          next.addRejection(reason);
+        }
+
+      } catch (final CancellationException e) {
+        getLogger().wrn(e, "Promise has been cancelled");
+        next.addRejectionSafe(e);
+
+      } catch (final Throwable t) {
+        InterruptedExecutionException.throwIfInterrupt(t);
+        getLogger().err(t, "Error while processing rejection with reason: %s", reason);
+        next.addRejectionSafe(t);
+      }
+    }
+
+    @Override
+    void resolve(final PromiseChain<O, ?> next) {
+      try {
+        next.resolve();
+
+      } catch (final CancellationException e) {
+        getLogger().wrn(e, "Promise has been cancelled");
+
+      } catch (final Throwable t) {
+        InterruptedExecutionException.throwIfInterrupt(t);
+        getLogger().err(t, "Error while propagating resolution");
+      }
+    }
+  }
+
   private static class ChainMapCatchTrusted<O> extends PromiseChain<O, O> {
 
     private final Iterable<Class<? extends Throwable>> mErrors;
@@ -2702,6 +2971,8 @@ class DefaultPromiseIterable<O> implements PromiseIterable<O>, Serializable {
 
     private final NestedQueue<Resolution<R>> mQueue = new NestedQueue<Resolution<R>>();
 
+    private ChainCallback mCallback;
+
     private boolean mIsCreated;
 
     private boolean mIsRejected;
@@ -2783,10 +3054,12 @@ class DefaultPromiseIterable<O> implements PromiseIterable<O>, Serializable {
 
     private class ChainCallback implements CallbackIterable<R> {
 
-      private final PromiseChain<R, ?> mNext;
+      private volatile PromiseChain<R, ?> mNext;
 
-      private ChainCallback(final PromiseChain<R, ?> next) {
+      @NotNull
+      ChainCallback withNext(final PromiseChain<R, ?> next) {
         mNext = next;
+        return this;
       }
 
       public void defer(@NotNull final Chainable<R> chainable) {
@@ -2978,7 +3251,11 @@ class DefaultPromiseIterable<O> implements PromiseIterable<O>, Serializable {
           }
 
           try {
-            final ChainCallback callback = new ChainCallback(next);
+            if (mCallback == null) {
+              mCallback = new ChainCallback();
+            }
+
+            final ChainCallback callback = mCallback.withNext(next);
             final StatefulHandler<O, R, S> handler = mHandler;
             if (!mIsCreated) {
               mIsCreated = true;
@@ -3013,7 +3290,11 @@ class DefaultPromiseIterable<O> implements PromiseIterable<O>, Serializable {
           }
 
           try {
-            final ChainCallback callback = new ChainCallback(next);
+            if (mCallback == null) {
+              mCallback = new ChainCallback();
+            }
+
+            final ChainCallback callback = mCallback.withNext(next);
             final StatefulHandler<O, R, S> handler = mHandler;
             if (!mIsCreated) {
               mIsCreated = true;
@@ -3057,7 +3338,11 @@ class DefaultPromiseIterable<O> implements PromiseIterable<O>, Serializable {
           }
 
           try {
-            final ChainCallback callback = new ChainCallback(next);
+            if (mCallback == null) {
+              mCallback = new ChainCallback();
+            }
+
+            final ChainCallback callback = mCallback.withNext(next);
             final StatefulHandler<O, R, S> handler = mHandler;
             if (!mIsCreated) {
               mIsCreated = true;
@@ -3092,7 +3377,11 @@ class DefaultPromiseIterable<O> implements PromiseIterable<O>, Serializable {
           }
 
           try {
-            final ChainCallback callback = new ChainCallback(next);
+            if (mCallback == null) {
+              mCallback = new ChainCallback();
+            }
+
+            final ChainCallback callback = mCallback.withNext(next);
             final StatefulHandler<O, R, S> handler = mHandler;
             if (!mIsCreated) {
               mIsCreated = true;
@@ -3185,83 +3474,6 @@ class DefaultPromiseIterable<O> implements PromiseIterable<O>, Serializable {
         @NotNull final CallbackIterable<R> callback) throws Exception {
       if (state != null) {
         mHandler.fulfill(state, callback);
-
-      } else {
-        callback.resolve();
-      }
-    }
-  }
-
-  private static class HandlerAny<O, R>
-      implements StatefulHandler<O, R, AnyState<R>>, Serializable {
-
-    private final Handler<O, ? super CallbackIterable<R>> mHandler;
-
-    private final Logger mLogger;
-
-    @SuppressWarnings("unchecked")
-    private HandlerAny(@Nullable final Handler<O, ? super CallbackIterable<R>> handler,
-        @Nullable final Log log, @Nullable final Level level) {
-      mHandler = ConstantConditions.notNull("handler", handler);
-      mLogger = Logger.newLogger(log, level, this);
-    }
-
-    private Object writeReplace() throws ObjectStreamException {
-      final Logger logger = mLogger;
-      return new HandlerProxy<O, R>(mHandler, logger.getLog(), logger.getLogLevel());
-    }
-
-    private static class HandlerProxy<O, R> extends SerializableProxy {
-
-      private HandlerProxy(final Handler<O, ? super CallbackIterable<R>> handler, final Log log,
-          final Level level) {
-        super(proxy(handler), log, level);
-      }
-
-      @SuppressWarnings("unchecked")
-      Object readResolve() throws ObjectStreamException {
-        try {
-          final Object[] args = deserializeArgs();
-          return new HandlerAny<O, R>((Handler<O, ? super CallbackIterable<R>>) args[0],
-              (Log) args[1], (Level) args[2]);
-
-        } catch (final Throwable t) {
-          throw new InvalidObjectException(t.getMessage());
-        }
-      }
-    }
-
-    public AnyState<R> create(@NotNull final CallbackIterable<R> callback) {
-      return null;
-    }
-
-    public AnyState<R> fulfill(final AnyState<R> state, final O input,
-        @NotNull final CallbackIterable<R> callback) throws Exception {
-      if ((state == null) || state.isRejection()) {
-        mHandler.fulfill(input, callback);
-        return new AnyStateResolved<R>();
-      }
-
-      return state;
-    }
-
-    @SuppressWarnings("unchecked")
-    public AnyState<R> reject(final AnyState<R> state, final Throwable reason,
-        @NotNull final CallbackIterable<R> callback) throws Exception {
-      if (state == null) {
-        return new AnyStateRejected<R>(reason);
-
-      } else if (state.isRejection()) {
-        ((AnyStateRejected<R>) state).add(reason);
-      }
-
-      return state;
-    }
-
-    public void resolve(final AnyState<R> state, @NotNull final CallbackIterable<R> callback) throws
-        Exception {
-      if (state != null) {
-        state.resolve(mHandler, callback);
 
       } else {
         callback.resolve();
@@ -3518,6 +3730,94 @@ class DefaultPromiseIterable<O> implements PromiseIterable<O>, Serializable {
         }
       }
 
+      callback.reject(reason);
+    }
+  }
+
+  private static class HandlerEachSpread<O, R>
+      implements Handler<O, CallbackIterable<R>>, Serializable {
+
+    private final Mapper<O, Iterable<R>> mMapper;
+
+    private HandlerEachSpread(@NotNull final Mapper<O, Iterable<R>> mapper) {
+      mMapper = ConstantConditions.notNull("mapper", mapper);
+    }
+
+    private Object writeReplace() throws ObjectStreamException {
+      return new HandlerProxy<O, R>(mMapper);
+    }
+
+    private static class HandlerProxy<O, R> extends SerializableProxy {
+
+      private HandlerProxy(final Mapper<O, Iterable<R>> mapper) {
+        super(proxy(mapper));
+      }
+
+      @SuppressWarnings("unchecked")
+      Object readResolve() throws ObjectStreamException {
+        try {
+          final Object[] args = deserializeArgs();
+          return new HandlerEachSpread<O, R>((Mapper<O, Iterable<R>>) args[0]);
+
+        } catch (final Throwable t) {
+          throw new InvalidObjectException(t.getMessage());
+        }
+      }
+    }
+
+    @SuppressWarnings("unchecked")
+    public void fulfill(final O input, @NotNull final CallbackIterable<R> callback) throws
+        Exception {
+      callback.addAll(mMapper.apply(input));
+      callback.resolve();
+    }
+
+    public void reject(final Throwable reason, @NotNull final CallbackIterable<R> callback) {
+      callback.reject(reason);
+    }
+  }
+
+  private static class HandlerEachSpreadTrusted<O, R>
+      implements Handler<O, CallbackIterable<R>>, Serializable {
+
+    private final Mapper<O, Chainable<? extends Iterable<R>>> mMapper;
+
+    private HandlerEachSpreadTrusted(
+        @NotNull final Mapper<O, Chainable<? extends Iterable<R>>> mapper) {
+      mMapper = ConstantConditions.notNull("mapper", mapper);
+    }
+
+    private Object writeReplace() throws ObjectStreamException {
+      return new HandlerProxy<O, R>(mMapper);
+    }
+
+    private static class HandlerProxy<O, R> extends SerializableProxy {
+
+      private HandlerProxy(final Mapper<O, Chainable<? extends Iterable<R>>> mapper) {
+        super(proxy(mapper));
+      }
+
+      @SuppressWarnings("unchecked")
+      Object readResolve() throws ObjectStreamException {
+        try {
+          final Object[] args = deserializeArgs();
+          return new HandlerEachSpreadTrusted<O, R>(
+              (Mapper<O, Chainable<? extends Iterable<R>>>) args[0]);
+
+        } catch (final Throwable t) {
+          throw new InvalidObjectException(t.getMessage());
+        }
+      }
+    }
+
+    @SuppressWarnings("unchecked")
+    public void fulfill(final O input, @NotNull final CallbackIterable<R> callback) throws
+        Exception {
+      callback.addAllDeferred(mMapper.apply(input));
+      callback.resolve();
+    }
+
+    public void reject(final Throwable reason, @NotNull final CallbackIterable<R> callback) {
       callback.reject(reason);
     }
   }

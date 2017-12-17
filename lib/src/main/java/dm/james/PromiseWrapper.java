@@ -64,15 +64,15 @@ abstract class PromiseWrapper<O> implements Promise<O>, Serializable {
   }
 
   @NotNull
-  public Promise<O> catchAllTrusted(@NotNull final Iterable<Class<? extends Throwable>> errors,
+  public Promise<O> catchAllFlat(@NotNull final Iterable<Class<? extends Throwable>> errors,
       @NotNull final Mapper<Throwable, Chainable<? extends O>> mapper) {
-    return newInstance(mPromise.catchAllTrusted(errors, mapper));
+    return newInstance(mPromise.catchAllFlat(errors, mapper));
   }
 
   @NotNull
-  public Promise<O> catchAllTrusted(
+  public Promise<O> catchAllFlat(
       @NotNull final Mapper<Throwable, Chainable<? extends O>> mapper) {
-    return newInstance(mPromise.catchAllTrusted(mapper));
+    return newInstance(mPromise.catchAllFlat(mapper));
   }
 
   public O get() {
@@ -112,6 +112,11 @@ abstract class PromiseWrapper<O> implements Promise<O>, Serializable {
   }
 
   @NotNull
+  public Promise<O> renew() {
+    return newInstance(mPromise.renew());
+  }
+
+  @NotNull
   public Promise<O> scheduleAll(@NotNull final ScheduledExecutor executor) {
     return newInstance(mPromise.scheduleAll(executor));
   }
@@ -127,8 +132,8 @@ abstract class PromiseWrapper<O> implements Promise<O>, Serializable {
   }
 
   @NotNull
-  public <R> Promise<R> thenTrusted(@NotNull final Mapper<O, Chainable<? extends R>> mapper) {
-    return newInstance(mPromise.thenTrusted(mapper));
+  public <R> Promise<R> thenFlat(@NotNull final Mapper<O, Chainable<? extends R>> mapper) {
+    return newInstance(mPromise.thenFlat(mapper));
   }
 
   @NotNull
@@ -142,8 +147,8 @@ abstract class PromiseWrapper<O> implements Promise<O>, Serializable {
   }
 
   @NotNull
-  public <R> Promise<R> thenTryTrusted(@NotNull final Mapper<O, Chainable<? extends R>> mapper) {
-    return newInstance(mPromise.thenTryTrusted(mapper));
+  public <R> Promise<R> thenTryFlat(@NotNull final Mapper<O, Chainable<? extends R>> mapper) {
+    return newInstance(mPromise.thenTryFlat(mapper));
   }
 
   public void waitResolved() {
@@ -155,18 +160,18 @@ abstract class PromiseWrapper<O> implements Promise<O>, Serializable {
   }
 
   @NotNull
-  public Promise<O> whenFulfilled(@NotNull final Observer<O> observer) {
-    return newInstance(mPromise.whenFulfilled(observer));
+  public Promise<O> onFulfill(@NotNull final Observer<O> observer) {
+    return newInstance(mPromise.onFulfill(observer));
   }
 
   @NotNull
-  public Promise<O> whenRejected(@NotNull final Observer<Throwable> observer) {
-    return newInstance(mPromise.whenRejected(observer));
+  public Promise<O> onReject(@NotNull final Observer<Throwable> observer) {
+    return newInstance(mPromise.onReject(observer));
   }
 
   @NotNull
-  public Promise<O> whenResolved(@NotNull final Action action) {
-    return newInstance(mPromise.whenResolved(action));
+  public Promise<O> onResolve(@NotNull final Action action) {
+    return newInstance(mPromise.onResolve(action));
   }
 
   public boolean isFulfilled() {

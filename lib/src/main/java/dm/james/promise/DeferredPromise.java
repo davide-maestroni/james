@@ -36,14 +36,17 @@ public interface DeferredPromise<I, O> extends Promise<O> {
   DeferredPromise<I, O> catchAll(@NotNull Mapper<Throwable, O> mapper);
 
   @NotNull
-  DeferredPromise<I, O> catchAllTrusted(@NotNull Iterable<Class<? extends Throwable>> errors,
+  DeferredPromise<I, O> catchAllFlat(@NotNull Iterable<Class<? extends Throwable>> errors,
       @NotNull Mapper<Throwable, Chainable<? extends O>> mapper);
 
   @NotNull
-  DeferredPromise<I, O> catchAllTrusted(@NotNull Mapper<Throwable, Chainable<? extends O>> mapper);
+  DeferredPromise<I, O> catchAllFlat(@NotNull Mapper<Throwable, Chainable<? extends O>> mapper);
 
   @NotNull
   DeferredPromise<I, PromiseInspection<O>> inspect();
+
+  @NotNull
+  DeferredPromise<I, O> renew();
 
   @NotNull
   DeferredPromise<I, O> scheduleAll(@NotNull ScheduledExecutor executor);
@@ -55,7 +58,7 @@ public interface DeferredPromise<I, O> extends Promise<O> {
   <R> DeferredPromise<I, R> then(@NotNull Mapper<O, R> mapper);
 
   @NotNull
-  <R> DeferredPromise<I, R> thenTrusted(@NotNull Mapper<O, Chainable<? extends R>> mapper);
+  <R> DeferredPromise<I, R> thenFlat(@NotNull Mapper<O, Chainable<? extends R>> mapper);
 
   @NotNull
   <R> DeferredPromise<I, R> thenTry(@NotNull Handler<O, ? super Callback<R>> handler);
@@ -64,16 +67,16 @@ public interface DeferredPromise<I, O> extends Promise<O> {
   <R> DeferredPromise<I, R> thenTry(@NotNull Mapper<O, R> mapper);
 
   @NotNull
-  <R> DeferredPromise<I, R> thenTryTrusted(@NotNull Mapper<O, Chainable<? extends R>> mapper);
+  <R> DeferredPromise<I, R> thenTryFlat(@NotNull Mapper<O, Chainable<? extends R>> mapper);
 
   @NotNull
-  DeferredPromise<I, O> whenFulfilled(@NotNull Observer<O> observer);
+  DeferredPromise<I, O> onFulfill(@NotNull Observer<O> observer);
 
   @NotNull
-  DeferredPromise<I, O> whenRejected(@NotNull Observer<Throwable> observer);
+  DeferredPromise<I, O> onReject(@NotNull Observer<Throwable> observer);
 
   @NotNull
-  DeferredPromise<I, O> whenResolved(@NotNull Action action);
+  DeferredPromise<I, O> onResolve(@NotNull Action action);
 
   void defer(@NotNull Chainable<I> chainable);
 

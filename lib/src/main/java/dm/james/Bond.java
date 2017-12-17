@@ -27,6 +27,7 @@ import java.io.ObjectStreamException;
 import java.io.Serializable;
 import java.nio.ByteBuffer;
 import java.nio.channels.ReadableByteChannel;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.Callable;
@@ -39,7 +40,6 @@ import dm.james.io.Buffer;
 import dm.james.log.Log;
 import dm.james.log.Log.Level;
 import dm.james.log.Logger;
-import dm.james.promise.Action;
 import dm.james.promise.CancellationException;
 import dm.james.promise.Chainable;
 import dm.james.promise.Chainable.Callback;
@@ -53,6 +53,7 @@ import dm.james.promise.Mapper;
 import dm.james.promise.Observer;
 import dm.james.promise.Promise;
 import dm.james.promise.PromiseIterable;
+import dm.james.promise.RejectionIterableException;
 import dm.james.util.ConstantConditions;
 import dm.james.util.InterruptedExecutionException;
 import dm.james.util.Iterables;
@@ -64,7 +65,6 @@ import dm.james.util.SerializableProxy;
 public class Bond implements Serializable {
 
   // TODO: 06/08/2017 Handlers => james-handler??
-  // TODO: 08/08/2017 promisify
   // TODO: 06/08/2017 james-android, james-retrofit, james-swagger
 
   private final Log mLog;
@@ -108,25 +108,18 @@ public class Bond implements Serializable {
   @NotNull
   public <O> PromiseIterable<O> allSorted(
       @NotNull final Iterable<? extends Chainable<?>> chainables) {
-    return resolvedIterable(null).eachSorted(new HandlerChainables<O>(chainables));
+    return resolvedIterable(null).forEachSorted(new HandlerChainables<O>(chainables));
   }
 
   @NotNull
   public <O> PromiseIterable<O> any(@NotNull final Iterable<? extends Chainable<?>> chainables) {
-    return combine(chainables, new HandlerRace<O>());
+    return this.<O>all(chainables).then(new HandlerAny<O>(mLog, mLogLevel));
   }
 
   @NotNull
   @SuppressWarnings("unchecked")
   public <O> PromiseIterable<O> any(@NotNull final Chainable<? extends Iterable<O>> chainable) {
-    // TODO: 28/08/2017 fix any/first
-    return all(chainable).each(IdentityMapper.<O>instance());
-  }
-
-  @NotNull
-  public <O> PromiseIterable<O> anyOnly(
-      @NotNull final Iterable<? extends Chainable<?>> chainables) {
-    return combine(chainables, new HandlerSurvive<O>());
+    return all(chainable).then(new HandlerAny<O>(mLog, mLogLevel));
   }
 
   @NotNull
@@ -148,42 +141,65 @@ public class Bond implements Serializable {
 
   @NotNull
   public <I> DeferredPromiseIterable<I, I> deferredIterable() {
+    // TODO: 02/09/2017 max cached propagations
     return new DefaultDeferredPromiseIterable<I, I>(mLog, mLogLevel);
   }
 
   @NotNull
-  public <O> Promise<O> from(@NotNull final Future<O> future) {
-    return from(future, false);
+  public <O> PromiseIterable<O> first(@NotNull final Iterable<? extends Chainable<?>> chainables) {
+    return this.<O>all(chainables).then(new HandlerFirst<O>(mLog, mLogLevel));
   }
 
   @NotNull
-  public <O> Promise<O> from(@NotNull final Future<O> future, final boolean mayInterruptIfRunning) {
+  @SuppressWarnings("unchecked")
+  public <O> PromiseIterable<O> first(@NotNull final Chainable<? extends Iterable<O>> chainable) {
+    return all(chainable).then(new HandlerFirst<O>(mLog, mLogLevel));
+  }
+
+  @NotNull
+  public <O> Promise<O> fromCallable(@NotNull final Callable<O> callable) {
+    return promise(new ObserverCallable<O>(callable));
+  }
+
+  @NotNull
+  public <O> Promise<O> fromCallable(@NotNull final ScheduledExecutor executor,
+      @NotNull final Callable<O> callable) {
+    return promise(executor, new ObserverCallable<O>(callable));
+  }
+
+  @NotNull
+  @SuppressWarnings("unchecked")
+  public <O> Promise<O> fromChainable(@NotNull final Chainable<O> chainable) {
+    if (chainable instanceof Promise) {
+      return (Promise<O>) chainable;
+    }
+
+    return promise(new ObserverChainable<O>(chainable));
+  }
+
+  @NotNull
+  public <O> Promise<O> fromFuture(@NotNull final Future<O> future) {
+    return fromFuture(future, false);
+  }
+
+  @NotNull
+  public <O> Promise<O> fromFuture(@NotNull final Future<O> future,
+      final boolean mayInterruptIfRunning) {
     return new FuturePromise<O>(promise(new ObserverFuture<O>(future)), future,
         mayInterruptIfRunning);
   }
 
   @NotNull
-  public <O> Promise<O> from(@NotNull final Callable<O> callable) {
-    return promise(new ObserverCallable<O>(callable));
-  }
-
-  @NotNull
-  public <O> Promise<O> from(@NotNull final ScheduledExecutor executor,
+  public <O> Promise<O> fromFuture(@NotNull final ScheduledExecutor executor,
       @NotNull final Future<O> future) {
-    return from(executor, future, false);
+    return fromFuture(executor, future, false);
   }
 
   @NotNull
-  public <O> Promise<O> from(@NotNull final ScheduledExecutor executor,
+  public <O> Promise<O> fromFuture(@NotNull final ScheduledExecutor executor,
       @NotNull final Future<O> future, final boolean mayInterruptIfRunning) {
     return new FuturePromise<O>(promise(executor, new ObserverFuture<O>(future)), future,
         mayInterruptIfRunning);
-  }
-
-  @NotNull
-  public <O> Promise<O> from(@NotNull final ScheduledExecutor executor,
-      @NotNull final Callable<O> callable) {
-    return promise(executor, new ObserverCallable<O>(callable));
   }
 
   @NotNull
@@ -199,16 +215,6 @@ public class Bond implements Serializable {
   }
 
   @NotNull
-  @SuppressWarnings("unchecked")
-  public <O> Promise<O> just(@NotNull final Chainable<O> chainable) {
-    if (chainable instanceof Promise) {
-      return (Promise<O>) chainable;
-    }
-
-    return promise(new ObserverChainable<O>(chainable));
-  }
-
-  @NotNull
   public <O> Promise<O> promise(@NotNull final Observer<? super Callback<O>> observer) {
     return new DefaultPromise<O>(observer, mLog, mLogLevel);
   }
@@ -217,6 +223,11 @@ public class Bond implements Serializable {
   public <O> Promise<O> promise(@NotNull final ScheduledExecutor executor,
       @NotNull final Observer<? super Callback<O>> observer) {
     return promise(new ObserverScheduled<O>(executor, observer));
+  }
+
+  @NotNull
+  public <O> PromiseIterable<O> race(@NotNull final Iterable<? extends Chainable<?>> chainables) {
+    return combine(chainables, new HandlerRace<O>());
   }
 
   @NotNull
@@ -237,6 +248,36 @@ public class Bond implements Serializable {
   @NotNull
   public <O> PromiseIterable<O> resolvedIterable(@Nullable final Iterable<O> outputs) {
     return iterable(new ObserverResolvedIterable<O>(outputs));
+  }
+
+  @NotNull
+  public <O> Mapper<Promise<O>, Promise<O>> share() {
+    // TODO: 02/09/2017 classes
+    return new Mapper<Promise<O>, Promise<O>>() {
+
+      public Promise<O> apply(final Promise<O> promise) throws Exception {
+        final DeferredPromise<O, O> deferred = deferred();
+        promise.then(new Handler<O, Callback<Void>>() {
+
+          public void fulfill(final O input, @NotNull final Callback<Void> callback) throws
+              Exception {
+            deferred.resolve(input);
+          }
+
+          public void reject(final Throwable reason, @NotNull final Callback<Void> callback) throws
+              Exception {
+            deferred.reject(reason);
+          }
+        });
+        return deferred;
+      }
+    };
+  }
+
+  @NotNull
+  public <O> PromiseIterable<O> survive(
+      @NotNull final Iterable<? extends Chainable<?>> chainables) {
+    return combine(chainables, new HandlerSurvive<O>());
   }
 
   @NotNull
@@ -265,6 +306,42 @@ public class Bond implements Serializable {
   @NotNull
   public Bond withLogLevel(@Nullable final Level level) {
     return new Bond(mLog, level);
+  }
+
+  private interface AnyState<R> extends Observer<Callback<R>> {
+
+    boolean isRejection();
+  }
+
+  private static class AnyStateRejected<R> implements AnyState<R> {
+
+    private final ArrayList<Throwable> mReasons = new ArrayList<Throwable>();
+
+    private AnyStateRejected(final Throwable reason) {
+      mReasons.add(reason);
+    }
+
+    public void accept(final Callback<R> callback) {
+      callback.reject(new RejectionIterableException(mReasons));
+    }
+
+    public boolean isRejection() {
+      return true;
+    }
+
+    void add(final Throwable reason) {
+      mReasons.add(reason);
+    }
+  }
+
+  private static class AnyStateResolved<R> implements AnyState<R> {
+
+    public void accept(final Callback<R> input) {
+    }
+
+    public boolean isRejection() {
+      return false;
+    }
   }
 
   private static class BufferHandler<O>
@@ -453,6 +530,76 @@ public class Bond implements Serializable {
     }
   }
 
+  private static class HandlerAny<O> implements StatefulHandler<O, O, AnyState<O>>, Serializable {
+
+    private final Logger mLogger;
+
+    @SuppressWarnings("unchecked")
+    private HandlerAny(@Nullable final Log log, @Nullable final Level level) {
+      mLogger = Logger.newLogger(log, level, this);
+    }
+
+    private Object writeReplace() throws ObjectStreamException {
+      final Logger logger = mLogger;
+      return new HandlerProxy<O>(logger.getLog(), logger.getLogLevel());
+    }
+
+    private static class HandlerProxy<O> extends SerializableProxy {
+
+      private HandlerProxy(final Log log, final Level level) {
+        super(log, level);
+      }
+
+      @SuppressWarnings("unchecked")
+      Object readResolve() throws ObjectStreamException {
+        try {
+          final Object[] args = deserializeArgs();
+          return new HandlerAny<O>((Log) args[0], (Level) args[1]);
+
+        } catch (final Throwable t) {
+          throw new InvalidObjectException(t.getMessage());
+        }
+      }
+    }
+
+    public AnyState<O> create(@NotNull final CallbackIterable<O> callback) {
+      return null;
+    }
+
+    public AnyState<O> fulfill(final AnyState<O> state, final O input,
+        @NotNull final CallbackIterable<O> callback) throws Exception {
+      if ((state == null) || state.isRejection()) {
+        callback.resolve(input);
+        return new AnyStateResolved<O>();
+      }
+
+      return state;
+    }
+
+    @SuppressWarnings("unchecked")
+    public AnyState<O> reject(final AnyState<O> state, final Throwable reason,
+        @NotNull final CallbackIterable<O> callback) throws Exception {
+      if (state == null) {
+        return new AnyStateRejected<O>(reason);
+
+      } else if (state.isRejection()) {
+        ((AnyStateRejected<O>) state).add(reason);
+      }
+
+      return state;
+    }
+
+    public void resolve(final AnyState<O> state, @NotNull final CallbackIterable<O> callback) throws
+        Exception {
+      if (state == null) {
+        callback.resolve();
+
+      } else {
+        state.accept(callback);
+      }
+    }
+  }
+
   private static class HandlerChainables<O>
       implements Handler<Object, CallbackIterable<O>>, Observer<CallbackIterable<O>>, Serializable {
 
@@ -463,7 +610,7 @@ public class Bond implements Serializable {
     }
 
     @SuppressWarnings("unchecked")
-    public void accept(final CallbackIterable<O> callback) {
+    public void fulfill(final Object input, @NotNull final CallbackIterable<O> callback) {
       for (final Chainable<?> chainable : mChainables) {
         if (chainable instanceof ChainableIterable) {
           callback.addAllDeferred((ChainableIterable<O>) chainable);
@@ -477,7 +624,7 @@ public class Bond implements Serializable {
     }
 
     @SuppressWarnings("unchecked")
-    public void fulfill(final Object input, @NotNull final CallbackIterable<O> callback) {
+    public void accept(final CallbackIterable<O> callback) {
       for (final Chainable<?> chainable : mChainables) {
         if (chainable instanceof ChainableIterable) {
           callback.addAllDeferred((ChainableIterable<O>) chainable);
@@ -594,6 +741,68 @@ public class Bond implements Serializable {
           }
         }
       });
+    }
+  }
+
+  private static class HandlerFirst<O> implements StatefulHandler<O, O, Boolean>, Serializable {
+
+    private final Logger mLogger;
+
+    @SuppressWarnings("unchecked")
+    private HandlerFirst(@Nullable final Log log, @Nullable final Level level) {
+      mLogger = Logger.newLogger(log, level, this);
+    }
+
+    private Object writeReplace() throws ObjectStreamException {
+      final Logger logger = mLogger;
+      return new HandlerProxy<O>(logger.getLog(), logger.getLogLevel());
+    }
+
+    private static class HandlerProxy<O> extends SerializableProxy {
+
+      private HandlerProxy(final Log log, final Level level) {
+        super(log, level);
+      }
+
+      @SuppressWarnings("unchecked")
+      Object readResolve() throws ObjectStreamException {
+        try {
+          final Object[] args = deserializeArgs();
+          return new HandlerAny<O>((Log) args[0], (Level) args[1]);
+
+        } catch (final Throwable t) {
+          throw new InvalidObjectException(t.getMessage());
+        }
+      }
+    }
+
+    public Boolean create(@NotNull final CallbackIterable<O> callback) {
+      return Boolean.FALSE;
+    }
+
+    public Boolean fulfill(final Boolean state, final O input,
+        @NotNull final CallbackIterable<O> callback) {
+      if (!state) {
+        callback.resolve(input);
+      }
+
+      return Boolean.TRUE;
+    }
+
+    @SuppressWarnings("unchecked")
+    public Boolean reject(final Boolean state, final Throwable reason,
+        @NotNull final CallbackIterable<O> callback) {
+      if (!state) {
+        callback.reject(reason);
+      }
+
+      return Boolean.TRUE;
+    }
+
+    public void resolve(final Boolean state, @NotNull final CallbackIterable<O> callback) {
+      if (!state) {
+        callback.resolve();
+      }
     }
   }
 
@@ -880,72 +1089,6 @@ public class Bond implements Serializable {
         state.setRejected(true);
         callback.reject(t);
       }
-    }
-  }
-
-  private static class ObserverCombinationResolve<O, S>
-      implements Observer<Callback<Void>>, Action {
-
-    private final CallbackIterable<O> mCallback;
-
-    private final List<? extends Chainable<?>> mChainables;
-
-    private final ScheduledExecutor mExecutor;
-
-    private final CombinationHandler<O, S> mHandler;
-
-    private final int mIndex;
-
-    private final Logger mLogger;
-
-    private final CombinationState<S> mState;
-
-    private ObserverCombinationResolve(@NotNull final CombinationState<S> state,
-        @NotNull final CombinationHandler<O, S> handler, @NotNull final ScheduledExecutor executor,
-        @NotNull final List<? extends Chainable<?>> chainables, final int index,
-        @NotNull final CallbackIterable<O> callback, @NotNull final Logger logger) {
-      mState = state;
-      mHandler = handler;
-      mExecutor = executor;
-      mChainables = chainables;
-      mIndex = index;
-      mCallback = callback;
-      mLogger = logger;
-    }
-
-    public void perform() {
-      mExecutor.execute(new Runnable() {
-
-        public void run() {
-          final CombinationState<S> state = mState;
-          if (state.isRejected()) {
-            mLogger.wrn("Ignoring resolution");
-            return;
-          }
-
-          try {
-            state.set(mHandler.resolve(state.get(), mChainables, mIndex, mCallback));
-            if (state.addResolved()) {
-              mHandler.settle(state.get(), mChainables, mCallback);
-            }
-
-          } catch (final CancellationException e) {
-            mLogger.wrn(e, "Promise has been cancelled");
-            state.setRejected(true);
-            mCallback.reject(e);
-
-          } catch (final Throwable t) {
-            InterruptedExecutionException.throwIfInterrupt(t);
-            mLogger.err(t, "Error while processing resolution");
-            state.setRejected(true);
-            mCallback.reject(t);
-          }
-        }
-      });
-    }
-
-    public void accept(final Callback<Void> callback) {
-      perform();
     }
   }
 

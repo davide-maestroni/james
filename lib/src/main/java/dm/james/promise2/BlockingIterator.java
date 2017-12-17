@@ -14,23 +14,27 @@
  * limitations under the License.
  */
 
-package dm.james.promise;
+package dm.james.promise2;
 
-import org.jetbrains.annotations.NotNull;
-
+import java.util.Iterator;
 import java.util.List;
 
 /**
- * Created by davide-maestroni on 08/15/2017.
+ * Created by davide-maestroni on 12/01/2017.
  */
-public interface ScheduledData<O> {
+public interface BlockingIterator<E> extends Iterator<E> {
 
-  @NotNull
-  List<O> outputs();
+  List<E> next(int maxSize);
 
-  int pending();
+  List<E> nextAll();
 
-  void retain(int count);
+  E nextOr(E defaultValue);
 
-  void retainAll();
+  List<E> take(int maxSize);
+
+  E take();
+
+  List<E> takeAll();
+
+  E takeOr(E defaultValue);
 }

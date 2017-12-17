@@ -53,7 +53,7 @@ class BoundPromise<I, O> extends PromiseWrapper<O> implements Serializable {
       @NotNull final DeferredPromise<Iterable<I>, O> deferred) {
     final BoundPromise<Iterable<I>, O> boundPromise =
         new BoundPromise<Iterable<I>, O>(ConstantConditions.notNull("promise", promise), deferred);
-    promise.all(new DeferredHandler<Iterable<I>>(deferred));
+    promise.thenAll(new DeferredHandler<Iterable<I>>(deferred));
     return boundPromise;
   }
 

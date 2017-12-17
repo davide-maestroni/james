@@ -28,6 +28,8 @@ import java.nio.channels.WritableByteChannel;
  */
 public interface Buffer {
 
+  // TODO: 21/11/2017 Closeable
+
   int available();
 
   byte peek(int index);

@@ -47,6 +47,8 @@ import java.util.List;
  */
 public interface Log {
 
+  // TODO: 11/12/2017 LogPrinter
+
   /**
    * Logs a debug message.
    *

@@ -65,21 +65,26 @@ class WrappingDeferredPromise<I, O> implements DeferredPromise<I, O>, Serializab
   }
 
   @NotNull
-  public DeferredPromise<I, O> catchAllTrusted(
+  public DeferredPromise<I, O> catchAllFlat(
       @NotNull final Iterable<Class<? extends Throwable>> errors,
       @NotNull final Mapper<Throwable, Chainable<? extends O>> mapper) {
-    return newInstance(mPromise.catchAllTrusted(errors, mapper));
+    return newInstance(mPromise.catchAllFlat(errors, mapper));
   }
 
   @NotNull
-  public DeferredPromise<I, O> catchAllTrusted(
+  public DeferredPromise<I, O> catchAllFlat(
       @NotNull final Mapper<Throwable, Chainable<? extends O>> mapper) {
-    return newInstance(mPromise.catchAllTrusted(mapper));
+    return newInstance(mPromise.catchAllFlat(mapper));
   }
 
   @NotNull
   public DeferredPromise<I, PromiseInspection<O>> inspect() {
     return newInstance(mPromise.inspect());
+  }
+
+  @NotNull
+  public DeferredPromise<I, O> renew() {
+    return newInstance(mPromise.renew());
   }
 
   @NotNull
@@ -98,9 +103,9 @@ class WrappingDeferredPromise<I, O> implements DeferredPromise<I, O>, Serializab
   }
 
   @NotNull
-  public <R> DeferredPromise<I, R> thenTrusted(
+  public <R> DeferredPromise<I, R> thenFlat(
       @NotNull final Mapper<O, Chainable<? extends R>> mapper) {
-    return newInstance(mPromise.thenTrusted(mapper));
+    return newInstance(mPromise.thenFlat(mapper));
   }
 
   @NotNull
@@ -114,24 +119,24 @@ class WrappingDeferredPromise<I, O> implements DeferredPromise<I, O>, Serializab
   }
 
   @NotNull
-  public <R> DeferredPromise<I, R> thenTryTrusted(
+  public <R> DeferredPromise<I, R> thenTryFlat(
       @NotNull final Mapper<O, Chainable<? extends R>> mapper) {
-    return newInstance(mPromise.thenTryTrusted(mapper));
+    return newInstance(mPromise.thenTryFlat(mapper));
   }
 
   @NotNull
-  public DeferredPromise<I, O> whenFulfilled(@NotNull final Observer<O> observer) {
-    return newInstance(mPromise.whenFulfilled(observer));
+  public DeferredPromise<I, O> onFulfill(@NotNull final Observer<O> observer) {
+    return newInstance(mPromise.onFulfill(observer));
   }
 
   @NotNull
-  public DeferredPromise<I, O> whenRejected(@NotNull final Observer<Throwable> observer) {
-    return newInstance(mPromise.whenRejected(observer));
+  public DeferredPromise<I, O> onReject(@NotNull final Observer<Throwable> observer) {
+    return newInstance(mPromise.onReject(observer));
   }
 
   @NotNull
-  public DeferredPromise<I, O> whenResolved(@NotNull final Action action) {
-    return newInstance(mPromise.whenResolved(action));
+  public DeferredPromise<I, O> onResolve(@NotNull final Action action) {
+    return newInstance(mPromise.onResolve(action));
   }
 
   public void defer(@NotNull final Chainable<I> chainable) {

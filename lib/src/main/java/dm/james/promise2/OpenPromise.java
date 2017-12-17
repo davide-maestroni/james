@@ -14,23 +14,13 @@
  * limitations under the License.
  */
 
-package dm.james.promise;
+package dm.james.promise2;
 
-import org.jetbrains.annotations.NotNull;
-
-import java.util.List;
+import dm.james.promise2.Promise.IterableCallback;
 
 /**
- * Created by davide-maestroni on 08/15/2017.
+ * Created by davide-maestroni on 12/15/2017.
  */
-public interface ScheduledData<O> {
+public interface OpenPromise<I, O> extends Promise<Iterable<O>>, IterableCallback<I> {
 
-  @NotNull
-  List<O> outputs();
-
-  int pending();
-
-  void retain(int count);
-
-  void retainAll();
 }

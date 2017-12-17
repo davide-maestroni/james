@@ -64,8 +64,8 @@ class BackoffHandler<O> implements StatefulHandler<O, O, BackoffData<O>>, Serial
       @NotNull final CallbackIterable<O> callback) throws Exception {
     state.outputs().add(input);
     applyBackoff(state);
-    if (!state.resetRetain()) {
-      final List<O> outputs = state.resetOutputs();
+    final List<O> outputs = state.resetOutputs();
+    if (!outputs.isEmpty()) {
       mExecutor.execute(new Runnable() {
 
         public void run() {
@@ -161,7 +161,7 @@ class BackoffHandler<O> implements StatefulHandler<O, O, BackoffData<O>>, Serial
 
     private int mCount;
 
-    private boolean mIsRetain;
+    private int mRetainCount;
 
     private BackoffData() {
     }
@@ -177,8 +177,12 @@ class BackoffHandler<O> implements StatefulHandler<O, O, BackoffData<O>>, Serial
       }
     }
 
-    public void retain() {
-      mIsRetain = true;
+    public void retain(final int count) {
+      mRetainCount = count;
+    }
+
+    public void retainAll() {
+      retain(Integer.MAX_VALUE);
     }
 
     private void decrementPending() {
@@ -201,15 +205,12 @@ class BackoffHandler<O> implements StatefulHandler<O, O, BackoffData<O>>, Serial
 
     @NotNull
     private List<I> resetOutputs() {
-      final ArrayList<I> inputs = new ArrayList<I>(mInputs);
-      mInputs.clear();
-      return inputs;
-    }
-
-    private boolean resetRetain() {
-      final boolean isRetain = mIsRetain;
-      mIsRetain = false;
-      return isRetain;
+      final ArrayList<I> inputs = mInputs;
+      final List<I> toRemove = inputs.subList(0, Math.max(0, inputs.size() - mRetainCount));
+      final ArrayList<I> outputs = new ArrayList<I>(toRemove);
+      toRemove.clear();
+      mRetainCount = 0;
+      return outputs;
     }
   }
 
