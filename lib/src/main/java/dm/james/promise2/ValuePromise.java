@@ -64,24 +64,6 @@ public class ValuePromise<V> implements Promise<V> {
 
   private static final InspectReject<?> sInspectReject = new InspectReject<Object>();
 
-  private static final CallbackHandler<Object, Object, IterableCallback<Object>> sSpreadFulfill =
-      new CallbackHandler<Object, Object, IterableCallback<Object>>() {
-
-        public void accept(final Object value,
-            @NotNull final IterableCallback<Object> callback) throws Exception {
-          if (value instanceof Iterable) {
-            callback.fulfillAllAndContinue((Iterable<?>) value).resolve();
-
-          } else {
-            callback.fulfill(value);
-          }
-        }
-
-        Object readResolve() throws ObjectStreamException {
-          return sSpreadFulfill;
-        }
-      };
-
   private static DefaultFulfillHandler<?, ?> sDefaultFulfillHandler =
       new DefaultFulfillHandler<Object, Object>();
 
@@ -263,22 +245,22 @@ public class ValuePromise<V> implements Promise<V> {
 
   @NotNull
   public <E, R, S> Promise<R> collect(
-      @NotNull final ReductionHandler<E, R, S, ? super Callback<R>> handler) {
+      @NotNull final LoopHandler<E, R, S, ? super Callback<R>> handler) {
     return then(new ReduceFulfill<V, E, R, S>(handler), new ReduceReject<E, R, S>(handler));
   }
 
   @NotNull
   public <E, R, S> Promise<R> collect(@Nullable final Mapper<? super Callback<R>, S> create,
-      @Nullable final ReductionFulfill<E, R, S, ? super Callback<R>> fulfill,
-      @Nullable final ReductionReject<R, S, ? super Callback<R>> reject,
-      @Nullable final ReductionResolve<R, S, ? super Callback<R>> resolve) {
+      @Nullable final LoopFulfill<E, R, S, ? super Callback<R>> fulfill,
+      @Nullable final LoopReject<R, S, ? super Callback<R>> reject,
+      @Nullable final LoopResolve<R, S, ? super Callback<R>> resolve) {
     return collect(
-        new ComposedReductionHandler<E, R, S, Callback<R>>(create, fulfill, reject, resolve));
+        new ComposedLoopHandler<E, R, S, Callback<R>>(create, fulfill, reject, resolve));
   }
 
   @NotNull
   public <E, R, S> Promise<R> collectTrying(
-      @NotNull final ReductionHandler<E, R, S, ? super Callback<R>> handler) {
+      @NotNull final LoopHandler<E, R, S, ? super Callback<R>> handler) {
     final Logger logger = mLogger;
     return then(new ReduceFulfillTrying<V, E, R, S>(handler, logger.getLog(), logger.getLogLevel()),
         new ReduceRejectTrying<E, R, S>(handler, logger.getLog(), logger.getLogLevel()));
@@ -286,11 +268,11 @@ public class ValuePromise<V> implements Promise<V> {
 
   @NotNull
   public <E, R, S> Promise<R> collectTrying(@Nullable final Mapper<? super Callback<R>, S> create,
-      @Nullable final ReductionFulfill<E, R, S, ? super Callback<R>> fulfill,
-      @Nullable final ReductionReject<R, S, ? super Callback<R>> reject,
-      @Nullable final ReductionResolve<R, S, ? super Callback<R>> resolve) {
+      @Nullable final LoopFulfill<E, R, S, ? super Callback<R>> fulfill,
+      @Nullable final LoopReject<R, S, ? super Callback<R>> reject,
+      @Nullable final LoopResolve<R, S, ? super Callback<R>> resolve) {
     return collectTrying(
-        new ComposedReductionHandler<E, R, S, Callback<R>>(create, fulfill, reject, resolve));
+        new ComposedLoopHandler<E, R, S, Callback<R>>(create, fulfill, reject, resolve));
   }
 
   @NotNull
@@ -510,33 +492,33 @@ public class ValuePromise<V> implements Promise<V> {
   }
 
   @NotNull
-  public <E, R, S> Promise<Iterable<R>> reduce(
-      @NotNull final ReductionHandler<E, R, S, ? super IterableCallback<R>> handler) {
-    return spread().reduce(handler);
+  public <E, R, S> Promise<Iterable<R>> forEach(
+      @NotNull final LoopHandler<E, R, S, ? super IterableCallback<R>> handler) {
+    return spread().forEach(handler);
   }
 
   @NotNull
-  public <E, R, S> Promise<Iterable<R>> reduce(
+  public <E, R, S> Promise<Iterable<R>> forEach(
       @Nullable final Mapper<? super IterableCallback<R>, S> create,
-      @Nullable final ReductionFulfill<E, R, S, ? super IterableCallback<R>> fulfill,
-      @Nullable final ReductionReject<R, S, ? super IterableCallback<R>> reject,
-      @Nullable final ReductionResolve<R, S, ? super IterableCallback<R>> resolve) {
-    return spread().reduce(create, fulfill, reject, resolve);
+      @Nullable final LoopFulfill<E, R, S, ? super IterableCallback<R>> fulfill,
+      @Nullable final LoopReject<R, S, ? super IterableCallback<R>> reject,
+      @Nullable final LoopResolve<R, S, ? super IterableCallback<R>> resolve) {
+    return spread().forEach(create, fulfill, reject, resolve);
   }
 
   @NotNull
-  public <E, R, S> Promise<Iterable<R>> reduceTrying(
-      @NotNull final ReductionHandler<E, R, S, ? super IterableCallback<R>> handler) {
-    return spread().reduceTrying(handler);
+  public <E, R, S> Promise<Iterable<R>> forEachTrying(
+      @NotNull final LoopHandler<E, R, S, ? super IterableCallback<R>> handler) {
+    return spread().forEachTrying(handler);
   }
 
   @NotNull
-  public <E, R, S> Promise<Iterable<R>> reduceTrying(
+  public <E, R, S> Promise<Iterable<R>> forEachTrying(
       @Nullable final Mapper<? super IterableCallback<R>, S> create,
-      @Nullable final ReductionFulfill<E, R, S, ? super IterableCallback<R>> fulfill,
-      @Nullable final ReductionReject<R, S, ? super IterableCallback<R>> reject,
-      @Nullable final ReductionResolve<R, S, ? super IterableCallback<R>> resolve) {
-    return spread().reduceTrying(create, fulfill, reject, resolve);
+      @Nullable final LoopFulfill<E, R, S, ? super IterableCallback<R>> fulfill,
+      @Nullable final LoopReject<R, S, ? super IterableCallback<R>> reject,
+      @Nullable final LoopResolve<R, S, ? super IterableCallback<R>> resolve) {
+    return spread().forEachTrying(create, fulfill, reject, resolve);
   }
 
   @NotNull
@@ -570,7 +552,7 @@ public class ValuePromise<V> implements Promise<V> {
   }
 
   @NotNull
-  public <R> Promise<Iterable<R>> thenSpread(
+  public <R> Promise<Iterable<R>> spread(
       @Nullable final CallbackHandler<V, R, ? super IterableCallback<R>> fulfill,
       @Nullable final CallbackHandler<Throwable, R, ? super IterableCallback<R>> reject) {
     final OpenPromise<R, R> openPromise = null;
@@ -618,7 +600,7 @@ public class ValuePromise<V> implements Promise<V> {
 
   @NotNull
   public <R, S> Promise<R> whenChained(@Nullable final Mapper<? super Promise<V>, S> create,
-      @Nullable final ChainHandle<V, S> handle,
+      @Nullable final ChainValue<V, S> handle,
       @Nullable final ChainThen<V, R, S, ? super Callback<R>> then) {
     return null;
   }
@@ -632,7 +614,7 @@ public class ValuePromise<V> implements Promise<V> {
   @NotNull
   public <R, S> Promise<Iterable<R>> whenEachChained(
       @Nullable final Mapper<? super Promise<V>, S> create,
-      @Nullable final ChainHandle<V, S> handle,
+      @Nullable final ChainValue<V, S> handle,
       @Nullable final ChainThen<V, R, S, ? super IterableCallback<R>> then) {
     return null;
   }
@@ -787,7 +769,7 @@ public class ValuePromise<V> implements Promise<V> {
   @NotNull
   @SuppressWarnings("unchecked")
   private <E> Promise<Iterable<E>> spread() {
-    return thenSpread((CallbackHandler<V, E, ? super IterableCallback<E>>) sSpreadFulfill, null);
+    return spread((CallbackHandler<V, E, ? super IterableCallback<E>>) sSpreadFulfill, null);
   }
 
   private Object writeReplace() throws ObjectStreamException {
@@ -1588,9 +1570,9 @@ public class ValuePromise<V> implements Promise<V> {
   private static class ReduceFulfill<V, E, R, S>
       implements CallbackHandler<V, R, Callback<R>>, Serializable {
 
-    private final ReductionHandler<E, R, S, ? super Callback<R>> mHandler;
+    private final LoopHandler<E, R, S, ? super Callback<R>> mHandler;
 
-    private ReduceFulfill(@NotNull final ReductionHandler<E, R, S, ? super Callback<R>> handler) {
+    private ReduceFulfill(@NotNull final LoopHandler<E, R, S, ? super Callback<R>> handler) {
       mHandler = ConstantConditions.notNull("handler", handler);
     }
 
@@ -1600,7 +1582,7 @@ public class ValuePromise<V> implements Promise<V> {
 
     private static class HandlerProxy<V, E, R, S> extends SerializableProxy {
 
-      private HandlerProxy(final ReductionHandler<E, R, S, ? super Callback<R>> handler) {
+      private HandlerProxy(final LoopHandler<E, R, S, ? super Callback<R>> handler) {
         super(proxy(handler));
       }
 
@@ -1609,7 +1591,7 @@ public class ValuePromise<V> implements Promise<V> {
         try {
           final Object[] args = deserializeArgs();
           return new ReduceFulfill<V, E, R, S>(
-              (ReductionHandler<E, R, S, ? super Callback<R>>) args[0]);
+              (LoopHandler<E, R, S, ? super Callback<R>>) args[0]);
 
         } catch (final Throwable t) {
           throw new InvalidObjectException(t.getMessage());
@@ -1619,7 +1601,7 @@ public class ValuePromise<V> implements Promise<V> {
 
     @SuppressWarnings("unchecked")
     public void accept(final V value, @NotNull final Callback<R> callback) throws Exception {
-      final ReductionHandler<E, R, S, ? super Callback<R>> handler = mHandler;
+      final LoopHandler<E, R, S, ? super Callback<R>> handler = mHandler;
       S state = handler.create(callback);
       if (value instanceof Iterable) {
         for (final E element : (Iterable<E>) value) {
@@ -1637,12 +1619,12 @@ public class ValuePromise<V> implements Promise<V> {
   private static class ReduceFulfillTrying<V, E, R, S>
       implements CallbackHandler<V, R, Callback<R>>, Serializable {
 
-    private final ReductionHandler<E, R, S, ? super Callback<R>> mHandler;
+    private final LoopHandler<E, R, S, ? super Callback<R>> mHandler;
 
     private final Logger mLogger;
 
     private ReduceFulfillTrying(
-        @NotNull final ReductionHandler<E, R, S, ? super Callback<R>> handler,
+        @NotNull final LoopHandler<E, R, S, ? super Callback<R>> handler,
         @Nullable final Log log, @Nullable final Level level) {
       mHandler = ConstantConditions.notNull("handler", handler);
       mLogger = Logger.newLogger(log, level, this);
@@ -1655,7 +1637,7 @@ public class ValuePromise<V> implements Promise<V> {
 
     private static class HandlerProxy<V, E, R, S> extends SerializableProxy {
 
-      private HandlerProxy(final ReductionHandler<E, R, S, ? super Callback<R>> handler,
+      private HandlerProxy(final LoopHandler<E, R, S, ? super Callback<R>> handler,
           final Log log, final Level level) {
         super(proxy(handler), log, level);
       }
@@ -1665,7 +1647,7 @@ public class ValuePromise<V> implements Promise<V> {
         try {
           final Object[] args = deserializeArgs();
           return new ReduceFulfillTrying<V, E, R, S>(
-              (ReductionHandler<E, R, S, ? super Callback<R>>) args[0], (Log) args[1],
+              (LoopHandler<E, R, S, ? super Callback<R>>) args[0], (Log) args[1],
               (Level) args[2]);
 
         } catch (final Throwable t) {
@@ -1676,7 +1658,7 @@ public class ValuePromise<V> implements Promise<V> {
 
     @SuppressWarnings("unchecked")
     public void accept(final V value, @NotNull final Callback<R> callback) throws Exception {
-      final ReductionHandler<E, R, S, ? super Callback<R>> handler = mHandler;
+      final LoopHandler<E, R, S, ? super Callback<R>> handler = mHandler;
       S state = handler.create(callback);
       try {
         if (value instanceof Iterable) {
@@ -1699,9 +1681,9 @@ public class ValuePromise<V> implements Promise<V> {
   private static class ReduceReject<E, R, S>
       implements CallbackHandler<Throwable, R, Callback<R>>, Serializable {
 
-    private final ReductionHandler<E, R, S, ? super Callback<R>> mHandler;
+    private final LoopHandler<E, R, S, ? super Callback<R>> mHandler;
 
-    private ReduceReject(@NotNull final ReductionHandler<E, R, S, ? super Callback<R>> handler) {
+    private ReduceReject(@NotNull final LoopHandler<E, R, S, ? super Callback<R>> handler) {
       mHandler = ConstantConditions.notNull("handler", handler);
     }
 
@@ -1711,7 +1693,7 @@ public class ValuePromise<V> implements Promise<V> {
 
     private static class HandlerProxy<E, R, S> extends SerializableProxy {
 
-      private HandlerProxy(final ReductionHandler<E, R, S, ? super Callback<R>> handler) {
+      private HandlerProxy(final LoopHandler<E, R, S, ? super Callback<R>> handler) {
         super(proxy(handler));
       }
 
@@ -1720,7 +1702,7 @@ public class ValuePromise<V> implements Promise<V> {
         try {
           final Object[] args = deserializeArgs();
           return new ReduceReject<E, R, S>(
-              (ReductionHandler<E, R, S, ? super Callback<R>>) args[0]);
+              (LoopHandler<E, R, S, ? super Callback<R>>) args[0]);
 
         } catch (final Throwable t) {
           throw new InvalidObjectException(t.getMessage());
@@ -1731,7 +1713,7 @@ public class ValuePromise<V> implements Promise<V> {
     @SuppressWarnings("unchecked")
     public void accept(final Throwable value, @NotNull final Callback<R> callback) throws
         Exception {
-      final ReductionHandler<E, R, S, ? super Callback<R>> handler = mHandler;
+      final LoopHandler<E, R, S, ? super Callback<R>> handler = mHandler;
       S state = handler.create(callback);
       state = handler.reject(state, value, callback);
       handler.resolve(state, callback);
@@ -1741,12 +1723,12 @@ public class ValuePromise<V> implements Promise<V> {
   private static class ReduceRejectTrying<E, R, S>
       implements CallbackHandler<Throwable, R, Callback<R>>, Serializable {
 
-    private final ReductionHandler<E, R, S, ? super Callback<R>> mHandler;
+    private final LoopHandler<E, R, S, ? super Callback<R>> mHandler;
 
     private final Logger mLogger;
 
     private ReduceRejectTrying(
-        @NotNull final ReductionHandler<E, R, S, ? super Callback<R>> handler,
+        @NotNull final LoopHandler<E, R, S, ? super Callback<R>> handler,
         @Nullable final Log log, @Nullable final Level level) {
       mHandler = ConstantConditions.notNull("handler", handler);
       mLogger = Logger.newLogger(log, level, this);
@@ -1759,7 +1741,7 @@ public class ValuePromise<V> implements Promise<V> {
 
     private static class HandlerProxy<E, R, S> extends SerializableProxy {
 
-      private HandlerProxy(final ReductionHandler<E, R, S, ? super Callback<R>> handler,
+      private HandlerProxy(final LoopHandler<E, R, S, ? super Callback<R>> handler,
           final Log log, final Level level) {
         super(proxy(handler), log, level);
       }
@@ -1769,7 +1751,7 @@ public class ValuePromise<V> implements Promise<V> {
         try {
           final Object[] args = deserializeArgs();
           return new ReduceRejectTrying<E, R, S>(
-              (ReductionHandler<E, R, S, ? super Callback<R>>) args[0], (Log) args[1],
+              (LoopHandler<E, R, S, ? super Callback<R>>) args[0], (Log) args[1],
               (Level) args[2]);
 
         } catch (final Throwable t) {
@@ -1781,7 +1763,7 @@ public class ValuePromise<V> implements Promise<V> {
     @SuppressWarnings("unchecked")
     public void accept(final Throwable value, @NotNull final Callback<R> callback) throws
         Exception {
-      final ReductionHandler<E, R, S, ? super Callback<R>> handler = mHandler;
+      final LoopHandler<E, R, S, ? super Callback<R>> handler = mHandler;
       S state = handler.create(callback);
       try {
         state = handler.reject(state, value, callback);

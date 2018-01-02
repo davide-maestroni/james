@@ -23,8 +23,8 @@ apply from: '../extra.gradle'
 group = project.getProperty('groupName')
 version = project.getProperty('releaseVersion')
 archivesBaseName = project.name
-compileJavaCompatibility = JavaVersion.VERSION_1_8
-compileTestJavaCompatibility = JavaVersion.VERSION_1_8
+project.setCompileJavaCompatibility(JavaVersion.VERSION_1_8)
+project.setCompileTestJavaCompatibility(JavaVersion.VERSION_1_8)
 
 ext {
   libVersion = '0.0.1'
@@ -37,7 +37,7 @@ dependencies {
   testCompile 'org.assertj:assertj-core:2.4.1'
 }
 
-conditionalDependencies {
+project.conditionalDependencies {
   compile name: 'lib', version: libVersion
 }
 

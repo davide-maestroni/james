@@ -55,29 +55,29 @@ abstract class PromiseWrapper<V> implements Promise<V> {
 
   @NotNull
   public <E, R, S> Promise<R> collect(
-      @NotNull final ReductionHandler<E, R, S, ? super Callback<R>> handler) {
+      @NotNull final LoopHandler<E, R, S, ? super Callback<R>> handler) {
     return newInstance(mPromise.collect(handler));
   }
 
   @NotNull
   public <E, R, S> Promise<R> collect(@Nullable final Mapper<? super Callback<R>, S> create,
-      @Nullable final ReductionFulfill<E, R, S, ? super Callback<R>> fulfill,
-      @Nullable final ReductionReject<R, S, ? super Callback<R>> reject,
-      @Nullable final ReductionResolve<R, S, ? super Callback<R>> resolve) {
+      @Nullable final LoopFulfill<E, R, S, ? super Callback<R>> fulfill,
+      @Nullable final LoopReject<R, S, ? super Callback<R>> reject,
+      @Nullable final LoopResolve<R, S, ? super Callback<R>> resolve) {
     return newInstance(mPromise.collect(create, fulfill, reject, resolve));
   }
 
   @NotNull
   public <E, R, S> Promise<R> collectTrying(
-      @NotNull final ReductionHandler<E, R, S, ? super Callback<R>> handler) {
+      @NotNull final LoopHandler<E, R, S, ? super Callback<R>> handler) {
     return newInstance(mPromise.collectTrying(handler));
   }
 
   @NotNull
   public <E, R, S> Promise<R> collectTrying(@Nullable final Mapper<? super Callback<R>, S> create,
-      @Nullable final ReductionFulfill<E, R, S, ? super Callback<R>> fulfill,
-      @Nullable final ReductionReject<R, S, ? super Callback<R>> reject,
-      @Nullable final ReductionResolve<R, S, ? super Callback<R>> resolve) {
+      @Nullable final LoopFulfill<E, R, S, ? super Callback<R>> fulfill,
+      @Nullable final LoopReject<R, S, ? super Callback<R>> reject,
+      @Nullable final LoopResolve<R, S, ? super Callback<R>> resolve) {
     return newInstance(mPromise.collectTrying(create, fulfill, reject, resolve));
   }
 
@@ -203,33 +203,33 @@ abstract class PromiseWrapper<V> implements Promise<V> {
   }
 
   @NotNull
-  public <E, R, S> Promise<Iterable<R>> reduce(
-      @NotNull final ReductionHandler<E, R, S, ? super IterableCallback<R>> handler) {
-    return newInstance(mPromise.reduce(handler));
+  public <E, R, S> Promise<Iterable<R>> forEach(
+      @NotNull final LoopHandler<E, R, S, ? super IterableCallback<R>> handler) {
+    return newInstance(mPromise.forEach(handler));
   }
 
   @NotNull
-  public <E, R, S> Promise<Iterable<R>> reduce(
+  public <E, R, S> Promise<Iterable<R>> forEach(
       @Nullable final Mapper<? super IterableCallback<R>, S> create,
-      @Nullable final ReductionFulfill<E, R, S, ? super IterableCallback<R>> fulfill,
-      @Nullable final ReductionReject<R, S, ? super IterableCallback<R>> reject,
-      @Nullable final ReductionResolve<R, S, ? super IterableCallback<R>> resolve) {
-    return newInstance(mPromise.reduce(create, fulfill, reject, resolve));
+      @Nullable final LoopFulfill<E, R, S, ? super IterableCallback<R>> fulfill,
+      @Nullable final LoopReject<R, S, ? super IterableCallback<R>> reject,
+      @Nullable final LoopResolve<R, S, ? super IterableCallback<R>> resolve) {
+    return newInstance(mPromise.forEach(create, fulfill, reject, resolve));
   }
 
   @NotNull
-  public <E, R, S> Promise<Iterable<R>> reduceTrying(
-      @NotNull final ReductionHandler<E, R, S, ? super IterableCallback<R>> handler) {
-    return newInstance(mPromise.reduceTrying(handler));
+  public <E, R, S> Promise<Iterable<R>> forEachTrying(
+      @NotNull final LoopHandler<E, R, S, ? super IterableCallback<R>> handler) {
+    return newInstance(mPromise.forEachTrying(handler));
   }
 
   @NotNull
-  public <E, R, S> Promise<Iterable<R>> reduceTrying(
+  public <E, R, S> Promise<Iterable<R>> forEachTrying(
       @Nullable final Mapper<? super IterableCallback<R>, S> create,
-      @Nullable final ReductionFulfill<E, R, S, ? super IterableCallback<R>> fulfill,
-      @Nullable final ReductionReject<R, S, ? super IterableCallback<R>> reject,
-      @Nullable final ReductionResolve<R, S, ? super IterableCallback<R>> resolve) {
-    return newInstance(mPromise.reduceTrying(create, fulfill, reject, resolve));
+      @Nullable final LoopFulfill<E, R, S, ? super IterableCallback<R>> fulfill,
+      @Nullable final LoopReject<R, S, ? super IterableCallback<R>> reject,
+      @Nullable final LoopResolve<R, S, ? super IterableCallback<R>> resolve) {
+    return newInstance(mPromise.forEachTrying(create, fulfill, reject, resolve));
   }
 
   @NotNull
@@ -259,10 +259,10 @@ abstract class PromiseWrapper<V> implements Promise<V> {
   }
 
   @NotNull
-  public <R> Promise<Iterable<R>> thenSpread(
+  public <R> Promise<Iterable<R>> spread(
       @Nullable final CallbackHandler<V, R, ? super IterableCallback<R>> fulfill,
       @Nullable final CallbackHandler<Throwable, R, ? super IterableCallback<R>> reject) {
-    return newInstance(mPromise.thenSpread(fulfill, reject));
+    return newInstance(mPromise.spread(fulfill, reject));
   }
 
   @NotNull
@@ -286,7 +286,7 @@ abstract class PromiseWrapper<V> implements Promise<V> {
 
   @NotNull
   public <R, S> Promise<R> whenChained(@Nullable final Mapper<? super Promise<V>, S> create,
-      @Nullable final ChainHandle<V, S> handle,
+      @Nullable final ChainValue<V, S> handle,
       @Nullable final ChainThen<V, R, S, ? super Callback<R>> then) {
     return newInstance(mPromise.whenChained(create, handle, then));
   }
@@ -300,7 +300,7 @@ abstract class PromiseWrapper<V> implements Promise<V> {
   @NotNull
   public <R, S> Promise<Iterable<R>> whenEachChained(
       @Nullable final Mapper<? super Promise<V>, S> create,
-      @Nullable final ChainHandle<V, S> handle,
+      @Nullable final ChainValue<V, S> handle,
       @Nullable final ChainThen<V, R, S, ? super IterableCallback<R>> then) {
     return newInstance(mPromise.whenEachChained(create, handle, then));
   }

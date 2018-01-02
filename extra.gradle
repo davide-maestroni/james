@@ -58,7 +58,7 @@ Project.metaClass.setCompileJavaCompatibility = { JavaVersion javaVersion ->
         jarPath = "${javaHome}/../Classes/classes.jar"
       }
       if (file(jarPath).exists()) {
-        options.bootClasspath = jarPath
+        options.bootstrapClasspath = files(jarPath)
       }
     }
     sourceCompatibility = javaVersion
@@ -80,7 +80,7 @@ Project.metaClass.setCompileTestJavaCompatibility = { JavaVersion javaVersion ->
         jarPath = "${javaHome}/../Classes/classes.jar"
       }
       if (file(jarPath).exists()) {
-        options.bootClasspath = jarPath
+        options.bootstrapClasspath = files(jarPath)
       }
     }
     sourceCompatibility = javaVersion
@@ -397,7 +397,7 @@ class ConditionalDependencySpecs {
       }
     }
 
-    if (dependsOnProject.hasProperty('releaseVersion') && !dependsOnProject.getProperty('releaseVersion').equals(version)) {
+    if (dependsOnProject.hasProperty('releaseVersion') && dependsOnProject.getProperty('releaseVersion') != version) {
       throw new IllegalArgumentException("Could not find artifact: ${group}:${artifact}:${version}@${packaging}")
     }
 

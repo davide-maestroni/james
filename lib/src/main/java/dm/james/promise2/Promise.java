@@ -23,14 +23,11 @@ import java.io.Serializable;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 
-import dm.james.executor.ScheduledExecutor;
 import dm.james.promise.Action;
 import dm.james.promise.Mapper;
 import dm.james.promise.Observer;
 import dm.james.promise.PromiseInspection;
 import dm.james.promise.RejectionException;
-import dm.james.promise.ScheduledData;
-import dm.james.util.Backoff;
 
 /**
  * Created by davide-maestroni on 11/16/2017.
@@ -43,31 +40,28 @@ public interface Promise<V> extends Thenable<V>, PromiseInspection<V>, Future<V>
   boolean cancel();
 
   @NotNull
-  <E, R, S> Promise<R> collect(@NotNull ReductionHandler<E, R, S, ? super Callback<R>> handler);
+  <E, R> Promise<Iterable<R>> forEach(@Nullable ThenHandler<E, R, ? super Callback<R>> handler);
 
   @NotNull
-  <E, R, S> Promise<R> collect(@Nullable Mapper<? super Callback<R>, S> create,
-      @Nullable ReductionFulfill<E, R, S, ? super Callback<R>> fulfill,
-      @Nullable ReductionReject<R, S, ? super Callback<R>> reject,
-      @Nullable ReductionResolve<R, S, ? super Callback<R>> resolve);
+  <E, R> Promise<Iterable<R>> forEach(@Nullable CallbackHandler<E, R, ? super Callback<R>> fulfill,
+      @Nullable CallbackHandler<Throwable, R, ? super Callback<R>> reject);
 
   @NotNull
-  <E, R, S> Promise<R> collectTrying(
-      @NotNull ReductionHandler<E, R, S, ? super Callback<R>> handler);
+  <E, R, S> Promise<Iterable<R>> forEach(
+      @NotNull LoopHandler<E, R, S, ? super IterableCallback<R>> handler);
 
   @NotNull
-  <E, R, S> Promise<R> collectTrying(@Nullable Mapper<? super Callback<R>, S> create,
-      @Nullable ReductionFulfill<E, R, S, ? super Callback<R>> fulfill,
-      @Nullable ReductionReject<R, S, ? super Callback<R>> reject,
-      @Nullable ReductionResolve<R, S, ? super Callback<R>> resolve);
-
-  @NotNull
-  <E, R> Promise<Iterable<R>> forEach(
-      @Nullable CallbackHandler<E, R, ? super IterableCallback<R>> fulfill,
-      @Nullable CallbackHandler<Throwable, R, ? super IterableCallback<R>> reject);
+  <E, R, S> Promise<Iterable<R>> forEach(@Nullable Mapper<? super IterableCallback<R>, S> create,
+      @Nullable LoopFulfill<E, R, S, ? super IterableCallback<R>> fulfill,
+      @Nullable LoopReject<R, S, ? super IterableCallback<R>> reject,
+      @Nullable LoopResolve<R, S, ? super IterableCallback<R>> resolve,
+      @Nullable Mapper<S, Boolean> test);
 
   @NotNull
   <R> Promise<Iterable<R>> forEachCatch(@Nullable Mapper<Throwable, R> mapper);
+
+  @NotNull
+  <R> Promise<Iterable<R>> forEachCatchOrdered(@Nullable Mapper<Throwable, R> mapper);
 
   @NotNull
   <E, R> Promise<Iterable<R>> forEachMap(@Nullable Mapper<E, R> mapper);
@@ -77,11 +71,32 @@ public interface Promise<V> extends Thenable<V>, PromiseInspection<V>, Future<V>
       int maxBatchSize);
 
   @NotNull
-  <E> Promise<Iterable<E>> forEachSchedule(@NotNull ScheduledExecutor executor,
-      @NotNull Backoff<ScheduledData<E>> backoff);
+  <E, R> Promise<Iterable<R>> forEachMapOrdered(@Nullable Mapper<E, R> mapper);
 
   @NotNull
-  <E> Promise<Iterable<E>> forEachSchedule(@NotNull ScheduledExecutor executor);
+  <E, R> Promise<Iterable<R>> forEachMapOrdered(@Nullable Mapper<E, R> mapper, int minBatchSize,
+      int maxBatchSize);
+
+  @NotNull
+  <E, R> Promise<Iterable<R>> forEachOrdered(
+      @Nullable ThenHandler<E, R, ? super Callback<R>> handler);
+
+  @NotNull
+  <E, R> Promise<Iterable<R>> forEachOrdered(
+      @Nullable CallbackHandler<E, R, ? super Callback<R>> fulfill,
+      @Nullable CallbackHandler<Throwable, R, ? super Callback<R>> reject);
+
+  @NotNull
+  <E, R, S> Promise<Iterable<R>> forEachOrdered(
+      @NotNull LoopHandler<E, R, S, ? super IterableCallback<R>> handler);
+
+  @NotNull
+  <E, R, S> Promise<Iterable<R>> forEachOrdered(
+      @Nullable Mapper<? super IterableCallback<R>, S> create,
+      @Nullable LoopFulfill<E, R, S, ? super IterableCallback<R>> fulfill,
+      @Nullable LoopReject<R, S, ? super IterableCallback<R>> reject,
+      @Nullable LoopResolve<R, S, ? super IterableCallback<R>> resolve,
+      @Nullable Mapper<S, Boolean> test);
 
   @Nullable
   RejectionException getReason();
@@ -118,7 +133,7 @@ public interface Promise<V> extends Thenable<V>, PromiseInspection<V>, Future<V>
   <E> Promise<Iterable<E>> onEachFulfill(@NotNull Observer<E> observer);
 
   @NotNull
-  <E> Promise<Iterable<E>> onEachReject(@NotNull Observer<Throwable> observer);
+  <E> Promise<Iterable<E>> onEachReject(@NotNull Observer<? super Throwable> observer);
 
   @NotNull
   Promise<V> onFulfill(@NotNull Observer<? super V> observer);
@@ -130,31 +145,10 @@ public interface Promise<V> extends Thenable<V>, PromiseInspection<V>, Future<V>
   Promise<V> onResolve(@NotNull Action action);
 
   @NotNull
-  Promise<V> ordered();
-
-  @NotNull
-  <E, R, S> Promise<Iterable<R>> reduce(
-      @NotNull ReductionHandler<E, R, S, ? super IterableCallback<R>> handler);
-
-  @NotNull
-  <E, R, S> Promise<Iterable<R>> reduce(@Nullable Mapper<? super IterableCallback<R>, S> create,
-      @Nullable ReductionFulfill<E, R, S, ? super IterableCallback<R>> fulfill,
-      @Nullable ReductionReject<R, S, ? super IterableCallback<R>> reject,
-      @Nullable ReductionResolve<R, S, ? super IterableCallback<R>> resolve);
-
-  @NotNull
-  <E, R, S> Promise<Iterable<R>> reduceTrying(
-      @NotNull ReductionHandler<E, R, S, ? super IterableCallback<R>> handler);
-
-  @NotNull
-  <E, R, S> Promise<Iterable<R>> reduceTrying(
-      @Nullable Mapper<? super IterableCallback<R>, S> create,
-      @Nullable ReductionFulfill<E, R, S, ? super IterableCallback<R>> fulfill,
-      @Nullable ReductionReject<R, S, ? super IterableCallback<R>> reject,
-      @Nullable ReductionResolve<R, S, ? super IterableCallback<R>> resolve);
-
-  @NotNull
   Promise<V> renew();
+
+  @NotNull
+  <R> Promise<R> then(@Nullable ThenHandler<V, R, ? super Callback<R>> handler);
 
   @NotNull
   <R> Promise<R> then(@Nullable CallbackHandler<V, R, ? super Callback<R>> fulfill,
@@ -167,35 +161,25 @@ public interface Promise<V> extends Thenable<V>, PromiseInspection<V>, Future<V>
   <R> Promise<R> thenMap(@NotNull Mapper<V, R> mapper);
 
   @NotNull
-  Promise<V> thenSchedule(@NotNull ScheduledExecutor executor);
+  Promise<V> tryingState();
 
   @NotNull
-  <R> Promise<Iterable<R>> thenSpread(
-      @Nullable CallbackHandler<V, R, ? super IterableCallback<R>> fulfill,
-      @Nullable CallbackHandler<Throwable, R, ? super IterableCallback<R>> reject);
+  Promise<V> tryingStateAndValues();
 
   @NotNull
-  Promise<V> trying();
+  Promise<V> tryingValues();
 
   void waitDone();
 
   boolean waitDone(long timeout, @NotNull TimeUnit unit);
 
   @NotNull
-  <R, S> Promise<R> whenChained(@NotNull ChainHandler<V, R, S, ? super Callback<R>> handler);
+  <R, S> Promise<R> whenChained(@NotNull ChainHandler<V, R, S> handler);
 
   @NotNull
   <R, S> Promise<R> whenChained(@Nullable Mapper<? super Promise<V>, S> create,
-      @Nullable ChainHandle<V, S> handle, @Nullable ChainThen<V, R, S, ? super Callback<R>> then);
-
-  @NotNull
-  <R, S> Promise<Iterable<R>> whenEachChained(
-      @NotNull ChainHandler<V, R, S, ? super IterableCallback<R>> handler);
-
-  @NotNull
-  <R, S> Promise<Iterable<R>> whenEachChained(@Nullable Mapper<? super Promise<V>, S> create,
-      @Nullable ChainHandle<V, S> handle,
-      @Nullable ChainThen<V, R, S, ? super IterableCallback<R>> then);
+      @Nullable ChainThen<V, R, S, ? super IterableCallback<R>> forEach,
+      @Nullable ChainThen<V, R, S, ? super Callback<R>> then, @Nullable ChainValue<V, S> value);
 
   @NotNull
   <R> Promise<R> wrap(@NotNull Mapper<? super Promise<?>, ? extends Promise<?>> mapper);
@@ -203,23 +187,25 @@ public interface Promise<V> extends Thenable<V>, PromiseInspection<V>, Future<V>
   @NotNull
   <R> Promise<R> wrapOnce(@NotNull Mapper<? super Promise<V>, ? extends Promise<R>> mapper);
 
-  interface ChainHandle<V, S> {
-
-    S handle(S state, @NotNull Promise<V> promise);
-  }
-
-  interface ChainHandler<V, R, S, C extends Callback<R>> {
+  interface ChainHandler<V, R, S> {
 
     S create(@NotNull Promise<V> promise) throws Exception;
 
-    S handle(S state, @NotNull Promise<V> promise);
+    S forEach(S state, @NotNull Promise<V> promise, @NotNull IterableCallback<R> callback);
 
-    S then(S state, @NotNull Promise<V> promise, @NotNull C callback);
+    S then(S state, @NotNull Promise<V> promise, @NotNull Callback<R> callback);
+
+    S value(S state, @NotNull Promise<V> promise);
   }
 
   interface ChainThen<V, R, S, C extends Callback<R>> {
 
     S then(S state, @NotNull Promise<V> promise, @NotNull C callback);
+  }
+
+  interface ChainValue<V, S> {
+
+    S handle(S state, @NotNull Promise<V> promise);
   }
 
   interface IterableCallback<V> extends Callback<V> {
@@ -239,12 +225,12 @@ public interface Promise<V> extends Thenable<V>, PromiseInspection<V>, Future<V>
     IterableCallback<V> resolveAndContinue(@NotNull Thenable<? extends V> thenable);
   }
 
-  interface ReductionFulfill<V, R, S, C extends Callback<R>> {
+  interface LoopFulfill<V, R, S, C extends Callback<R>> {
 
     S fulfill(S state, V value, @NotNull C callback) throws Exception;
   }
 
-  interface ReductionHandler<V, R, S, C extends Callback<R>> {
+  interface LoopHandler<V, R, S, C extends Callback<R>> {
 
     S create(@NotNull C callback) throws Exception;
 
@@ -253,15 +239,24 @@ public interface Promise<V> extends Thenable<V>, PromiseInspection<V>, Future<V>
     S reject(S state, @NotNull Throwable reason, @NotNull C callback) throws Exception;
 
     void resolve(S state, @NotNull C callback) throws Exception;
+
+    boolean test(S state) throws Exception;
   }
 
-  interface ReductionReject<R, S, C extends Callback<R>> {
+  interface LoopReject<R, S, C extends Callback<R>> {
 
     S reject(S state, @NotNull Throwable reason, @NotNull C callback) throws Exception;
   }
 
-  interface ReductionResolve<R, S, C extends Callback<R>> {
+  interface LoopResolve<R, S, C extends Callback<R>> {
 
     void resolve(S state, @NotNull C callback) throws Exception;
+  }
+
+  interface ThenHandler<V, R, C extends Callback<R>> {
+
+    void fulfill(V value, @NotNull C callback) throws Exception;
+
+    void reject(Throwable reason, @NotNull C callback) throws Exception;
   }
 }

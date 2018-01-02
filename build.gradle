@@ -18,12 +18,13 @@
 buildscript {
   repositories {
     jcenter()
+    google()
     maven {
       url 'https://plugins.gradle.org/m2/'
     }
   }
   dependencies {
-    classpath 'com.android.tools.build:gradle:2.2.3'
+    classpath 'com.android.tools.build:gradle:3.0.1'
     classpath 'com.github.ben-manes:gradle-versions-plugin:0.14.0'
     classpath 'com.neenbedankt.gradle.plugins:android-apt:1.8'
     classpath "org.jacoco:org.jacoco.core:${project.getProperty('jacocoVersion')}"

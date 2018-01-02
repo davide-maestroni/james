@@ -23,8 +23,8 @@ apply from: '../extra.gradle'
 group = project.getProperty('groupName')
 version = project.getProperty('releaseVersion')
 archivesBaseName = project.parent.name
-compileJavaCompatibility = JavaVersion.VERSION_1_5
-compileTestJavaCompatibility = JavaVersion.VERSION_1_7
+project.setCompileJavaCompatibility(JavaVersion.VERSION_1_5)
+project.setCompileTestJavaCompatibility(JavaVersion.VERSION_1_7)
 
 dependencies {
   compile 'com.intellij:annotations:12.0'

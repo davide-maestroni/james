@@ -24,18 +24,18 @@ import java.io.ObjectStreamException;
 import java.io.Serializable;
 
 import dm.james.promise.Mapper;
-import dm.james.promise2.Promise.ReductionFulfill;
-import dm.james.promise2.Promise.ReductionHandler;
-import dm.james.promise2.Promise.ReductionReject;
-import dm.james.promise2.Promise.ReductionResolve;
+import dm.james.promise2.Promise.LoopFulfill;
+import dm.james.promise2.Promise.LoopHandler;
+import dm.james.promise2.Promise.LoopReject;
+import dm.james.promise2.Promise.LoopResolve;
 import dm.james.promise2.Thenable.Callback;
 import dm.james.util.SerializableProxy;
 
 /**
  * Created by davide-maestroni on 12/11/2017.
  */
-class ComposedReductionHandler<E, R, S, C extends Callback<R>>
-    implements ReductionHandler<E, R, S, C>, Serializable {
+class ComposedLoopHandler<E, R, S, C extends Callback<R>>
+    implements LoopHandler<E, R, S, C>, Serializable {
 
   // TODO: 11/12/2017 move to valuepromise
 
@@ -47,8 +47,8 @@ class ComposedReductionHandler<E, R, S, C extends Callback<R>>
     }
   };
 
-  private static final ReductionFulfill<?, ?, ?, ?> sDefaultFulfill =
-      new ReductionFulfill<Object, Object, Object, Callback<Object>>() {
+  private static final LoopFulfill<?, ?, ?, ?> sDefaultFulfill =
+      new LoopFulfill<Object, Object, Object, Callback<Object>>() {
 
         public Object fulfill(final Object state, final Object value,
             @NotNull final Callback<Object> callback) {
@@ -56,8 +56,8 @@ class ComposedReductionHandler<E, R, S, C extends Callback<R>>
         }
       };
 
-  private static final ReductionReject<?, ?, ?> sDefaultReject =
-      new ReductionReject<Object, Object, Callback<Object>>() {
+  private static final LoopReject<?, ?, ?> sDefaultReject =
+      new LoopReject<Object, Object, Callback<Object>>() {
 
         public Object reject(final Object state, @NotNull final Throwable reason,
             @NotNull final Callback<Object> callback) {
@@ -65,8 +65,8 @@ class ComposedReductionHandler<E, R, S, C extends Callback<R>>
         }
       };
 
-  private static final ReductionResolve<?, ?, ?> sDefaultResolve =
-      new ReductionResolve<Object, Object, Callback<Object>>() {
+  private static final LoopResolve<?, ?, ?> sDefaultResolve =
+      new LoopResolve<Object, Object, Callback<Object>>() {
 
         public void resolve(final Object state, @NotNull final Callback<Object> callback) {
 
@@ -75,24 +75,24 @@ class ComposedReductionHandler<E, R, S, C extends Callback<R>>
 
   private final Mapper<? super Callback<R>, ? extends S> mCreate;
 
-  private final ReductionFulfill<E, R, ? super S, ? super Callback<R>> mFulfill;
+  private final LoopFulfill<E, R, ? super S, ? super Callback<R>> mFulfill;
 
-  private final ReductionReject<R, ? super S, ? super Callback<R>> mReject;
+  private final LoopReject<R, ? super S, ? super Callback<R>> mReject;
 
-  private final ReductionResolve<R, ? super S, ? super Callback<R>> mResolve;
+  private final LoopResolve<R, ? super S, ? super Callback<R>> mResolve;
 
   @SuppressWarnings("unchecked")
-  ComposedReductionHandler(@Nullable final Mapper<? super Callback<R>, ? extends S> create,
-      @Nullable final ReductionFulfill<E, R, ? super S, ? super Callback<R>> fulfill,
-      @Nullable final ReductionReject<R, ? super S, ? super Callback<R>> reject,
-      @Nullable final ReductionResolve<R, ? super S, ? super Callback<R>> resolve) {
+  ComposedLoopHandler(@Nullable final Mapper<? super Callback<R>, ? extends S> create,
+      @Nullable final LoopFulfill<E, R, ? super S, ? super Callback<R>> fulfill,
+      @Nullable final LoopReject<R, ? super S, ? super Callback<R>> reject,
+      @Nullable final LoopResolve<R, ? super S, ? super Callback<R>> resolve) {
     mCreate = (Mapper<? super Callback<R>, ? extends S>) ((create != null) ? create
         : (Mapper<? super Callback<R>, ? extends S>) defaultCreate());
-    mFulfill = (ReductionFulfill<E, R, ? super S, ? super Callback<R>>) ((fulfill != null) ? fulfill
+    mFulfill = (LoopFulfill<E, R, ? super S, ? super Callback<R>>) ((fulfill != null) ? fulfill
         : defaultFulfill());
-    mReject = (ReductionReject<R, ? super S, ? super Callback<R>>) ((reject != null) ? reject
+    mReject = (LoopReject<R, ? super S, ? super Callback<R>>) ((reject != null) ? reject
         : defaultReject());
-    mResolve = (ReductionResolve<R, ? super S, ? super Callback<R>>) ((resolve != null) ? resolve
+    mResolve = (LoopResolve<R, ? super S, ? super Callback<R>>) ((resolve != null) ? resolve
         : defaultResolve());
   }
 
@@ -104,20 +104,20 @@ class ComposedReductionHandler<E, R, S, C extends Callback<R>>
 
   @NotNull
   @SuppressWarnings("unchecked")
-  static <E, R, S> ReductionFulfill<E, R, ? super S, ? super Callback<R>> defaultFulfill() {
-    return (ReductionFulfill<E, R, ? super S, ? super Callback<R>>) sDefaultFulfill;
+  static <E, R, S> LoopFulfill<E, R, ? super S, ? super Callback<R>> defaultFulfill() {
+    return (LoopFulfill<E, R, ? super S, ? super Callback<R>>) sDefaultFulfill;
   }
 
   @NotNull
   @SuppressWarnings("unchecked")
-  static <R, S> ReductionReject<R, ? super S, ? super Callback<R>> defaultReject() {
-    return (ReductionReject<R, ? super S, ? super Callback<R>>) sDefaultReject;
+  static <R, S> LoopReject<R, ? super S, ? super Callback<R>> defaultReject() {
+    return (LoopReject<R, ? super S, ? super Callback<R>>) sDefaultReject;
   }
 
   @NotNull
   @SuppressWarnings("unchecked")
-  static <R, S> ReductionResolve<R, ? super S, ? super Callback<R>> defaultResolve() {
-    return (ReductionResolve<R, ? super S, ? super Callback<R>>) sDefaultResolve;
+  static <R, S> LoopResolve<R, ? super S, ? super Callback<R>> defaultResolve() {
+    return (LoopResolve<R, ? super S, ? super Callback<R>>) sDefaultResolve;
   }
 
   public S create(@NotNull final C callback) throws Exception {
@@ -146,9 +146,9 @@ class ComposedReductionHandler<E, R, S, C extends Callback<R>>
   private static class HandlerProxy<E, R, S, C extends Callback<R>> extends SerializableProxy {
 
     private HandlerProxy(final Mapper<? super Callback<R>, ? extends S> create,
-        final ReductionFulfill<E, R, ? super S, ? super Callback<R>> fulfill,
-        final ReductionReject<R, ? super S, ? super Callback<R>> reject,
-        final ReductionResolve<R, ? super S, ? super Callback<R>> resolve) {
+        final LoopFulfill<E, R, ? super S, ? super Callback<R>> fulfill,
+        final LoopReject<R, ? super S, ? super Callback<R>> reject,
+        final LoopResolve<R, ? super S, ? super Callback<R>> resolve) {
       super(proxy(create), proxy(fulfill), proxy(reject), proxy(resolve));
     }
 
@@ -156,11 +156,11 @@ class ComposedReductionHandler<E, R, S, C extends Callback<R>>
     Object readResolve() throws ObjectStreamException {
       try {
         final Object[] args = deserializeArgs();
-        return new ComposedReductionHandler<E, R, S, C>(
+        return new ComposedLoopHandler<E, R, S, C>(
             (Mapper<? super Callback<R>, ? extends S>) args[0],
-            (ReductionFulfill<E, R, ? super S, ? super Callback<R>>) args[1],
-            (ReductionReject<R, ? super S, ? super Callback<R>>) args[2],
-            (ReductionResolve<R, ? super S, ? super Callback<R>>) args[3]);
+            (LoopFulfill<E, R, ? super S, ? super Callback<R>>) args[1],
+            (LoopReject<R, ? super S, ? super Callback<R>>) args[2],
+            (LoopResolve<R, ? super S, ? super Callback<R>>) args[3]);
 
       } catch (final Throwable t) {
         throw new InvalidObjectException(t.getMessage());
