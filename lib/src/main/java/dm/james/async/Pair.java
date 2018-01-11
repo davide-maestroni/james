@@ -1,5 +1,5 @@
 /*
- * Copyright 2017 Davide Maestroni
+ * Copyright 2018 Davide Maestroni
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,31 +14,34 @@
  * limitations under the License.
  */
 
-package dm.james.promise2;
+package dm.james.async;
 
 import org.jetbrains.annotations.NotNull;
-import org.jetbrains.annotations.Nullable;
 
 /**
- * Created by davide-maestroni on 11/16/2017.
+ * Created by davide-maestroni on 01/08/2018.
  */
-public interface Thenable<V> {
+public class Pair<V1, V2> {
 
-  @NotNull
-  <R> Thenable<R> then(@Nullable CallbackHandler<V, R, ? super Callback<R>> fulfill,
-      @Nullable CallbackHandler<Throwable, R, ? super Callback<R>> reject);
+  private final V1 mFirst;
 
-  interface Callback<V> {
+  private final V2 mSecond;
 
-    void fulfill(V value);
-
-    void reject(Throwable reason);
-
-    void resolve(@NotNull Thenable<? extends V> thenable);
+  private Pair(final V1 first, final V2 second) {
+    mFirst = first;
+    mSecond = second;
   }
 
-  interface CallbackHandler<V, R, C extends Callback<R>> {
+  @NotNull
+  public static <V1, V2> Pair<V1, V2> of(V1 first, V2 second) {
+    return new Pair<V1, V2>(first, second);
+  }
 
-    void accept(V value, @NotNull C callback) throws Exception;
+  public V1 first() {
+    return mFirst;
+  }
+
+  public V2 second() {
+    return mSecond;
   }
 }

@@ -52,8 +52,11 @@ public class Backoffs {
    * <br>
    * The backoff will always return the specified delay.
    *
+   * @param converter
+   * @param offset
    * @param delay    the delay value.
    * @param timeUnit the delay unit.
+   * @param <T>
    * @return the backoff instance.
    * @throws IllegalArgumentException if the delay is negative.
    */
@@ -68,8 +71,11 @@ public class Backoffs {
    * <br>
    * The backoff will return a delay computed as: {@code delay * 2^(count - 1)}.
    *
+   * @param converter
+   * @param offset
    * @param delay    the delay value.
    * @param timeUnit the delay unit.
+   * @param <T>
    * @return the backoff instance.
    * @throws IllegalArgumentException if the delay is negative.
    */
@@ -86,8 +92,11 @@ public class Backoffs {
    * <p>
    * Note that this particular implementation tries to scale the maximum jitter on the count value.
    *
+   * @param converter
+   * @param offset
    * @param delay    the delay value.
    * @param timeUnit the delay unit.
+   * @param <T>
    * @return the backoff instance.
    * @throws IllegalArgumentException if the delay is negative.
    */
@@ -102,8 +111,11 @@ public class Backoffs {
    * <br>
    * The backoff will return a delay computed as: {@code delay * count}.
    *
+   * @param converter
+   * @param offset
    * @param delay    the delay value.
    * @param timeUnit the delay unit.
+   * @param <T>
    * @return the backoff instance.
    * @throws IllegalArgumentException if the delay is negative.
    */
@@ -118,6 +130,7 @@ public class Backoffs {
    * <br>
    * The backoff will always return {@code NO_DELAY}.
    *
+   * @param <T>
    * @return the backoff instance.
    */
   @NotNull
@@ -133,6 +146,9 @@ public class Backoffs {
    * {@code NO_DELAY}, its value is returned. If both are different, the sum of the two values
    * is returned.
    *
+   * @param first
+   * @param second
+   * @param <T>
    * @return the summed backoff policy.
    */
   @NotNull
@@ -144,8 +160,10 @@ public class Backoffs {
   /**
    * Caps this backoff policy to the specified maximum delay.
    *
+   * @param backoff
    * @param value the delay value.
    * @param unit  the delay unit.
+   * @param <T>
    * @return the capped backoff policy.
    * @throws IllegalArgumentException if the delay is negative.
    */
@@ -158,8 +176,10 @@ public class Backoffs {
   /**
    * Adds jitter to this backoff policy.
    *
+   * @param backoff
    * @param percentage a floating number between 0 and 1 indicating the percentage of delay to
    *                   randomize.
+   * @param <T>
    * @return the backoff policy with jitter.
    * @throws IllegalArgumentException if the percentage is outside the [0, 1] range.
    */

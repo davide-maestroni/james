@@ -1,5 +1,5 @@
 /*
- * Copyright 2017 Davide Maestroni
+ * Copyright 2018 Davide Maestroni
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,13 +14,16 @@
  * limitations under the License.
  */
 
-package dm.james.promise2;
+package dm.james.async;
 
-import dm.james.promise2.Promise.IterableCallback;
+import java.io.Serializable;
 
 /**
- * Created by davide-maestroni on 12/15/2017.
+ * Created by davide-maestroni on 01/08/2018.
  */
-public interface OpenPromise<I, O> extends Promise<Iterable<O>>, IterableCallback<I> {
+public interface AsyncResult<V> extends Serializable {
 
+  void fail(Throwable failure);
+
+  void set(V value);
 }

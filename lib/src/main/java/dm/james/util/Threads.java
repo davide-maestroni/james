@@ -21,14 +21,14 @@ import org.jetbrains.annotations.NotNull;
 /**
  * Created by davide-maestroni on 08/05/2017.
  */
-public class ThreadUtils {
+public class Threads {
 
   private static final Object mMutex = new Object();
 
   private static WeakIdentityHashMap<ThreadOwner, Void> mOwners =
       new WeakIdentityHashMap<ThreadOwner, Void>();
 
-  private ThreadUtils() {
+  private Threads() {
   }
 
   public static boolean isOwnedThread() {

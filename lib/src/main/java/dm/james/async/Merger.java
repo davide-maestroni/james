@@ -1,5 +1,5 @@
 /*
- * Copyright 2017 Davide Maestroni
+ * Copyright 2018 Davide Maestroni
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,27 +14,12 @@
  * limitations under the License.
  */
 
-package dm.james.promise2;
-
-import java.util.Iterator;
-import java.util.List;
+package dm.james.async;
 
 /**
- * Created by davide-maestroni on 12/01/2017.
+ * Created by davide-maestroni on 01/10/2018.
  */
-public interface BlockingIterator<E> extends Iterator<E> {
+public interface Merger<V1, V2, R> {
 
-  List<E> next(int maxSize);
-
-  List<E> nextAll();
-
-  E nextOr(E defaultValue);
-
-  List<E> take(int maxSize);
-
-  E take();
-
-  List<E> takeAll();
-
-  E takeOr(E defaultValue);
+  R merge(V1 first, V2 second);
 }

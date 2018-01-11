@@ -27,7 +27,7 @@ import java.util.concurrent.TimeUnit;
 
 import dm.james.util.ConstantConditions;
 import dm.james.util.SerializableProxy;
-import dm.james.util.ThreadUtils;
+import dm.james.util.Threads;
 
 /**
  * Class implementing an executor employing an executor service.
@@ -63,7 +63,7 @@ class ServiceExecutor extends AsyncExecutor implements Serializable {
     final ServiceExecutor executor = new ServiceExecutor(service);
     synchronized (mOwners) {
       if (!Boolean.TRUE.equals(mOwners.put(service, Boolean.TRUE))) {
-        ThreadUtils.register(executor);
+        Threads.register(executor);
       }
     }
 
@@ -83,7 +83,7 @@ class ServiceExecutor extends AsyncExecutor implements Serializable {
     final StoppableServiceExecutor executor = new StoppableServiceExecutor(service);
     synchronized (mOwners) {
       if (!Boolean.TRUE.equals(mOwners.put(service, Boolean.TRUE))) {
-        ThreadUtils.register(executor);
+        Threads.register(executor);
       }
     }
 

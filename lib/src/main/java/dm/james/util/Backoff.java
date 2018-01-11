@@ -26,14 +26,17 @@ import org.jetbrains.annotations.NotNull;
  * count numbers.
  * <p>
  * Created by davide-maestroni on 05/09/2016.
+ *
+ * @param <T>
  */
 public interface Backoff<T> {
 
   /**
    * Gets the delay for the specified count.
    *
-   * @param count the count (it must be positive).
+   * @param t the count (it must be positive).
    * @return the delay in milliseconds.
+   * @throws Exception
    */
   long getDelay(@NotNull T t) throws Exception;
 }

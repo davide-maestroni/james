@@ -14,17 +14,32 @@
  * limitations under the License.
  */
 
-apply plugin: 'java'
-apply plugin: 'jacoco'
-apply plugin: 'findbugs'
-apply plugin: 'com.github.ben-manes.versions'
+plugins {
+  id 'java'
+  id 'jacoco'
+  id 'findbugs'
+  id 'com.github.ben-manes.versions'
+}
+
 apply from: '../extra.gradle'
 
 group = project.getProperty('groupName')
 version = project.getProperty('releaseVersion')
 archivesBaseName = project.parent.name
-project.setCompileJavaCompatibility(JavaVersion.VERSION_1_5)
-project.setCompileTestJavaCompatibility(JavaVersion.VERSION_1_7)
+
+compileJava {
+  def javaVersion = JavaVersion.VERSION_1_5
+  project.setBootstrapClasspath(javaVersion, options)
+  sourceCompatibility = javaVersion
+  targetCompatibility = javaVersion
+}
+
+compileTestJava {
+  def javaVersion = JavaVersion.VERSION_1_7
+  project.setBootstrapClasspath(javaVersion, options)
+  sourceCompatibility = javaVersion
+  targetCompatibility = javaVersion
+}
 
 dependencies {
   compile 'com.intellij:annotations:12.0'
@@ -45,6 +60,7 @@ jacoco {
 
 findbugs {
   toolVersion project.getProperty('findbugsVersion')
+  sourceSets = [] // temporarily disable FindBugs
 }
 
 javadoc {

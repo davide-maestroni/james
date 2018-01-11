@@ -45,9 +45,9 @@ import dm.james.promise.TimeoutException;
 import dm.james.util.ConstantConditions;
 import dm.james.util.InterruptedExecutionException;
 import dm.james.util.SerializableProxy;
-import dm.james.util.ThreadUtils;
-import dm.james.util.TimeUtils;
-import dm.james.util.TimeUtils.Condition;
+import dm.james.util.Threads;
+import dm.james.util.TimeUnits;
+import dm.james.util.TimeUnits.Condition;
 
 /**
  * Created by davide-maestroni on 07/03/2017.
@@ -243,7 +243,7 @@ class DefaultPromise<O> implements Promise<O> {
     final ChainHead<?> head = mHead;
     synchronized (mMutex) {
       try {
-        if (TimeUtils.waitUntil(mMutex, new Condition() {
+        if (TimeUnits.waitUntil(mMutex, new Condition() {
 
           public boolean isTrue() {
             checkBound();
@@ -268,7 +268,7 @@ class DefaultPromise<O> implements Promise<O> {
     final ChainHead<?> head = mHead;
     synchronized (mMutex) {
       try {
-        if (TimeUtils.waitUntil(mMutex, new Condition() {
+        if (TimeUnits.waitUntil(mMutex, new Condition() {
 
           public boolean isTrue() {
             checkBound();
@@ -297,7 +297,7 @@ class DefaultPromise<O> implements Promise<O> {
     final ChainHead<?> head = mHead;
     synchronized (mMutex) {
       try {
-        if (TimeUtils.waitUntil(mMutex, new Condition() {
+        if (TimeUnits.waitUntil(mMutex, new Condition() {
 
           public boolean isTrue() {
             checkBound();
@@ -322,7 +322,7 @@ class DefaultPromise<O> implements Promise<O> {
     final ChainHead<?> head = mHead;
     synchronized (mMutex) {
       try {
-        if (TimeUtils.waitUntil(mMutex, new Condition() {
+        if (TimeUnits.waitUntil(mMutex, new Condition() {
 
           public boolean isTrue() {
             checkBound();
@@ -401,7 +401,7 @@ class DefaultPromise<O> implements Promise<O> {
     deadLockWarning(timeout);
     synchronized (mMutex) {
       try {
-        if (TimeUtils.waitUntil(mMutex, new Condition() {
+        if (TimeUnits.waitUntil(mMutex, new Condition() {
 
           public boolean isTrue() {
             return (mState.isResolved() || mHead.getState().isResolved());
@@ -512,7 +512,7 @@ class DefaultPromise<O> implements Promise<O> {
     }
 
     final Logger logger = mLogger;
-    if ((logger.getLogLevel().compareTo(Level.WARNING) <= 0) && ThreadUtils.isOwnedThread()) {
+    if ((logger.getLogLevel().compareTo(Level.WARNING) <= 0) && Threads.isOwnedThread()) {
       logger.wrn("ATTENTION: possible deadlock detected! Try to avoid waiting on managed threads");
     }
   }

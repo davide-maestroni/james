@@ -44,55 +44,25 @@ Project.metaClass.isWorkingBranch = { String branch ->
   (branch != null) && branch.equals(delegate.workingBranch)
 }
 
-Project.metaClass.getCompileJavaCompatibility = {
-  compileJava.sourceCompatibility
-}
-
-Project.metaClass.setCompileJavaCompatibility = { JavaVersion javaVersion ->
-  compileJava {
-    def javaHome = System.getenv("JAVA${javaVersion.ordinal() + 1}_HOME")
-    if ((javaHome != null) && (javaHome.length() > 0)) {
-      def jarPath = "${javaHome}/jre/lib/rt.jar"
-      if (!file(jarPath).exists()) {
-        // Mac OS workaround
-        jarPath = "${javaHome}/../Classes/classes.jar"
-      }
-      if (file(jarPath).exists()) {
-        options.bootstrapClasspath = files(jarPath)
-      }
+Project.metaClass.setBootstrapClasspath = { JavaVersion javaVersion, CompileOptions options ->
+  def javaHome = System.getenv("JAVA${javaVersion.ordinal() + 1}_HOME")
+  if ((javaHome != null) && (javaHome.length() > 0)) {
+    def jarPath = "${javaHome}/jre/lib/rt.jar"
+    if (!file(jarPath).exists()) {
+      // Mac OS workaround
+      jarPath = "${javaHome}/../Classes/classes.jar"
     }
-    sourceCompatibility = javaVersion
-    targetCompatibility = javaVersion
-  }
-}
-
-Project.metaClass.getCompileTestJavaCompatibility = {
-  compileTestJava.sourceCompatibility
-}
-
-Project.metaClass.setCompileTestJavaCompatibility = { JavaVersion javaVersion ->
-  compileTestJava {
-    def javaHome = System.getenv("JAVA${javaVersion.ordinal() + 1}_HOME")
-    if ((javaHome != null) && (javaHome.length() > 0)) {
-      def jarPath = "${javaHome}/jre/lib/rt.jar"
-      if (!file(jarPath).exists()) {
-        // Mac OS workaround
-        jarPath = "${javaHome}/../Classes/classes.jar"
-      }
-      if (file(jarPath).exists()) {
-        options.bootstrapClasspath = files(jarPath)
-      }
+    if (file(jarPath).exists()) {
+      options.setBootstrapClasspath(files(jarPath))
     }
-    sourceCompatibility = javaVersion
-    targetCompatibility = javaVersion
   }
 }
 
-Project.metaClass.setJavaCompilerArgs = { args ->
-  tasks.withType(JavaCompile) {
-    options.compilerArgs = args
-  }
-}
+//Project.metaClass.setJavaCompilerArgs = { args ->
+//  tasks.withType(JavaCompile) {
+//    options.compilerArgs = args
+//  }
+//}
 
 Project.metaClass.conditionalDependencies = { Closure closure ->
   closure.delegate = new ConditionalDependencySpecs(delegate)

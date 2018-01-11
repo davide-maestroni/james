@@ -14,17 +14,18 @@
  * limitations under the License.
  */
 
-apply plugin: 'java'
-apply plugin: 'jacoco'
-apply plugin: 'findbugs'
-apply plugin: 'com.github.ben-manes.versions'
+plugins {
+  id 'java'
+  id 'jacoco'
+  id 'findbugs'
+  id 'com.github.ben-manes.versions'
+}
+
 apply from: '../extra.gradle'
 
 group = project.getProperty('groupName')
 version = project.getProperty('releaseVersion')
 archivesBaseName = project.name
-project.setCompileJavaCompatibility(JavaVersion.VERSION_1_8)
-project.setCompileTestJavaCompatibility(JavaVersion.VERSION_1_8)
 
 ext {
   libVersion = '0.0.1'

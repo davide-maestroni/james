@@ -57,9 +57,9 @@ import dm.james.util.DoubleQueue;
 import dm.james.util.InterruptedExecutionException;
 import dm.james.util.Iterables;
 import dm.james.util.SerializableProxy;
-import dm.james.util.ThreadUtils;
-import dm.james.util.TimeUtils;
-import dm.james.util.TimeUtils.Condition;
+import dm.james.util.Threads;
+import dm.james.util.TimeUnits;
+import dm.james.util.TimeUnits.Condition;
 
 /**
  * Created by davide-maestroni on 07/23/2017.
@@ -252,7 +252,7 @@ class DefaultPromiseIterable<O> implements PromiseIterable<O>, Serializable {
     @SuppressWarnings("UnnecessaryLocalVariable") final ChainHead<?> head = mHead;
     synchronized (mMutex) {
       try {
-        if (TimeUtils.waitUntil(mMutex, new Condition() {
+        if (TimeUnits.waitUntil(mMutex, new Condition() {
 
           public boolean isTrue() {
             checkBound();
@@ -278,7 +278,7 @@ class DefaultPromiseIterable<O> implements PromiseIterable<O>, Serializable {
     @SuppressWarnings("UnnecessaryLocalVariable") final ChainHead<?> head = mHead;
     synchronized (mMutex) {
       try {
-        if (TimeUtils.waitUntil(mMutex, new Condition() {
+        if (TimeUnits.waitUntil(mMutex, new Condition() {
 
           public boolean isTrue() {
             checkBound();
@@ -307,7 +307,7 @@ class DefaultPromiseIterable<O> implements PromiseIterable<O>, Serializable {
     final ChainHead<?> head = mHead;
     synchronized (mMutex) {
       try {
-        if (TimeUtils.waitUntil(mMutex, new Condition() {
+        if (TimeUnits.waitUntil(mMutex, new Condition() {
 
           public boolean isTrue() {
             checkBound();
@@ -332,7 +332,7 @@ class DefaultPromiseIterable<O> implements PromiseIterable<O>, Serializable {
     final ChainHead<?> head = mHead;
     synchronized (mMutex) {
       try {
-        if (TimeUtils.waitUntil(mMutex, new Condition() {
+        if (TimeUnits.waitUntil(mMutex, new Condition() {
 
           public boolean isTrue() {
             checkBound();
@@ -396,7 +396,7 @@ class DefaultPromiseIterable<O> implements PromiseIterable<O>, Serializable {
     deadLockWarning(timeout);
     synchronized (mMutex) {
       try {
-        if (TimeUtils.waitUntil(mMutex, new Condition() {
+        if (TimeUnits.waitUntil(mMutex, new Condition() {
 
           public boolean isTrue() {
             return (mState.isResolved() || mHead.getState().isResolved());
@@ -672,7 +672,7 @@ class DefaultPromiseIterable<O> implements PromiseIterable<O>, Serializable {
     final ChainHead<?> head = mHead;
     synchronized (mMutex) {
       try {
-        if (TimeUtils.waitUntil(mMutex, new Condition() {
+        if (TimeUnits.waitUntil(mMutex, new Condition() {
 
           public boolean isTrue() {
             checkBound();
@@ -718,7 +718,7 @@ class DefaultPromiseIterable<O> implements PromiseIterable<O>, Serializable {
     final ChainHead<?> head = mHead;
     synchronized (mMutex) {
       try {
-        if (TimeUtils.waitUntil(mMutex, new Condition() {
+        if (TimeUnits.waitUntil(mMutex, new Condition() {
 
           public boolean isTrue() {
             checkBound();
@@ -743,7 +743,7 @@ class DefaultPromiseIterable<O> implements PromiseIterable<O>, Serializable {
     final ChainHead<?> head = mHead;
     synchronized (mMutex) {
       try {
-        if (TimeUtils.waitUntil(mMutex, new Condition() {
+        if (TimeUnits.waitUntil(mMutex, new Condition() {
 
           public boolean isTrue() {
             checkBound();
@@ -798,7 +798,7 @@ class DefaultPromiseIterable<O> implements PromiseIterable<O>, Serializable {
     final ChainHead<?> head = mHead;
     synchronized (mMutex) {
       try {
-        if (TimeUtils.waitUntil(mMutex, new Condition() {
+        if (TimeUnits.waitUntil(mMutex, new Condition() {
 
           public boolean isTrue() {
             checkBound();
@@ -829,7 +829,7 @@ class DefaultPromiseIterable<O> implements PromiseIterable<O>, Serializable {
     final ChainHead<?> head = mHead;
     synchronized (mMutex) {
       try {
-        if (TimeUtils.waitUntil(mMutex, new Condition() {
+        if (TimeUnits.waitUntil(mMutex, new Condition() {
 
           public boolean isTrue() {
             checkBound();
@@ -864,7 +864,7 @@ class DefaultPromiseIterable<O> implements PromiseIterable<O>, Serializable {
     final ChainHead<?> head = mHead;
     synchronized (mMutex) {
       try {
-        if (TimeUtils.waitUntil(mMutex, new Condition() {
+        if (TimeUnits.waitUntil(mMutex, new Condition() {
 
           public boolean isTrue() {
             checkBound();
@@ -976,7 +976,7 @@ class DefaultPromiseIterable<O> implements PromiseIterable<O>, Serializable {
     deadLockWarning(timeout);
     synchronized (mMutex) {
       try {
-        if (TimeUtils.waitUntil(mMutex, new Condition() {
+        if (TimeUnits.waitUntil(mMutex, new Condition() {
 
           public boolean isTrue() {
             return mHead.isSettled();
@@ -1086,7 +1086,7 @@ class DefaultPromiseIterable<O> implements PromiseIterable<O>, Serializable {
     }
 
     final Logger logger = mLogger;
-    if ((logger.getLogLevel().compareTo(Level.WARNING) <= 0) && ThreadUtils.isOwnedThread()) {
+    if ((logger.getLogLevel().compareTo(Level.WARNING) <= 0) && Threads.isOwnedThread()) {
       logger.wrn("ATTENTION: possible deadlock detected! Try to avoid waiting on managed threads");
     }
   }
@@ -5415,7 +5415,7 @@ class DefaultPromiseIterable<O> implements PromiseIterable<O>, Serializable {
       if (timeout >= 0) {
         mTimeUnit = ((timeUnit.toNanos(timeout) % TimeUnit.MILLISECONDS.toNanos(1)) == 0)
             ? TimeUnit.MILLISECONDS : TimeUnit.NANOSECONDS;
-        mTimeout = mTimeUnit.convert(timeout, timeUnit) + TimeUtils.currentTimeIn(mTimeUnit);
+        mTimeout = mTimeUnit.convert(timeout, timeUnit) + TimeUnits.currentTimeIn(mTimeUnit);
 
       } else {
         mTimeUnit = TimeUnit.MILLISECONDS;
@@ -5431,7 +5431,7 @@ class DefaultPromiseIterable<O> implements PromiseIterable<O>, Serializable {
       synchronized (mMutex) {
         final int index = mIndex;
         try {
-          if (TimeUtils.waitUntil(mMutex, new Condition() {
+          if (TimeUnits.waitUntil(mMutex, new Condition() {
 
             public boolean isTrue() {
               checkBound();
@@ -5458,7 +5458,7 @@ class DefaultPromiseIterable<O> implements PromiseIterable<O>, Serializable {
       synchronized (mMutex) {
         final int index = mIndex;
         try {
-          if (TimeUtils.waitUntil(mMutex, new Condition() {
+          if (TimeUnits.waitUntil(mMutex, new Condition() {
 
             public boolean isTrue() {
               checkBound();
@@ -5517,7 +5517,7 @@ class DefaultPromiseIterable<O> implements PromiseIterable<O>, Serializable {
         return -1;
       }
 
-      final long remainingTime = timeout - TimeUtils.currentTimeIn(mTimeUnit);
+      final long remainingTime = timeout - TimeUnits.currentTimeIn(mTimeUnit);
       if (remainingTime < 0) {
         throw timeoutException();
       }

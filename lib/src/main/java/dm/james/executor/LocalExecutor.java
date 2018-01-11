@@ -21,7 +21,7 @@ import org.jetbrains.annotations.NotNull;
 import java.util.concurrent.TimeUnit;
 
 import dm.james.util.InterruptedExecutionException;
-import dm.james.util.TimeUtils;
+import dm.james.util.TimeUnits;
 
 /**
  * Class maintaining a queue of commands which is local to the calling thread.
@@ -245,7 +245,7 @@ class LocalExecutor {
 
         if (delayNs > 0) {
           try {
-            TimeUtils.sleepAtLeast(delayNs, TimeUnit.NANOSECONDS);
+            TimeUnits.sleepAtLeast(delayNs, TimeUnit.NANOSECONDS);
 
           } catch (final InterruptedException e) {
             throw new InterruptedExecutionException(e);

@@ -72,13 +72,13 @@ public class Testo {
       }
     }).apply(bond.<Integer>cache());
     final Integer integer = promise.get();
-    assertThat(promise.whenFulfilled(new Observer<Integer>() {
+    assertThat(promise.onFulfill(new Observer<Integer>() {
 
       public void accept(final Integer input) {
 
       }
     }).get()).isEqualTo(integer);
-    assertThat(promise.whenFulfilled(new Observer<Integer>() {
+    assertThat(promise.onFulfill(new Observer<Integer>() {
 
       public void accept(final Integer input) {
 
@@ -199,13 +199,13 @@ public class Testo {
       }
     });
     final Integer integer = promise.get();
-    assertThat(promise.whenFulfilled(new Observer<Integer>() {
+    assertThat(promise.onFulfill(new Observer<Integer>() {
 
       public void accept(final Integer input) {
 
       }
     }).get()).isEqualTo(integer);
-    assertThat(promise.whenFulfilled(new Observer<Integer>() {
+    assertThat(promise.onFulfill(new Observer<Integer>() {
 
       public void accept(final Integer input) {
 

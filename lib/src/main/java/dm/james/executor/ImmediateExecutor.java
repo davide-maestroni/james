@@ -23,7 +23,7 @@ import java.io.Serializable;
 import java.util.concurrent.TimeUnit;
 
 import dm.james.util.InterruptedExecutionException;
-import dm.james.util.TimeUtils;
+import dm.james.util.TimeUnits;
 
 /**
  * Executor implementation just running the command in the same call to the {@code execute()}
@@ -60,7 +60,7 @@ class ImmediateExecutor extends SyncExecutor implements Serializable {
       @NotNull final TimeUnit timeUnit) {
     if (delay > 0) {
       try {
-        TimeUtils.sleepAtLeast(delay, timeUnit);
+        TimeUnits.sleepAtLeast(delay, timeUnit);
 
       } catch (final InterruptedException e) {
         throw new InterruptedExecutionException(e);

@@ -21,7 +21,7 @@ import org.jetbrains.annotations.NotNull;
 import java.util.concurrent.Executor;
 import java.util.concurrent.TimeUnit;
 
-import dm.james.util.ThreadUtils.ThreadOwner;
+import dm.james.util.Threads.ThreadOwner;
 
 /**
  * The executor class defines an object responsible for executing routine invocations inside

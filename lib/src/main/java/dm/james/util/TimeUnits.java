@@ -23,11 +23,11 @@ import java.util.concurrent.TimeUnit;
 /**
  * Created by davide-maestroni on 07/18/2017.
  */
-public class TimeUtils {
+public class TimeUnits {
 
   private static final long ONE_MILLI_NANOS = TimeUnit.MILLISECONDS.toNanos(1);
 
-  private TimeUtils() {
+  private TimeUnits() {
   }
 
   public static long currentTimeIn(@NotNull final TimeUnit timeUnit) {

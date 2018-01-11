@@ -35,8 +35,8 @@ import dm.james.promise.ScheduledData;
 import dm.james.util.Backoff;
 import dm.james.util.ConstantConditions;
 import dm.james.util.SerializableProxy;
-import dm.james.util.TimeUtils;
-import dm.james.util.TimeUtils.Condition;
+import dm.james.util.TimeUnits;
+import dm.james.util.TimeUnits.Condition;
 
 /**
  * Created by davide-maestroni on 08/03/2017.
@@ -134,7 +134,7 @@ class BackoffHandler<O> implements StatefulHandler<O, O, BackoffData<O>>, Serial
       final Backoff<ScheduledData<O>> backoff = mBackoff;
       final long delay = backoff.getDelay(data);
       if (delay > 0) {
-        TimeUtils.waitUntil(mutex, new Condition() {
+        TimeUnits.waitUntil(mutex, new Condition() {
 
           public boolean isTrue() {
             try {
