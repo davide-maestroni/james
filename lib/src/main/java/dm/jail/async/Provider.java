@@ -14,12 +14,12 @@
  * limitations under the License.
  */
 
-package dm.james.async;
+package dm.jail.async;
 
 /**
- * Created by davide-maestroni on 01/10/2018.
+ * Created by davide-maestroni on 07/20/2017.
  */
-public interface Merger<V1, V2, R> {
+public interface Provider<O> {
 
-  R merge(V1 first, V2 second);
+  O get() throws Exception;
 }

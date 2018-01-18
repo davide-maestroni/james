@@ -14,34 +14,12 @@
  * limitations under the License.
  */
 
-package dm.james.async;
-
-import org.jetbrains.annotations.NotNull;
+package dm.jail.async;
 
 /**
- * Created by davide-maestroni on 01/08/2018.
+ * Created by davide-maestroni on 07/20/2017.
  */
-public class Pair<V1, V2> {
+public interface Mapper<I, O> {
 
-  private final V1 mFirst;
-
-  private final V2 mSecond;
-
-  private Pair(final V1 first, final V2 second) {
-    mFirst = first;
-    mSecond = second;
-  }
-
-  @NotNull
-  public static <V1, V2> Pair<V1, V2> of(V1 first, V2 second) {
-    return new Pair<V1, V2>(first, second);
-  }
-
-  public V1 first() {
-    return mFirst;
-  }
-
-  public V2 second() {
-    return mSecond;
-  }
+  O apply(I input) throws Exception;
 }

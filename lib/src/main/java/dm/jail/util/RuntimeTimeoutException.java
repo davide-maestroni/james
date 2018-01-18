@@ -14,20 +14,17 @@
  * limitations under the License.
  */
 
-package dm.james.async;
+package dm.jail.util;
 
 /**
- * Created by davide-maestroni on 01/08/2018.
+ * Created by davide-maestroni on 01/15/2018.
  */
-public interface AsyncResultCollection<V> extends AsyncResult<Iterable<V>> {
+public class RuntimeTimeoutException extends RuntimeException {
 
-  AsyncResultCollection<V> addFailure(Throwable failure);
+  public RuntimeTimeoutException() {
+  }
 
-  AsyncResultCollection<V> addFailures(Iterable<Throwable> failures);
-
-  AsyncResultCollection<V> addValue(V value);
-
-  AsyncResultCollection<V> addValues(Iterable<V> value);
-
-  void set();
+  public RuntimeTimeoutException(final String message) {
+    super(message);
+  }
 }

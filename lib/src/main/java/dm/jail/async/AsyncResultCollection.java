@@ -14,16 +14,20 @@
  * limitations under the License.
  */
 
-package dm.james.async;
-
-import java.io.Serializable;
+package dm.jail.async;
 
 /**
  * Created by davide-maestroni on 01/08/2018.
  */
-public interface AsyncResult<V> extends Serializable {
+public interface AsyncResultCollection<V> extends AsyncResult<Iterable<V>> {
 
-  void fail(Throwable failure);
+  AsyncResultCollection<V> addFailure(Throwable failure);
 
-  void set(V value);
+  AsyncResultCollection<V> addFailures(Iterable<Throwable> failures);
+
+  AsyncResultCollection<V> addValue(V value);
+
+  AsyncResultCollection<V> addValues(Iterable<V> value);
+
+  void set();
 }

@@ -1,5 +1,5 @@
 /*
- * Copyright 2017 Davide Maestroni
+ * Copyright 2018 Davide Maestroni
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,9 +14,12 @@
  * limitations under the License.
  */
 
+package dm.jail.async;
+
 /**
- * LogPrinter related classes and definitions.
- * <p>
- * Created by davide-maestroni on 10/04/2014.
+ * Created by davide-maestroni on 07/22/2017.
  */
-package dm.james.log;
+public interface Action {
+
+  void perform() throws Exception;
+}

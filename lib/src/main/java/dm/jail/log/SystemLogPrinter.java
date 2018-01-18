@@ -1,5 +1,5 @@
 /*
- * Copyright 2017 Davide Maestroni
+ * Copyright 2018 Davide Maestroni
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,38 +14,36 @@
  * limitations under the License.
  */
 
-package dm.james.log;
+package dm.jail.log;
 
 import org.jetbrains.annotations.NotNull;
-import org.jetbrains.annotations.Nullable;
 
 import java.io.ObjectStreamException;
 import java.io.Serializable;
-import java.util.List;
 
 /**
- * LogPrinter implementation simply discarding all messages.
+ * Simple log implementation writing messages to the system output.
  * <p>
- * Created by davide-maestroni on 10/04/2014.
+ * Created by davide-maestroni on 10/03/2014.
  */
-class NullLog extends TemplateLog implements Serializable {
+class SystemLogPrinter extends TemplateLogPrinter implements Serializable {
 
-  private static final NullLog sInstance = new NullLog();
+  private static final SystemLogPrinter sInstance = new SystemLogPrinter();
 
   /**
    * Avoid explicit instantiation.
    */
-  private NullLog() {
+  private SystemLogPrinter() {
   }
 
   @NotNull
-  static NullLog instance() {
+  static SystemLogPrinter instance() {
     return sInstance;
   }
 
   @Override
-  protected void log(@NotNull final Level level, @NotNull final List<Object> contexts,
-      @Nullable final String message, @Nullable final Throwable throwable) {
+  public void log(@NotNull final String message) {
+    System.out.println(message);
   }
 
   Object readResolve() throws ObjectStreamException {

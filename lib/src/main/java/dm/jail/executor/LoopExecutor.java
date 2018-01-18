@@ -1,5 +1,5 @@
 /*
- * Copyright 2017 Davide Maestroni
+ * Copyright 2018 Davide Maestroni
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,38 +14,45 @@
  * limitations under the License.
  */
 
-package dm.james.log;
+package dm.jail.executor;
 
 import org.jetbrains.annotations.NotNull;
-import org.jetbrains.annotations.Nullable;
 
 import java.io.ObjectStreamException;
 import java.io.Serializable;
-import java.util.List;
+import java.util.concurrent.TimeUnit;
 
 /**
- * LogPrinter implementation simply discarding all messages.
+ * Class implementing a synchronous loop executor.
  * <p>
- * Created by davide-maestroni on 10/04/2014.
+ * The executor maintains an internal buffer of commands that are consumed only when the last one
+ * completes, thus avoiding overflowing the call stack because of nested calls to other routines.
+ * <p>
+ * Created by davide-maestroni on 09/18/2014.
  */
-class NullLog extends TemplateLog implements Serializable {
+class LoopExecutor extends SyncExecutor implements Serializable {
 
-  private static final NullLog sInstance = new NullLog();
+  private static final LoopExecutor
+      sInstance = new LoopExecutor();
 
   /**
    * Avoid explicit instantiation.
    */
-  private NullLog() {
+  private LoopExecutor() {
   }
 
   @NotNull
-  static NullLog instance() {
+  static LoopExecutor instance() {
     return sInstance;
   }
 
-  @Override
-  protected void log(@NotNull final Level level, @NotNull final List<Object> contexts,
-      @Nullable final String message, @Nullable final Throwable throwable) {
+  public void execute(@NotNull final Runnable command) {
+    LocalExecutor.run(command);
+  }
+
+  public void execute(@NotNull final Runnable command, final long delay,
+      @NotNull final TimeUnit timeUnit) {
+    LocalExecutor.run(command, delay, timeUnit);
   }
 
   Object readResolve() throws ObjectStreamException {

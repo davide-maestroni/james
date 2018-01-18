@@ -14,14 +14,13 @@
  * limitations under the License.
  */
 
-package dm.james.async;
+package dm.jail.async;
 
 import org.jetbrains.annotations.NotNull;
 
 import java.io.ObjectStreamException;
 import java.io.Serializable;
-
-import dm.james.promise.CancellationException;
+import java.util.concurrent.CancellationException;
 
 /**
  * Created by davide-maestroni on 01/11/2018.
@@ -64,11 +63,11 @@ public abstract class SimpleState<V> implements AsyncState<V> {
       return !isCancelled();
     }
 
-    public boolean isPending() {
+    public boolean isEvaluating() {
       return false;
     }
 
-    public boolean isValued() {
+    public boolean isSet() {
       return false;
     }
 
@@ -97,11 +96,11 @@ public abstract class SimpleState<V> implements AsyncState<V> {
       return false;
     }
 
-    public boolean isPending() {
+    public boolean isEvaluating() {
       return true;
     }
 
-    public boolean isValued() {
+    public boolean isSet() {
       return false;
     }
 
@@ -130,11 +129,11 @@ public abstract class SimpleState<V> implements AsyncState<V> {
       return false;
     }
 
-    public boolean isPending() {
+    public boolean isEvaluating() {
       return false;
     }
 
-    public boolean isValued() {
+    public boolean isSet() {
       return true;
     }
 

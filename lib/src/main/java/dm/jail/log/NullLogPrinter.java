@@ -1,5 +1,5 @@
 /*
- * Copyright 2017 Davide Maestroni
+ * Copyright 2018 Davide Maestroni
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package dm.james.log;
+package dm.jail.log;
 
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -28,18 +28,18 @@ import java.util.List;
  * <p>
  * Created by davide-maestroni on 10/04/2014.
  */
-class NullLog extends TemplateLog implements Serializable {
+class NullLogPrinter extends TemplateLogPrinter implements Serializable {
 
-  private static final NullLog sInstance = new NullLog();
+  private static final NullLogPrinter sInstance = new NullLogPrinter();
 
   /**
    * Avoid explicit instantiation.
    */
-  private NullLog() {
+  private NullLogPrinter() {
   }
 
   @NotNull
-  static NullLog instance() {
+  static NullLogPrinter instance() {
     return sInstance;
   }
 

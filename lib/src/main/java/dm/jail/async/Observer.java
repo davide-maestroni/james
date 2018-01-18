@@ -14,24 +14,12 @@
  * limitations under the License.
  */
 
-package dm.james.async;
-
-import java.io.Serializable;
+package dm.jail.async;
 
 /**
- * Created by davide-maestroni on 01/09/2018.
+ * Created by davide-maestroni on 07/20/2017.
  */
-public interface AsyncState<V> extends Serializable {
+public interface Observer<I> {
 
-  Throwable failure();
-
-  boolean isCancelled();
-
-  boolean isFailed();
-
-  boolean isPending();
-
-  boolean isValued();
-
-  V value();
+  void accept(I input) throws Exception;
 }

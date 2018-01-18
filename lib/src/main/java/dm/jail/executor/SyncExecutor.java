@@ -1,5 +1,5 @@
 /*
- * Copyright 2017 Davide Maestroni
+ * Copyright 2018 Davide Maestroni
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,9 +14,25 @@
  * limitations under the License.
  */
 
+package dm.jail.executor;
+
 /**
- * LogPrinter related classes and definitions.
+ * Base abstract implementation of a synchronous executor.
+ * <br>
+ * For a synchronous executor any thread is an execution thread while no one is managed.
  * <p>
- * Created by davide-maestroni on 10/04/2014.
+ * Created by davide-maestroni on 06/06/2016.
  */
-package dm.james.log;
+public abstract class SyncExecutor implements ScheduledExecutor {
+
+  public boolean isExecutionThread() {
+    return true;
+  }
+
+  public void stop() {
+  }
+
+  public boolean isOwnedThread() {
+    return false;
+  }
+}

@@ -1,5 +1,5 @@
 /*
- * Copyright 2017 Davide Maestroni
+ * Copyright 2018 Davide Maestroni
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package dm.james.log;
+package dm.jail.log;
 
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -22,12 +22,12 @@ import org.jetbrains.annotations.Nullable;
 import java.util.List;
 
 /**
- * Interface defining a log object responsible for formatting and writing the log messages.
+ * Interface defining a log printer object responsible for formatting and writing the log messages.
  * <p>
- * A default log instance can be set by invoking the proper logger methods. Note, however, that a
- * routine instance cannot dynamically change its log after creation.
- * <p>
- * Note also that a log instance is typically accessed from different threads, so, it is
+ * A default printer instance can be set by invoking the proper logger methods. Note, however, that
+ * the instance employed cannot be dynamically changed after the logger instantiation.
+ * <br>
+ * Note also that a printer instance is typically accessed from different threads, so, it is
  * responsibility of the implementing class to avoid concurrency issues by synchronizing mutable
  * fields when required.
  * <p>
@@ -36,18 +36,16 @@ import java.util.List;
  * the released code by using Proguard and adding, for example, the following rule to the
  * configuration file:
  * <pre><code>
- * -assumenosideeffects class dm.james.log.Logger {
+ * -assumenosideeffects class dm.jail.log.Logger {
  *   public void dbg(...);
  * }
  * </code></pre>
  * <p>
  * Created by davide-maestroni on 10/03/2014.
  *
- * @see dm.james.log.Logger Logger
+ * @see Logger Logger
  */
-public interface Log {
-
-  // TODO: 11/12/2017 LogPrinter
+public interface LogPrinter {
 
   /**
    * Logs a debug message.
