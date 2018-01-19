@@ -168,17 +168,17 @@ class DefaultAsyncStatement<V> implements AsyncStatement<V>, Serializable {
     }
   }
 
-  private static void close(@Nullable final Object object, @NotNull final Logger logger) throws
-      FailureException {
-    if (!(object instanceof Closeable)) {
+  private static void close(@Nullable final Closeable closeable,
+      @NotNull final Logger logger) throws FailureException {
+    if (closeable == null) {
       return;
     }
 
     try {
-      ((Closeable) object).close();
+      closeable.close();
 
     } catch (final IOException e) {
-      logger.err(e, "Error while closing closeable: " + object);
+      logger.err(e, "Error while closing closeable: " + closeable);
       throw new FailureException(e);
     }
   }
@@ -1519,7 +1519,7 @@ class DefaultAsyncStatement<V> implements AsyncStatement<V>, Serializable {
         mHandler.value(value, result);
 
       } finally {
-        close(value, mLogger);
+        close(mCloseable.apply(value), mLogger);
       }
     }
   }
@@ -1585,7 +1585,7 @@ class DefaultAsyncStatement<V> implements AsyncStatement<V>, Serializable {
       }).whenDone(new Action() {
 
         public void perform() throws Exception {
-          close(value, mLogger);
+          close(mCloseable.apply(value), mLogger);
         }
       });
     }

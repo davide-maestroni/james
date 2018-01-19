@@ -16,14 +16,16 @@
 
 package dm.jail;
 
-import org.junit.Ignore;
 import org.junit.Test;
 
+import java.io.Closeable;
+import java.io.IOException;
 import java.util.Random;
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 
 import dm.jail.async.AsyncResult;
@@ -311,7 +313,6 @@ public class TestAsyncStatement {
     assertThat(statement.getValue()).isEqualTo(4);
   }
 
-  @Ignore
   @Test
   public void thenIfFail() {
     final AsyncStatement<Integer> statement =
@@ -323,6 +324,145 @@ public class TestAsyncStatement {
         });
     assertThat(statement.getFailure().getCause()).isExactlyInstanceOf(
         IllegalArgumentException.class);
+  }
+
+  @Test
+  public void thenTry() {
+    final AtomicCloseable closeable = new AtomicCloseable();
+    final AsyncStatement<String> statement =
+        new Async().value("test").thenTry(new Mapper<String, Closeable>() {
+
+          public Closeable apply(final String input) {
+            return closeable;
+          }
+        }, new Mapper<String, String>() {
+
+          public String apply(final String input) {
+            return input.toUpperCase();
+          }
+        });
+    assertThat(statement.getValue()).isEqualTo("TEST");
+    assertThat(closeable.isCalled()).isTrue();
+  }
+
+  @Test
+  public void thenTryDo() {
+    final AtomicCloseable closeable = new AtomicCloseable();
+    final AtomicReference<String> ref = new AtomicReference<String>();
+    final AsyncStatement<String> statement =
+        new Async().value("test").thenTryDo(new Mapper<String, Closeable>() {
+
+          public Closeable apply(final String input) {
+            return closeable;
+          }
+        }, new Observer<String>() {
+
+          public void accept(final String input) {
+            ref.set(input);
+          }
+        });
+    assertThat(statement.getValue()).isEqualTo("test");
+    assertThat(ref.get()).isEqualTo("test");
+    assertThat(closeable.isCalled()).isTrue();
+  }
+
+  @Test
+  public void thenTryDoFail() {
+    final AtomicCloseable closeable = new AtomicCloseable();
+    final AsyncStatement<String> statement =
+        new Async().value("test").thenTryDo(new Mapper<String, Closeable>() {
+
+          public Closeable apply(final String input) {
+            return closeable;
+          }
+        }, new Observer<String>() {
+
+          public void accept(final String input) {
+            throw new IllegalArgumentException();
+          }
+        });
+    assertThat(statement.getFailure().getCause()).isExactlyInstanceOf(
+        IllegalArgumentException.class);
+    assertThat(closeable.isCalled()).isTrue();
+  }
+
+  @Test
+  public void thenTryFail() {
+    final AtomicCloseable closeable = new AtomicCloseable();
+    final AsyncStatement<String> statement =
+        new Async().value("test").thenTry(new Mapper<String, Closeable>() {
+
+          public Closeable apply(final String input) {
+            return closeable;
+          }
+        }, new Mapper<String, String>() {
+
+          public String apply(final String input) {
+            throw new IllegalArgumentException();
+          }
+        });
+    assertThat(statement.getFailure().getCause()).isExactlyInstanceOf(
+        IllegalArgumentException.class);
+    assertThat(closeable.isCalled()).isTrue();
+  }
+
+  @Test
+  public void thenTryIf() {
+    final AtomicCloseable closeable = new AtomicCloseable();
+    final AsyncStatement<Integer> statement =
+        new Async().value("test").thenTryIf(new Mapper<String, Closeable>() {
+
+          public Closeable apply(final String input) {
+            return closeable;
+          }
+        }, new Mapper<String, AsyncStatement<Integer>>() {
+
+          public AsyncStatement<Integer> apply(final String input) {
+            return new Async().value(input.length());
+          }
+        });
+    assertThat(statement.getValue()).isEqualTo(4);
+    assertThat(closeable.isCalled()).isTrue();
+  }
+
+  @Test
+  public void thenTryIfAsync() {
+    final AtomicCloseable closeable = new AtomicCloseable();
+    final AsyncStatement<Integer> statement =
+        new Async().value("test").thenTryIf(new Mapper<String, Closeable>() {
+
+          public Closeable apply(final String input) {
+            return closeable;
+          }
+        }, new Mapper<String, AsyncStatement<Integer>>() {
+
+          public AsyncStatement<Integer> apply(final String input) {
+            return new Async().value(input.length())
+                              .on(withDelay(backgroundExecutor(), 100, TimeUnit.MILLISECONDS));
+          }
+        });
+    assertThat(statement.getValue()).isEqualTo(4);
+    assertThat(closeable.isCalled()).isTrue();
+  }
+
+  @Test
+  public void thenTryIfFail() {
+    final AtomicCloseable closeable = new AtomicCloseable();
+    final AsyncStatement<Integer> statement =
+        new Async().value("test").thenTryIf(new Mapper<String, Closeable>() {
+
+          public Closeable apply(final String input) {
+            return closeable;
+          }
+        }, new Mapper<String, AsyncStatement<Integer>>() {
+
+          public AsyncStatement<Integer> apply(final String input) {
+            return new Async().failure(new IllegalArgumentException());
+          }
+        });
+    assertThat(statement.getFailure().getCause()).isExactlyInstanceOf(
+        IllegalArgumentException.class);
+    assertThat(closeable.isCalled()).isTrue();
   }
 
   @Test
@@ -372,5 +512,18 @@ public class TestAsyncStatement {
     final AsyncStatement<String> statement =
         new Async().on(withDelay(backgroundExecutor(), 100, TimeUnit.MILLISECONDS)).value("test");
     assertThat(statement.waitDone(1, TimeUnit.SECONDS)).isTrue();
+  }
+
+  private static class AtomicCloseable implements Closeable {
+
+    private final AtomicBoolean mIsCalled = new AtomicBoolean();
+
+    public void close() throws IOException {
+      mIsCalled.set(true);
+    }
+
+    public boolean isCalled() {
+      return mIsCalled.get();
+    }
   }
 }
