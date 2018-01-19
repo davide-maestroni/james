@@ -32,6 +32,8 @@ import dm.jail.async.AsyncResult;
 import dm.jail.async.AsyncStatement;
 import dm.jail.async.Mapper;
 import dm.jail.async.Observer;
+import dm.jail.util.ConstantConditions;
+import dm.jail.util.RuntimeTimeoutException;
 
 import static dm.jail.executor.ScheduledExecutors.backgroundExecutor;
 import static dm.jail.executor.ScheduledExecutors.withDelay;
@@ -98,7 +100,7 @@ public class TestAsyncStatement {
             return input.toUpperCase();
           }
         });
-    assertThat(statement.getFailure().getCause()).isNull();
+    assertThat(ConstantConditions.notNull(statement.getFailure()).getCause()).isNull();
   }
 
   @Test
@@ -173,6 +175,14 @@ public class TestAsyncStatement {
         new Async().on(withDelay(backgroundExecutor(), 100, TimeUnit.MILLISECONDS))
                    .failure(new IllegalArgumentException());
     statement.get();
+  }
+
+  @Test(expected = RuntimeTimeoutException.class)
+  public void getFailureTimeout() throws ExecutionException, InterruptedException,
+      TimeoutException {
+    final AsyncStatement<String> statement =
+        new Async().on(withDelay(backgroundExecutor(), 1, TimeUnit.SECONDS)).value("test");
+    assertThat(statement.getFailure(10, TimeUnit.MILLISECONDS));
   }
 
   @Test(expected = ExecutionException.class)
@@ -271,7 +281,7 @@ public class TestAsyncStatement {
             throw new IllegalArgumentException();
           }
         });
-    assertThat(statement.getFailure().getCause()).isExactlyInstanceOf(
+    assertThat(ConstantConditions.notNull(statement.getFailure()).getCause()).isExactlyInstanceOf(
         IllegalArgumentException.class);
   }
 
@@ -284,7 +294,7 @@ public class TestAsyncStatement {
             throw new IllegalArgumentException();
           }
         });
-    assertThat(statement.getFailure().getCause()).isExactlyInstanceOf(
+    assertThat(ConstantConditions.notNull(statement.getFailure()).getCause()).isExactlyInstanceOf(
         IllegalArgumentException.class);
   }
 
@@ -322,7 +332,7 @@ public class TestAsyncStatement {
             return new Async().failure(new IllegalArgumentException());
           }
         });
-    assertThat(statement.getFailure().getCause()).isExactlyInstanceOf(
+    assertThat(ConstantConditions.notNull(statement.getFailure()).getCause()).isExactlyInstanceOf(
         IllegalArgumentException.class);
   }
 
@@ -381,7 +391,7 @@ public class TestAsyncStatement {
             throw new IllegalArgumentException();
           }
         });
-    assertThat(statement.getFailure().getCause()).isExactlyInstanceOf(
+    assertThat(ConstantConditions.notNull(statement.getFailure()).getCause()).isExactlyInstanceOf(
         IllegalArgumentException.class);
     assertThat(closeable.isCalled()).isTrue();
   }
@@ -401,7 +411,7 @@ public class TestAsyncStatement {
             throw new IllegalArgumentException();
           }
         });
-    assertThat(statement.getFailure().getCause()).isExactlyInstanceOf(
+    assertThat(ConstantConditions.notNull(statement.getFailure()).getCause()).isExactlyInstanceOf(
         IllegalArgumentException.class);
     assertThat(closeable.isCalled()).isTrue();
   }
@@ -460,7 +470,7 @@ public class TestAsyncStatement {
             return new Async().failure(new IllegalArgumentException());
           }
         });
-    assertThat(statement.getFailure().getCause()).isExactlyInstanceOf(
+    assertThat(ConstantConditions.notNull(statement.getFailure()).getCause()).isExactlyInstanceOf(
         IllegalArgumentException.class);
     assertThat(closeable.isCalled()).isTrue();
   }
@@ -522,7 +532,7 @@ public class TestAsyncStatement {
       mIsCalled.set(true);
     }
 
-    public boolean isCalled() {
+    boolean isCalled() {
       return mIsCalled.get();
     }
   }
