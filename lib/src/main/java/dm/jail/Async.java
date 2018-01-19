@@ -28,6 +28,7 @@ import dm.jail.async.AsyncLoop;
 import dm.jail.async.AsyncResult;
 import dm.jail.async.AsyncResultCollection;
 import dm.jail.async.AsyncStatement;
+import dm.jail.async.DeferredStatement;
 import dm.jail.async.Mapper;
 import dm.jail.async.Observer;
 import dm.jail.executor.ScheduledExecutor;
@@ -64,6 +65,11 @@ public class Async {
 
   private static void test() {
 
+  }
+
+  @NotNull
+  public DeferredStatement<Void> deferred() {
+    return new DefaultDeferredStatement<Void>(new StatementMapper(this));
   }
 
   @NotNull
@@ -122,8 +128,8 @@ public class Async {
   public <V> AsyncStatement<V> statement(@NotNull final Observer<AsyncResult<V>> observer) {
     final ScheduledExecutor executor = mExecutor;
     if (executor != null) {
-      new DefaultAsyncStatement<V>(new ExecutorObserver<V>(observer, executor), executor,
-          mLogPrinter, mLogLevel);
+      return new DefaultAsyncStatement<V>(new ExecutorObserver<V>(observer, executor), mLogPrinter,
+          mLogLevel);
     }
 
     return new DefaultAsyncStatement<V>(observer, mLogPrinter, mLogLevel);
@@ -255,6 +261,20 @@ public class Async {
 
     public void accept(final AsyncResult<V> result) {
       result.fail(mError);
+    }
+  }
+
+  private static class StatementMapper
+      implements Mapper<Observer<AsyncResult<Void>>, AsyncStatement<Void>>, Serializable {
+
+    private final Async mAsync;
+
+    private StatementMapper(@NotNull final Async async) {
+      mAsync = async;
+    }
+
+    public AsyncStatement<Void> apply(final Observer<AsyncResult<Void>> observer) {
+      return mAsync.statement(observer);
     }
   }
 

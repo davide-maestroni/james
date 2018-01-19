@@ -57,6 +57,8 @@ import dm.james.util.SerializableProxy;
  */
 class DefaultAsyncStatement<V> implements AsyncStatement<V>, Serializable {
 
+  private static final Class<?>[] ANY_EXCEPTION = new Class<?>[]{Throwable.class};
+
   private final ScheduledExecutor mExecutor;
 
   private final ChainHead<?> mHead;
@@ -79,7 +81,7 @@ class DefaultAsyncStatement<V> implements AsyncStatement<V>, Serializable {
   }
 
   @SuppressWarnings("unchecked")
-  DefaultAsyncStatement(@NotNull final Observer<? super AsyncResult<V>> observer,
+  private DefaultAsyncStatement(@NotNull final Observer<? super AsyncResult<V>> observer,
       @NotNull final ScheduledExecutor executor, @Nullable final LogPrinter printer,
       @Nullable final Level level) {
     // buffering
@@ -182,6 +184,12 @@ class DefaultAsyncStatement<V> implements AsyncStatement<V>, Serializable {
   }
 
   @NotNull
+  private static Class<?>[] safeExceptionTypes(@Nullable final Class<?>... exceptionTypes) {
+    return ((exceptionTypes != null) && (exceptionTypes.length > 0)) ? exceptionTypes.clone()
+        : ANY_EXCEPTION;
+  }
+
+  @NotNull
   public <S> AsyncStatement<V> buffer(
       @NotNull final Bufferer<S, ? super AsyncStatement<V>, ? super V, ? extends V> bufferer) {
     final Logger logger = mLogger;
@@ -197,7 +205,7 @@ class DefaultAsyncStatement<V> implements AsyncStatement<V>, Serializable {
           V>> statement,
       @Nullable final BufferUpdater<S, ? super AsyncStatement<V>, ? super AsyncResultCollection<?
           extends V>> loop) {
-    return null;
+    return buffer(new ComposedBufferer<S, V>(init, value, failure, statement, loop));
   }
 
   @NotNull
@@ -280,7 +288,7 @@ class DefaultAsyncStatement<V> implements AsyncStatement<V>, Serializable {
 
   public boolean isFinal() {
     synchronized (mMutex) {
-      return (mChain != null);
+      return (mChain == null);
     }
   }
 
@@ -361,7 +369,7 @@ class DefaultAsyncStatement<V> implements AsyncStatement<V>, Serializable {
 
   public boolean waitDone(final long timeout, @NotNull final TimeUnit timeUnit) {
     deadLockWarning(timeout);
-    final ChainHead<?> head = mHead;
+    @SuppressWarnings("UnnecessaryLocalVariable") final ChainHead<?> head = mHead;
     synchronized (mMutex) {
       try {
         if (TimeUnits.waitUntil(mMutex, new Condition() {
@@ -456,7 +464,7 @@ class DefaultAsyncStatement<V> implements AsyncStatement<V>, Serializable {
 
   public boolean isCancelled() {
     final FailureException failure = getFailure(0, TimeUnit.MILLISECONDS);
-    return (failure != null) && (failure.getCause() instanceof CancellationException);
+    return (failure != null) && failure.isCancelled();
   }
 
   public boolean isEvaluating() {
@@ -925,6 +933,10 @@ class DefaultAsyncStatement<V> implements AsyncStatement<V>, Serializable {
         };
       }
 
+      Object getValue() {
+        throw FailureException.wrap(mException);
+      }
+
       @Nullable
       @Override
       FailureException getFailure() {
@@ -1003,7 +1015,7 @@ class DefaultAsyncStatement<V> implements AsyncStatement<V>, Serializable {
     private ElseCatchHandler(@NotNull final Mapper<? super Throwable, ? extends V> mapper,
         @Nullable final Class<?>[] exceptionTypes) {
       mMapper = ConstantConditions.notNull("mapper", mapper);
-      mTypes = (exceptionTypes != null) ? exceptionTypes.clone() : new Class<?>[0];
+      mTypes = safeExceptionTypes(exceptionTypes);
       if (Arrays.asList(mTypes).contains(null)) {
         throw new NullPointerException("exception type array contains null values");
       }
@@ -1056,7 +1068,7 @@ class DefaultAsyncStatement<V> implements AsyncStatement<V>, Serializable {
     private ElseDoHandler(@NotNull final Observer<? super Throwable> observer,
         @Nullable final Class<?>[] exceptionTypes) {
       mObserver = ConstantConditions.notNull("observer", observer);
-      mTypes = (exceptionTypes != null) ? exceptionTypes.clone() : new Class<?>[0];
+      mTypes = safeExceptionTypes(exceptionTypes);
       if (Arrays.asList(mTypes).contains(null)) {
         throw new NullPointerException("exception type array contains null values");
       }
@@ -1108,7 +1120,7 @@ class DefaultAsyncStatement<V> implements AsyncStatement<V>, Serializable {
         @NotNull final Mapper<? super Throwable, ? extends AsyncStatement<? extends V>> mapper,
         @Nullable final Class<?>[] exceptionTypes) {
       mMapper = ConstantConditions.notNull("mapper", mapper);
-      mTypes = (exceptionTypes != null) ? exceptionTypes.clone() : new Class<?>[0];
+      mTypes = safeExceptionTypes(exceptionTypes);
       if (Arrays.asList(mTypes).contains(null)) {
         throw new NullPointerException("exception type array contains null values");
       }

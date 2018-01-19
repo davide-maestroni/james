@@ -18,7 +18,12 @@ package dm.jail;
 
 import org.junit.Test;
 
+import java.util.concurrent.TimeUnit;
+
 import dm.jail.async.AsyncResult;
+import dm.jail.async.AsyncStatement;
+import dm.jail.async.DeferredStatement;
+import dm.jail.async.Mapper;
 import dm.jail.async.Observer;
 import dm.jail.executor.ScheduledExecutors;
 import dm.jail.log.LogPrinter.Level;
@@ -34,6 +39,41 @@ public class TestAsync {
   @Test
   public void constructor() {
     new Async();
+  }
+
+  @Test
+  public void deferred() {
+    final DeferredStatement<Integer> deferredStatement =
+        new Async().deferred().then(new Mapper<Void, Integer>() {
+
+          public Integer apply(final Void ignored) {
+            return 3;
+          }
+        });
+    assertThat(deferredStatement.isSet()).isFalse();
+    assertThat(deferredStatement.isDone()).isFalse();
+    final AsyncStatement<Integer> statement = deferredStatement.evaluate();
+    assertThat(deferredStatement.isSet()).isTrue();
+    assertThat(statement.isDone()).isTrue();
+    assertThat(statement.getValue()).isEqualTo(3);
+  }
+
+  @Test
+  public void deferredRenew() {
+    final DeferredStatement<Integer> deferredStatement =
+        new Async().deferred().then(new Mapper<Void, Integer>() {
+
+          public Integer apply(final Void ignored) {
+            return 3;
+          }
+        });
+    assertThat(deferredStatement.isSet()).isFalse();
+    assertThat(deferredStatement.isDone()).isFalse();
+    final AsyncStatement<Integer> statement = deferredStatement.renew();
+    assertThat(deferredStatement.isSet()).isTrue();
+    assertThat(deferredStatement.getValue()).isEqualTo(3);
+    assertThat(statement.isDone()).isTrue();
+    assertThat(statement.getValue()).isEqualTo(3);
   }
 
   @Test
@@ -76,6 +116,35 @@ public class TestAsync {
                             }
                           })
                           .getValue()).isEqualTo(3);
+  }
+
+  @Test
+  @SuppressWarnings("ConstantConditions")
+  public void statementDelayedFailure() {
+    final long startTime = System.currentTimeMillis();
+    assertThat(new Async().on(
+        ScheduledExecutors.withDelay(ScheduledExecutors.backgroundExecutor(), 100,
+            TimeUnit.MILLISECONDS)).statement(new Observer<AsyncResult<Integer>>() {
+
+      public void accept(final AsyncResult<Integer> result) {
+        result.fail(new IllegalAccessException());
+      }
+    }).getFailure().getCause()).isExactlyInstanceOf(IllegalAccessException.class);
+    assertThat(System.currentTimeMillis() - startTime).isGreaterThanOrEqualTo(100);
+  }
+
+  @Test
+  public void statementDelayedValue() {
+    final long startTime = System.currentTimeMillis();
+    assertThat(new Async().on(
+        ScheduledExecutors.withDelay(ScheduledExecutors.backgroundExecutor(), 100,
+            TimeUnit.MILLISECONDS)).statement(new Observer<AsyncResult<Integer>>() {
+
+      public void accept(final AsyncResult<Integer> result) {
+        result.set(3);
+      }
+    }).getValue()).isEqualTo(3);
+    assertThat(System.currentTimeMillis() - startTime).isGreaterThanOrEqualTo(100);
   }
 
   @Test
