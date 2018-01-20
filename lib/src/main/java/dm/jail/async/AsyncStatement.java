@@ -32,19 +32,6 @@ import dm.jail.executor.ScheduledExecutor;
 public interface AsyncStatement<V> extends AsyncState<V>, Future<V>, Serializable {
 
   @NotNull
-  <S> AsyncStatement<V> buffer(
-      @NotNull Bufferer<S, ? super AsyncStatement<V>, ? super V, ? extends V> bufferer);
-
-  @NotNull
-  <S> AsyncStatement<V> buffer(@Nullable Mapper<? super AsyncStatement<V>, S> init,
-      @Nullable BufferUpdater<S, ? super AsyncStatement<V>, ? super V> value,
-      @Nullable BufferUpdater<S, ? super AsyncStatement<V>, ? super Throwable> failure,
-      @Nullable BufferUpdater<S, ? super AsyncStatement<V>, ? super AsyncResult<? extends V>>
-          statement,
-      @Nullable BufferUpdater<S, ? super AsyncStatement<V>, ? super AsyncResultCollection<?
-          extends V>> loop);
-
-  @NotNull
   AsyncStatement<V> elseCatch(@NotNull Mapper<? super Throwable, ? extends V> mapper,
       @Nullable Class<?>... exceptionTypes);
 
@@ -56,6 +43,20 @@ public interface AsyncStatement<V> extends AsyncState<V>, Future<V>, Serializabl
   AsyncStatement<V> elseIf(
       @NotNull Mapper<? super Throwable, ? extends AsyncStatement<? extends V>> mapper,
       @Nullable Class<?>... exceptionTypes);
+
+  @NotNull
+  <S> AsyncStatement<V> fork(
+      @NotNull Forker<S, ? super AsyncStatement<V>, ? super V, ? extends V> forker);
+
+  @NotNull
+  <S> AsyncStatement<V> fork(@Nullable Mapper<? super AsyncStatement<V>, S> init,
+      @Nullable ForkUpdater<S, ? super AsyncStatement<V>, ? super V> value,
+      @Nullable ForkUpdater<S, ? super AsyncStatement<V>, ? super Throwable> failure,
+      @Nullable ForkUpdater<S, ? super AsyncStatement<V>, ? super AsyncResult<? extends V>>
+          statement,
+      @Nullable ForkUpdater<S, ? super AsyncStatement<V>, ? super AsyncResultCollection<? extends
+          V>> loop,
+      @Nullable ForkCompleter<S, ? super AsyncStatement<V>> done);
 
   @Nullable
   FailureException getFailure();
@@ -103,12 +104,19 @@ public interface AsyncStatement<V> extends AsyncState<V>, Future<V>, Serializabl
   @NotNull
   AsyncStatement<V> whenDone(@NotNull Action action);
 
-  interface BufferUpdater<S, A, T> {
+  interface ForkCompleter<S, A> {
+
+    S complete(@NotNull A statement, S stack) throws Exception;
+  }
+
+  interface ForkUpdater<S, A, T> {
 
     S update(@NotNull A statement, S stack, T input) throws Exception;
   }
 
-  interface Bufferer<S, A, V, R> {
+  interface Forker<S, A, V, R> {
+
+    S done(@NotNull A statement, S stack) throws Exception;
 
     S failure(@NotNull A statement, S stack, Throwable failure) throws Exception;
 

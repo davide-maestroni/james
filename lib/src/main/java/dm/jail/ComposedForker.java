@@ -26,47 +26,58 @@ import java.io.Serializable;
 import dm.jail.async.AsyncResult;
 import dm.jail.async.AsyncResultCollection;
 import dm.jail.async.AsyncStatement;
-import dm.jail.async.AsyncStatement.BufferUpdater;
-import dm.jail.async.AsyncStatement.Bufferer;
+import dm.jail.async.AsyncStatement.ForkCompleter;
+import dm.jail.async.AsyncStatement.ForkUpdater;
+import dm.jail.async.AsyncStatement.Forker;
 import dm.jail.async.Mapper;
 import dm.james.util.SerializableProxy;
 
 /**
  * Created by davide-maestroni on 01/19/2018.
  */
-class ComposedBufferer<S, V> implements Bufferer<S, AsyncStatement<V>, V, V>, Serializable {
+class ComposedForker<S, V> implements Forker<S, AsyncStatement<V>, V, V>, Serializable {
 
-  private final BufferUpdater<S, ? super AsyncStatement<V>, ? super Throwable> mFailure;
+  private final ForkCompleter<S, ? super AsyncStatement<V>> mDone;
+
+  private final ForkUpdater<S, ? super AsyncStatement<V>, ? super Throwable> mFailure;
 
   private final Mapper<? super AsyncStatement<V>, S> mInit;
 
-  private final BufferUpdater<S, ? super AsyncStatement<V>, ? super AsyncResultCollection<?
-      extends V>>
+  private final ForkUpdater<S, ? super AsyncStatement<V>, ? super AsyncResultCollection<? extends
+      V>>
       mLoop;
 
-  private final BufferUpdater<S, ? super AsyncStatement<V>, ? super AsyncResult<? extends V>>
+  private final ForkUpdater<S, ? super AsyncStatement<V>, ? super AsyncResult<? extends V>>
       mStatement;
 
-  private final BufferUpdater<S, ? super AsyncStatement<V>, ? super V> mValue;
+  private final ForkUpdater<S, ? super AsyncStatement<V>, ? super V> mValue;
 
   @SuppressWarnings("unchecked")
-  ComposedBufferer(@Nullable final Mapper<? super AsyncStatement<V>, S> init,
-      @Nullable final BufferUpdater<S, ? super AsyncStatement<V>, ? super V> value,
-      @Nullable final BufferUpdater<S, ? super AsyncStatement<V>, ? super Throwable> failure,
-      @Nullable final BufferUpdater<S, ? super AsyncStatement<V>, ? super AsyncResult<? extends
-          V>> statement,
-      @Nullable final BufferUpdater<S, ? super AsyncStatement<V>, ? super AsyncResultCollection<?
-          extends V>> loop) {
+  ComposedForker(@Nullable final Mapper<? super AsyncStatement<V>, S> init,
+      @Nullable final ForkUpdater<S, ? super AsyncStatement<V>, ? super V> value,
+      @Nullable final ForkUpdater<S, ? super AsyncStatement<V>, ? super Throwable> failure,
+      @Nullable final ForkUpdater<S, ? super AsyncStatement<V>, ? super AsyncResult<? extends V>>
+          statement,
+      @Nullable final ForkUpdater<S, ? super AsyncStatement<V>, ? super AsyncResultCollection<?
+          extends V>> loop,
+      @Nullable final ForkCompleter<S, ? super AsyncStatement<V>> done) {
     mInit = (Mapper<? super AsyncStatement<V>, S>) ((init != null) ? init : DefaultInit.sInstance);
-    mValue = (BufferUpdater<S, ? super AsyncStatement<V>, ? super V>) ((value != null) ? value
+    mValue = (ForkUpdater<S, ? super AsyncStatement<V>, ? super V>) ((value != null) ? value
         : DefaultUpdateValue.sInstance);
-    mFailure = (BufferUpdater<S, ? super AsyncStatement<V>, ? super Throwable>) ((failure != null)
-        ? failure : DefaultUpdateValue.sInstance);
-    mStatement = (BufferUpdater<S, ? super AsyncStatement<V>, ? super AsyncResult<? extends V>>) (
+    mFailure =
+        (ForkUpdater<S, ? super AsyncStatement<V>, ? super Throwable>) ((failure != null) ? failure
+            : DefaultUpdateValue.sInstance);
+    mStatement = (ForkUpdater<S, ? super AsyncStatement<V>, ? super AsyncResult<? extends V>>) (
         (statement != null) ? statement : DefaultUpdateResult.sInstance);
     mLoop =
-        (BufferUpdater<S, ? super AsyncStatement<V>, ? super AsyncResultCollection<? extends V>>) (
+        (ForkUpdater<S, ? super AsyncStatement<V>, ? super AsyncResultCollection<? extends V>>) (
             (loop != null) ? loop : DefaultUpdateCollection.sInstance);
+    mDone = (ForkCompleter<S, ? super AsyncStatement<V>>) ((done != null) ? done
+        : DefaultComplete.sInstance);
+  }
+
+  public S done(@NotNull final AsyncStatement<V> statement, final S stack) throws Exception {
+    return mDone.complete(statement, stack);
   }
 
   public S failure(@NotNull final AsyncStatement<V> statement, final S stack,
@@ -94,35 +105,50 @@ class ComposedBufferer<S, V> implements Bufferer<S, AsyncStatement<V>, V, V>, Se
   }
 
   private Object writeReplace() throws ObjectStreamException {
-    return new BuffererProxy<S, V>(mInit, mValue, mFailure, mStatement, mLoop);
+    return new BuffererProxy<S, V>(mInit, mValue, mFailure, mStatement, mLoop, mDone);
   }
 
   private static class BuffererProxy<S, V> extends SerializableProxy {
 
     private BuffererProxy(final Mapper<? super AsyncStatement<V>, S> init,
-        final BufferUpdater<S, ? super AsyncStatement<V>, ? super V> value,
-        final BufferUpdater<S, ? super AsyncStatement<V>, ? super Throwable> failure,
-        final BufferUpdater<S, ? super AsyncStatement<V>, ? super AsyncResult<? extends V>>
-            statement,
-        final BufferUpdater<S, ? super AsyncStatement<V>, ? super AsyncResultCollection<? extends
-            V>> loop) {
-      super(proxy(init), proxy(value), proxy(failure), proxy(statement), proxy(loop));
+        final ForkUpdater<S, ? super AsyncStatement<V>, ? super V> value,
+        final ForkUpdater<S, ? super AsyncStatement<V>, ? super Throwable> failure,
+        final ForkUpdater<S, ? super AsyncStatement<V>, ? super AsyncResult<? extends V>> statement,
+        final ForkUpdater<S, ? super AsyncStatement<V>, ? super AsyncResultCollection<? extends
+            V>> loop,
+        final ForkCompleter<S, ? super AsyncStatement<V>> done) {
+      super(proxy(init), proxy(value), proxy(failure), proxy(statement), proxy(loop), proxy(done));
     }
 
     @SuppressWarnings("unchecked")
     Object readResolve() throws ObjectStreamException {
       try {
         final Object[] args = deserializeArgs();
-        return new ComposedBufferer<S, V>((Mapper<? super AsyncStatement<V>, S>) args[0],
-            (BufferUpdater<S, ? super AsyncStatement<V>, ? super V>) args[1],
-            (BufferUpdater<S, ? super AsyncStatement<V>, ? super Throwable>) args[2],
-            (BufferUpdater<S, ? super AsyncStatement<V>, ? super AsyncResult<? extends V>>) args[3],
-            (BufferUpdater<S, ? super AsyncStatement<V>, ? super AsyncResultCollection<? extends
-                V>>) args[4]);
+        return new ComposedForker<S, V>((Mapper<? super AsyncStatement<V>, S>) args[0],
+            (ForkUpdater<S, ? super AsyncStatement<V>, ? super V>) args[1],
+            (ForkUpdater<S, ? super AsyncStatement<V>, ? super Throwable>) args[2],
+            (ForkUpdater<S, ? super AsyncStatement<V>, ? super AsyncResult<? extends V>>) args[3],
+            (ForkUpdater<S, ? super AsyncStatement<V>, ? super AsyncResultCollection<? extends
+                V>>) args[4],
+            (ForkCompleter<S, ? super AsyncStatement<V>>) args[5]);
 
       } catch (final Throwable t) {
         throw new InvalidObjectException(t.getMessage());
       }
+    }
+  }
+
+  private static class DefaultComplete<S, V>
+      implements ForkCompleter<S, AsyncStatement<V>>, Serializable {
+
+    private static final DefaultComplete<?, ?> sInstance = new DefaultComplete<Object, Object>();
+
+    public S complete(@NotNull final AsyncStatement<V> statement, final S stack) {
+      return stack;
+    }
+
+    Object readResolve() throws ObjectStreamException {
+      return sInstance;
     }
   }
 
@@ -140,7 +166,7 @@ class ComposedBufferer<S, V> implements Bufferer<S, AsyncStatement<V>, V, V>, Se
   }
 
   private static class DefaultUpdateCollection<S, V>
-      implements BufferUpdater<S, AsyncStatement<V>, AsyncResultCollection<V>>, Serializable {
+      implements ForkUpdater<S, AsyncStatement<V>, AsyncResultCollection<V>>, Serializable {
 
     private static final DefaultUpdateCollection<?, ?> sInstance =
         new DefaultUpdateCollection<Object, Object>();
@@ -157,7 +183,7 @@ class ComposedBufferer<S, V> implements Bufferer<S, AsyncStatement<V>, V, V>, Se
   }
 
   private static class DefaultUpdateResult<S, V>
-      implements BufferUpdater<S, AsyncStatement<V>, AsyncResult<V>>, Serializable {
+      implements ForkUpdater<S, AsyncStatement<V>, AsyncResult<V>>, Serializable {
 
     private static final DefaultUpdateResult<?, ?> sInstance =
         new DefaultUpdateResult<Object, Object>();
@@ -174,7 +200,7 @@ class ComposedBufferer<S, V> implements Bufferer<S, AsyncStatement<V>, V, V>, Se
   }
 
   private static class DefaultUpdateValue<S, V, I>
-      implements BufferUpdater<S, AsyncStatement<V>, I>, Serializable {
+      implements ForkUpdater<S, AsyncStatement<V>, I>, Serializable {
 
     private static final DefaultUpdateValue<?, ?, ?> sInstance =
         new DefaultUpdateValue<Object, Object, Object>();

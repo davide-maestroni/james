@@ -67,21 +67,21 @@ class DefaultDeferredStatement<V> implements DeferredStatement<V> {
     mStatement = statement;
   }
 
-  @NotNull
-  public <S> DeferredStatement<V> buffer(
-      @NotNull final Bufferer<S, ? super AsyncStatement<V>, ? super V, ? extends V> bufferer) {
-    return newInstance(mStatement.buffer(bufferer));
+  public boolean cancel(final boolean mayInterruptIfRunning) {
+    return mStatement.cancel(mayInterruptIfRunning);
   }
 
-  @NotNull
-  public <S> DeferredStatement<V> buffer(@Nullable final Mapper<? super AsyncStatement<V>, S> init,
-      @Nullable final BufferUpdater<S, ? super AsyncStatement<V>, ? super V> value,
-      @Nullable final BufferUpdater<S, ? super AsyncStatement<V>, ? super Throwable> failure,
-      @Nullable final BufferUpdater<S, ? super AsyncStatement<V>, ? super AsyncResult<? extends
-          V>> statement,
-      @Nullable final BufferUpdater<S, ? super AsyncStatement<V>, ? super AsyncResultCollection<?
-          extends V>> loop) {
-    return newInstance(mStatement.buffer(init, value, failure, statement, loop));
+  public boolean isDone() {
+    return mStatement.isDone();
+  }
+
+  public V get() throws InterruptedException, ExecutionException {
+    return mStatement.get();
+  }
+
+  public V get(final long timeout, @NotNull final TimeUnit timeUnit) throws InterruptedException,
+      ExecutionException, TimeoutException {
+    return mStatement.get(timeout, timeUnit);
   }
 
   @NotNull
@@ -102,6 +102,24 @@ class DefaultDeferredStatement<V> implements DeferredStatement<V> {
       @NotNull final Mapper<? super Throwable, ? extends AsyncStatement<? extends V>> mapper,
       @Nullable final Class<?>[] exceptionTypes) {
     return newInstance(mStatement.elseIf(mapper, exceptionTypes));
+  }
+
+  @NotNull
+  public <S> DeferredStatement<V> fork(
+      @NotNull final Forker<S, ? super AsyncStatement<V>, ? super V, ? extends V> forker) {
+    return newInstance(mStatement.fork(forker));
+  }
+
+  @NotNull
+  public <S> DeferredStatement<V> fork(@Nullable final Mapper<? super AsyncStatement<V>, S> init,
+      @Nullable final ForkUpdater<S, ? super AsyncStatement<V>, ? super V> value,
+      @Nullable final ForkUpdater<S, ? super AsyncStatement<V>, ? super Throwable> failure,
+      @Nullable final ForkUpdater<S, ? super AsyncStatement<V>, ? super AsyncResult<? extends V>>
+          statement,
+      @Nullable final ForkUpdater<S, ? super AsyncStatement<V>, ? super AsyncResultCollection<?
+          extends V>> loop,
+      @Nullable ForkCompleter<S, ? super AsyncStatement<V>> done) {
+    return newInstance(mStatement.fork(init, value, failure, statement, loop, done));
   }
 
   @NotNull
@@ -161,23 +179,6 @@ class DefaultDeferredStatement<V> implements DeferredStatement<V> {
   public AsyncStatement<V> evaluate() {
     mObserver.evaluate();
     return mStatement;
-  }
-
-  public boolean cancel(final boolean mayInterruptIfRunning) {
-    return mStatement.cancel(mayInterruptIfRunning);
-  }
-
-  public boolean isDone() {
-    return mStatement.isDone();
-  }
-
-  public V get() throws InterruptedException, ExecutionException {
-    return mStatement.get();
-  }
-
-  public V get(final long timeout, @NotNull final TimeUnit timeUnit) throws InterruptedException,
-      ExecutionException, TimeoutException {
-    return mStatement.get(timeout, timeUnit);
   }
 
   public Throwable failure() {

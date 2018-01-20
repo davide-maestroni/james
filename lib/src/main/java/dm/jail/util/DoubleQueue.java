@@ -68,8 +68,7 @@ public class DoubleQueue<E> extends AbstractCollection<E> implements Queue<E> {
    * @throws IllegalArgumentException if the specified capacity is less than 1.
    */
   public DoubleQueue(final int minCapacity) {
-    final int msb =
-        Integer.highestOneBit(ConstantConditions.positive("minCapacity", minCapacity));
+    final int msb = Integer.highestOneBit(ConstantConditions.positive("minCapacity", minCapacity));
     final int initialCapacity = (minCapacity == msb) ? msb : msb << 1;
     mData = new Object[initialCapacity];
     mMask = initialCapacity - 1;

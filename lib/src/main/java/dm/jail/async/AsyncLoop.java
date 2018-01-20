@@ -33,26 +33,6 @@ import dm.jail.executor.ScheduledExecutor;
 public interface AsyncLoop<V> extends AsyncStatement<Iterable<V>>, Serializable {
 
   @NotNull
-  <S> AsyncLoop<V> buffer(
-      @NotNull Bufferer<S, ? super AsyncStatement<Iterable<V>>, ? super Iterable<V>, ? extends
-          Iterable<V>> bufferer);
-
-  @NotNull
-  <S> AsyncLoop<V> buffer(@Nullable Mapper<? super AsyncStatement<Iterable<V>>, S> init,
-      @Nullable BufferUpdater<S, ? super AsyncStatement<Iterable<V>>, ? super Iterable<V>> value,
-      @Nullable BufferUpdater<S, ? super AsyncStatement<Iterable<V>>, ? super Throwable> failure,
-      @Nullable BufferUpdater<S, ? super AsyncStatement<Iterable<V>>, ? super AsyncResult<?
-          extends Iterable<V>>> statement,
-      @Nullable BufferUpdater<S, ? super AsyncStatement<Iterable<V>>, ? super
-          AsyncResultCollection<? extends Iterable<V>>> loop);
-
-  @NotNull
-  AsyncLoop<V> on(@NotNull ScheduledExecutor executor);
-
-  @NotNull
-  AsyncLoop<V> renew();
-
-  @NotNull
   <R> AsyncLoop<R> forEach(@NotNull Mapper<V, R> mapper);
 
   @NotNull
@@ -66,51 +46,48 @@ public interface AsyncLoop<V> extends AsyncStatement<Iterable<V>>, Serializable 
 
   @NotNull
   AsyncLoop<V> forEachElseIf(@NotNull Mapper<Throwable, AsyncStatement<V>> mapper);
-  // TODO: 16/01/2018 ordered?
 
   @NotNull
   AsyncLoop<V> forEachElseLoop(@NotNull Mapper<Throwable, Iterable<V>> mapper);
 
   @NotNull
   AsyncLoop<V> forEachElseLoopIf(@NotNull Mapper<Throwable, AsyncLoop<V>> mapper);
-  // TODO: 16/01/2018 ordered?
 
   @NotNull
   <R> AsyncLoop<R> forEachIf(@NotNull Mapper<V, AsyncStatement<R>> mapper);
-  // TODO: 16/01/2018 ordered?
 
   @NotNull
   <R> AsyncLoop<R> forEachLoop(@NotNull Mapper<V, Iterable<R>> mapper);
+  // TODO: 16/01/2018 ordered?
 
   @NotNull
   <R> AsyncLoop<R> forEachLoopIf(@NotNull Mapper<V, AsyncLoop<R>> mapper);
-  // TODO: 16/01/2018 ordered?
 
   @NotNull
   <R> AsyncLoop<R> forEachTry(@NotNull Mapper<V, Closeable> closeable,
       @NotNull Mapper<V, R> mapper);
+  // TODO: 16/01/2018 ordered?
 
   @NotNull
   AsyncLoop<V> forEachTryDo(@NotNull Mapper<V, Closeable> closeable, @NotNull Observer<V> observer);
+  // TODO: 16/01/2018 ordered?
 
   @NotNull
   <R> AsyncLoop<R> forEachTryIf(@NotNull Mapper<V, Closeable> closeable,
       @NotNull Mapper<V, AsyncStatement<R>> mapper);
-  // TODO: 16/01/2018 ordered?
 
   @NotNull
   <R> AsyncLoop<R> forEachTryLoop(@NotNull Mapper<V, Closeable> closeable,
       @NotNull Mapper<V, Iterable<R>> mapper);
+  // TODO: 16/01/2018 ordered?
 
   @NotNull
   <R> AsyncLoop<R> forEachTryLoopIf(@NotNull Mapper<V, Closeable> closeable,
       @NotNull Mapper<V, AsyncLoop<R>> mapper);
-  // TODO: 16/01/2018 ordered?
 
   @NotNull
   <R, S> AsyncLoop<R> forEachTryYield(@NotNull Mapper<V, Closeable> closeable,
       @NotNull Looper<S, V, R> looper);
-  // TODO: 16/01/2018 ordered?
 
   @NotNull
   <R, S> AsyncLoop<R> forEachTryYield(@NotNull Mapper<V, Closeable> closeable,
@@ -121,12 +98,35 @@ public interface AsyncLoop<V> extends AsyncStatement<Iterable<V>>, Serializable 
 
   @NotNull
   <R, S> AsyncLoop<R> forEachYield(@NotNull Looper<S, V, R> looper);
-  // TODO: 16/01/2018 ordered?
 
   @NotNull
   <R, S> AsyncLoop<R> forEachYield(@Nullable Provider<S> init, @Nullable Mapper<S, Boolean> loop,
       @Nullable LoopUpdater<S, V, R> value, @Nullable LoopUpdater<S, Throwable, R> failure,
       @Nullable LoopCompleter<S, R> complete);
+  // TODO: 16/01/2018 ordered?
+
+  @NotNull
+  <S> AsyncLoop<V> fork(
+      @NotNull Forker<S, ? super AsyncStatement<Iterable<V>>, ? super Iterable<V>, ? extends
+          Iterable<V>> forker);
+  // TODO: 16/01/2018 ordered?
+
+  @NotNull
+  <S> AsyncLoop<V> fork(@Nullable Mapper<? super AsyncStatement<Iterable<V>>, S> init,
+      @Nullable ForkUpdater<S, ? super AsyncStatement<Iterable<V>>, ? super Iterable<V>> value,
+      @Nullable ForkUpdater<S, ? super AsyncStatement<Iterable<V>>, ? super Throwable> failure,
+      @Nullable ForkUpdater<S, ? super AsyncStatement<Iterable<V>>, ? super AsyncResult<?
+                extends Iterable<V>>> statement,
+      @Nullable ForkUpdater<S, ? super AsyncStatement<Iterable<V>>, ? super
+                AsyncResultCollection<? extends Iterable<V>>> loop);
+  // TODO: 16/01/2018 ordered?
+
+  @NotNull
+  AsyncLoop<V> on(@NotNull ScheduledExecutor executor);
+  // TODO: 16/01/2018 ordered?
+
+  @NotNull
+  AsyncLoop<V> renew();
   // TODO: 16/01/2018 ordered?
 
   @NotNull

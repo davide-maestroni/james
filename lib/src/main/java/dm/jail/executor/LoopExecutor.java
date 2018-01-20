@@ -32,8 +32,7 @@ import java.util.concurrent.TimeUnit;
  */
 class LoopExecutor extends SyncExecutor implements Serializable {
 
-  private static final LoopExecutor
-      sInstance = new LoopExecutor();
+  private static final LoopExecutor sInstance = new LoopExecutor();
 
   /**
    * Avoid explicit instantiation.

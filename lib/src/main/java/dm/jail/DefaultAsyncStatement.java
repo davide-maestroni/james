@@ -84,7 +84,7 @@ class DefaultAsyncStatement<V> implements AsyncStatement<V>, Serializable {
   private DefaultAsyncStatement(@NotNull final Observer<? super AsyncResult<V>> observer,
       @NotNull final ScheduledExecutor executor, @Nullable final LogPrinter printer,
       @Nullable final Level level) {
-    // buffering
+    // forking
     mObserver = (Observer<AsyncResult<?>>) ConstantConditions.notNull("observer", observer);
     mExecutor = ConstantConditions.notNull("executor", executor);
     mLogger = Logger.newLogger(printer, level, this);
@@ -189,23 +189,62 @@ class DefaultAsyncStatement<V> implements AsyncStatement<V>, Serializable {
         : ANY_EXCEPTION;
   }
 
-  @NotNull
-  public <S> AsyncStatement<V> buffer(
-      @NotNull final Bufferer<S, ? super AsyncStatement<V>, ? super V, ? extends V> bufferer) {
-    final Logger logger = mLogger;
-    return new DefaultAsyncStatement<V>(new BufferObserver<S, V>(this, bufferer), mExecutor,
-        logger.getLogPrinter(), logger.getLogLevel());
+  public boolean cancel(final boolean mayInterruptIfRunning) {
+    StatementChain<?, ?> chain = mHead;
+    final CancellationException reason = new CancellationException();
+    while (!chain.isTail()) {
+      if (chain.cancel(reason)) {
+        return true;
+      }
+
+      chain = chain.mNext;
+    }
+
+    return false;
   }
 
-  @NotNull
-  public <S> AsyncStatement<V> buffer(@Nullable final Mapper<? super AsyncStatement<V>, S> init,
-      @Nullable final BufferUpdater<S, ? super AsyncStatement<V>, ? super V> value,
-      @Nullable final BufferUpdater<S, ? super AsyncStatement<V>, ? super Throwable> failure,
-      @Nullable final BufferUpdater<S, ? super AsyncStatement<V>, ? super AsyncResult<? extends
-          V>> statement,
-      @Nullable final BufferUpdater<S, ? super AsyncStatement<V>, ? super AsyncResultCollection<?
-          extends V>> loop) {
-    return buffer(new ComposedBufferer<S, V>(init, value, failure, statement, loop));
+  public boolean isDone() {
+    synchronized (mMutex) {
+      return mHead.getState().isDone();
+    }
+  }
+
+  public V get() throws InterruptedException, ExecutionException {
+    try {
+      return getValue();
+
+    } catch (final FailureException e) {
+      final Throwable cause = e.getCause();
+      if (cause instanceof CancellationException) {
+        throw (CancellationException) cause;
+      }
+
+      throw new ExecutionException(e);
+
+    } catch (final RuntimeInterruptedException e) {
+      throw e.toInterruptedException();
+    }
+  }
+
+  public V get(final long timeout, @NotNull final TimeUnit timeUnit) throws InterruptedException,
+      ExecutionException, TimeoutException {
+    try {
+      return getValue(timeout, timeUnit);
+
+    } catch (final FailureException e) {
+      final Throwable cause = e.getCause();
+      if (cause instanceof CancellationException) {
+        throw (CancellationException) cause;
+      }
+
+      throw new ExecutionException(e);
+
+    } catch (final RuntimeTimeoutException e) {
+      throw new TimeoutException(e.getMessage());
+
+    } catch (final RuntimeInterruptedException e) {
+      throw e.toInterruptedException();
+    }
   }
 
   @NotNull
@@ -225,6 +264,26 @@ class DefaultAsyncStatement<V> implements AsyncStatement<V>, Serializable {
       @NotNull final Mapper<? super Throwable, ? extends AsyncStatement<? extends V>> mapper,
       @Nullable final Class<?>[] exceptionTypes) {
     return chain(new ElseIfHandler<V>(mapper, exceptionTypes));
+  }
+
+  @NotNull
+  public <S> AsyncStatement<V> fork(
+      @NotNull final Forker<S, ? super AsyncStatement<V>, ? super V, ? extends V> forker) {
+    final Logger logger = mLogger;
+    return new DefaultAsyncStatement<V>(new ForkObserver<S, V>(this, forker), mExecutor,
+        logger.getLogPrinter(), logger.getLogLevel());
+  }
+
+  @NotNull
+  public <S> AsyncStatement<V> fork(@Nullable final Mapper<? super AsyncStatement<V>, S> init,
+      @Nullable final ForkUpdater<S, ? super AsyncStatement<V>, ? super V> value,
+      @Nullable final ForkUpdater<S, ? super AsyncStatement<V>, ? super Throwable> failure,
+      @Nullable final ForkUpdater<S, ? super AsyncStatement<V>, ? super AsyncResult<? extends V>>
+          statement,
+      @Nullable final ForkUpdater<S, ? super AsyncStatement<V>, ? super AsyncResultCollection<?
+          extends V>> loop,
+      @Nullable ForkCompleter<S, ? super AsyncStatement<V>> done) {
+    return fork(new ComposedForker<S, V>(init, value, failure, statement, loop, done));
   }
 
   @Nullable
@@ -394,64 +453,6 @@ class DefaultAsyncStatement<V> implements AsyncStatement<V>, Serializable {
     return chain(new WhenDoneHandler<V>(action));
   }
 
-  public boolean cancel(final boolean mayInterruptIfRunning) {
-    StatementChain<?, ?> chain = mHead;
-    final CancellationException reason = new CancellationException();
-    while (!chain.isTail()) {
-      if (chain.cancel(reason)) {
-        return true;
-      }
-
-      chain = chain.mNext;
-    }
-
-    return false;
-  }
-
-  public boolean isDone() {
-    synchronized (mMutex) {
-      return mHead.getState().isDone();
-    }
-  }
-
-  public V get() throws InterruptedException, ExecutionException {
-    try {
-      return getValue();
-
-    } catch (final FailureException e) {
-      final Throwable cause = e.getCause();
-      if (cause instanceof CancellationException) {
-        throw (CancellationException) cause;
-      }
-
-      throw new ExecutionException(e);
-
-    } catch (final RuntimeInterruptedException e) {
-      throw e.toInterruptedException();
-    }
-  }
-
-  public V get(final long timeout, @NotNull final TimeUnit timeUnit) throws InterruptedException,
-      ExecutionException, TimeoutException {
-    try {
-      return getValue(timeout, timeUnit);
-
-    } catch (final FailureException e) {
-      final Throwable cause = e.getCause();
-      if (cause instanceof CancellationException) {
-        throw (CancellationException) cause;
-      }
-
-      throw new ExecutionException(e);
-
-    } catch (final RuntimeTimeoutException e) {
-      throw new TimeoutException(e.getMessage());
-
-    } catch (final RuntimeInterruptedException e) {
-      throw e.toInterruptedException();
-    }
-  }
-
   public Throwable failure() {
     synchronized (mMutex) {
       if (!isFailed()) {
@@ -509,8 +510,8 @@ class DefaultAsyncStatement<V> implements AsyncStatement<V>, Serializable {
     final Logger logger = mLogger;
     final Runnable chaining;
     final Observer<? extends AsyncResult<?>> observer = mObserver;
-    if (observer instanceof BufferObserver) {
-      return new DefaultAsyncStatement<V>(((BufferObserver<?, V>) observer).newObserver(),
+    if (observer instanceof DefaultAsyncStatement.ForkObserver) {
+      return new DefaultAsyncStatement<V>(((ForkObserver<?, V>) observer).newObserver(),
           logger.getLogPrinter(), logger.getLogLevel()).chain(chain, chainExecutor, newExecutor);
     }
 
@@ -605,183 +606,23 @@ class DefaultAsyncStatement<V> implements AsyncStatement<V>, Serializable {
     Observer<V> renew();
   }
 
-  private static class BufferObserver<S, V>
-      implements RenewableObserver<AsyncResult<V>>, Serializable {
+  private static class ChainForkObserver<S, V> implements Observer<AsyncResult<V>>, Serializable {
 
-    private final Bufferer<S, AsyncStatement<V>, V, V> mBufferer;
+    private final ForkObserver<S, V> mObserver;
 
-    private final ScheduledExecutor mExecutor;
-
-    private final List<AsyncResult<V>> mResults = new ArrayList<AsyncResult<V>>();
-
-    private Throwable mError;
-
-    private S mStack;
-
-    private AsyncStatement<V> mStatement;
-
-    @SuppressWarnings("unchecked")
-    private BufferObserver(@NotNull final AsyncStatement<V> statement,
-        @NotNull final Bufferer<S, ? super AsyncStatement<V>, ? super V, ? extends V> bufferer) {
-      mBufferer =
-          (Bufferer<S, AsyncStatement<V>, V, V>) ConstantConditions.notNull("bufferer", bufferer);
-      mExecutor = ScheduledExecutors.withThrottling(ScheduledExecutors.immediateExecutor(), 1);
-      mStatement = statement;
-      statement.then(new Mapper<V, Void>() {
-
-        public Void apply(final V value) {
-          mExecutor.execute(new Runnable() {
-
-            public void run() {
-              final Throwable error = mError;
-              if (error != null) {
-                for (final AsyncResult<V> result : mResults) {
-                  result.fail(error);
-                }
-
-                return;
-              }
-
-              try {
-                mStack = mBufferer.value(mStatement, mStack, value);
-
-              } catch (final Throwable t) {
-                RuntimeInterruptedException.throwIfInterrupt(t);
-                mError = t;
-                for (final AsyncResult<V> result : mResults) {
-                  result.fail(t);
-                }
-              }
-            }
-          });
-          return null;
-        }
-      }).elseCatch(new Mapper<Throwable, Void>() {
-
-        public Void apply(final Throwable failure) {
-          mExecutor.execute(new Runnable() {
-
-            public void run() {
-              final Throwable error = mError;
-              if (error != null) {
-                for (final AsyncResult<V> result : mResults) {
-                  result.fail(error);
-                }
-
-                return;
-              }
-
-              try {
-                mStack = mBufferer.failure(mStatement, mStack, failure);
-
-              } catch (final Throwable t) {
-                RuntimeInterruptedException.throwIfInterrupt(t);
-                mError = t;
-                for (final AsyncResult<V> result : mResults) {
-                  result.fail(t);
-                }
-              }
-            }
-          });
-          return null;
-        }
-      });
-    }
-
-    public void accept(final AsyncResult<V> result) {
-      mExecutor.execute(new Runnable() {
-
-        public void run() {
-          try {
-            mStack = mBufferer.init(mStatement);
-
-          } catch (final Throwable t) {
-            RuntimeInterruptedException.throwIfInterrupt(t);
-            mError = t;
-          }
-        }
-      });
-    }
-
-    @NotNull
-    public BufferObserver<S, V> renew() {
-      return new BufferObserver<S, V>(mStatement.renew(), mBufferer);
-    }
-
-    void chain(final AsyncResult<V> result) throws Exception {
-      mExecutor.execute(new Runnable() {
-
-        public void run() {
-          final Throwable error = mError;
-          if (error != null) {
-            result.fail(error);
-            return;
-          }
-
-          mResults.add(result);
-          try {
-            mStack = mBufferer.statement(mStatement, mStack, result);
-
-          } catch (final Throwable t) {
-            RuntimeInterruptedException.throwIfInterrupt(t);
-            final Throwable failure = mError;
-            if (failure != null) {
-              for (final AsyncResult<V> result : mResults) {
-                result.fail(t);
-              }
-            }
-          }
-        }
-      });
-    }
-
-    @NotNull
-    Observer<AsyncResult<V>> newObserver() {
-      return new ChainBufferObserver<S, V>(this);
-    }
-
-    private Object writeReplace() throws ObjectStreamException {
-      return new ObserverProxy<S, V>(mStatement, mBufferer);
-    }
-
-    private static class ObserverProxy<S, V> extends SerializableProxy {
-
-      private ObserverProxy(AsyncStatement<V> statement,
-          Bufferer<S, ? super AsyncStatement<V>, ? super V, ? extends V> bufferer) {
-        super(statement, proxy(bufferer));
-      }
-
-      @SuppressWarnings("unchecked")
-      Object readResolve() throws ObjectStreamException {
-        try {
-          final Object[] args = deserializeArgs();
-          return new BufferObserver<S, V>((AsyncStatement<V>) args[0],
-              (Bufferer<S, ? super AsyncStatement<V>, ? super V, ? extends V>) args[1]);
-
-        } catch (final Throwable t) {
-          throw new InvalidObjectException(t.getMessage());
-        }
-      }
-    }
-  }
-
-  private static class ChainBufferObserver<S, V> implements Observer<AsyncResult<V>>, Serializable {
-
-    private final BufferObserver<S, V> mObserver;
-
-    private ChainBufferObserver(@NotNull final BufferObserver<S, V> observer) {
+    private ChainForkObserver(@NotNull final ForkObserver<S, V> observer) {
       mObserver = observer;
-    }
-
-    @NotNull
-    public ChainBufferObserver<S, V> renew() {
-      final BufferObserver<S, V> observer = mObserver.renew();
-      observer.accept(null);
-      return new ChainBufferObserver<S, V>(observer);
     }
 
     public void accept(final AsyncResult<V> result) throws Exception {
       mObserver.chain(result);
+    }
+
+    @NotNull
+    public ChainForkObserver<S, V> renew() {
+      final ForkObserver<S, V> observer = mObserver.renew();
+      observer.accept(null);
+      return new ChainForkObserver<S, V>(observer);
     }
   }
 
@@ -1216,6 +1057,168 @@ class DefaultAsyncStatement<V> implements AsyncStatement<V>, Serializable {
     }
   }
 
+  private static class ForkObserver<S, V>
+      implements RenewableObserver<AsyncResult<V>>, Serializable {
+
+    private final ScheduledExecutor mExecutor;
+
+    private final Forker<S, AsyncStatement<V>, V, V> mForker;
+
+    private final List<AsyncResult<V>> mResults = new ArrayList<AsyncResult<V>>();
+
+    private Throwable mError;
+
+    private S mStack;
+
+    private AsyncStatement<V> mStatement;
+
+    @SuppressWarnings("unchecked")
+    private ForkObserver(@NotNull final AsyncStatement<V> statement,
+        @NotNull final Forker<S, ? super AsyncStatement<V>, ? super V, ? extends V> forker) {
+      mForker = (Forker<S, AsyncStatement<V>, V, V>) ConstantConditions.notNull("forker", forker);
+      mExecutor = ScheduledExecutors.withThrottling(ScheduledExecutors.immediateExecutor(), 1);
+      mStatement = statement;
+      statement.then(new Mapper<V, Void>() {
+
+        public Void apply(final V value) {
+          mExecutor.execute(new Runnable() {
+
+            public void run() {
+              final Throwable error = mError;
+              if (error != null) {
+                for (final AsyncResult<V> result : mResults) {
+                  result.fail(error);
+                }
+
+                return;
+              }
+
+              try {
+                final S stack = mForker.value(mStatement, mStack, value);
+                mStack = mForker.done(mStatement, stack);
+
+              } catch (final Throwable t) {
+                RuntimeInterruptedException.throwIfInterrupt(t);
+                mError = t;
+                for (final AsyncResult<V> result : mResults) {
+                  result.fail(t);
+                }
+              }
+            }
+          });
+          return null;
+        }
+      }).elseCatch(new Mapper<Throwable, Void>() {
+
+        public Void apply(final Throwable failure) {
+          mExecutor.execute(new Runnable() {
+
+            public void run() {
+              final Throwable error = mError;
+              if (error != null) {
+                for (final AsyncResult<V> result : mResults) {
+                  result.fail(error);
+                }
+
+                return;
+              }
+
+              try {
+                final S stack = mForker.failure(mStatement, mStack, failure);
+                mStack = mForker.done(mStatement, stack);
+
+              } catch (final Throwable t) {
+                RuntimeInterruptedException.throwIfInterrupt(t);
+                mError = t;
+                for (final AsyncResult<V> result : mResults) {
+                  result.fail(t);
+                }
+              }
+            }
+          });
+          return null;
+        }
+      });
+    }
+
+    @NotNull
+    public ForkObserver<S, V> renew() {
+      return new ForkObserver<S, V>(mStatement.renew(), mForker);
+    }
+
+    void chain(final AsyncResult<V> result) throws Exception {
+      mExecutor.execute(new Runnable() {
+
+        public void run() {
+          final Throwable error = mError;
+          if (error != null) {
+            result.fail(error);
+            return;
+          }
+
+          mResults.add(result);
+          try {
+            mStack = mForker.statement(mStatement, mStack, result);
+
+          } catch (final Throwable t) {
+            RuntimeInterruptedException.throwIfInterrupt(t);
+            final Throwable failure = mError;
+            if (failure != null) {
+              for (final AsyncResult<V> result : mResults) {
+                result.fail(t);
+              }
+            }
+          }
+        }
+      });
+    }
+
+    @NotNull
+    Observer<AsyncResult<V>> newObserver() {
+      return new ChainForkObserver<S, V>(this);
+    }
+
+    private Object writeReplace() throws ObjectStreamException {
+      return new ObserverProxy<S, V>(mStatement, mForker);
+    }    public void accept(final AsyncResult<V> result) {
+      mExecutor.execute(new Runnable() {
+
+        public void run() {
+          try {
+            mStack = mForker.init(mStatement);
+
+          } catch (final Throwable t) {
+            RuntimeInterruptedException.throwIfInterrupt(t);
+            mError = t;
+          }
+        }
+      });
+    }
+
+    private static class ObserverProxy<S, V> extends SerializableProxy {
+
+      private ObserverProxy(AsyncStatement<V> statement,
+          Forker<S, ? super AsyncStatement<V>, ? super V, ? extends V> forker) {
+        super(statement, proxy(forker));
+      }
+
+      @SuppressWarnings("unchecked")
+      Object readResolve() throws ObjectStreamException {
+        try {
+          final Object[] args = deserializeArgs();
+          return new ForkObserver<S, V>((AsyncStatement<V>) args[0],
+              (Forker<S, ? super AsyncStatement<V>, ? super V, ? extends V>) args[1]);
+
+        } catch (final Throwable t) {
+          throw new InvalidObjectException(t.getMessage());
+        }
+      }
+    }
+
+
+
+  }
+
   private static abstract class StatementChain<V, R> implements AsyncResult<V>, Serializable {
 
     private transient volatile StateEvaluating mInnerState = new StateEvaluating();
@@ -1570,7 +1573,12 @@ class DefaultAsyncStatement<V> implements AsyncStatement<V>, Serializable {
 
     @Override
     void value(final V value, @NotNull final AsyncResult<R> result) throws Exception {
-      mMapper.apply(value).then(new Mapper<R, Void>() {
+      mMapper.apply(value).whenDone(new Action() {
+
+        public void perform() throws Exception {
+          close(mCloseable.apply(value), mLogger);
+        }
+      }).then(new Mapper<R, Void>() {
 
         public Void apply(final R value) {
           result.set(value);
@@ -1581,11 +1589,6 @@ class DefaultAsyncStatement<V> implements AsyncStatement<V>, Serializable {
         public Void apply(final Throwable failure) {
           result.fail(failure);
           return null;
-        }
-      }).whenDone(new Action() {
-
-        public void perform() throws Exception {
-          close(mCloseable.apply(value), mLogger);
         }
       });
     }

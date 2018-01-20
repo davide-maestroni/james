@@ -30,19 +30,6 @@ import dm.jail.executor.ScheduledExecutor;
 public interface DeferredStatement<V> extends AsyncStatement<V>, Serializable {
 
   @NotNull
-  <S> DeferredStatement<V> buffer(
-      @NotNull Bufferer<S, ? super AsyncStatement<V>, ? super V, ? extends V> bufferer);
-
-  @NotNull
-  <S> DeferredStatement<V> buffer(@Nullable Mapper<? super AsyncStatement<V>, S> init,
-      @Nullable BufferUpdater<S, ? super AsyncStatement<V>, ? super V> value,
-      @Nullable BufferUpdater<S, ? super AsyncStatement<V>, ? super Throwable> failure,
-      @Nullable BufferUpdater<S, ? super AsyncStatement<V>, ? super AsyncResult<? extends V>>
-          statement,
-      @Nullable BufferUpdater<S, ? super AsyncStatement<V>, ? super AsyncResultCollection<?
-          extends V>> loop);
-
-  @NotNull
   DeferredStatement<V> elseCatch(@NotNull Mapper<? super Throwable, ? extends V> mapper,
       @Nullable Class<?>[] exceptionTypes);
 
@@ -54,6 +41,20 @@ public interface DeferredStatement<V> extends AsyncStatement<V>, Serializable {
   DeferredStatement<V> elseIf(
       @NotNull Mapper<? super Throwable, ? extends AsyncStatement<? extends V>> mapper,
       @Nullable Class<?>[] exceptionTypes);
+
+  @NotNull
+  <S> DeferredStatement<V> fork(
+      @NotNull Forker<S, ? super AsyncStatement<V>, ? super V, ? extends V> forker);
+
+  @NotNull
+  <S> DeferredStatement<V> fork(@Nullable Mapper<? super AsyncStatement<V>, S> init,
+      @Nullable ForkUpdater<S, ? super AsyncStatement<V>, ? super V> value,
+      @Nullable ForkUpdater<S, ? super AsyncStatement<V>, ? super Throwable> failure,
+      @Nullable ForkUpdater<S, ? super AsyncStatement<V>, ? super AsyncResult<? extends V>>
+          statement,
+      @Nullable ForkUpdater<S, ? super AsyncStatement<V>, ? super AsyncResultCollection<? extends
+          V>> loop,
+      @Nullable ForkCompleter<S, ? super AsyncStatement<V>> done);
 
   @NotNull
   DeferredStatement<V> on(@NotNull ScheduledExecutor executor);
