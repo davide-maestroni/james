@@ -112,21 +112,21 @@ public interface AsyncLoop<V> extends AsyncStatement<Iterable<V>>, Serializable 
   // TODO: 16/01/2018 ordered?
 
   @NotNull
-  <S> AsyncLoop<V> fork(@Nullable Mapper<? super AsyncStatement<Iterable<V>>, S> init,
-      @Nullable ForkUpdater<S, ? super AsyncStatement<Iterable<V>>, ? super Iterable<V>> value,
-      @Nullable ForkUpdater<S, ? super AsyncStatement<Iterable<V>>, ? super Throwable> failure,
-      @Nullable ForkUpdater<S, ? super AsyncStatement<Iterable<V>>, ? super AsyncResult<?
-                extends Iterable<V>>> statement,
-      @Nullable ForkUpdater<S, ? super AsyncStatement<Iterable<V>>, ? super
-                AsyncResultCollection<? extends Iterable<V>>> loop);
-  // TODO: 16/01/2018 ordered?
-
-  @NotNull
   AsyncLoop<V> on(@NotNull ScheduledExecutor executor);
   // TODO: 16/01/2018 ordered?
 
   @NotNull
   AsyncLoop<V> renew();
+  // TODO: 16/01/2018 ordered?
+
+  @NotNull
+  <S> AsyncLoop<V> fork(@Nullable Mapper<? super AsyncStatement<Iterable<V>>, S> init,
+      @Nullable ForkUpdater<S, ? super AsyncStatement<Iterable<V>>, ? super Iterable<V>> value,
+      @Nullable ForkUpdater<S, ? super AsyncStatement<Iterable<V>>, ? super Throwable> failure,
+      @Nullable ForkUpdater<S, ? super AsyncStatement<Iterable<V>>, ? super AsyncResult<? extends
+          Iterable<V>>> statement,
+      @Nullable ForkUpdater<S, ? super AsyncStatement<Iterable<V>>, ? super
+          AsyncResultCollection<? extends Iterable<V>>> loop);
   // TODO: 16/01/2018 ordered?
 
   @NotNull
@@ -200,7 +200,7 @@ public interface AsyncLoop<V> extends AsyncStatement<Iterable<V>>, Serializable 
 
   interface Looper<S, V, R> {
 
-    void complete(S stack, Generator<R> generator);
+    void done(S stack, Generator<R> generator);
 
     S failure(S stack, Throwable failure, Generator<R> generator);
 

@@ -82,7 +82,7 @@ class ComposedForker<S, V> implements Forker<S, AsyncStatement<V>, V, V>, Serial
 
   public S failure(@NotNull final AsyncStatement<V> statement, final S stack,
       final Throwable failure) throws Exception {
-    return null;
+    return mFailure.update(statement, stack, failure);
   }
 
   public S init(@NotNull final AsyncStatement<V> statement) throws Exception {
@@ -173,7 +173,7 @@ class ComposedForker<S, V> implements Forker<S, AsyncStatement<V>, V, V>, Serial
 
     public S update(@NotNull final AsyncStatement<V> statement, final S stack,
         final AsyncResultCollection<V> result) {
-      result.set();
+      result.addFailure(new IllegalStateException()).set();
       return stack;
     }
 
@@ -194,7 +194,7 @@ class ComposedForker<S, V> implements Forker<S, AsyncStatement<V>, V, V>, Serial
 
     public S update(@NotNull final AsyncStatement<V> statement, final S stack,
         final AsyncResult<V> result) {
-      result.set(null);
+      result.fail(new IllegalStateException());
       return stack;
     }
   }

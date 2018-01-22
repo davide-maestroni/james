@@ -168,19 +168,19 @@ public class Async {
     return null;
   }
 
-  interface CombinationCompleter<S, A, R> {
+  interface CombinationCompleter<S, A, R> { // TODO: 20/01/2018 ???
 
-    void accept(@NotNull List<A> statements, S stack, @NotNull R result) throws Exception;
+    void complete(@NotNull List<A> statements, S stack, @NotNull R result) throws Exception;
   }
 
-  interface CombinationSetter<S, A, R> {
+  interface CombinationSetter<S, A, R> { // TODO: 20/01/2018 CombinationCompleter.done
 
     S apply(@NotNull List<A> statements, int index, S stack, @NotNull R result) throws Exception;
   }
 
   interface CombinationUpdater<S, A, V, R> {
 
-    S apply(@NotNull List<A> statements, int index, S stack, V value, @NotNull R result) throws
+    S update(@NotNull List<A> statements, int index, S stack, V value, @NotNull R result) throws
         Exception;
   }
 

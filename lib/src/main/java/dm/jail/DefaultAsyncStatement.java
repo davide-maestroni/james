@@ -1180,19 +1180,6 @@ class DefaultAsyncStatement<V> implements AsyncStatement<V>, Serializable {
 
     private Object writeReplace() throws ObjectStreamException {
       return new ObserverProxy<S, V>(mStatement, mForker);
-    }    public void accept(final AsyncResult<V> result) {
-      mExecutor.execute(new Runnable() {
-
-        public void run() {
-          try {
-            mStack = mForker.init(mStatement);
-
-          } catch (final Throwable t) {
-            RuntimeInterruptedException.throwIfInterrupt(t);
-            mError = t;
-          }
-        }
-      });
     }
 
     private static class ObserverProxy<S, V> extends SerializableProxy {
@@ -1215,8 +1202,20 @@ class DefaultAsyncStatement<V> implements AsyncStatement<V>, Serializable {
       }
     }
 
+    public void accept(final AsyncResult<V> result) {
+      mExecutor.execute(new Runnable() {
 
+        public void run() {
+          try {
+            mStack = mForker.init(mStatement);
 
+          } catch (final Throwable t) {
+            RuntimeInterruptedException.throwIfInterrupt(t);
+            mError = t;
+          }
+        }
+      });
+    }
   }
 
   private static abstract class StatementChain<V, R> implements AsyncResult<V>, Serializable {
