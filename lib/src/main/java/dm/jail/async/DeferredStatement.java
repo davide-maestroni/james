@@ -44,23 +44,20 @@ public interface DeferredStatement<V> extends AsyncStatement<V>, Serializable {
 
   @NotNull
   <S> DeferredStatement<V> fork(
-      @NotNull Forker<S, ? super AsyncStatement<V>, ? super V, ? extends V> forker);
+      @NotNull Forker<S, ? super AsyncStatement<V>, ? super V, ? super AsyncResult<V>> forker);
 
   @NotNull
   <S> DeferredStatement<V> fork(@Nullable Mapper<? super AsyncStatement<V>, S> init,
       @Nullable ForkUpdater<S, ? super AsyncStatement<V>, ? super V> value,
       @Nullable ForkUpdater<S, ? super AsyncStatement<V>, ? super Throwable> failure,
-      @Nullable ForkUpdater<S, ? super AsyncStatement<V>, ? super AsyncResult<? extends V>>
-          statement,
-      @Nullable ForkUpdater<S, ? super AsyncStatement<V>, ? super AsyncResultCollection<? extends
-          V>> loop,
-      @Nullable ForkCompleter<S, ? super AsyncStatement<V>> done);
+      @Nullable ForkCompleter<S, ? super AsyncStatement<V>> done,
+      @Nullable ForkUpdater<S, ? super AsyncStatement<V>, ? super AsyncResult<V>> statement);
 
   @NotNull
   DeferredStatement<V> on(@NotNull ScheduledExecutor executor);
 
   @NotNull
-  AsyncStatement<V> renew();
+  AsyncStatement<V> reEvaluate();
 
   @NotNull
   <R> DeferredStatement<R> then(@NotNull Mapper<? super V, R> mapper);
@@ -82,6 +79,9 @@ public interface DeferredStatement<V> extends AsyncStatement<V>, Serializable {
   @NotNull
   <R> DeferredStatement<R> thenTryIf(@NotNull Mapper<? super V, ? extends Closeable> closeable,
       @NotNull Mapper<? super V, ? extends AsyncStatement<R>> mapper);
+
+  @NotNull
+  DeferredStatement<Void> to(@NotNull AsyncResult<? super V> result);
 
   @NotNull
   DeferredStatement<V> whenDone(@NotNull Action action);

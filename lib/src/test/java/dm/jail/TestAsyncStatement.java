@@ -16,10 +16,15 @@
 
 package dm.jail;
 
+import org.jetbrains.annotations.NotNull;
 import org.junit.Test;
 
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
 import java.io.Closeable;
 import java.io.IOException;
+import java.io.ObjectInputStream;
+import java.io.ObjectOutputStream;
 import java.util.Random;
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.ExecutionException;
@@ -43,6 +48,28 @@ import static org.assertj.core.api.Assertions.assertThat;
  * Created by davide-maestroni on 01/19/2018.
  */
 public class TestAsyncStatement {
+
+  // TODO: 25/01/2018 fork, serialization
+
+  @NotNull
+  private static AsyncStatement<String> createStatement() {
+    return new Async().value("test").then(new Mapper<String, String>() {
+
+      public String apply(final String input) {
+        return input.toUpperCase();
+      }
+    });
+  }
+
+  @NotNull
+  private static AsyncStatement<String> createStatementAsync() {
+    return new Async().value("test").on(backgroundExecutor()).then(new Mapper<String, String>() {
+
+      public String apply(final String input) {
+        return input.toUpperCase();
+      }
+    });
+  }
 
   @Test
   public void cancelled() {
@@ -69,6 +96,104 @@ public class TestAsyncStatement {
         new Async().on(withDelay(backgroundExecutor(), 100, TimeUnit.MILLISECONDS)).value("test");
     statement.waitDone();
     assertThat(statement.isDone()).isTrue();
+  }
+
+  @Test
+  public void elseCatch() {
+    final AsyncStatement<String> statement =
+        new Async().<String>failure(new IllegalStateException("test")).elseCatch(
+            new Mapper<Throwable, String>() {
+
+              public String apply(final Throwable error) {
+                return error.getMessage();
+              }
+            });
+    assertThat(statement.getValue()).isEqualTo("test");
+  }
+
+  @Test
+  public void elseDo() {
+    final AtomicReference<String> ref = new AtomicReference<String>();
+    final AsyncStatement<String> statement =
+        new Async().<String>failure(new IllegalStateException("test")).elseDo(
+            new Observer<Throwable>() {
+
+              public void accept(final Throwable input) {
+                ref.set(input.getMessage());
+              }
+            });
+    assertThat(ConstantConditions.notNull(statement.getFailure()).getCause()).isExactlyInstanceOf(
+        IllegalStateException.class);
+    assertThat(ref.get()).isEqualTo("test");
+  }
+
+  @Test
+  public void elseDoFail() {
+    final AsyncStatement<String> statement =
+        new Async().<String>failure(new IllegalStateException("test")).elseDo(
+            new Observer<Throwable>() {
+
+              public void accept(final Throwable input) {
+                throw new IllegalArgumentException();
+              }
+            });
+    assertThat(ConstantConditions.notNull(statement.getFailure()).getCause()).isExactlyInstanceOf(
+        IllegalArgumentException.class);
+  }
+
+  @Test
+  public void elseFail() {
+    final AsyncStatement<String> statement =
+        new Async().<String>failure(new IllegalStateException("test")).elseCatch(
+            new Mapper<Throwable, String>() {
+
+              public String apply(final Throwable input) {
+                throw new IllegalArgumentException();
+              }
+            });
+    assertThat(ConstantConditions.notNull(statement.getFailure()).getCause()).isExactlyInstanceOf(
+        IllegalArgumentException.class);
+  }
+
+  @Test
+  public void elseIf() {
+    final AsyncStatement<Integer> statement =
+        new Async().<Integer>failure(new IllegalStateException("test")).elseIf(
+            new Mapper<Throwable, AsyncStatement<Integer>>() {
+
+              public AsyncStatement<Integer> apply(final Throwable input) {
+                return new Async().value(input.getMessage().length());
+              }
+            });
+    assertThat(statement.getValue()).isEqualTo(4);
+  }
+
+  @Test
+  public void elseIfAsync() {
+    final AsyncStatement<Integer> statement =
+        new Async().<Integer>failure(new IllegalStateException("test")).elseIf(
+            new Mapper<Throwable, AsyncStatement<Integer>>() {
+
+              public AsyncStatement<Integer> apply(final Throwable input) {
+                return new Async().value(input.getMessage().length())
+                                  .on(withDelay(backgroundExecutor(), 100, TimeUnit.MILLISECONDS));
+              }
+            });
+    assertThat(statement.getValue()).isEqualTo(4);
+  }
+
+  @Test
+  public void elseIfFail() {
+    final AsyncStatement<Integer> statement =
+        new Async().<Integer>failure(new IllegalStateException("test")).elseIf(
+            new Mapper<Throwable, AsyncStatement<Integer>>() {
+
+              public AsyncStatement<Integer> apply(final Throwable input) {
+                return new Async().failure(new IllegalArgumentException());
+              }
+            });
+    assertThat(ConstantConditions.notNull(statement.getFailure()).getCause()).isExactlyInstanceOf(
+        IllegalArgumentException.class);
   }
 
   @Test
@@ -228,7 +353,7 @@ public class TestAsyncStatement {
   }
 
   @Test
-  public void renew() {
+  public void reEvaluate() {
     final Random random = new Random();
     final AsyncStatement<Float> statement =
         new Async().on(withDelay(backgroundExecutor(), 100, TimeUnit.MILLISECONDS))
@@ -242,8 +367,72 @@ public class TestAsyncStatement {
     final Float value = statement.getValue();
     assertThat(System.currentTimeMillis() - startTime).isGreaterThanOrEqualTo(100);
     startTime = System.currentTimeMillis();
-    assertThat(statement.renew().getValue()).isNotEqualTo(value);
+    assertThat(statement.reEvaluate().getValue()).isNotEqualTo(value);
     assertThat(System.currentTimeMillis() - startTime).isGreaterThanOrEqualTo(100);
+  }
+
+  @Test
+  public void testSerialize() throws IOException, ClassNotFoundException {
+    final AsyncStatement<String> statement = createStatement();
+    final ByteArrayOutputStream byteOutputStream = new ByteArrayOutputStream();
+    final ObjectOutputStream objectOutputStream = new ObjectOutputStream(byteOutputStream);
+    objectOutputStream.writeObject(statement);
+    final ByteArrayInputStream byteInputStream =
+        new ByteArrayInputStream(byteOutputStream.toByteArray());
+    final ObjectInputStream objectInputStream = new ObjectInputStream(byteInputStream);
+    @SuppressWarnings("unchecked") final AsyncStatement<String> deserialized =
+        (AsyncStatement<String>) objectInputStream.readObject();
+    assertThat(deserialized.getValue()).isEqualTo("TEST");
+  }
+
+  @Test
+  public void testSerializeAsync() throws IOException, ClassNotFoundException {
+    final AsyncStatement<String> statement = createStatementAsync();
+    final ByteArrayOutputStream byteOutputStream = new ByteArrayOutputStream();
+    final ObjectOutputStream objectOutputStream = new ObjectOutputStream(byteOutputStream);
+    objectOutputStream.writeObject(statement);
+    final ByteArrayInputStream byteInputStream =
+        new ByteArrayInputStream(byteOutputStream.toByteArray());
+    final ObjectInputStream objectInputStream = new ObjectInputStream(byteInputStream);
+    @SuppressWarnings("unchecked") final AsyncStatement<String> deserialized =
+        (AsyncStatement<String>) objectInputStream.readObject();
+    assertThat(deserialized.getValue()).isEqualTo("TEST");
+  }
+
+  @Test(expected = IOException.class)
+  public void testSerializeError() throws IOException, ClassNotFoundException {
+    final AsyncStatement<String> promise =
+        new Async().statement(new Observer<AsyncResult<String>>() {
+
+          public void accept(final AsyncResult<String> result) {
+            result.set("test");
+          }
+        });
+    final ByteArrayOutputStream byteOutputStream = new ByteArrayOutputStream();
+    final ObjectOutputStream objectOutputStream = new ObjectOutputStream(byteOutputStream);
+    objectOutputStream.writeObject(promise);
+    final ByteArrayInputStream byteInputStream =
+        new ByteArrayInputStream(byteOutputStream.toByteArray());
+    final ObjectInputStream objectInputStream = new ObjectInputStream(byteInputStream);
+    objectInputStream.readObject();
+  }
+
+  @Test(expected = IOException.class)
+  public void testSerializeErrorChain() throws IOException, ClassNotFoundException {
+    final AsyncStatement<String> promise =
+        createStatement().elseCatch(new Mapper<Throwable, String>() {
+
+          public String apply(final Throwable input) {
+            return null;
+          }
+        });
+    final ByteArrayOutputStream byteOutputStream = new ByteArrayOutputStream();
+    final ObjectOutputStream objectOutputStream = new ObjectOutputStream(byteOutputStream);
+    objectOutputStream.writeObject(promise);
+    final ByteArrayInputStream byteInputStream =
+        new ByteArrayInputStream(byteOutputStream.toByteArray());
+    final ObjectInputStream objectInputStream = new ObjectInputStream(byteInputStream);
+    objectInputStream.readObject();
   }
 
   @Test

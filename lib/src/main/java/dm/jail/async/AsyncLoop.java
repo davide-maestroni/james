@@ -46,48 +46,51 @@ public interface AsyncLoop<V> extends AsyncStatement<Iterable<V>>, Serializable 
 
   @NotNull
   AsyncLoop<V> forEachElseIf(@NotNull Mapper<Throwable, AsyncStatement<V>> mapper);
+  // TODO: 16/01/2018 ordered?
 
   @NotNull
   AsyncLoop<V> forEachElseLoop(@NotNull Mapper<Throwable, Iterable<V>> mapper);
 
   @NotNull
   AsyncLoop<V> forEachElseLoopIf(@NotNull Mapper<Throwable, AsyncLoop<V>> mapper);
-
-  @NotNull
-  <R> AsyncLoop<R> forEachIf(@NotNull Mapper<V, AsyncStatement<R>> mapper);
-
-  @NotNull
-  <R> AsyncLoop<R> forEachLoop(@NotNull Mapper<V, Iterable<R>> mapper);
   // TODO: 16/01/2018 ordered?
 
   @NotNull
+  <R> AsyncLoop<R> forEachIf(@NotNull Mapper<V, AsyncStatement<R>> mapper);
+  // TODO: 16/01/2018 ordered?
+
+  @NotNull
+  <R> AsyncLoop<R> forEachLoop(@NotNull Mapper<V, Iterable<R>> mapper);
+
+  @NotNull
   <R> AsyncLoop<R> forEachLoopIf(@NotNull Mapper<V, AsyncLoop<R>> mapper);
+  // TODO: 16/01/2018 ordered?
 
   @NotNull
   <R> AsyncLoop<R> forEachTry(@NotNull Mapper<V, Closeable> closeable,
       @NotNull Mapper<V, R> mapper);
-  // TODO: 16/01/2018 ordered?
 
   @NotNull
   AsyncLoop<V> forEachTryDo(@NotNull Mapper<V, Closeable> closeable, @NotNull Observer<V> observer);
-  // TODO: 16/01/2018 ordered?
 
   @NotNull
   <R> AsyncLoop<R> forEachTryIf(@NotNull Mapper<V, Closeable> closeable,
       @NotNull Mapper<V, AsyncStatement<R>> mapper);
+  // TODO: 16/01/2018 ordered?
 
   @NotNull
   <R> AsyncLoop<R> forEachTryLoop(@NotNull Mapper<V, Closeable> closeable,
       @NotNull Mapper<V, Iterable<R>> mapper);
-  // TODO: 16/01/2018 ordered?
 
   @NotNull
   <R> AsyncLoop<R> forEachTryLoopIf(@NotNull Mapper<V, Closeable> closeable,
       @NotNull Mapper<V, AsyncLoop<R>> mapper);
+  // TODO: 16/01/2018 ordered?
 
   @NotNull
   <R, S> AsyncLoop<R> forEachTryYield(@NotNull Mapper<V, Closeable> closeable,
       @NotNull Looper<S, V, R> looper);
+  // TODO: 16/01/2018 ordered?
 
   @NotNull
   <R, S> AsyncLoop<R> forEachTryYield(@NotNull Mapper<V, Closeable> closeable,
@@ -98,6 +101,7 @@ public interface AsyncLoop<V> extends AsyncStatement<Iterable<V>>, Serializable 
 
   @NotNull
   <R, S> AsyncLoop<R> forEachYield(@NotNull Looper<S, V, R> looper);
+  // TODO: 16/01/2018 ordered?
 
   @NotNull
   <R, S> AsyncLoop<R> forEachYield(@Nullable Provider<S> init, @Nullable Mapper<S, Boolean> loop,
@@ -107,27 +111,23 @@ public interface AsyncLoop<V> extends AsyncStatement<Iterable<V>>, Serializable 
 
   @NotNull
   <S> AsyncLoop<V> fork(
-      @NotNull Forker<S, ? super AsyncStatement<Iterable<V>>, ? super Iterable<V>, ? extends
-          Iterable<V>> forker);
-  // TODO: 16/01/2018 ordered?
+      @NotNull Forker<S, ? super AsyncStatement<Iterable<V>>, ? super Iterable<V>, ? super
+          AsyncResult<Iterable<V>>> forker);
+
+  @NotNull
+  <S> AsyncLoop<V> fork(@Nullable Mapper<? super AsyncStatement<Iterable<V>>, S> init,
+      @Nullable ForkUpdater<S, ? super AsyncStatement<Iterable<V>>, ? super Iterable<V>> value,
+      @Nullable ForkUpdater<S, ? super AsyncStatement<Iterable<V>>, ? super Throwable> failure,
+      @Nullable ForkCompleter<S, ? super AsyncStatement<Iterable<V>>> done,
+      @Nullable ForkUpdater<S, ? super AsyncStatement<Iterable<V>>, ? super
+          AsyncResult<Iterable<V>>> statement);
 
   @NotNull
   AsyncLoop<V> on(@NotNull ScheduledExecutor executor);
   // TODO: 16/01/2018 ordered?
 
   @NotNull
-  AsyncLoop<V> renew();
-  // TODO: 16/01/2018 ordered?
-
-  @NotNull
-  <S> AsyncLoop<V> fork(@Nullable Mapper<? super AsyncStatement<Iterable<V>>, S> init,
-      @Nullable ForkUpdater<S, ? super AsyncStatement<Iterable<V>>, ? super Iterable<V>> value,
-      @Nullable ForkUpdater<S, ? super AsyncStatement<Iterable<V>>, ? super Throwable> failure,
-      @Nullable ForkUpdater<S, ? super AsyncStatement<Iterable<V>>, ? super AsyncResult<? extends
-          Iterable<V>>> statement,
-      @Nullable ForkUpdater<S, ? super AsyncStatement<Iterable<V>>, ? super
-          AsyncResultCollection<? extends Iterable<V>>> loop);
-  // TODO: 16/01/2018 ordered?
+  AsyncLoop<V> reEvaluate();
 
   @NotNull
   AsyncLoop<V> parallelOn(@NotNull ScheduledExecutor executor);

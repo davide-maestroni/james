@@ -22,15 +22,19 @@ import org.jetbrains.annotations.Nullable;
 import java.io.InvalidObjectException;
 import java.io.ObjectStreamException;
 import java.io.Serializable;
+import java.util.ArrayList;
 import java.util.List;
 
 import dm.jail.async.AsyncLoop;
 import dm.jail.async.AsyncResult;
 import dm.jail.async.AsyncResultCollection;
+import dm.jail.async.AsyncState;
 import dm.jail.async.AsyncStatement;
+import dm.jail.async.AsyncStatement.Forker;
 import dm.jail.async.DeferredStatement;
 import dm.jail.async.Mapper;
 import dm.jail.async.Observer;
+import dm.jail.async.SimpleState;
 import dm.jail.executor.ScheduledExecutor;
 import dm.jail.log.LogPrinter;
 import dm.jail.log.LogPrinter.Level;
@@ -65,6 +69,80 @@ public class Async {
 
   private static void test() {
 
+    class ForkStack<V> {
+
+      AsyncStatement<String> forked;
+
+      ArrayList<AsyncResult<V>> results = new ArrayList<AsyncResult<V>>();
+
+      AsyncState<V> state;
+
+      long timestamp = -1;
+    }
+
+    new Async().value("hello")
+               .fork(
+                   new Forker<ForkStack<String>, AsyncStatement<String>, String,
+                       AsyncResult<String>>() {
+
+                     public ForkStack<String> done(@NotNull final AsyncStatement<String> statement,
+                         final ForkStack<String> stack) {
+                       return stack;
+                     }
+
+                     public ForkStack<String> failure(
+                         @NotNull final AsyncStatement<String> statement,
+                         final ForkStack<String> stack, final Throwable failure) {
+                       stack.state = SimpleState.ofFailure(failure);
+                       for (final AsyncResult<String> result : stack.results) {
+                         result.fail(failure);
+                       }
+
+                       stack.results.clear();
+                       return stack;
+                     }
+
+                     public ForkStack<String> init(
+                         @NotNull final AsyncStatement<String> statement) {
+                       return new ForkStack<String>();
+                     }
+
+                     public ForkStack<String> statement(
+                         @NotNull final AsyncStatement<String> statement,
+                         final ForkStack<String> stack, @NotNull final AsyncResult<String> result) {
+                       final AsyncState<String> state = stack.state;
+                       if (state == null) {
+                         stack.results.add(result);
+
+                       } else if (state.isFailed()) {
+                         result.fail(state.failure());
+
+                       } else if (System.currentTimeMillis() - stack.timestamp <= 10000) {
+                         result.set(state.value());
+
+                       } else {
+                         if (stack.forked == null) {
+                           stack.forked = statement.reEvaluate().fork(this);
+                         }
+
+                         stack.forked.to(result);
+                       }
+
+                       return stack;
+                     }
+
+                     public ForkStack<String> value(@NotNull final AsyncStatement<String> statement,
+                         final ForkStack<String> stack, final String value) {
+                       stack.timestamp = System.currentTimeMillis();
+                       stack.state = SimpleState.ofValue(value);
+                       for (final AsyncResult<String> result : stack.results) {
+                         result.set(value);
+                       }
+
+                       stack.results.clear();
+                       return stack;
+                     }
+                   });
   }
 
   @NotNull

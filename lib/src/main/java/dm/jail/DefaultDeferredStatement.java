@@ -27,7 +27,6 @@ import java.util.concurrent.TimeoutException;
 
 import dm.jail.async.Action;
 import dm.jail.async.AsyncResult;
-import dm.jail.async.AsyncResultCollection;
 import dm.jail.async.AsyncStatement;
 import dm.jail.async.DeferredStatement;
 import dm.jail.async.FailureException;
@@ -106,7 +105,8 @@ class DefaultDeferredStatement<V> implements DeferredStatement<V> {
 
   @NotNull
   public <S> DeferredStatement<V> fork(
-      @NotNull final Forker<S, ? super AsyncStatement<V>, ? super V, ? extends V> forker) {
+      @NotNull final Forker<S, ? super AsyncStatement<V>, ? super V, ? super AsyncResult<V>>
+          forker) {
     return newInstance(mStatement.fork(forker));
   }
 
@@ -114,12 +114,9 @@ class DefaultDeferredStatement<V> implements DeferredStatement<V> {
   public <S> DeferredStatement<V> fork(@Nullable final Mapper<? super AsyncStatement<V>, S> init,
       @Nullable final ForkUpdater<S, ? super AsyncStatement<V>, ? super V> value,
       @Nullable final ForkUpdater<S, ? super AsyncStatement<V>, ? super Throwable> failure,
-      @Nullable final ForkUpdater<S, ? super AsyncStatement<V>, ? super AsyncResult<? extends V>>
-          statement,
-      @Nullable final ForkUpdater<S, ? super AsyncStatement<V>, ? super AsyncResultCollection<?
-          extends V>> loop,
-      @Nullable ForkCompleter<S, ? super AsyncStatement<V>> done) {
-    return newInstance(mStatement.fork(init, value, failure, statement, loop, done));
+      @Nullable final ForkCompleter<S, ? super AsyncStatement<V>> done,
+      @Nullable final ForkUpdater<S, ? super AsyncStatement<V>, ? super AsyncResult<V>> statement) {
+    return newInstance(mStatement.fork(init, value, failure, done, statement));
   }
 
   @NotNull
@@ -128,9 +125,9 @@ class DefaultDeferredStatement<V> implements DeferredStatement<V> {
   }
 
   @NotNull
-  public AsyncStatement<V> renew() {
+  public AsyncStatement<V> reEvaluate() {
     evaluate();
-    return mStatement.renew();
+    return mStatement.reEvaluate();
   }
 
   @NotNull
@@ -168,6 +165,11 @@ class DefaultDeferredStatement<V> implements DeferredStatement<V> {
       @NotNull final Mapper<? super V, ? extends Closeable> closeable,
       @NotNull final Mapper<? super V, ? extends AsyncStatement<R>> mapper) {
     return newInstance(mStatement.thenTryIf(closeable, mapper));
+  }
+
+  @NotNull
+  public DeferredStatement<Void> to(@NotNull final AsyncResult<? super V> result) {
+    return newInstance(mStatement.to(result));
   }
 
   @NotNull

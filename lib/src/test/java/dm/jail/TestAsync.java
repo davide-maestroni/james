@@ -59,7 +59,7 @@ public class TestAsync {
   }
 
   @Test
-  public void deferredRenew() {
+  public void deferredReEvaluate() {
     final DeferredStatement<Integer> deferredStatement =
         new Async().deferred().then(new Mapper<Void, Integer>() {
 
@@ -69,7 +69,7 @@ public class TestAsync {
         });
     assertThat(deferredStatement.isSet()).isFalse();
     assertThat(deferredStatement.isDone()).isFalse();
-    final AsyncStatement<Integer> statement = deferredStatement.renew();
+    final AsyncStatement<Integer> statement = deferredStatement.reEvaluate();
     assertThat(deferredStatement.isSet()).isTrue();
     assertThat(deferredStatement.getValue()).isEqualTo(3);
     assertThat(statement.isDone()).isTrue();

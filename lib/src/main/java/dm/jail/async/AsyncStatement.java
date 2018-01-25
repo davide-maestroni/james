@@ -46,17 +46,14 @@ public interface AsyncStatement<V> extends AsyncState<V>, Future<V>, Serializabl
 
   @NotNull
   <S> AsyncStatement<V> fork(
-      @NotNull Forker<S, ? super AsyncStatement<V>, ? super V, ? extends V> forker);
+      @NotNull Forker<S, ? super AsyncStatement<V>, ? super V, ? super AsyncResult<V>> forker);
 
   @NotNull
   <S> AsyncStatement<V> fork(@Nullable Mapper<? super AsyncStatement<V>, S> init,
       @Nullable ForkUpdater<S, ? super AsyncStatement<V>, ? super V> value,
       @Nullable ForkUpdater<S, ? super AsyncStatement<V>, ? super Throwable> failure,
-      @Nullable ForkUpdater<S, ? super AsyncStatement<V>, ? super AsyncResult<? extends V>>
-          statement,
-      @Nullable ForkUpdater<S, ? super AsyncStatement<V>, ? super AsyncResultCollection<? extends
-          V>> loop,
-      @Nullable ForkCompleter<S, ? super AsyncStatement<V>> done);
+      @Nullable ForkCompleter<S, ? super AsyncStatement<V>> done,
+      @Nullable ForkUpdater<S, ? super AsyncStatement<V>, ? super AsyncResult<V>> statement);
 
   @Nullable
   FailureException getFailure();
@@ -74,7 +71,7 @@ public interface AsyncStatement<V> extends AsyncState<V>, Future<V>, Serializabl
   AsyncStatement<V> on(@NotNull ScheduledExecutor executor);
 
   @NotNull
-  AsyncStatement<V> renew();
+  AsyncStatement<V> reEvaluate();
 
   @NotNull
   <R> AsyncStatement<R> then(@NotNull Mapper<? super V, R> mapper);
@@ -96,6 +93,9 @@ public interface AsyncStatement<V> extends AsyncState<V>, Future<V>, Serializabl
   @NotNull
   <R> AsyncStatement<R> thenTryIf(@NotNull Mapper<? super V, ? extends Closeable> closeable,
       @NotNull Mapper<? super V, ? extends AsyncStatement<R>> mapper);
+
+  @NotNull
+  AsyncStatement<Void> to(@NotNull AsyncResult<? super V> result);
 
   void waitDone();
 
@@ -122,10 +122,7 @@ public interface AsyncStatement<V> extends AsyncState<V>, Future<V>, Serializabl
 
     S init(@NotNull A statement) throws Exception;
 
-    S loop(@NotNull A statement, S stack, @NotNull AsyncResultCollection<R> results) throws
-        Exception;
-
-    S statement(@NotNull A statement, S stack, @NotNull AsyncResult<R> result) throws Exception;
+    S statement(@NotNull A statement, S stack, @NotNull R result) throws Exception;
 
     S value(@NotNull A statement, S stack, V value) throws Exception;
   }
