@@ -654,6 +654,28 @@ class DefaultAsyncStatement<V> implements AsyncStatement<V>, Serializable {
       return new ChainHandler<V, R>(mHandler);
     }
 
+    private Object writeReplace() throws ObjectStreamException {
+      return new ChainProxy<V, R>(mHandler);
+    }
+
+    private static class ChainProxy<V, R> extends SerializableProxy {
+
+      private ChainProxy(AsyncStatementHandler<V, R> handler) {
+        super(handler);
+      }
+
+      @SuppressWarnings("unchecked")
+      Object readResolve() throws ObjectStreamException {
+        try {
+          final Object[] args = deserializeArgs();
+          return new ChainHandler<V, R>((AsyncStatementHandler<V, R>) args[0]);
+
+        } catch (final Throwable t) {
+          throw new InvalidObjectException(t.getMessage());
+        }
+      }
+    }
+
     void fail(final StatementChain<R, ?> next, final Throwable failure) {
       try {
         getLogger().dbg("Processing failure with reason: %s", failure);
