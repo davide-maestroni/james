@@ -42,6 +42,8 @@ public abstract class TemplateLogPrinter implements LogPrinter, Serializable {
 
   private static final String DATE_FORMAT = "MM/dd HH:mm:ss.SSS z";
 
+  private static final Locale DEFAULT_LOCALE = Locale.ENGLISH;
+
   private static final String EXCEPTION_FORMAT = " caused by:%n%s";
 
   private static final String LOG_FORMAT = "%s\t%s\t%s\t%s<%s>";
@@ -57,7 +59,7 @@ public abstract class TemplateLogPrinter implements LogPrinter, Serializable {
 
   private static String format(@NotNull final Level level, @NotNull final List<Object> contexts,
       @Nullable final String message) {
-    return String.format(LOG_FORMAT, sDateFormatter.get().format(new Date()),
+    return String.format(DEFAULT_LOCALE, LOG_FORMAT, sDateFormatter.get().format(new Date()),
         Thread.currentThread().getName(), contexts.toString(), level, message);
   }
 
@@ -88,7 +90,8 @@ public abstract class TemplateLogPrinter implements LogPrinter, Serializable {
       @Nullable final String message, @Nullable final Throwable throwable) {
     String formatted = format(level, contexts, message);
     if (throwable != null) {
-      formatted += String.format(EXCEPTION_FORMAT, Logger.printStackTrace(throwable));
+      formatted +=
+          String.format(DEFAULT_LOCALE, EXCEPTION_FORMAT, Logger.printStackTrace(throwable));
     }
 
     log(formatted);

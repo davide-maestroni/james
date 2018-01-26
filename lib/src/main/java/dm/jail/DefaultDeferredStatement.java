@@ -168,11 +168,6 @@ class DefaultDeferredStatement<V> implements DeferredStatement<V> {
   }
 
   @NotNull
-  public DeferredStatement<Void> to(@NotNull final AsyncResult<? super V> result) {
-    return newInstance(mStatement.to(result));
-  }
-
-  @NotNull
   public DeferredStatement<V> whenDone(@NotNull final Action action) {
     return newInstance(mStatement.whenDone(action));
   }
@@ -183,6 +178,7 @@ class DefaultDeferredStatement<V> implements DeferredStatement<V> {
     return mStatement;
   }
 
+  @NotNull
   public Throwable failure() {
     return mStatement.failure();
   }
@@ -229,6 +225,10 @@ class DefaultDeferredStatement<V> implements DeferredStatement<V> {
     return mStatement.isFinal();
   }
 
+  public void to(@NotNull final AsyncResult<? super V> result) {
+    mStatement.to(result);
+  }
+
   public void waitDone() {
     mStatement.waitDone();
   }
@@ -244,7 +244,7 @@ class DefaultDeferredStatement<V> implements DeferredStatement<V> {
 
   private static class DeferredObserver<V> implements Observer<AsyncResult<V>>, Serializable {
 
-    private transient final Object mMutex = new Object();
+    private final Object mMutex = new Object();
 
     private boolean mAccepted;
 

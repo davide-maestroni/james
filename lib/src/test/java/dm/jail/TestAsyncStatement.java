@@ -34,9 +34,12 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 
 import dm.jail.async.AsyncResult;
+import dm.jail.async.AsyncState;
 import dm.jail.async.AsyncStatement;
+import dm.jail.async.AsyncStatement.Forker;
 import dm.jail.async.Mapper;
 import dm.jail.async.Observer;
+import dm.jail.async.SimpleState;
 import dm.jail.util.ConstantConditions;
 import dm.jail.util.RuntimeTimeoutException;
 
@@ -48,8 +51,6 @@ import static org.assertj.core.api.Assertions.assertThat;
  * Created by davide-maestroni on 01/19/2018.
  */
 public class TestAsyncStatement {
-
-  // TODO: 25/01/2018 fork, serialization
 
   @NotNull
   private static AsyncStatement<String> createStatement() {
@@ -67,6 +68,52 @@ public class TestAsyncStatement {
 
       public String apply(final String input) {
         return input.toUpperCase();
+      }
+    });
+  }
+
+  @NotNull
+  private static AsyncStatement<String> createStatementFork(
+      @NotNull final AsyncStatement<String> statement) {
+    return statement.then(new Mapper<String, String>() {
+
+      public String apply(final String input) {
+        return input.toUpperCase();
+      }
+    }).fork(new Forker<AsyncState<String>, AsyncStatement<String>, String, AsyncResult<String>>() {
+
+      public AsyncState<String> done(@NotNull final AsyncStatement<String> statement,
+          final AsyncState<String> stack) {
+        return stack;
+      }
+
+      public AsyncState<String> failure(@NotNull final AsyncStatement<String> statement,
+          final AsyncState<String> stack, @NotNull final Throwable failure) {
+        return SimpleState.ofFailure(failure);
+      }
+
+      public AsyncState<String> init(@NotNull final AsyncStatement<String> statement) {
+        return null;
+      }
+
+      public AsyncState<String> statement(@NotNull final AsyncStatement<String> statement,
+          final AsyncState<String> stack, @NotNull final AsyncResult<String> result) throws
+          Exception {
+        if (stack != null) {
+          if (stack.isSet()) {
+            result.set(stack.value());
+
+          } else {
+            result.fail(stack.failure());
+          }
+        }
+
+        return null;
+      }
+
+      public AsyncState<String> value(@NotNull final AsyncStatement<String> statement,
+          final AsyncState<String> stack, final String value) {
+        return SimpleState.ofValue(value);
       }
     });
   }
@@ -219,13 +266,16 @@ public class TestAsyncStatement {
   @Test
   public void failThen() {
     final AsyncStatement<String> statement =
-        new Async().<String>failure(null).then(new Mapper<String, String>() {
+        new Async().<String>failure(new NullPointerException("test")).then(
+            new Mapper<String, String>() {
 
-          public String apply(final String input) {
-            return input.toUpperCase();
-          }
-        });
-    assertThat(ConstantConditions.notNull(statement.getFailure()).getCause()).isNull();
+              public String apply(final String input) {
+                return input.toUpperCase();
+              }
+            });
+    assertThat(
+        ConstantConditions.notNull(statement.getFailure()).getCause().getMessage()).isEqualTo(
+        "test");
   }
 
   @Test
@@ -268,6 +318,67 @@ public class TestAsyncStatement {
   public void failureSet() {
     final AsyncStatement<String> statement = new Async().failure(new IllegalArgumentException());
     assertThat(statement.isSet()).isFalse();
+  }
+
+  @Test
+  public void fork() {
+    final AsyncStatement<String> statement = createStatementFork(new Async().value("test"));
+    assertThat(statement.isFinal()).isTrue();
+    assertThat(statement.isDone()).isFalse();
+    assertThat(statement.then(new Mapper<String, String>() {
+
+      public String apply(final String input) {
+        return input;
+      }
+    }).value()).isEqualTo("TEST");
+  }
+
+  @Test
+  public void forkCancel() {
+    final AsyncStatement<String> statement = createStatementFork(
+        new Async().on(withDelay(backgroundExecutor(), 1, TimeUnit.SECONDS)).value("test"));
+    assertThat(statement.isFinal()).isTrue();
+    assertThat(statement.isDone()).isFalse();
+    assertThat(statement.cancel(true)).isTrue();
+    assertThat(statement.isCancelled()).isFalse();
+    assertThat(statement.isFailed()).isFalse();
+    assertThat(statement.then(new Mapper<String, String>() {
+
+      public String apply(final String input) {
+        return input;
+      }
+    }).isFailed()).isTrue();
+  }
+
+  @Test
+  public void forkCancelFailure() {
+    final AsyncStatement<String> statement = createStatementFork(new Async().value("test"));
+    assertThat(statement.isFinal()).isTrue();
+    assertThat(statement.isDone()).isFalse();
+    assertThat(statement.cancel(true)).isFalse();
+    assertThat(statement.isCancelled()).isFalse();
+    assertThat(statement.then(new Mapper<String, String>() {
+
+      public String apply(final String input) {
+        return input;
+      }
+    }).value()).isEqualTo("TEST");
+  }
+
+  @Test
+  public void forkFailure() {
+    final AsyncStatement<String> statement =
+        createStatementFork(new Async().<String>failure(new IllegalArgumentException()));
+    assertThat(statement.isFinal()).isTrue();
+    assertThat(statement.isDone()).isFalse();
+    assertThat(statement.isCancelled()).isFalse();
+    assertThat(statement.isFailed()).isFalse();
+    assertThat(statement.then(new Mapper<String, String>() {
+
+      public String apply(final String input) {
+        return input;
+      }
+    }).isFailed()).isTrue();
   }
 
   @Test
@@ -433,6 +544,25 @@ public class TestAsyncStatement {
         new ByteArrayInputStream(byteOutputStream.toByteArray());
     final ObjectInputStream objectInputStream = new ObjectInputStream(byteInputStream);
     objectInputStream.readObject();
+  }
+
+  @Test
+  public void testSerializeFork() throws IOException, ClassNotFoundException {
+    final AsyncStatement<String> statement = createStatementFork(new Async().value("test"));
+    final ByteArrayOutputStream byteOutputStream = new ByteArrayOutputStream();
+    final ObjectOutputStream objectOutputStream = new ObjectOutputStream(byteOutputStream);
+    objectOutputStream.writeObject(statement);
+    final ByteArrayInputStream byteInputStream =
+        new ByteArrayInputStream(byteOutputStream.toByteArray());
+    final ObjectInputStream objectInputStream = new ObjectInputStream(byteInputStream);
+    @SuppressWarnings("unchecked") final AsyncStatement<String> deserialized =
+        (AsyncStatement<String>) objectInputStream.readObject();
+    assertThat(deserialized.then(new Mapper<String, String>() {
+
+      public String apply(final String input) {
+        return input;
+      }
+    }).getValue()).isEqualTo("TEST");
   }
 
   @Test

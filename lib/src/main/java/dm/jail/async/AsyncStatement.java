@@ -94,8 +94,7 @@ public interface AsyncStatement<V> extends AsyncState<V>, Future<V>, Serializabl
   <R> AsyncStatement<R> thenTryIf(@NotNull Mapper<? super V, ? extends Closeable> closeable,
       @NotNull Mapper<? super V, ? extends AsyncStatement<R>> mapper);
 
-  @NotNull
-  AsyncStatement<Void> to(@NotNull AsyncResult<? super V> result);
+  void to(@NotNull AsyncResult<? super V> result);
 
   void waitDone();
 
@@ -118,7 +117,7 @@ public interface AsyncStatement<V> extends AsyncState<V>, Future<V>, Serializabl
 
     S done(@NotNull A statement, S stack) throws Exception;
 
-    S failure(@NotNull A statement, S stack, Throwable failure) throws Exception;
+    S failure(@NotNull A statement, S stack, @NotNull Throwable failure) throws Exception;
 
     S init(@NotNull A statement) throws Exception;
 

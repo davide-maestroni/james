@@ -23,6 +23,7 @@ import java.io.PrintWriter;
 import java.io.StringWriter;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Locale;
 import java.util.concurrent.atomic.AtomicReference;
 
 import dm.jail.log.LogPrinter.Level;
@@ -39,6 +40,8 @@ import static dm.jail.util.ReflectionUtils.asArgs;
 public class Logger {
 
   private static final int DEBUG_LEVEL = Level.DEBUG.ordinal();
+
+  private static final Locale DEFAULT_LOCALE = Locale.ENGLISH;
 
   private static final int ERROR_LEVEL = Level.ERROR.ordinal();
 
@@ -159,7 +162,7 @@ public class Logger {
    */
   public void dbg(@NotNull final String format, @Nullable final Object arg1) {
     if (mLevel <= DEBUG_LEVEL) {
-      mLogPrinter.dbg(mContextList, String.format(format, arg1), null);
+      mLogPrinter.dbg(mContextList, String.format(DEFAULT_LOCALE, format, arg1), null);
     }
   }
 
@@ -173,7 +176,7 @@ public class Logger {
   public void dbg(@NotNull final String format, @Nullable final Object arg1,
       @Nullable final Object arg2) {
     if (mLevel <= DEBUG_LEVEL) {
-      mLogPrinter.dbg(mContextList, String.format(format, arg1, arg2), null);
+      mLogPrinter.dbg(mContextList, String.format(DEFAULT_LOCALE, format, arg1, arg2), null);
     }
   }
 
@@ -188,7 +191,7 @@ public class Logger {
   public void dbg(@NotNull final String format, @Nullable final Object arg1,
       @Nullable final Object arg2, @Nullable final Object arg3) {
     if (mLevel <= DEBUG_LEVEL) {
-      mLogPrinter.dbg(mContextList, String.format(format, arg1, arg2, arg3), null);
+      mLogPrinter.dbg(mContextList, String.format(DEFAULT_LOCALE, format, arg1, arg2, arg3), null);
     }
   }
 
@@ -204,7 +207,8 @@ public class Logger {
   public void dbg(@NotNull final String format, @Nullable final Object arg1,
       @Nullable final Object arg2, @Nullable final Object arg3, @Nullable final Object arg4) {
     if (mLevel <= DEBUG_LEVEL) {
-      mLogPrinter.dbg(mContextList, String.format(format, arg1, arg2, arg3, arg4), null);
+      mLogPrinter.dbg(mContextList, String.format(DEFAULT_LOCALE, format, arg1, arg2, arg3, arg4),
+          null);
     }
   }
 
@@ -216,7 +220,7 @@ public class Logger {
    */
   public void dbg(@NotNull final String format, @Nullable final Object... args) {
     if (mLevel <= DEBUG_LEVEL) {
-      mLogPrinter.dbg(mContextList, String.format(format, args), null);
+      mLogPrinter.dbg(mContextList, String.format(DEFAULT_LOCALE, format, args), null);
     }
   }
 
@@ -253,7 +257,7 @@ public class Logger {
   public void dbg(@NotNull final Throwable throwable, @NotNull final String format,
       @Nullable final Object arg1) {
     if (mLevel <= DEBUG_LEVEL) {
-      mLogPrinter.dbg(mContextList, String.format(format, arg1), throwable);
+      mLogPrinter.dbg(mContextList, String.format(DEFAULT_LOCALE, format, arg1), throwable);
     }
   }
 
@@ -268,7 +272,7 @@ public class Logger {
   public void dbg(@NotNull final Throwable throwable, @NotNull final String format,
       @Nullable final Object arg1, @Nullable final Object arg2) {
     if (mLevel <= DEBUG_LEVEL) {
-      mLogPrinter.dbg(mContextList, String.format(format, arg1, arg2), throwable);
+      mLogPrinter.dbg(mContextList, String.format(DEFAULT_LOCALE, format, arg1, arg2), throwable);
     }
   }
 
@@ -284,7 +288,8 @@ public class Logger {
   public void dbg(@NotNull final Throwable throwable, @NotNull final String format,
       @Nullable final Object arg1, @Nullable final Object arg2, @Nullable final Object arg3) {
     if (mLevel <= DEBUG_LEVEL) {
-      mLogPrinter.dbg(mContextList, String.format(format, arg1, arg2, arg3), throwable);
+      mLogPrinter.dbg(mContextList, String.format(DEFAULT_LOCALE, format, arg1, arg2, arg3),
+          throwable);
     }
   }
 
@@ -302,7 +307,8 @@ public class Logger {
       @Nullable final Object arg1, @Nullable final Object arg2, @Nullable final Object arg3,
       @Nullable final Object arg4) {
     if (mLevel <= DEBUG_LEVEL) {
-      mLogPrinter.dbg(mContextList, String.format(format, arg1, arg2, arg3, arg4), throwable);
+      mLogPrinter.dbg(mContextList, String.format(DEFAULT_LOCALE, format, arg1, arg2, arg3, arg4),
+          throwable);
     }
   }
 
@@ -316,7 +322,7 @@ public class Logger {
   public void dbg(@NotNull final Throwable throwable, @NotNull final String format,
       @Nullable final Object... args) {
     if (mLevel <= DEBUG_LEVEL) {
-      mLogPrinter.dbg(mContextList, String.format(format, args), throwable);
+      mLogPrinter.dbg(mContextList, String.format(DEFAULT_LOCALE, format, args), throwable);
     }
   }
 
@@ -339,7 +345,7 @@ public class Logger {
    */
   public void err(@NotNull final String format, @Nullable final Object arg1) {
     if (mLevel <= ERROR_LEVEL) {
-      mLogPrinter.err(mContextList, String.format(format, arg1), null);
+      mLogPrinter.err(mContextList, String.format(DEFAULT_LOCALE, format, arg1), null);
     }
   }
 
@@ -353,7 +359,7 @@ public class Logger {
   public void err(@NotNull final String format, @Nullable final Object arg1,
       @Nullable final Object arg2) {
     if (mLevel <= ERROR_LEVEL) {
-      mLogPrinter.err(mContextList, String.format(format, arg1, arg2), null);
+      mLogPrinter.err(mContextList, String.format(DEFAULT_LOCALE, format, arg1, arg2), null);
     }
   }
 
@@ -368,7 +374,7 @@ public class Logger {
   public void err(@NotNull final String format, @Nullable final Object arg1,
       @Nullable final Object arg2, @Nullable final Object arg3) {
     if (mLevel <= ERROR_LEVEL) {
-      mLogPrinter.err(mContextList, String.format(format, arg1, arg2, arg3), null);
+      mLogPrinter.err(mContextList, String.format(DEFAULT_LOCALE, format, arg1, arg2, arg3), null);
     }
   }
 
@@ -384,7 +390,8 @@ public class Logger {
   public void err(@NotNull final String format, @Nullable final Object arg1,
       @Nullable final Object arg2, @Nullable final Object arg3, @Nullable final Object arg4) {
     if (mLevel <= ERROR_LEVEL) {
-      mLogPrinter.err(mContextList, String.format(format, arg1, arg2, arg3, arg4), null);
+      mLogPrinter.err(mContextList, String.format(DEFAULT_LOCALE, format, arg1, arg2, arg3, arg4),
+          null);
     }
   }
 
@@ -396,7 +403,7 @@ public class Logger {
    */
   public void err(@NotNull final String format, @Nullable final Object... args) {
     if (mLevel <= ERROR_LEVEL) {
-      mLogPrinter.err(mContextList, String.format(format, args), null);
+      mLogPrinter.err(mContextList, String.format(DEFAULT_LOCALE, format, args), null);
     }
   }
 
@@ -433,7 +440,7 @@ public class Logger {
   public void err(@NotNull final Throwable throwable, @NotNull final String format,
       @Nullable final Object arg1) {
     if (mLevel <= ERROR_LEVEL) {
-      mLogPrinter.err(mContextList, String.format(format, arg1), throwable);
+      mLogPrinter.err(mContextList, String.format(DEFAULT_LOCALE, format, arg1), throwable);
     }
   }
 
@@ -448,7 +455,7 @@ public class Logger {
   public void err(@NotNull final Throwable throwable, @NotNull final String format,
       @Nullable final Object arg1, @Nullable final Object arg2) {
     if (mLevel <= ERROR_LEVEL) {
-      mLogPrinter.err(mContextList, String.format(format, arg1, arg2), throwable);
+      mLogPrinter.err(mContextList, String.format(DEFAULT_LOCALE, format, arg1, arg2), throwable);
     }
   }
 
@@ -464,7 +471,8 @@ public class Logger {
   public void err(@NotNull final Throwable throwable, @NotNull final String format,
       @Nullable final Object arg1, @Nullable final Object arg2, @Nullable final Object arg3) {
     if (mLevel <= ERROR_LEVEL) {
-      mLogPrinter.err(mContextList, String.format(format, arg1, arg2, arg3), throwable);
+      mLogPrinter.err(mContextList, String.format(DEFAULT_LOCALE, format, arg1, arg2, arg3),
+          throwable);
     }
   }
 
@@ -482,7 +490,8 @@ public class Logger {
       @Nullable final Object arg1, @Nullable final Object arg2, @Nullable final Object arg3,
       @Nullable final Object arg4) {
     if (mLevel <= ERROR_LEVEL) {
-      mLogPrinter.err(mContextList, String.format(format, arg1, arg2, arg3, arg4), throwable);
+      mLogPrinter.err(mContextList, String.format(DEFAULT_LOCALE, format, arg1, arg2, arg3, arg4),
+          throwable);
     }
   }
 
@@ -496,7 +505,7 @@ public class Logger {
   public void err(@NotNull final Throwable throwable, @NotNull final String format,
       @Nullable final Object... args) {
     if (mLevel <= ERROR_LEVEL) {
-      mLogPrinter.err(mContextList, String.format(format, args), throwable);
+      mLogPrinter.err(mContextList, String.format(DEFAULT_LOCALE, format, args), throwable);
     }
   }
 
@@ -567,7 +576,7 @@ public class Logger {
    */
   public void wrn(@NotNull final String format, @Nullable final Object arg1) {
     if (mLevel <= WARNING_LEVEL) {
-      mLogPrinter.wrn(mContextList, String.format(format, arg1), null);
+      mLogPrinter.wrn(mContextList, String.format(DEFAULT_LOCALE, format, arg1), null);
     }
   }
 
@@ -581,7 +590,7 @@ public class Logger {
   public void wrn(@NotNull final String format, @Nullable final Object arg1,
       @Nullable final Object arg2) {
     if (mLevel <= WARNING_LEVEL) {
-      mLogPrinter.wrn(mContextList, String.format(format, arg1, arg2), null);
+      mLogPrinter.wrn(mContextList, String.format(DEFAULT_LOCALE, format, arg1, arg2), null);
     }
   }
 
@@ -596,7 +605,7 @@ public class Logger {
   public void wrn(@NotNull final String format, @Nullable final Object arg1,
       @Nullable final Object arg2, @Nullable final Object arg3) {
     if (mLevel <= WARNING_LEVEL) {
-      mLogPrinter.wrn(mContextList, String.format(format, arg1, arg2, arg3), null);
+      mLogPrinter.wrn(mContextList, String.format(DEFAULT_LOCALE, format, arg1, arg2, arg3), null);
     }
   }
 
@@ -612,7 +621,8 @@ public class Logger {
   public void wrn(@NotNull final String format, @Nullable final Object arg1,
       @Nullable final Object arg2, @Nullable final Object arg3, @Nullable final Object arg4) {
     if (mLevel <= WARNING_LEVEL) {
-      mLogPrinter.wrn(mContextList, String.format(format, arg1, arg2, arg3, arg4), null);
+      mLogPrinter.wrn(mContextList, String.format(DEFAULT_LOCALE, format, arg1, arg2, arg3, arg4),
+          null);
     }
   }
 
@@ -624,7 +634,7 @@ public class Logger {
    */
   public void wrn(@NotNull final String format, @Nullable final Object... args) {
     if (mLevel <= WARNING_LEVEL) {
-      mLogPrinter.wrn(mContextList, String.format(format, args), null);
+      mLogPrinter.wrn(mContextList, String.format(DEFAULT_LOCALE, format, args), null);
     }
   }
 
@@ -661,7 +671,7 @@ public class Logger {
   public void wrn(@NotNull final Throwable throwable, @NotNull final String format,
       @Nullable final Object arg1) {
     if (mLevel <= WARNING_LEVEL) {
-      mLogPrinter.wrn(mContextList, String.format(format, arg1), throwable);
+      mLogPrinter.wrn(mContextList, String.format(DEFAULT_LOCALE, format, arg1), throwable);
     }
   }
 
@@ -676,7 +686,7 @@ public class Logger {
   public void wrn(@NotNull final Throwable throwable, @NotNull final String format,
       @Nullable final Object arg1, @Nullable final Object arg2) {
     if (mLevel <= WARNING_LEVEL) {
-      mLogPrinter.wrn(mContextList, String.format(format, arg1, arg2), throwable);
+      mLogPrinter.wrn(mContextList, String.format(DEFAULT_LOCALE, format, arg1, arg2), throwable);
     }
   }
 
@@ -692,7 +702,8 @@ public class Logger {
   public void wrn(@NotNull final Throwable throwable, @NotNull final String format,
       @Nullable final Object arg1, @Nullable final Object arg2, @Nullable final Object arg3) {
     if (mLevel <= WARNING_LEVEL) {
-      mLogPrinter.wrn(mContextList, String.format(format, arg1, arg2, arg3), throwable);
+      mLogPrinter.wrn(mContextList, String.format(DEFAULT_LOCALE, format, arg1, arg2, arg3),
+          throwable);
     }
   }
 
@@ -710,7 +721,8 @@ public class Logger {
       @Nullable final Object arg1, @Nullable final Object arg2, @Nullable final Object arg3,
       @Nullable final Object arg4) {
     if (mLevel <= WARNING_LEVEL) {
-      mLogPrinter.wrn(mContextList, String.format(format, arg1, arg2, arg3, arg4), throwable);
+      mLogPrinter.wrn(mContextList, String.format(DEFAULT_LOCALE, format, arg1, arg2, arg3, arg4),
+          throwable);
     }
   }
 
@@ -724,7 +736,7 @@ public class Logger {
   public void wrn(@NotNull final Throwable throwable, @NotNull final String format,
       @Nullable final Object... args) {
     if (mLevel <= WARNING_LEVEL) {
-      mLogPrinter.wrn(mContextList, String.format(format, args), throwable);
+      mLogPrinter.wrn(mContextList, String.format(DEFAULT_LOCALE, format, args), throwable);
     }
   }
 }

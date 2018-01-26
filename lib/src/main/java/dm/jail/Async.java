@@ -92,7 +92,7 @@ public class Async {
 
                      public ForkStack<String> failure(
                          @NotNull final AsyncStatement<String> statement,
-                         final ForkStack<String> stack, final Throwable failure) {
+                         final ForkStack<String> stack, @NotNull final Throwable failure) {
                        stack.state = SimpleState.ofFailure(failure);
                        for (final AsyncResult<String> result : stack.results) {
                          result.fail(failure);
@@ -151,7 +151,7 @@ public class Async {
   }
 
   @NotNull
-  public <V> AsyncStatement<V> failure(@Nullable final Throwable failure) {
+  public <V> AsyncStatement<V> failure(@NotNull final Throwable failure) {
     return statement(new FailureObserver<V>(failure));
   }
 
@@ -189,10 +189,10 @@ public class Async {
           AsyncResultCollection<? extends R>> value,
       @Nullable final CombinationUpdater<S, ? super AsyncStatement<V>, ? super Throwable, ? super
           AsyncResultCollection<? extends R>> failure,
-      @Nullable final CombinationSetter<S, ? super AsyncStatement<V>, ? super
-          AsyncResultCollection<? extends R>> set,
       @Nullable final CombinationCompleter<S, ? super AsyncStatement<V>, ? super
           AsyncResultCollection<? extends R>> done,
+      @Nullable final CombinationSettler<S, ? super AsyncStatement<V>, ? super
+          AsyncResultCollection<? extends R>> settle,
       @NotNull final Iterable<? extends AsyncStatement<? extends V>> statements) {
     return null;
   }
@@ -228,10 +228,10 @@ public class Async {
           AsyncResult<? extends R>> value,
       @Nullable final CombinationUpdater<S, ? super AsyncStatement<V>, ? super Throwable, ? super
           AsyncResult<? extends R>> failure,
-      @Nullable final CombinationSetter<S, ? super AsyncStatement<V>, ? super AsyncResult<?
-          extends R>> set,
       @Nullable final CombinationCompleter<S, ? super AsyncStatement<V>, ? super AsyncResult<?
           extends R>> done,
+      @Nullable final CombinationSettler<S, ? super AsyncStatement<V>, ? super AsyncResult<?
+          extends R>> settle,
       @NotNull final Iterable<? extends AsyncStatement<? extends V>> statements) {
     return null;
   }
@@ -246,14 +246,14 @@ public class Async {
     return null;
   }
 
-  interface CombinationCompleter<S, A, R> { // TODO: 20/01/2018 ???
+  interface CombinationCompleter<S, A, R> {
 
-    void complete(@NotNull List<A> statements, S stack, @NotNull R result) throws Exception;
+    S complete(@NotNull List<A> statements, int index, S stack, @NotNull R result) throws Exception;
   }
 
-  interface CombinationSetter<S, A, R> { // TODO: 20/01/2018 CombinationCompleter.done
+  interface CombinationSettler<S, A, R> {
 
-    S apply(@NotNull List<A> statements, int index, S stack, @NotNull R result) throws Exception;
+    void settle(@NotNull List<A> statements, S stack, @NotNull R result) throws Exception;
   }
 
   interface CombinationUpdater<S, A, V, R> {
@@ -264,14 +264,14 @@ public class Async {
 
   interface Combiner<S, A, V, R> {
 
-    void done(@NotNull List<A> statements, S stack, @NotNull R result) throws Exception;
+    S done(@NotNull List<A> statements, int index, S stack, @NotNull R result) throws Exception;
 
     S failure(@NotNull List<A> statements, int index, S stack, Throwable failure,
         @NotNull R result) throws Exception;
 
     S init(@NotNull List<A> statements) throws Exception;
 
-    S set(@NotNull List<A> statements, int index, S stack, @NotNull R result) throws Exception;
+    void settle(@NotNull List<A> statements, S stack, @NotNull R result) throws Exception;
 
     S value(@NotNull List<A> statements, int index, S stack, V value, @NotNull R result) throws
         Exception;

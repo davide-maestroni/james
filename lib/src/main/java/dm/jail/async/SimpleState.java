@@ -22,13 +22,15 @@ import java.io.ObjectStreamException;
 import java.io.Serializable;
 import java.util.concurrent.CancellationException;
 
+import dm.jail.util.ConstantConditions;
+
 /**
  * Created by davide-maestroni on 01/11/2018.
  */
 public abstract class SimpleState<V> implements AsyncState<V> {
 
   @NotNull
-  public static <V> SimpleState<V> ofFailure(final Throwable reason) {
+  public static <V> SimpleState<V> ofFailure(@NotNull final Throwable reason) {
     return new FailureState<V>(reason);
   }
 
@@ -45,18 +47,19 @@ public abstract class SimpleState<V> implements AsyncState<V> {
 
   private static class FailureState<V> extends SimpleState<V> implements Serializable {
 
-    private final Throwable mReason;
+    private final Throwable mFailure;
 
-    private FailureState(final Throwable reason) {
-      mReason = reason;
+    private FailureState(@NotNull final Throwable failure) {
+      mFailure = ConstantConditions.notNull("failure", failure);
     }
 
+    @NotNull
     public Throwable failure() {
-      return mReason;
+      return mFailure;
     }
 
     public boolean isCancelled() {
-      return (mReason instanceof CancellationException);
+      return (mFailure instanceof CancellationException);
     }
 
     public boolean isFailed() {
@@ -84,6 +87,7 @@ public abstract class SimpleState<V> implements AsyncState<V> {
       return sInstance;
     }
 
+    @NotNull
     public Throwable failure() {
       throw new IllegalStateException();
     }
@@ -117,6 +121,7 @@ public abstract class SimpleState<V> implements AsyncState<V> {
       mValue = value;
     }
 
+    @NotNull
     public Throwable failure() {
       throw new IllegalStateException();
     }

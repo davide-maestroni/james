@@ -71,7 +71,7 @@ class ComposedForker<S, V>
   }
 
   public S failure(@NotNull final AsyncStatement<V> statement, final S stack,
-      final Throwable failure) throws Exception {
+      @NotNull final Throwable failure) throws Exception {
     return mFailure.update(statement, stack, failure);
   }
 

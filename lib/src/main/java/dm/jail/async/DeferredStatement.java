@@ -81,9 +81,6 @@ public interface DeferredStatement<V> extends AsyncStatement<V>, Serializable {
       @NotNull Mapper<? super V, ? extends AsyncStatement<R>> mapper);
 
   @NotNull
-  DeferredStatement<Void> to(@NotNull AsyncResult<? super V> result);
-
-  @NotNull
   DeferredStatement<V> whenDone(@NotNull Action action);
 
   @NotNull

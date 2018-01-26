@@ -16,6 +16,8 @@
 
 package dm.jail.async;
 
+import org.jetbrains.annotations.NotNull;
+
 import java.io.Serializable;
 
 /**
@@ -23,6 +25,7 @@ import java.io.Serializable;
  */
 public interface AsyncState<V> extends Serializable {
 
+  @NotNull
   Throwable failure();
 
   boolean isCancelled();

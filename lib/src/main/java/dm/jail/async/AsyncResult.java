@@ -16,6 +16,8 @@
 
 package dm.jail.async;
 
+import org.jetbrains.annotations.NotNull;
+
 import java.io.Serializable;
 
 /**
@@ -23,7 +25,7 @@ import java.io.Serializable;
  */
 public interface AsyncResult<V> extends Serializable {
 
-  void fail(Throwable failure);
+  void fail(@NotNull Throwable failure);
 
   void set(V value);
 }

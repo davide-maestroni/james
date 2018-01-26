@@ -17,33 +17,31 @@
 package dm.jail.async;
 
 import org.jetbrains.annotations.NotNull;
-import org.jetbrains.annotations.Nullable;
 
 import java.io.PrintStream;
 import java.io.PrintWriter;
 import java.util.concurrent.CancellationException;
+
+import dm.jail.util.ConstantConditions;
 
 /**
  * Created by davide-maestroni on 01/08/2018.
  */
 public class FailureException extends RuntimeException {
 
-  public FailureException() {
-  }
-
-  public FailureException(final Throwable throwable) {
-    super(throwable);
+  public FailureException(@NotNull final Throwable throwable) {
+    super(ConstantConditions.notNull("throwable", throwable));
   }
 
   @NotNull
-  public static FailureException wrap(@Nullable final Throwable t) {
+  public static FailureException wrap(@NotNull final Throwable t) {
     return (FailureException) wrapIfNot(FailureException.class, t);
   }
 
   @NotNull
   public static RuntimeException wrapIfNot(@NotNull final Class<? extends RuntimeException> type,
-      @Nullable final Throwable t) {
-    if ((t == null) || !type.isInstance(t)) {
+      @NotNull final Throwable t) {
+    if (!type.isInstance(t)) {
       return new FailureException(t);
     }
 
