@@ -40,26 +40,26 @@ import java.util.Locale;
 @SuppressWarnings("WeakerAccess")
 public abstract class TemplateLogPrinter implements LogPrinter, Serializable {
 
-  private static final String DATE_FORMAT = "MM/dd HH:mm:ss.SSS z";
-
   private static final Locale DEFAULT_LOCALE = Locale.ENGLISH;
 
-  private static final String EXCEPTION_FORMAT = " caused by:%n%s";
+  private static final String FORMAT_DATE = "MM/dd HH:mm:ss.SSS z";
 
-  private static final String LOG_FORMAT = "%s\t%s\t%s\t%s<%s>";
+  private static final String FORMAT_EXCEPTION = " caused by:%n%s";
+
+  private static final String FORMAT_LOG = "%s\t%s\t%s\t%s<%s>";
 
   private static ThreadLocal<SimpleDateFormat> sDateFormatter =
       new ThreadLocal<SimpleDateFormat>() {
 
         @Override
         protected SimpleDateFormat initialValue() {
-          return new SimpleDateFormat(DATE_FORMAT, Locale.getDefault());
+          return new SimpleDateFormat(FORMAT_DATE, Locale.getDefault());
         }
       };
 
   private static String format(@NotNull final Level level, @NotNull final List<Object> contexts,
       @Nullable final String message) {
-    return String.format(DEFAULT_LOCALE, LOG_FORMAT, sDateFormatter.get().format(new Date()),
+    return String.format(DEFAULT_LOCALE, FORMAT_LOG, sDateFormatter.get().format(new Date()),
         Thread.currentThread().getName(), contexts.toString(), level, message);
   }
 
@@ -91,7 +91,7 @@ public abstract class TemplateLogPrinter implements LogPrinter, Serializable {
     String formatted = format(level, contexts, message);
     if (throwable != null) {
       formatted +=
-          String.format(DEFAULT_LOCALE, EXCEPTION_FORMAT, Logger.printStackTrace(throwable));
+          String.format(DEFAULT_LOCALE, FORMAT_EXCEPTION, LogPrinters.printStackTrace(throwable));
     }
 
     log(formatted);

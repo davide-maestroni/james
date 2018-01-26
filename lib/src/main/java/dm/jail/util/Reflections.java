@@ -28,7 +28,7 @@ import java.util.HashMap;
 /**
  * Created by davide-maestroni on 07/18/2017.
  */
-public class ReflectionUtils {
+public class Reflections {
 
   /**
    * Constant defining an empty argument array for methods or constructors.
@@ -48,7 +48,7 @@ public class ReflectionUtils {
         put(void.class, Void.class);
       }};
 
-  private ReflectionUtils() {
+  private Reflections() {
   }
 
   /**

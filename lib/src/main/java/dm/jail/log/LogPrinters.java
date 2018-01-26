@@ -18,6 +18,9 @@ package dm.jail.log;
 
 import org.jetbrains.annotations.NotNull;
 
+import java.io.PrintWriter;
+import java.io.StringWriter;
+
 import dm.jail.util.ConstantConditions;
 
 /**
@@ -42,6 +45,19 @@ public class LogPrinters {
   @NotNull
   public static LogPrinter nullPrinter() {
     return NullLogPrinter.instance();
+  }
+
+  /**
+   * Prints the stack trace of the specified throwable into a string.
+   *
+   * @param throwable the throwable instance.
+   * @return the printed stack trace.
+   */
+  @NotNull
+  public static String printStackTrace(@NotNull final Throwable throwable) {
+    final StringWriter writer = new StringWriter();
+    throwable.printStackTrace(new PrintWriter(writer));
+    return writer.toString();
   }
 
   /**

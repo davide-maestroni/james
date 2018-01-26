@@ -101,39 +101,51 @@ public class Iterables {
 
   @NotNull
   public static Object[] toArray(@NotNull final Iterable<?> iterable) {
-    final Object[] array = new Object[size(iterable)];
-    final Iterator<?> iterator = iterable.iterator();
-    for (int i = 0; iterator.hasNext(); ++i) {
-      array[i] = iterator.next();
+    if (iterable instanceof Collection) {
+      final Object[] array = new Object[((Collection<?>) iterable).size()];
+      final Iterator<?> iterator = iterable.iterator();
+      for (int i = 0; iterator.hasNext(); ++i) {
+        array[i] = iterator.next();
+      }
+
+      return array;
     }
 
-    return array;
+    final ArrayList<Object> list = new ArrayList<Object>();
+    addAll(iterable, list);
+    return list.toArray();
   }
 
   @NotNull
   @SuppressWarnings("unchecked")
-  public static <T> T[] toArray(@NotNull final Iterable<?> iterable, @NotNull T[] array) {
-    final int size = size(iterable);
-    if (array.length < size) {
-      final Class<? extends Object[]> arrayClass = array.getClass();
-      if (arrayClass == Object[].class) {
-        array = (T[]) new Object[size];
+  public static <T> T[] toArray(@NotNull final Iterable<? extends T> iterable, @NotNull T[] array) {
+    if (iterable instanceof Collection) {
+      final int size = ((Collection<?>) iterable).size();
+      if (array.length < size) {
+        final Class<? extends Object[]> arrayClass = array.getClass();
+        if (arrayClass == Object[].class) {
+          array = (T[]) new Object[size];
 
-      } else {
-        array = (T[]) Array.newInstance(arrayClass.getComponentType(), size);
+        } else {
+          array = (T[]) Array.newInstance(arrayClass.getComponentType(), size);
+        }
       }
+
+      final Iterator<?> iterator = iterable.iterator();
+      for (int i = 0; iterator.hasNext(); ++i) {
+        array[i] = (T) iterator.next();
+      }
+
+      if (array.length > size) {
+        array[size] = null;
+      }
+
+      return array;
     }
 
-    final Iterator<?> iterator = iterable.iterator();
-    for (int i = 0; iterator.hasNext(); ++i) {
-      array[i] = (T) iterator.next();
-    }
-
-    if (array.length > size) {
-      array[size] = null;
-    }
-
-    return array;
+    final ArrayList<T> list = new ArrayList<T>();
+    addAll(iterable, list);
+    return list.toArray(array);
   }
 
   @NotNull

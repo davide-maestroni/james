@@ -29,6 +29,9 @@ import dm.jail.util.ConstantConditions;
  */
 public abstract class SimpleState<V> implements AsyncState<V> {
 
+  private SimpleState() {
+  }
+
   @NotNull
   public static <V> SimpleState<V> ofFailure(@NotNull final Throwable reason) {
     return new FailureState<V>(reason);

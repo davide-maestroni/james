@@ -89,6 +89,12 @@ public class TestAsync {
                           .getCause()).isExactlyInstanceOf(IllegalAccessException.class);
   }
 
+  @Test(expected = NullPointerException.class)
+  @SuppressWarnings("ConstantConditions")
+  public void failureNPE() {
+    new Async().failure(null);
+  }
+
   @Test
   public void immutable() {
     final Async async = new Async();
@@ -169,6 +175,12 @@ public class TestAsync {
     assertThat(logPrinter.errCalled.get()).isTrue();
   }
 
+  @Test(expected = NullPointerException.class)
+  @SuppressWarnings("ConstantConditions")
+  public void onNPE() {
+    new Async().on(null);
+  }
+
   @Test
   @SuppressWarnings("ConstantConditions")
   public void statementAsyncFailure() {
@@ -233,6 +245,12 @@ public class TestAsync {
         result.fail(new IllegalAccessException());
       }
     }).getFailure().getCause()).isExactlyInstanceOf(IllegalAccessException.class);
+  }
+
+  @Test(expected = NullPointerException.class)
+  @SuppressWarnings("ConstantConditions")
+  public void statementNPE() {
+    new Async().statement(null);
   }
 
   @Test

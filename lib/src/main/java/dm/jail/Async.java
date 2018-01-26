@@ -196,7 +196,7 @@ public class Async {
 
   @NotNull
   public Async on(@NotNull final ScheduledExecutor executor) {
-    return new Async(executor, mLogPrinter, mLogLevel);
+    return new Async(ConstantConditions.notNull("executor", executor), mLogPrinter, mLogLevel);
   }
 
   // TODO: 26/01/2018 with Cancellable?
@@ -329,14 +329,14 @@ public class Async {
 
   private static class FailureObserver<V> implements Observer<AsyncResult<V>>, Serializable {
 
-    private final Throwable mError;
+    private final Throwable mFailure;
 
-    private FailureObserver(final Throwable error) {
-      mError = error;
+    private FailureObserver(@NotNull final Throwable failure) {
+      mFailure = ConstantConditions.notNull("failure", failure);
     }
 
     public void accept(final AsyncResult<V> result) {
-      result.fail(mError);
+      result.fail(mFailure);
     }
   }
 

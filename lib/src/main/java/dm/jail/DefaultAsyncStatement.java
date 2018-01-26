@@ -168,7 +168,7 @@ class DefaultAsyncStatement<V> implements AsyncStatement<V>, Serializable {
   }
 
   private static void close(@Nullable final Closeable closeable,
-      @NotNull final Logger logger) throws FailureException {
+      @NotNull final Logger logger) throws IOException {
     if (closeable == null) {
       return;
     }
@@ -178,7 +178,7 @@ class DefaultAsyncStatement<V> implements AsyncStatement<V>, Serializable {
 
     } catch (final IOException e) {
       logger.err(e, "Error while closing closeable: " + closeable);
-      throw new FailureException(e);
+      throw e;
     }
   }
 
@@ -637,7 +637,8 @@ class DefaultAsyncStatement<V> implements AsyncStatement<V>, Serializable {
     Observer<V> renew();
   }
 
-  private static class ChainForkObserver<S, V> implements Observer<AsyncResult<V>>, Serializable {
+  private static class ChainForkObserver<S, V>
+      implements RenewableObserver<AsyncResult<V>>, Serializable {
 
     private final ForkObserver<S, V> mObserver;
 
@@ -1124,11 +1125,6 @@ class DefaultAsyncStatement<V> implements AsyncStatement<V>, Serializable {
       mStatement = statement;
     }
 
-    @NotNull
-    public ForkObserver<S, V> renew() {
-      return new ForkObserver<S, V>(mStatement.reEvaluate(), mForker);
-    }
-
     boolean cancel(final boolean mayInterruptIfRunning) {
       if (mStatement.cancel(mayInterruptIfRunning)) {
         return true;
@@ -1144,6 +1140,9 @@ class DefaultAsyncStatement<V> implements AsyncStatement<V>, Serializable {
         }
       });
       return false;
+    }    @NotNull
+    public ForkObserver<S, V> renew() {
+      return new ForkObserver<S, V>(mStatement.reEvaluate(), mForker);
     }
 
     void chain(final AsyncResult<V> result) throws Exception {
@@ -1201,6 +1200,8 @@ class DefaultAsyncStatement<V> implements AsyncStatement<V>, Serializable {
         }
       }
     }
+
+
 
     public void accept(final AsyncResult<V> result) {
       mExecutor.execute(new Runnable() {

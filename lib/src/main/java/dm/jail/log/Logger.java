@@ -19,8 +19,6 @@ package dm.jail.log;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
-import java.io.PrintWriter;
-import java.io.StringWriter;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Locale;
@@ -29,7 +27,7 @@ import java.util.concurrent.atomic.AtomicReference;
 import dm.jail.log.LogPrinter.Level;
 import dm.jail.util.ConstantConditions;
 
-import static dm.jail.util.ReflectionUtils.asArgs;
+import static dm.jail.util.Reflections.asArgs;
 
 /**
  * Utility class used for logging messages.
@@ -128,19 +126,6 @@ public class Logger {
   public static Logger newLogger(@Nullable final LogPrinter printer, @Nullable final Level level,
       @NotNull final Object context) {
     return new Logger(asArgs(ConstantConditions.notNull("context", context)), printer, level);
-  }
-
-  /**
-   * Prints the stack trace of the specified throwable into a string.
-   *
-   * @param throwable the throwable instance.
-   * @return the printed stack trace.
-   */
-  @NotNull
-  public static String printStackTrace(@NotNull final Throwable throwable) {
-    final StringWriter writer = new StringWriter();
-    throwable.printStackTrace(new PrintWriter(writer));
-    return writer.toString();
   }
 
   /**

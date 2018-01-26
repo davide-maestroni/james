@@ -75,7 +75,7 @@ public abstract class SerializableProxy implements Serializable {
 
     Object deserialize() throws Exception {
       final Class<?> aClass = mClass;
-      return (aClass != null) ? ReflectionUtils.getDefaultConstructor(aClass).newInstance() : null;
+      return (aClass != null) ? Reflections.getDefaultConstructor(aClass).newInstance() : null;
     }
   }
 }

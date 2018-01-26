@@ -52,6 +52,9 @@ import static org.assertj.core.api.Assertions.assertThat;
  */
 public class TestAsyncStatement {
 
+  // TODO: 26/01/2018 reEvaluate, then serialization
+  // TODO: 26/01/2018 NPE then and below + if => null statement
+
   @NotNull
   private static AsyncStatement<String> createStatement() {
     return new Async().value("test").then(new Mapper<String, String>() {
@@ -75,30 +78,34 @@ public class TestAsyncStatement {
   @NotNull
   private static AsyncStatement<String> createStatementFork(
       @NotNull final AsyncStatement<String> statement) {
-    return statement.then(new Mapper<String, String>() {
+    return fork(statement.then(new Mapper<String, String>() {
 
       public String apply(final String input) {
         return input.toUpperCase();
       }
-    }).fork(new Forker<AsyncState<String>, AsyncStatement<String>, String, AsyncResult<String>>() {
+    }));
+  }
 
-      public AsyncState<String> done(@NotNull final AsyncStatement<String> statement,
-          final AsyncState<String> stack) {
+  @NotNull
+  private static <V> AsyncStatement<V> fork(@NotNull final AsyncStatement<V> statement) {
+    return statement.fork(new Forker<AsyncState<V>, AsyncStatement<V>, V, AsyncResult<V>>() {
+
+      public AsyncState<V> done(@NotNull final AsyncStatement<V> statement,
+          final AsyncState<V> stack) {
         return stack;
       }
 
-      public AsyncState<String> failure(@NotNull final AsyncStatement<String> statement,
-          final AsyncState<String> stack, @NotNull final Throwable failure) {
+      public AsyncState<V> failure(@NotNull final AsyncStatement<V> statement,
+          final AsyncState<V> stack, @NotNull final Throwable failure) {
         return SimpleState.ofFailure(failure);
       }
 
-      public AsyncState<String> init(@NotNull final AsyncStatement<String> statement) {
+      public AsyncState<V> init(@NotNull final AsyncStatement<V> statement) {
         return null;
       }
 
-      public AsyncState<String> statement(@NotNull final AsyncStatement<String> statement,
-          final AsyncState<String> stack, @NotNull final AsyncResult<String> result) throws
-          Exception {
+      public AsyncState<V> statement(@NotNull final AsyncStatement<V> statement,
+          final AsyncState<V> stack, @NotNull final AsyncResult<V> result) throws Exception {
         if (stack != null) {
           if (stack.isSet()) {
             result.set(stack.value());
@@ -111,8 +118,8 @@ public class TestAsyncStatement {
         return null;
       }
 
-      public AsyncState<String> value(@NotNull final AsyncStatement<String> statement,
-          final AsyncState<String> stack, final String value) {
+      public AsyncState<V> value(@NotNull final AsyncStatement<V> statement,
+          final AsyncState<V> stack, final V value) {
         return SimpleState.ofValue(value);
       }
     });
@@ -158,6 +165,23 @@ public class TestAsyncStatement {
     assertThat(statement.getValue()).isEqualTo("test");
   }
 
+  @Test(expected = NullPointerException.class)
+  @SuppressWarnings("ConstantConditions")
+  public void elseCatchNPE() {
+    new Async().value(null).elseCatch(null);
+  }
+
+  @Test(expected = NullPointerException.class)
+  @SuppressWarnings("ConstantConditions")
+  public void elseCatchTypesNPE() {
+    new Async().value(null).elseCatch(new Mapper<Throwable, Object>() {
+
+      public Object apply(final Throwable input) {
+        return null;
+      }
+    }, (Class<?>) null);
+  }
+
   @Test
   public void elseDo() {
     final AtomicReference<String> ref = new AtomicReference<String>();
@@ -186,6 +210,23 @@ public class TestAsyncStatement {
             });
     assertThat(ConstantConditions.notNull(statement.getFailure()).getCause()).isExactlyInstanceOf(
         IllegalArgumentException.class);
+  }
+
+  @Test(expected = NullPointerException.class)
+  @SuppressWarnings("ConstantConditions")
+  public void elseDoNPE() {
+    new Async().value(null).elseDo(null);
+  }
+
+  @Test(expected = NullPointerException.class)
+  @SuppressWarnings("ConstantConditions")
+  public void elseDoTypesNPE() {
+    new Async().value(null).elseDo(new Observer<Throwable>() {
+
+      public void accept(final Throwable input) {
+
+      }
+    }, (Class<?>) null);
   }
 
   @Test
@@ -241,6 +282,34 @@ public class TestAsyncStatement {
             });
     assertThat(ConstantConditions.notNull(statement.getFailure()).getCause()).isExactlyInstanceOf(
         IllegalArgumentException.class);
+  }
+
+  @Test(expected = NullPointerException.class)
+  @SuppressWarnings("ConstantConditions")
+  public void elseIfNPE() {
+    new Async().value(null).elseIf(null);
+  }
+
+  @Test
+  public void elseIfStatementNPE() {
+    assertThat(
+        new Async().failure(new Exception()).elseIf(new Mapper<Throwable, AsyncStatement<?>>() {
+
+          public AsyncStatement<?> apply(final Throwable input) {
+            return null;
+          }
+        }).failure()).isExactlyInstanceOf(NullPointerException.class);
+  }
+
+  @Test(expected = NullPointerException.class)
+  @SuppressWarnings("ConstantConditions")
+  public void elseIfTypesNPE() {
+    new Async().value(null).elseIf(new Mapper<Throwable, AsyncStatement<?>>() {
+
+      public AsyncStatement<?> apply(final Throwable input) {
+        return new Async().value(null);
+      }
+    }, (Class<?>) null);
   }
 
   @Test
@@ -381,6 +450,12 @@ public class TestAsyncStatement {
     }).isFailed()).isTrue();
   }
 
+  @Test(expected = NullPointerException.class)
+  @SuppressWarnings("ConstantConditions")
+  public void forkNPE() {
+    new Async().value(null).fork(null);
+  }
+
   @Test
   public void get() throws ExecutionException, InterruptedException {
     final AsyncStatement<String> statement =
@@ -413,6 +488,12 @@ public class TestAsyncStatement {
     statement.get();
   }
 
+  @Test(expected = NullPointerException.class)
+  @SuppressWarnings({"ConstantConditions", "ThrowableNotThrown"})
+  public void getFailureNPE() {
+    new Async().value(null).getFailure(0, null);
+  }
+
   @Test(expected = RuntimeTimeoutException.class)
   public void getFailureTimeout() throws ExecutionException, InterruptedException,
       TimeoutException {
@@ -435,6 +516,12 @@ public class TestAsyncStatement {
     final AsyncStatement<String> statement =
         new Async().on(withDelay(backgroundExecutor(), 1, TimeUnit.SECONDS)).value("test");
     statement.get(10, TimeUnit.MILLISECONDS);
+  }
+
+  @Test(expected = NullPointerException.class)
+  @SuppressWarnings("ConstantConditions")
+  public void getValueNPE() {
+    new Async().value(null).getValue(0, null);
   }
 
   @Test
@@ -463,6 +550,12 @@ public class TestAsyncStatement {
     assertThat(newStatement.isFinal()).isTrue();
   }
 
+  @Test(expected = NullPointerException.class)
+  @SuppressWarnings("ConstantConditions")
+  public void onNPE() {
+    new Async().value(null).on(null);
+  }
+
   @Test
   public void reEvaluate() {
     final Random random = new Random();
@@ -480,6 +573,25 @@ public class TestAsyncStatement {
     startTime = System.currentTimeMillis();
     assertThat(statement.reEvaluate().getValue()).isNotEqualTo(value);
     assertThat(System.currentTimeMillis() - startTime).isGreaterThanOrEqualTo(100);
+  }
+
+  @Test
+  public void reEvaluateFork() {
+    final Random random = new Random();
+    final AsyncStatement<Float> statement =
+        fork(new Async().statement(new Observer<AsyncResult<Float>>() {
+
+          public void accept(final AsyncResult<Float> result) {
+            result.set(random.nextFloat());
+          }
+        })).then(new Mapper<Float, Float>() {
+
+          public Float apply(final Float input) {
+            return input;
+          }
+        });
+    final Float value = statement.getValue();
+    assertThat(statement.reEvaluate().getValue()).isNotEqualTo(value);
   }
 
   @Test
@@ -826,7 +938,7 @@ public class TestAsyncStatement {
 
   @Test(expected = IllegalStateException.class)
   public void valueInvalidStateFailure() {
-    final AsyncStatement<String> statement = new Async().failure(null);
+    final AsyncStatement<String> statement = new Async().failure(new Exception());
     statement.value();
   }
 

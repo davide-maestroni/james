@@ -32,6 +32,7 @@ public class TimeUnits {
 
   public static long currentTimeIn(@NotNull final TimeUnit timeUnit) {
     if (timeUnit == TimeUnit.NANOSECONDS) {
+      ConstantConditions.notNull("timeUnit", timeUnit);
       return System.nanoTime();
     }
 
@@ -42,21 +43,22 @@ public class TimeUnits {
    * Performs a {@link Thread#sleep(long, int)} using the specified duration as timeout,
    * ensuring that the sleep time is respected even if spurious wake-ups happen in the while.
    *
-   * @param time the time value.
-   * @param unit the time unit.
+   * @param time     the time value.
+   * @param timeUnit the time unit.
    * @throws InterruptedException if the current thread is interrupted.
    */
-  public static void sleepAtLeast(final long time, @NotNull final TimeUnit unit) throws
+  public static void sleepAtLeast(final long time, @NotNull final TimeUnit timeUnit) throws
       InterruptedException {
     if (time == 0) {
+      ConstantConditions.notNull("timeUnit", timeUnit);
       return;
     }
 
-    if ((unit.compareTo(TimeUnit.MILLISECONDS) >= 0) || ((unit.toNanos(time) % ONE_MILLI_NANOS)
-        == 0)) {
+    if ((timeUnit.compareTo(TimeUnit.MILLISECONDS) >= 0) || (
+        (timeUnit.toNanos(time) % ONE_MILLI_NANOS) == 0)) {
       final long startMillis = System.currentTimeMillis();
       while (true) {
-        if (!sleepSinceMillis(time, unit, startMillis)) {
+        if (!sleepSinceMillis(time, timeUnit, startMillis)) {
           return;
         }
       }
@@ -64,7 +66,7 @@ public class TimeUnits {
 
     final long startNanos = System.nanoTime();
     while (true) {
-      if (!sleepSinceNanos(time, unit, startNanos)) {
+      if (!sleepSinceNanos(time, timeUnit, startNanos)) {
         return;
       }
     }
@@ -75,21 +77,23 @@ public class TimeUnits {
    * time in milliseconds, by using the specified time as timeout.
    *
    * @param time      the time value.
-   * @param unit      the time unit.
+   * @param timeUnit  the time unit.
    * @param milliTime the starting system time in milliseconds.
    * @return whether the sleep happened at all.
    * @throws IllegalStateException if this duration overflows the maximum sleep time.
    * @throws InterruptedException  if the current thread is interrupted.
    * @see System#currentTimeMillis()
    */
-  public static boolean sleepSinceMillis(final long time, @NotNull final TimeUnit unit,
+  public static boolean sleepSinceMillis(final long time, @NotNull final TimeUnit timeUnit,
       final long milliTime) throws InterruptedException {
     if (time == 0) {
+      ConstantConditions.notNull("timeUnit", timeUnit);
       return false;
     }
 
-    final long millisToSleep = milliTime - System.currentTimeMillis() + unit.toMillis(time);
+    final long millisToSleep = milliTime - System.currentTimeMillis() + timeUnit.toMillis(time);
     if (millisToSleep <= 0) {
+      ConstantConditions.notNull("timeUnit", timeUnit);
       return false;
     }
 
@@ -102,21 +106,23 @@ public class TimeUnits {
    * precision system time in nanoseconds, by using the specified time as timeout.
    *
    * @param time     the time value.
-   * @param unit     the time unit.
+   * @param timeUnit the time unit.
    * @param nanoTime the starting system time in nanoseconds.
    * @return whether the sleep happened at all.
    * @throws IllegalStateException if this duration overflows the maximum sleep time.
    * @throws InterruptedException  if the current thread is interrupted.
    * @see System#nanoTime()
    */
-  public static boolean sleepSinceNanos(final long time, @NotNull final TimeUnit unit,
+  public static boolean sleepSinceNanos(final long time, @NotNull final TimeUnit timeUnit,
       final long nanoTime) throws InterruptedException {
     if (time == 0) {
+      ConstantConditions.notNull("timeUnit", timeUnit);
       return false;
     }
 
-    final long nanosToSleep = nanoTime - System.nanoTime() + unit.toNanos(time);
+    final long nanosToSleep = nanoTime - System.nanoTime() + timeUnit.toNanos(time);
     if (nanosToSleep <= 0) {
+      ConstantConditions.notNull("timeUnit", timeUnit);
       return false;
     }
 
@@ -185,24 +191,27 @@ public class TimeUnits {
    * @param target    the target object.
    * @param milliTime the starting system time in milliseconds.
    * @param time      the time value.
-   * @param unit      the time unit.
+   * @param timeUnit  the time unit.
    * @return whether the wait happened at all.
    * @throws InterruptedException if the current thread is interrupted.
    * @see System#currentTimeMillis()
    */
   public static boolean waitSinceMillis(@NotNull final Object target, final long milliTime,
-      final long time, @NotNull final TimeUnit unit) throws InterruptedException {
+      final long time, @NotNull final TimeUnit timeUnit) throws InterruptedException {
     if (time == 0) {
+      ConstantConditions.notNull("timeUnit", timeUnit);
       return false;
     }
 
     if (time < 0) {
+      ConstantConditions.notNull("timeUnit", timeUnit);
       target.wait();
       return true;
     }
 
-    final long millisToWait = milliTime - System.currentTimeMillis() + unit.toMillis(time);
+    final long millisToWait = milliTime - System.currentTimeMillis() + timeUnit.toMillis(time);
     if (millisToWait <= 0) {
+      ConstantConditions.notNull("timeUnit", timeUnit);
       return false;
     }
 
@@ -219,24 +228,27 @@ public class TimeUnits {
    * @param target   the target object.
    * @param nanoTime the starting system time in nanoseconds.
    * @param time     the time value.
-   * @param unit     the time unit.
+   * @param timeUnit the time unit.
    * @return whether the wait happened at all.
    * @throws InterruptedException if the current thread is interrupted.
    * @see System#nanoTime()
    */
   public static boolean waitSinceNanos(@NotNull final Object target, final long nanoTime,
-      final long time, @NotNull final TimeUnit unit) throws InterruptedException {
+      final long time, @NotNull final TimeUnit timeUnit) throws InterruptedException {
     if (time == 0) {
+      ConstantConditions.notNull("timeUnit", timeUnit);
       return false;
     }
 
     if (time < 0) {
+      ConstantConditions.notNull("timeUnit", timeUnit);
       target.wait();
       return true;
     }
 
-    final long nanosToWait = nanoTime - System.nanoTime() + unit.toNanos(time);
+    final long nanosToWait = nanoTime - System.nanoTime() + timeUnit.toNanos(time);
     if (nanosToWait <= 0) {
+      ConstantConditions.notNull("timeUnit", timeUnit);
       return false;
     }
 
@@ -253,17 +265,19 @@ public class TimeUnits {
    * @param target    the target object.
    * @param condition the condition to verify.
    * @param time      the time value.
-   * @param unit      the time unit.
+   * @param timeUnit  the time unit.
    * @return whether the check became true before the timeout elapsed.
    * @throws InterruptedException if the current thread is interrupted.
    */
   public static boolean waitUntil(@NotNull final Object target, @NotNull final Condition condition,
-      final long time, @NotNull final TimeUnit unit) throws InterruptedException {
+      final long time, @NotNull final TimeUnit timeUnit) throws InterruptedException {
     if (time == 0) {
+      ConstantConditions.notNull("timeUnit", timeUnit);
       return condition.isTrue();
     }
 
     if (time < 0) {
+      ConstantConditions.notNull("timeUnit", timeUnit);
       while (!condition.isTrue()) {
         target.wait();
       }
@@ -271,10 +285,10 @@ public class TimeUnits {
       return true;
     }
 
-    if ((unit.toNanos(time) % ONE_MILLI_NANOS) == 0) {
+    if ((timeUnit.toNanos(time) % ONE_MILLI_NANOS) == 0) {
       final long startMillis = System.currentTimeMillis();
       while (!condition.isTrue()) {
-        if (!waitSinceMillis(target, startMillis, time, unit)) {
+        if (!waitSinceMillis(target, startMillis, time, timeUnit)) {
           return false;
         }
       }
@@ -282,7 +296,7 @@ public class TimeUnits {
     } else {
       final long startNanos = System.nanoTime();
       while (!condition.isTrue()) {
-        if (!waitSinceNanos(target, startNanos, time, unit)) {
+        if (!waitSinceNanos(target, startNanos, time, timeUnit)) {
           return false;
         }
       }
