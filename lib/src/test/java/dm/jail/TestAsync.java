@@ -16,9 +16,13 @@
 
 package dm.jail;
 
+import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 import org.junit.Test;
 
+import java.util.List;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import dm.jail.async.AsyncResult;
 import dm.jail.async.AsyncStatement;
@@ -26,6 +30,7 @@ import dm.jail.async.DeferredStatement;
 import dm.jail.async.Mapper;
 import dm.jail.async.Observer;
 import dm.jail.executor.ScheduledExecutors;
+import dm.jail.log.LogPrinter;
 import dm.jail.log.LogPrinter.Level;
 import dm.jail.log.LogPrinters;
 
@@ -90,6 +95,78 @@ public class TestAsync {
     assertThat(async.logWith(Level.SILENT)).isNotSameAs(async);
     assertThat(async.logWith(LogPrinters.nullPrinter())).isNotSameAs(async);
     assertThat(async.on(ScheduledExecutors.immediateExecutor())).isNotSameAs(async);
+  }
+
+  @Test
+  public void logLevelDebug() {
+    final TestLogPrinter logPrinter = new TestLogPrinter();
+    new Async().logWith(logPrinter)
+               .logWith(Level.DEBUG)
+               .value(null)
+               .then(new Mapper<Object, Object>() {
+
+                 public Object apply(final Object input) throws Exception {
+                   throw new Exception();
+                 }
+               })
+               .cancel(true);
+    assertThat(logPrinter.dbgCalled.get()).isTrue();
+    assertThat(logPrinter.wrnCalled.get()).isTrue();
+    assertThat(logPrinter.errCalled.get()).isTrue();
+  }
+
+  @Test
+  public void logLevelError() {
+    final TestLogPrinter logPrinter = new TestLogPrinter();
+    new Async().logWith(logPrinter)
+               .logWith(Level.ERROR)
+               .value(null)
+               .then(new Mapper<Object, Object>() {
+
+                 public Object apply(final Object input) throws Exception {
+                   throw new Exception();
+                 }
+               })
+               .cancel(true);
+    assertThat(logPrinter.dbgCalled.get()).isFalse();
+    assertThat(logPrinter.wrnCalled.get()).isFalse();
+    assertThat(logPrinter.errCalled.get()).isTrue();
+  }
+
+  @Test
+  public void logLevelSilent() {
+    final TestLogPrinter logPrinter = new TestLogPrinter();
+    new Async().logWith(logPrinter)
+               .logWith(Level.SILENT)
+               .value(null)
+               .then(new Mapper<Object, Object>() {
+
+                 public Object apply(final Object input) throws Exception {
+                   throw new Exception();
+                 }
+               })
+               .cancel(true);
+    assertThat(logPrinter.dbgCalled.get()).isFalse();
+    assertThat(logPrinter.wrnCalled.get()).isFalse();
+    assertThat(logPrinter.errCalled.get()).isFalse();
+  }
+
+  @Test
+  public void logLevelWarning() {
+    final TestLogPrinter logPrinter = new TestLogPrinter();
+    new Async().logWith(logPrinter)
+               .logWith(Level.WARNING)
+               .value(null)
+               .then(new Mapper<Object, Object>() {
+
+                 public Object apply(final Object input) throws Exception {
+                   throw new Exception();
+                 }
+               })
+               .cancel(true);
+    assertThat(logPrinter.dbgCalled.get()).isFalse();
+    assertThat(logPrinter.wrnCalled.get()).isTrue();
+    assertThat(logPrinter.errCalled.get()).isTrue();
   }
 
   @Test
@@ -171,5 +248,29 @@ public class TestAsync {
   @Test
   public void value() {
     assertThat(new Async().value(3).getValue()).isEqualTo(3);
+  }
+
+  private static class TestLogPrinter implements LogPrinter {
+
+    private final AtomicBoolean dbgCalled = new AtomicBoolean();
+
+    private final AtomicBoolean errCalled = new AtomicBoolean();
+
+    private final AtomicBoolean wrnCalled = new AtomicBoolean();
+
+    public void dbg(@NotNull final List<Object> contexts, @Nullable final String message,
+        @Nullable final Throwable throwable) {
+      dbgCalled.set(true);
+    }
+
+    public void err(@NotNull final List<Object> contexts, @Nullable final String message,
+        @Nullable final Throwable throwable) {
+      errCalled.set(true);
+    }
+
+    public void wrn(@NotNull final List<Object> contexts, @Nullable final String message,
+        @Nullable final Throwable throwable) {
+      wrnCalled.set(true);
+    }
   }
 }

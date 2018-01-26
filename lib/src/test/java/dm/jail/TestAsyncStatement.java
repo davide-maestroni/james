@@ -281,7 +281,7 @@ public class TestAsyncStatement {
   @Test
   public void failure() {
     final AsyncStatement<String> statement = new Async().failure(new IllegalArgumentException());
-    assertThat(statement.failure().getCause()).isExactlyInstanceOf(IllegalArgumentException.class);
+    assertThat(statement.failure()).isExactlyInstanceOf(IllegalArgumentException.class);
   }
 
   @Test

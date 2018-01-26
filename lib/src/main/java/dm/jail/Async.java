@@ -47,9 +47,6 @@ import dm.james.util.SerializableProxy;
  */
 public class Async {
 
-  // TODO: 12/01/2018 lazy => AsyncStatementLazy.evaluate()?
-  // TODO: 18/01/2018 AsyncExpression extends AsyncDeclaration => AsyncExpression.evaluate()?
-
   private final ScheduledExecutor mExecutor;
 
   private final Level mLogLevel;
@@ -202,6 +199,7 @@ public class Async {
     return new Async(executor, mLogPrinter, mLogLevel);
   }
 
+  // TODO: 26/01/2018 with Cancellable?
   @NotNull
   public <V> AsyncStatement<V> statement(@NotNull final Observer<AsyncResult<V>> observer) {
     final ScheduledExecutor executor = mExecutor;
