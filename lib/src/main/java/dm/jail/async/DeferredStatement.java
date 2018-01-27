@@ -30,6 +30,9 @@ import dm.jail.executor.ScheduledExecutor;
 public interface DeferredStatement<V> extends AsyncStatement<V>, Serializable {
 
   @NotNull
+  DeferredStatement<V> autoEvaluate();
+
+  @NotNull
   DeferredStatement<V> elseCatch(@NotNull Mapper<? super Throwable, ? extends V> mapper,
       @Nullable Class<?>[] exceptionTypes);
 

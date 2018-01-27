@@ -22,8 +22,10 @@ import org.jetbrains.annotations.Nullable;
 import java.io.InvalidObjectException;
 import java.io.ObjectStreamException;
 import java.io.Serializable;
+import java.lang.Thread.State;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicReference;
 
 import dm.jail.async.AsyncLoop;
 import dm.jail.async.AsyncResult;
@@ -32,6 +34,7 @@ import dm.jail.async.AsyncState;
 import dm.jail.async.AsyncStatement;
 import dm.jail.async.AsyncStatement.Forker;
 import dm.jail.async.DeferredStatement;
+import dm.jail.async.InterruptibleObserver;
 import dm.jail.async.Mapper;
 import dm.jail.async.Observer;
 import dm.jail.async.SimpleState;
@@ -199,7 +202,6 @@ public class Async {
     return new Async(ConstantConditions.notNull("executor", executor), mLogPrinter, mLogLevel);
   }
 
-  // TODO: 26/01/2018 with Cancellable? CancellableObserver?
   @NotNull
   public <V> AsyncStatement<V> statement(@NotNull final Observer<AsyncResult<V>> observer) {
     final ScheduledExecutor executor = mExecutor;
@@ -275,11 +277,14 @@ public class Async {
         Exception;
   }
 
-  private static class ExecutorObserver<V> implements Observer<AsyncResult<V>>, Serializable {
+  private static class ExecutorObserver<V>
+      implements InterruptibleObserver<AsyncResult<V>>, Serializable {
 
     private final ScheduledExecutor mExecutor;
 
     private final Observer<AsyncResult<V>> mObserver;
+
+    private final AtomicReference<Thread> mThread = new AtomicReference<Thread>();
 
     private ExecutorObserver(@NotNull final Observer<AsyncResult<V>> observer,
         @NotNull final ScheduledExecutor executor) {
@@ -291,16 +296,28 @@ public class Async {
       mExecutor.execute(new Runnable() {
 
         public void run() {
+          mThread.set(Thread.currentThread());
           try {
             mObserver.accept(result);
 
           } catch (final Throwable t) {
+            mThread.set(null);
             // TODO: 16/01/2018 invert order of call?
             RuntimeInterruptedException.throwIfInterrupt(t);
             result.fail(t);
           }
         }
       });
+    }
+
+    public void interrupt() {
+      final Thread thread = mThread.get();
+      if (thread != null) {
+        final State state = thread.getState();
+        if ((state == State.WAITING) || (state == State.TIMED_WAITING)) {
+          thread.interrupt();
+        }
+      }
     }
 
     private Object writeReplace() throws ObjectStreamException {

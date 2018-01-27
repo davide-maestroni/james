@@ -37,6 +37,7 @@ import dm.jail.async.Action;
 import dm.jail.async.AsyncResult;
 import dm.jail.async.AsyncStatement;
 import dm.jail.async.FailureException;
+import dm.jail.async.InterruptibleObserver;
 import dm.jail.async.Mapper;
 import dm.jail.async.Observer;
 import dm.jail.executor.ScheduledExecutor;
@@ -211,6 +212,15 @@ class DefaultAsyncStatement<V> implements AsyncStatement<V>, Serializable {
 
     StatementChain<?, ?> chain = mHead;
     final CancellationException exception = new CancellationException();
+    if (mayInterruptIfRunning && (observer instanceof InterruptibleObserver)) {
+      if (chain.cancel(exception)) {
+        ((InterruptibleObserver<?>) observer).interrupt();
+        return true;
+      }
+
+      chain = chain.mNext;
+    }
+
     while (!chain.isTail()) {
       if (chain.cancel(exception)) {
         return true;

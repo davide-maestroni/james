@@ -40,6 +40,8 @@ import dm.jail.util.RuntimeInterruptedException;
  */
 class DefaultDeferredStatement<V> implements DeferredStatement<V> {
 
+  private final boolean mAutoEvaluate;
+
   private final Mapper<?, ?> mFactory;
 
   private final DeferredObserver<?> mObserver;
@@ -58,30 +60,21 @@ class DefaultDeferredStatement<V> implements DeferredStatement<V> {
 
     mFactory = factory;
     mObserver = observer;
+    mAutoEvaluate = false;
   }
 
   private DefaultDeferredStatement(@NotNull final Mapper<?, ?> factory,
-      @NotNull final DeferredObserver<?> observer, @NotNull final AsyncStatement<V> statement) {
+      @NotNull final DeferredObserver<?> observer, @NotNull final AsyncStatement<V> statement,
+      boolean autoEvaluate) {
     mFactory = factory;
     mObserver = observer;
     mStatement = statement;
+    mAutoEvaluate = autoEvaluate;
   }
 
-  public boolean cancel(final boolean mayInterruptIfRunning) {
-    return mStatement.cancel(mayInterruptIfRunning);
-  }
-
-  public boolean isDone() {
-    return mStatement.isDone();
-  }
-
-  public V get() throws InterruptedException, ExecutionException {
-    return evaluate().get();
-  }
-
-  public V get(final long timeout, @NotNull final TimeUnit timeUnit) throws InterruptedException,
-      ExecutionException, TimeoutException {
-    return evaluate().get(timeout, timeUnit);
+  @NotNull
+  public DeferredStatement<V> autoEvaluate() {
+    return new DefaultDeferredStatement<V>(mFactory, mObserver, mStatement, true);
   }
 
   @NotNull
@@ -178,6 +171,23 @@ class DefaultDeferredStatement<V> implements DeferredStatement<V> {
     return mStatement;
   }
 
+  public boolean cancel(final boolean mayInterruptIfRunning) {
+    return mStatement.cancel(mayInterruptIfRunning);
+  }
+
+  public boolean isDone() {
+    return mStatement.isDone();
+  }
+
+  public V get() throws InterruptedException, ExecutionException {
+    return evaluate().get();
+  }
+
+  public V get(final long timeout, @NotNull final TimeUnit timeUnit) throws InterruptedException,
+      ExecutionException, TimeoutException {
+    return evaluate().get(timeout, timeUnit);
+  }
+
   @NotNull
   public Throwable failure() {
     return mStatement.failure();
@@ -239,7 +249,11 @@ class DefaultDeferredStatement<V> implements DeferredStatement<V> {
 
   @NotNull
   private <R> DeferredStatement<R> newInstance(@NotNull final AsyncStatement<R> statement) {
-    return new DefaultDeferredStatement<R>(mFactory, mObserver, statement);
+    if (mAutoEvaluate) {
+      evaluate();
+    }
+
+    return new DefaultDeferredStatement<R>(mFactory, mObserver, statement, false);
   }
 
   private static class DeferredObserver<V> implements Observer<AsyncResult<V>>, Serializable {
