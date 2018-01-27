@@ -98,16 +98,16 @@ public class TestAsync {
   @Test
   public void immutable() {
     final Async async = new Async();
-    assertThat(async.logWith(Level.SILENT)).isNotSameAs(async);
-    assertThat(async.logWith(LogPrinters.nullPrinter())).isNotSameAs(async);
+    assertThat(async.log(Level.SILENT)).isNotSameAs(async);
+    assertThat(async.log(LogPrinters.nullPrinter())).isNotSameAs(async);
     assertThat(async.on(ScheduledExecutors.immediateExecutor())).isNotSameAs(async);
   }
 
   @Test
   public void logLevelDebug() {
     final TestLogPrinter logPrinter = new TestLogPrinter();
-    new Async().logWith(logPrinter)
-               .logWith(Level.DEBUG)
+    new Async().log(logPrinter)
+               .log(Level.DEBUG)
                .value(null)
                .then(new Mapper<Object, Object>() {
 
@@ -124,8 +124,8 @@ public class TestAsync {
   @Test
   public void logLevelError() {
     final TestLogPrinter logPrinter = new TestLogPrinter();
-    new Async().logWith(logPrinter)
-               .logWith(Level.ERROR)
+    new Async().log(logPrinter)
+               .log(Level.ERROR)
                .value(null)
                .then(new Mapper<Object, Object>() {
 
@@ -142,8 +142,8 @@ public class TestAsync {
   @Test
   public void logLevelSilent() {
     final TestLogPrinter logPrinter = new TestLogPrinter();
-    new Async().logWith(logPrinter)
-               .logWith(Level.SILENT)
+    new Async().log(logPrinter)
+               .log(Level.SILENT)
                .value(null)
                .then(new Mapper<Object, Object>() {
 
@@ -160,8 +160,8 @@ public class TestAsync {
   @Test
   public void logLevelWarning() {
     final TestLogPrinter logPrinter = new TestLogPrinter();
-    new Async().logWith(logPrinter)
-               .logWith(Level.WARNING)
+    new Async().log(logPrinter)
+               .log(Level.WARNING)
                .value(null)
                .then(new Mapper<Object, Object>() {
 

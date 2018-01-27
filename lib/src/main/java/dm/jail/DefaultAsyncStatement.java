@@ -46,10 +46,10 @@ import dm.jail.log.Logger;
 import dm.jail.util.ConstantConditions;
 import dm.jail.util.RuntimeInterruptedException;
 import dm.jail.util.RuntimeTimeoutException;
+import dm.jail.util.SerializableProxy;
 import dm.jail.util.Threads;
 import dm.jail.util.TimeUnits;
 import dm.jail.util.TimeUnits.Condition;
-import dm.james.util.SerializableProxy;
 
 /**
  * Created by davide-maestroni on 01/12/2018.
@@ -244,7 +244,7 @@ class DefaultAsyncStatement<V> implements AsyncStatement<V>, Serializable {
       throw new ExecutionException(e);
 
     } catch (final RuntimeTimeoutException e) {
-      throw new TimeoutException(e.getMessage());
+      throw e.toTimeoutException();
 
     } catch (final RuntimeInterruptedException e) {
       throw e.toInterruptedException();
@@ -302,7 +302,7 @@ class DefaultAsyncStatement<V> implements AsyncStatement<V>, Serializable {
         if (TimeUnits.waitUntil(mMutex, new Condition() {
 
           public boolean isTrue() {
-            checkFinal();
+            checkCanGet();
             return head.getState().isDone();
           }
         }, timeout, timeUnit)) {
@@ -331,7 +331,7 @@ class DefaultAsyncStatement<V> implements AsyncStatement<V>, Serializable {
         if (TimeUnits.waitUntil(mMutex, new Condition() {
 
           public boolean isTrue() {
-            checkFinal();
+            checkCanGet();
             return head.getState().isDone();
           }
         }, timeout, timeUnit)) {
@@ -480,23 +480,15 @@ class DefaultAsyncStatement<V> implements AsyncStatement<V>, Serializable {
         throw new IllegalStateException("the statement is not failed");
       }
 
-      return getFailure(0, TimeUnit.MILLISECONDS).getCause();
+      return mHead.getFailure().getCause();
     }
   }
 
   public boolean isCancelled() {
-    final FailureException failure;
-    final ChainHead<?> head = mHead;
     synchronized (mMutex) {
-      if (head.getState().isDone()) {
-        failure = head.getFailure();
-
-      } else {
-        failure = null;
-      }
+      final FailureException failure = mHead.getFailure();
+      return (failure != null) && failure.isCancelled();
     }
-
-    return (failure != null) && failure.isCancelled();
   }
 
   public boolean isEvaluating() {
@@ -517,13 +509,14 @@ class DefaultAsyncStatement<V> implements AsyncStatement<V>, Serializable {
     }
   }
 
+  @SuppressWarnings("unchecked")
   public V value() {
     synchronized (mMutex) {
       if (!isSet()) {
         throw new IllegalStateException("the statement is not set");
       }
 
-      return getValue(0, TimeUnit.MILLISECONDS);
+      return (V) mHead.getValue();
     }
   }
 
@@ -569,9 +562,13 @@ class DefaultAsyncStatement<V> implements AsyncStatement<V>, Serializable {
     return statement;
   }
 
-  private void checkFinal() {
+  private void checkCanGet() {
     if (mChain != null) {
       throw new IllegalStateException("the statement is not final");
+    }
+
+    if (mObserver instanceof ForkObserver) {
+      throw new IllegalStateException("the statement has been forked");
     }
   }
 
@@ -581,7 +578,7 @@ class DefaultAsyncStatement<V> implements AsyncStatement<V>, Serializable {
     }
 
     final Logger logger = mLogger;
-    if ((logger.getLogLevel().compareTo(Level.WARNING) <= 0) && Threads.isOwnedThread()) {
+    if (logger.willPrint(Level.WARNING) && Threads.isOwnedThread()) {
       logger.wrn("ATTENTION: possible deadlock detected! Try to avoid waiting on managed threads");
     }
   }
@@ -1140,9 +1137,6 @@ class DefaultAsyncStatement<V> implements AsyncStatement<V>, Serializable {
         }
       });
       return false;
-    }    @NotNull
-    public ForkObserver<S, V> renew() {
-      return new ForkObserver<S, V>(mStatement.reEvaluate(), mForker);
     }
 
     void chain(final AsyncResult<V> result) throws Exception {
@@ -1201,7 +1195,10 @@ class DefaultAsyncStatement<V> implements AsyncStatement<V>, Serializable {
       }
     }
 
-
+    @NotNull
+    public ForkObserver<S, V> renew() {
+      return new ForkObserver<S, V>(mStatement.reEvaluate(), mForker);
+    }
 
     public void accept(final AsyncResult<V> result) {
       mExecutor.execute(new Runnable() {

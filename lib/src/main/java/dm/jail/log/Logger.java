@@ -542,6 +542,10 @@ public class Logger {
     return new Logger(newContexts, mLogPrinter, mLogLevel);
   }
 
+  public boolean willPrint(@NotNull final Level level) {
+    return (mLevel <= level.ordinal());
+  }
+
   /**
    * Logs a warning message.
    *

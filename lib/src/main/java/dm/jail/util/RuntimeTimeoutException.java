@@ -16,6 +16,10 @@
 
 package dm.jail.util;
 
+import org.jetbrains.annotations.NotNull;
+
+import java.util.concurrent.TimeoutException;
+
 /**
  * Created by davide-maestroni on 01/15/2018.
  */
@@ -26,5 +30,10 @@ public class RuntimeTimeoutException extends RuntimeException {
 
   public RuntimeTimeoutException(final String message) {
     super(message);
+  }
+
+  @NotNull
+  public TimeoutException toTimeoutException() {
+    return new TimeoutException(getMessage());
   }
 }

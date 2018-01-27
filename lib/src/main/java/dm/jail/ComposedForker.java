@@ -29,7 +29,7 @@ import dm.jail.async.AsyncStatement.ForkCompleter;
 import dm.jail.async.AsyncStatement.ForkUpdater;
 import dm.jail.async.AsyncStatement.Forker;
 import dm.jail.async.Mapper;
-import dm.james.util.SerializableProxy;
+import dm.jail.util.SerializableProxy;
 
 /**
  * Created by davide-maestroni on 01/19/2018.

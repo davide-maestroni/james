@@ -33,6 +33,7 @@ import dm.jail.async.FailureException;
 import dm.jail.async.Mapper;
 import dm.jail.async.Observer;
 import dm.jail.executor.ScheduledExecutor;
+import dm.jail.util.RuntimeInterruptedException;
 
 /**
  * Created by davide-maestroni on 01/18/2018.
@@ -75,12 +76,12 @@ class DefaultDeferredStatement<V> implements DeferredStatement<V> {
   }
 
   public V get() throws InterruptedException, ExecutionException {
-    return mStatement.get();
+    return evaluate().get();
   }
 
   public V get(final long timeout, @NotNull final TimeUnit timeUnit) throws InterruptedException,
       ExecutionException, TimeoutException {
-    return mStatement.get(timeout, timeUnit);
+    return evaluate().get(timeout, timeUnit);
   }
 
   @NotNull
@@ -126,8 +127,7 @@ class DefaultDeferredStatement<V> implements DeferredStatement<V> {
 
   @NotNull
   public AsyncStatement<V> reEvaluate() {
-    evaluate();
-    return mStatement.reEvaluate();
+    return evaluate().reEvaluate();
   }
 
   @NotNull
@@ -205,20 +205,20 @@ class DefaultDeferredStatement<V> implements DeferredStatement<V> {
 
   @Nullable
   public FailureException getFailure() {
-    return mStatement.getFailure();
+    return evaluate().getFailure();
   }
 
   @Nullable
   public FailureException getFailure(final long timeout, @NotNull final TimeUnit timeUnit) {
-    return mStatement.getFailure(timeout, timeUnit);
+    return evaluate().getFailure(timeout, timeUnit);
   }
 
   public V getValue() {
-    return mStatement.getValue();
+    return evaluate().getValue();
   }
 
   public V getValue(final long timeout, @NotNull final TimeUnit timeUnit) {
-    return mStatement.getValue(timeout, timeUnit);
+    return evaluate().getValue(timeout, timeUnit);
   }
 
   public boolean isFinal() {
@@ -226,7 +226,7 @@ class DefaultDeferredStatement<V> implements DeferredStatement<V> {
   }
 
   public void to(@NotNull final AsyncResult<? super V> result) {
-    mStatement.to(result);
+    evaluate().to(result);
   }
 
   public void waitDone() {
@@ -246,7 +246,9 @@ class DefaultDeferredStatement<V> implements DeferredStatement<V> {
 
     private final Object mMutex = new Object();
 
-    private boolean mAccepted;
+    private transient boolean mAccepted;
+
+    private transient boolean mEvaluated;
 
     private transient AsyncResult<V> mResult;
 
@@ -271,10 +273,24 @@ class DefaultDeferredStatement<V> implements DeferredStatement<V> {
     void evaluate() {
       final AsyncResult<V> result;
       synchronized (mMutex) {
-        result = mResult;
+        if (!mEvaluated) {
+          mEvaluated = true;
+          result = mResult;
+
+        } else {
+          result = null;
+        }
       }
 
-      result.set(null);
+      if (result != null) {
+        try {
+          result.set(null);
+
+        } catch (final Throwable t) {
+          RuntimeInterruptedException.throwIfInterrupt(t);
+          result.fail(t);
+        }
+      }
     }
   }
 }

@@ -38,9 +38,9 @@ import dm.jail.async.SimpleState;
 import dm.jail.executor.ScheduledExecutor;
 import dm.jail.log.LogPrinter;
 import dm.jail.log.LogPrinter.Level;
+import dm.jail.util.ConstantConditions;
 import dm.jail.util.RuntimeInterruptedException;
-import dm.james.util.ConstantConditions;
-import dm.james.util.SerializableProxy;
+import dm.jail.util.SerializableProxy;
 
 /**
  * Created by davide-maestroni on 01/12/2018.
@@ -158,12 +158,12 @@ public class Async {
   }
 
   @NotNull
-  public Async logWith(@Nullable final Level level) {
+  public Async log(@Nullable final Level level) {
     return new Async(mExecutor, mLogPrinter, level);
   }
 
   @NotNull
-  public Async logWith(@Nullable final LogPrinter printer) {
+  public Async log(@Nullable final LogPrinter printer) {
     return new Async(mExecutor, printer, mLogLevel);
   }
 
@@ -199,7 +199,7 @@ public class Async {
     return new Async(ConstantConditions.notNull("executor", executor), mLogPrinter, mLogLevel);
   }
 
-  // TODO: 26/01/2018 with Cancellable?
+  // TODO: 26/01/2018 with Cancellable? CancellableObserver?
   @NotNull
   public <V> AsyncStatement<V> statement(@NotNull final Observer<AsyncResult<V>> observer) {
     final ScheduledExecutor executor = mExecutor;
