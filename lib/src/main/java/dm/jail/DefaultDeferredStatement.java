@@ -248,7 +248,7 @@ class DefaultDeferredStatement<V> implements DeferredStatement<V> {
 
     private transient boolean mAccepted;
 
-    private transient boolean mEvaluated;
+    private boolean mEvaluated;
 
     private transient AsyncResult<V> mResult;
 
@@ -258,7 +258,7 @@ class DefaultDeferredStatement<V> implements DeferredStatement<V> {
         if (!mAccepted) {
           mAccepted = true;
           mResult = result;
-          currentResult = null;
+          currentResult = (mEvaluated) ? result : null;
 
         } else {
           currentResult = result;

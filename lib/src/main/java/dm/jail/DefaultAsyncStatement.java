@@ -28,6 +28,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.CancellationException;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
@@ -59,6 +60,9 @@ class DefaultAsyncStatement<V> implements AsyncStatement<V>, Serializable {
   private static final Class<?>[] ANY_EXCEPTION = new Class<?>[]{Throwable.class};
 
   private final ScheduledExecutor mExecutor;
+
+  private final CopyOnWriteArrayList<AsyncStatement<?>> mForked =
+      new CopyOnWriteArrayList<AsyncStatement<?>>();
 
   private final ChainHead<?> mHead;
 
@@ -191,7 +195,18 @@ class DefaultAsyncStatement<V> implements AsyncStatement<V>, Serializable {
   public boolean cancel(final boolean mayInterruptIfRunning) {
     final Observer<? extends AsyncResult<?>> observer = mObserver;
     if (observer instanceof ForkObserver) {
-      return ((ForkObserver<?, ?>) observer).cancel(mayInterruptIfRunning);
+      if (((ForkObserver<?, ?>) observer).cancel(mayInterruptIfRunning)) {
+        return true;
+      }
+
+      boolean isCancelled = false;
+      for (final AsyncStatement<?> forked : mForked) {
+        if (forked.cancel(mayInterruptIfRunning)) {
+          isCancelled = true;
+        }
+      }
+
+      return isCancelled;
     }
 
     StatementChain<?, ?> chain = mHead;
@@ -535,8 +550,12 @@ class DefaultAsyncStatement<V> implements AsyncStatement<V>, Serializable {
     final Runnable chaining;
     final Observer<? extends AsyncResult<?>> observer = mObserver;
     if (observer instanceof ForkObserver) {
-      return new DefaultAsyncStatement<V>(((ForkObserver<?, V>) observer).newObserver(),
-          logger.getLogPrinter(), logger.getLogLevel()).chain(chain, chainExecutor, newExecutor);
+      final AsyncStatement<R> forked =
+          new DefaultAsyncStatement<V>(((ForkObserver<?, V>) observer).newObserver(),
+              logger.getLogPrinter(), logger.getLogLevel()).chain(chain, chainExecutor,
+              newExecutor);
+      mForked.add(forked);
+      return forked;
     }
 
     synchronized (mMutex) {
@@ -1123,20 +1142,7 @@ class DefaultAsyncStatement<V> implements AsyncStatement<V>, Serializable {
     }
 
     boolean cancel(final boolean mayInterruptIfRunning) {
-      if (mStatement.cancel(mayInterruptIfRunning)) {
-        return true;
-      }
-
-      mExecutor.execute(new Runnable() {
-
-        public void run() {
-          final CancellationException exception = new CancellationException();
-          for (final AsyncResult<V> result : mResults) {
-            result.fail(exception);
-          }
-        }
-      });
-      return false;
+      return mStatement.cancel(mayInterruptIfRunning);
     }
 
     void chain(final AsyncResult<V> result) throws Exception {
