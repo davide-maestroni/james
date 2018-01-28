@@ -52,7 +52,16 @@ import static org.assertj.core.api.Assertions.assertThat;
  */
 public class TestAsyncStatement {
 
-  // TODO: 26/01/2018 reEvaluate, then serialization
+  // TODO: 27/01/2018 observer throws 
+  // TODO: 27/01/2018 closeable null + throws 
+  // TODO: 27/01/2018 cancel forked branch 
+  // TODO: 27/01/2018 fork functions 
+  // TODO: 27/01/2018 chain illegalstate 
+  // TODO: 27/01/2018 chain get + fork get 
+  // TODO: 27/01/2018 evaluating getValue 
+  // TODO: 27/01/2018 catch filtered exception type 
+  // TODO: 27/01/2018 forker throws
+  // TODO: 26/01/2018 evaluate/then serialization
   // TODO: 26/01/2018 NPE then and below + if => null statement
 
   @NotNull
@@ -127,7 +136,7 @@ public class TestAsyncStatement {
 
   @Test
   public void cancelled() {
-    final AsyncStatement<Void> statement = new Async().deferred();
+    final AsyncStatement<Void> statement = new Async().statementDeclaration();
     statement.cancel(true);
     assertThat(statement.isCancelled()).isTrue();
   }
@@ -313,8 +322,46 @@ public class TestAsyncStatement {
   }
 
   @Test
+  public void evaluate() {
+    final Random random = new Random();
+    final AsyncStatement<Float> statement =
+        new Async().on(withDelay(backgroundExecutor(), 100, TimeUnit.MILLISECONDS))
+                   .statement(new Observer<AsyncResult<Float>>() {
+
+                     public void accept(final AsyncResult<Float> result) {
+                       result.set(random.nextFloat());
+                     }
+                   });
+    long startTime = System.currentTimeMillis();
+    final Float value = statement.getValue();
+    assertThat(System.currentTimeMillis() - startTime).isGreaterThanOrEqualTo(100);
+    startTime = System.currentTimeMillis();
+    assertThat(statement.evaluate().getValue()).isNotEqualTo(value);
+    assertThat(System.currentTimeMillis() - startTime).isGreaterThanOrEqualTo(100);
+  }
+
+  @Test
+  public void evaluateFork() {
+    final Random random = new Random();
+    final AsyncStatement<Float> statement =
+        fork(new Async().statement(new Observer<AsyncResult<Float>>() {
+
+          public void accept(final AsyncResult<Float> result) {
+            result.set(random.nextFloat());
+          }
+        })).then(new Mapper<Float, Float>() {
+
+          public Float apply(final Float input) {
+            return input;
+          }
+        });
+    final Float value = statement.getValue();
+    assertThat(statement.evaluate().getValue()).isNotEqualTo(value);
+  }
+
+  @Test
   public void evaluating() {
-    final AsyncStatement<Void> statement = new Async().deferred();
+    final AsyncStatement<Void> statement = new Async().statementDeclaration();
     assertThat(statement.isEvaluating()).isTrue();
   }
 
@@ -373,7 +420,7 @@ public class TestAsyncStatement {
 
   @Test(expected = IllegalStateException.class)
   public void failureInvalidStateEvaluating() {
-    final AsyncStatement<Void> statement = new Async().deferred();
+    final AsyncStatement<Void> statement = new Async().statementDeclaration();
     assertThat(statement.failure());
   }
 
@@ -554,44 +601,6 @@ public class TestAsyncStatement {
   @SuppressWarnings("ConstantConditions")
   public void onNPE() {
     new Async().value(null).on(null);
-  }
-
-  @Test
-  public void reEvaluate() {
-    final Random random = new Random();
-    final AsyncStatement<Float> statement =
-        new Async().on(withDelay(backgroundExecutor(), 100, TimeUnit.MILLISECONDS))
-                   .statement(new Observer<AsyncResult<Float>>() {
-
-                     public void accept(final AsyncResult<Float> result) {
-                       result.set(random.nextFloat());
-                     }
-                   });
-    long startTime = System.currentTimeMillis();
-    final Float value = statement.getValue();
-    assertThat(System.currentTimeMillis() - startTime).isGreaterThanOrEqualTo(100);
-    startTime = System.currentTimeMillis();
-    assertThat(statement.reEvaluate().getValue()).isNotEqualTo(value);
-    assertThat(System.currentTimeMillis() - startTime).isGreaterThanOrEqualTo(100);
-  }
-
-  @Test
-  public void reEvaluateFork() {
-    final Random random = new Random();
-    final AsyncStatement<Float> statement =
-        fork(new Async().statement(new Observer<AsyncResult<Float>>() {
-
-          public void accept(final AsyncResult<Float> result) {
-            result.set(random.nextFloat());
-          }
-        })).then(new Mapper<Float, Float>() {
-
-          public Float apply(final Float input) {
-            return input;
-          }
-        });
-    final Float value = statement.getValue();
-    assertThat(statement.reEvaluate().getValue()).isNotEqualTo(value);
   }
 
   @Test
@@ -932,7 +941,7 @@ public class TestAsyncStatement {
 
   @Test(expected = IllegalStateException.class)
   public void valueInvalidStateEvaluating() {
-    final AsyncStatement<Void> statement = new Async().deferred();
+    final AsyncStatement<Void> statement = new Async().statementDeclaration();
     statement.value();
   }
 

@@ -20,6 +20,7 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 import java.io.Closeable;
+import java.io.ObjectStreamException;
 import java.io.Serializable;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
@@ -28,27 +29,22 @@ import java.util.concurrent.TimeoutException;
 import dm.jail.async.Action;
 import dm.jail.async.AsyncResult;
 import dm.jail.async.AsyncStatement;
-import dm.jail.async.DeferredStatement;
+import dm.jail.async.DeclaredStatement;
 import dm.jail.async.FailureException;
 import dm.jail.async.Mapper;
 import dm.jail.async.Observer;
 import dm.jail.executor.ScheduledExecutor;
-import dm.jail.util.RuntimeInterruptedException;
 
 /**
  * Created by davide-maestroni on 01/18/2018.
  */
-class DefaultDeferredStatement<V> implements DeferredStatement<V> {
+class DefaultDeclaredStatement<V> implements DeclaredStatement<V> {
 
   private final boolean mAutoEvaluate;
 
-  private final Mapper<?, ?> mFactory;
-
-  private final DeferredObserver<?> mObserver;
-
   private final AsyncStatement<V> mStatement;
 
-  DefaultDeferredStatement(
+  DefaultDeclaredStatement(
       @NotNull final Mapper<Observer<AsyncResult<V>>, AsyncStatement<V>> factory) {
     final DeferredObserver<V> observer = new DeferredObserver<V>();
     try {
@@ -58,54 +54,49 @@ class DefaultDeferredStatement<V> implements DeferredStatement<V> {
       throw FailureException.wrap(e);
     }
 
-    mFactory = factory;
-    mObserver = observer;
     mAutoEvaluate = false;
   }
 
-  private DefaultDeferredStatement(@NotNull final Mapper<?, ?> factory,
-      @NotNull final DeferredObserver<?> observer, @NotNull final AsyncStatement<V> statement,
+  private DefaultDeclaredStatement(@NotNull final AsyncStatement<V> statement,
       boolean autoEvaluate) {
-    mFactory = factory;
-    mObserver = observer;
     mStatement = statement;
     mAutoEvaluate = autoEvaluate;
   }
 
   @NotNull
-  public DeferredStatement<V> autoEvaluate() {
-    return new DefaultDeferredStatement<V>(mFactory, mObserver, mStatement, true);
+  public DeclaredStatement<V> autoEvaluate() {
+    return new DefaultDeclaredStatement<V>(mStatement, true);
   }
 
   @NotNull
-  public DeferredStatement<V> elseCatch(
+  public DeclaredStatement<V> elseCatch(
       @NotNull final Mapper<? super Throwable, ? extends V> mapper,
       @Nullable final Class<?>[] exceptionTypes) {
     return newInstance(mStatement.elseCatch(mapper, exceptionTypes));
   }
 
   @NotNull
-  public DeferredStatement<V> elseDo(@NotNull final Observer<? super Throwable> observer,
+  public DeclaredStatement<V> elseDo(@NotNull final Observer<? super Throwable> observer,
       @Nullable final Class<?>[] exceptionTypes) {
     return newInstance(mStatement.elseDo(observer, exceptionTypes));
   }
 
   @NotNull
-  public DeferredStatement<V> elseIf(
+  public DeclaredStatement<V> elseIf(
       @NotNull final Mapper<? super Throwable, ? extends AsyncStatement<? extends V>> mapper,
       @Nullable final Class<?>[] exceptionTypes) {
     return newInstance(mStatement.elseIf(mapper, exceptionTypes));
   }
 
   @NotNull
-  public <S> DeferredStatement<V> fork(
+  public <S> DeclaredStatement<V> fork(
       @NotNull final Forker<S, ? super AsyncStatement<V>, ? super V, ? super AsyncResult<V>>
           forker) {
     return newInstance(mStatement.fork(forker));
   }
 
   @NotNull
-  public <S> DeferredStatement<V> fork(@Nullable final Mapper<? super AsyncStatement<V>, S> init,
+  public <S> DeclaredStatement<V> fork(@Nullable final Mapper<? super AsyncStatement<V>, S> init,
       @Nullable final ForkUpdater<S, ? super AsyncStatement<V>, ? super V> value,
       @Nullable final ForkUpdater<S, ? super AsyncStatement<V>, ? super Throwable> failure,
       @Nullable final ForkCompleter<S, ? super AsyncStatement<V>> done,
@@ -114,61 +105,50 @@ class DefaultDeferredStatement<V> implements DeferredStatement<V> {
   }
 
   @NotNull
-  public DeferredStatement<V> on(@NotNull final ScheduledExecutor executor) {
+  public DeclaredStatement<V> on(@NotNull final ScheduledExecutor executor) {
     return newInstance(mStatement.on(executor));
   }
 
   @NotNull
-  public AsyncStatement<V> reEvaluate() {
-    return evaluate().reEvaluate();
-  }
-
-  @NotNull
-  public <R> DeferredStatement<R> then(@NotNull final Mapper<? super V, R> mapper) {
+  public <R> DeclaredStatement<R> then(@NotNull final Mapper<? super V, R> mapper) {
     return newInstance(mStatement.then(mapper));
   }
 
   @NotNull
-  public DeferredStatement<V> thenDo(@NotNull final Observer<? super V> observer) {
+  public DeclaredStatement<V> thenDo(@NotNull final Observer<? super V> observer) {
     return newInstance(mStatement.thenDo(observer));
   }
 
   @NotNull
-  public <R> DeferredStatement<R> thenIf(
+  public <R> DeclaredStatement<R> thenIf(
       @NotNull final Mapper<? super V, ? extends AsyncStatement<R>> mapper) {
     return newInstance(mStatement.thenIf(mapper));
   }
 
   @NotNull
-  public <R> DeferredStatement<R> thenTry(
+  public <R> DeclaredStatement<R> thenTry(
       @NotNull final Mapper<? super V, ? extends Closeable> closeable,
       @NotNull final Mapper<? super V, R> mapper) {
     return newInstance(mStatement.thenTry(closeable, mapper));
   }
 
   @NotNull
-  public DeferredStatement<V> thenTryDo(
+  public DeclaredStatement<V> thenTryDo(
       @NotNull final Mapper<? super V, ? extends Closeable> closeable,
       @NotNull final Observer<? super V> observer) {
     return newInstance(mStatement.thenTryDo(closeable, observer));
   }
 
   @NotNull
-  public <R> DeferredStatement<R> thenTryIf(
+  public <R> DeclaredStatement<R> thenTryIf(
       @NotNull final Mapper<? super V, ? extends Closeable> closeable,
       @NotNull final Mapper<? super V, ? extends AsyncStatement<R>> mapper) {
     return newInstance(mStatement.thenTryIf(closeable, mapper));
   }
 
   @NotNull
-  public DeferredStatement<V> whenDone(@NotNull final Action action) {
+  public DeclaredStatement<V> whenDone(@NotNull final Action action) {
     return newInstance(mStatement.whenDone(action));
-  }
-
-  @NotNull
-  public AsyncStatement<V> evaluate() {
-    mObserver.evaluate();
-    return mStatement;
   }
 
   public boolean cancel(final boolean mayInterruptIfRunning) {
@@ -180,12 +160,47 @@ class DefaultDeferredStatement<V> implements DeferredStatement<V> {
   }
 
   public V get() throws InterruptedException, ExecutionException {
-    return evaluate().get();
+    throw new UnsupportedOperationException();
   }
 
   public V get(final long timeout, @NotNull final TimeUnit timeUnit) throws InterruptedException,
       ExecutionException, TimeoutException {
-    return evaluate().get(timeout, timeUnit);
+    throw new UnsupportedOperationException();
+  }
+
+  @NotNull
+  public AsyncStatement<V> evaluate() {
+    return mStatement.evaluate();
+  }
+
+  @Nullable
+  public FailureException getFailure() {
+    throw new UnsupportedOperationException();
+  }
+
+  @Nullable
+  public FailureException getFailure(final long timeout, @NotNull final TimeUnit timeUnit) {
+    throw new UnsupportedOperationException();
+  }
+
+  public V getValue() {
+    throw new UnsupportedOperationException();
+  }
+
+  public V getValue(final long timeout, @NotNull final TimeUnit timeUnit) {
+    throw new UnsupportedOperationException();
+  }
+
+  public boolean isFinal() {
+    return mStatement.isFinal();
+  }
+
+  public void waitDone() {
+    throw new UnsupportedOperationException();
+  }
+
+  public boolean waitDone(final long timeout, @NotNull final TimeUnit timeUnit) {
+    throw new UnsupportedOperationException();
   }
 
   @NotNull
@@ -209,102 +224,43 @@ class DefaultDeferredStatement<V> implements DeferredStatement<V> {
     return mStatement.isSet();
   }
 
+  public void to(@NotNull final AsyncResult<? super V> result) {
+    throw new UnsupportedOperationException();
+  }
+
   public V value() {
     return mStatement.value();
   }
 
-  @Nullable
-  public FailureException getFailure() {
-    return evaluate().getFailure();
-  }
-
-  @Nullable
-  public FailureException getFailure(final long timeout, @NotNull final TimeUnit timeUnit) {
-    return evaluate().getFailure(timeout, timeUnit);
-  }
-
-  public V getValue() {
-    return evaluate().getValue();
-  }
-
-  public V getValue(final long timeout, @NotNull final TimeUnit timeUnit) {
-    return evaluate().getValue(timeout, timeUnit);
-  }
-
-  public boolean isFinal() {
-    return mStatement.isFinal();
-  }
-
-  public void to(@NotNull final AsyncResult<? super V> result) {
-    evaluate().to(result);
-  }
-
-  public void waitDone() {
-    mStatement.waitDone();
-  }
-
-  public boolean waitDone(final long timeout, @NotNull final TimeUnit timeUnit) {
-    return mStatement.waitDone(timeout, timeUnit);
-  }
-
   @NotNull
-  private <R> DeferredStatement<R> newInstance(@NotNull final AsyncStatement<R> statement) {
-    if (mAutoEvaluate) {
-      evaluate();
-    }
-
-    return new DefaultDeferredStatement<R>(mFactory, mObserver, statement, false);
+  private <R> DeclaredStatement<R> newInstance(@NotNull final AsyncStatement<R> statement) {
+    final AsyncStatement<R> newStatement = (mAutoEvaluate) ? statement.evaluate() : statement;
+    return new DefaultDeclaredStatement<R>(newStatement, false);
   }
 
-  private static class DeferredObserver<V> implements Observer<AsyncResult<V>>, Serializable {
+  private static class DeferredObserver<V>
+      implements RenewableObserver<AsyncResult<V>>, Serializable {
 
-    private final Object mMutex = new Object();
-
-    private transient boolean mAccepted;
-
-    private boolean mEvaluated;
-
-    private transient AsyncResult<V> mResult;
-
-    public void accept(final AsyncResult<V> result) throws Exception {
-      final AsyncResult<V> currentResult;
-      synchronized (mMutex) {
-        if (!mAccepted) {
-          mAccepted = true;
-          mResult = result;
-          currentResult = (mEvaluated) ? result : null;
-
-        } else {
-          currentResult = result;
-        }
-      }
-
-      if (currentResult != null) {
-        currentResult.set(null);
-      }
+    public void accept(final AsyncResult<V> result) {
     }
 
-    void evaluate() {
-      final AsyncResult<V> result;
-      synchronized (mMutex) {
-        if (!mEvaluated) {
-          mEvaluated = true;
-          result = mResult;
+    @NotNull
+    @SuppressWarnings("unchecked")
+    public NullObserver<V> renew() {
+      return (NullObserver<V>) NullObserver.sInstance;
+    }
+  }
 
-        } else {
-          result = null;
-        }
-      }
+  private static class NullObserver<V> implements Observer<AsyncResult<V>>, Serializable {
 
-      if (result != null) {
-        try {
-          result.set(null);
+    private static final NullObserver<?> sInstance = new NullObserver<Object>();
 
-        } catch (final Throwable t) {
-          RuntimeInterruptedException.throwIfInterrupt(t);
-          result.fail(t);
-        }
-      }
+    Object readResolve() throws ObjectStreamException {
+      return sInstance;
+    }
+
+    public void accept(final AsyncResult<V> result) {
+      result.set(null);
     }
   }
 }

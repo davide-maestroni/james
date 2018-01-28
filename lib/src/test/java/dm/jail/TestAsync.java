@@ -26,7 +26,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 
 import dm.jail.async.AsyncResult;
 import dm.jail.async.AsyncStatement;
-import dm.jail.async.DeferredStatement;
+import dm.jail.async.DeclaredStatement;
 import dm.jail.async.Mapper;
 import dm.jail.async.Observer;
 import dm.jail.executor.ScheduledExecutors;
@@ -47,36 +47,37 @@ public class TestAsync {
   }
 
   @Test
-  public void deferred() {
-    final DeferredStatement<Integer> deferredStatement =
-        new Async().deferred().then(new Mapper<Void, Integer>() {
+  public void declared() {
+    final DeclaredStatement<Integer> declaredStatement =
+        new Async().statementDeclaration().then(new Mapper<Void, Integer>() {
 
           public Integer apply(final Void ignored) {
             return 3;
           }
         });
-    assertThat(deferredStatement.isSet()).isFalse();
-    assertThat(deferredStatement.isDone()).isFalse();
-    final AsyncStatement<Integer> statement = deferredStatement.evaluate();
-    assertThat(deferredStatement.isSet()).isTrue();
+    assertThat(declaredStatement.isSet()).isFalse();
+    assertThat(declaredStatement.isDone()).isFalse();
+    final AsyncStatement<Integer> statement = declaredStatement.evaluate();
+    assertThat(declaredStatement.isSet()).isFalse();
+    assertThat(declaredStatement.isDone()).isFalse();
     assertThat(statement.isDone()).isTrue();
     assertThat(statement.getValue()).isEqualTo(3);
   }
 
   @Test
-  public void deferredReEvaluate() {
-    final DeferredStatement<Integer> deferredStatement =
-        new Async().deferred().then(new Mapper<Void, Integer>() {
+  public void declaredEvaluate() {
+    final DeclaredStatement<Integer> declaredStatement =
+        new Async().statementDeclaration().then(new Mapper<Void, Integer>() {
 
           public Integer apply(final Void ignored) {
             return 3;
           }
         });
-    assertThat(deferredStatement.isSet()).isFalse();
-    assertThat(deferredStatement.isDone()).isFalse();
-    final AsyncStatement<Integer> statement = deferredStatement.reEvaluate();
-    assertThat(deferredStatement.isSet()).isTrue();
-    assertThat(deferredStatement.getValue()).isEqualTo(3);
+    assertThat(declaredStatement.isSet()).isFalse();
+    assertThat(declaredStatement.isDone()).isFalse();
+    final AsyncStatement<Integer> statement = declaredStatement.evaluate();
+    assertThat(declaredStatement.isSet()).isFalse();
+    assertThat(declaredStatement.isDone()).isFalse();
     assertThat(statement.isDone()).isTrue();
     assertThat(statement.getValue()).isEqualTo(3);
   }
@@ -106,16 +107,12 @@ public class TestAsync {
   @Test
   public void logLevelDebug() {
     final TestLogPrinter logPrinter = new TestLogPrinter();
-    new Async().log(logPrinter)
-               .log(Level.DEBUG)
-               .value(null)
-               .then(new Mapper<Object, Object>() {
+    new Async().log(logPrinter).log(Level.DEBUG).value(null).then(new Mapper<Object, Object>() {
 
-                 public Object apply(final Object input) throws Exception {
-                   throw new Exception();
-                 }
-               })
-               .cancel(true);
+      public Object apply(final Object input) throws Exception {
+        throw new Exception();
+      }
+    }).cancel(true);
     assertThat(logPrinter.dbgCalled.get()).isTrue();
     assertThat(logPrinter.wrnCalled.get()).isTrue();
     assertThat(logPrinter.errCalled.get()).isTrue();
@@ -124,16 +121,12 @@ public class TestAsync {
   @Test
   public void logLevelError() {
     final TestLogPrinter logPrinter = new TestLogPrinter();
-    new Async().log(logPrinter)
-               .log(Level.ERROR)
-               .value(null)
-               .then(new Mapper<Object, Object>() {
+    new Async().log(logPrinter).log(Level.ERROR).value(null).then(new Mapper<Object, Object>() {
 
-                 public Object apply(final Object input) throws Exception {
-                   throw new Exception();
-                 }
-               })
-               .cancel(true);
+      public Object apply(final Object input) throws Exception {
+        throw new Exception();
+      }
+    }).cancel(true);
     assertThat(logPrinter.dbgCalled.get()).isFalse();
     assertThat(logPrinter.wrnCalled.get()).isFalse();
     assertThat(logPrinter.errCalled.get()).isTrue();
@@ -142,16 +135,12 @@ public class TestAsync {
   @Test
   public void logLevelSilent() {
     final TestLogPrinter logPrinter = new TestLogPrinter();
-    new Async().log(logPrinter)
-               .log(Level.SILENT)
-               .value(null)
-               .then(new Mapper<Object, Object>() {
+    new Async().log(logPrinter).log(Level.SILENT).value(null).then(new Mapper<Object, Object>() {
 
-                 public Object apply(final Object input) throws Exception {
-                   throw new Exception();
-                 }
-               })
-               .cancel(true);
+      public Object apply(final Object input) throws Exception {
+        throw new Exception();
+      }
+    }).cancel(true);
     assertThat(logPrinter.dbgCalled.get()).isFalse();
     assertThat(logPrinter.wrnCalled.get()).isFalse();
     assertThat(logPrinter.errCalled.get()).isFalse();
@@ -160,16 +149,12 @@ public class TestAsync {
   @Test
   public void logLevelWarning() {
     final TestLogPrinter logPrinter = new TestLogPrinter();
-    new Async().log(logPrinter)
-               .log(Level.WARNING)
-               .value(null)
-               .then(new Mapper<Object, Object>() {
+    new Async().log(logPrinter).log(Level.WARNING).value(null).then(new Mapper<Object, Object>() {
 
-                 public Object apply(final Object input) throws Exception {
-                   throw new Exception();
-                 }
-               })
-               .cancel(true);
+      public Object apply(final Object input) throws Exception {
+        throw new Exception();
+      }
+    }).cancel(true);
     assertThat(logPrinter.dbgCalled.get()).isFalse();
     assertThat(logPrinter.wrnCalled.get()).isTrue();
     assertThat(logPrinter.errCalled.get()).isTrue();

@@ -45,6 +45,9 @@ public interface AsyncStatement<V> extends AsyncState<V>, Future<V>, Serializabl
       @Nullable Class<?>... exceptionTypes);
 
   @NotNull
+  AsyncStatement<V> evaluate();
+
+  @NotNull
   <S> AsyncStatement<V> fork(
       @NotNull Forker<S, ? super AsyncStatement<V>, ? super V, ? super AsyncResult<V>> forker);
 
@@ -71,9 +74,6 @@ public interface AsyncStatement<V> extends AsyncState<V>, Future<V>, Serializabl
   AsyncStatement<V> on(@NotNull ScheduledExecutor executor);
 
   @NotNull
-  AsyncStatement<V> reEvaluate();
-
-  @NotNull
   <R> AsyncStatement<R> then(@NotNull Mapper<? super V, R> mapper);
 
   @NotNull
@@ -93,8 +93,6 @@ public interface AsyncStatement<V> extends AsyncState<V>, Future<V>, Serializabl
   @NotNull
   <R> AsyncStatement<R> thenTryIf(@NotNull Mapper<? super V, ? extends Closeable> closeable,
       @NotNull Mapper<? super V, ? extends AsyncStatement<R>> mapper);
-
-  void to(@NotNull AsyncResult<? super V> result);
 
   void waitDone();
 

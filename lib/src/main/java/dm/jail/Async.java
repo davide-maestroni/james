@@ -33,7 +33,7 @@ import dm.jail.async.AsyncResultCollection;
 import dm.jail.async.AsyncState;
 import dm.jail.async.AsyncStatement;
 import dm.jail.async.AsyncStatement.Forker;
-import dm.jail.async.DeferredStatement;
+import dm.jail.async.DeclaredStatement;
 import dm.jail.async.InterruptibleObserver;
 import dm.jail.async.Mapper;
 import dm.jail.async.Observer;
@@ -122,7 +122,7 @@ public class Async {
 
                        } else {
                          if (stack.forked == null) {
-                           stack.forked = statement.reEvaluate().fork(this);
+                           stack.forked = statement.evaluate().fork(this);
                          }
 
                          stack.forked.to(result);
@@ -143,11 +143,6 @@ public class Async {
                        return stack;
                      }
                    });
-  }
-
-  @NotNull
-  public DeferredStatement<Void> deferred() {
-    return new DefaultDeferredStatement<Void>(new StatementMapper(this));
   }
 
   @NotNull
@@ -211,6 +206,11 @@ public class Async {
     }
 
     return new DefaultAsyncStatement<V>(observer, mLogPrinter, mLogLevel);
+  }
+
+  @NotNull
+  public DeclaredStatement<Void> statementDeclaration() {
+    return new DefaultDeclaredStatement<Void>(new StatementMapper(this));
   }
 
   @NotNull

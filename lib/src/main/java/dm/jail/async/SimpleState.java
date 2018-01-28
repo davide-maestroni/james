@@ -77,6 +77,10 @@ public abstract class SimpleState<V> implements AsyncState<V> {
       return false;
     }
 
+    public void to(@NotNull final AsyncResult<? super V> result) {
+      result.fail(mFailure);
+    }
+
     public V value() {
       throw new IllegalStateException();
     }
@@ -111,6 +115,10 @@ public abstract class SimpleState<V> implements AsyncState<V> {
       return false;
     }
 
+    public void to(@NotNull final AsyncResult<? super V> result) {
+      throw new IllegalStateException();
+    }
+
     public V value() {
       throw new IllegalStateException();
     }
@@ -143,6 +151,10 @@ public abstract class SimpleState<V> implements AsyncState<V> {
 
     public boolean isSet() {
       return true;
+    }
+
+    public void to(@NotNull final AsyncResult<? super V> result) {
+      result.set(mValue);
     }
 
     public V value() {

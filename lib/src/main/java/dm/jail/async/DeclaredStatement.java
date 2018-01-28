@@ -27,65 +27,59 @@ import dm.jail.executor.ScheduledExecutor;
 /**
  * Created by davide-maestroni on 01/08/2018.
  */
-public interface DeferredStatement<V> extends AsyncStatement<V>, Serializable {
+public interface DeclaredStatement<V> extends AsyncStatement<V>, Serializable {
 
   @NotNull
-  DeferredStatement<V> autoEvaluate();
+  DeclaredStatement<V> autoEvaluate();
 
   @NotNull
-  DeferredStatement<V> elseCatch(@NotNull Mapper<? super Throwable, ? extends V> mapper,
+  DeclaredStatement<V> elseCatch(@NotNull Mapper<? super Throwable, ? extends V> mapper,
       @Nullable Class<?>[] exceptionTypes);
 
   @NotNull
-  DeferredStatement<V> elseDo(@NotNull Observer<? super Throwable> observer,
+  DeclaredStatement<V> elseDo(@NotNull Observer<? super Throwable> observer,
       @Nullable Class<?>[] exceptionTypes);
 
   @NotNull
-  DeferredStatement<V> elseIf(
+  DeclaredStatement<V> elseIf(
       @NotNull Mapper<? super Throwable, ? extends AsyncStatement<? extends V>> mapper,
       @Nullable Class<?>[] exceptionTypes);
 
   @NotNull
-  <S> DeferredStatement<V> fork(
+  <S> DeclaredStatement<V> fork(
       @NotNull Forker<S, ? super AsyncStatement<V>, ? super V, ? super AsyncResult<V>> forker);
 
   @NotNull
-  <S> DeferredStatement<V> fork(@Nullable Mapper<? super AsyncStatement<V>, S> init,
+  <S> DeclaredStatement<V> fork(@Nullable Mapper<? super AsyncStatement<V>, S> init,
       @Nullable ForkUpdater<S, ? super AsyncStatement<V>, ? super V> value,
       @Nullable ForkUpdater<S, ? super AsyncStatement<V>, ? super Throwable> failure,
       @Nullable ForkCompleter<S, ? super AsyncStatement<V>> done,
       @Nullable ForkUpdater<S, ? super AsyncStatement<V>, ? super AsyncResult<V>> statement);
 
   @NotNull
-  DeferredStatement<V> on(@NotNull ScheduledExecutor executor);
+  DeclaredStatement<V> on(@NotNull ScheduledExecutor executor);
 
   @NotNull
-  AsyncStatement<V> reEvaluate();
+  <R> DeclaredStatement<R> then(@NotNull Mapper<? super V, R> mapper);
 
   @NotNull
-  <R> DeferredStatement<R> then(@NotNull Mapper<? super V, R> mapper);
+  DeclaredStatement<V> thenDo(@NotNull Observer<? super V> observer);
 
   @NotNull
-  DeferredStatement<V> thenDo(@NotNull Observer<? super V> observer);
+  <R> DeclaredStatement<R> thenIf(@NotNull Mapper<? super V, ? extends AsyncStatement<R>> mapper);
 
   @NotNull
-  <R> DeferredStatement<R> thenIf(@NotNull Mapper<? super V, ? extends AsyncStatement<R>> mapper);
-
-  @NotNull
-  <R> DeferredStatement<R> thenTry(@NotNull Mapper<? super V, ? extends Closeable> closeable,
+  <R> DeclaredStatement<R> thenTry(@NotNull Mapper<? super V, ? extends Closeable> closeable,
       @NotNull Mapper<? super V, R> mapper);
 
   @NotNull
-  DeferredStatement<V> thenTryDo(@NotNull Mapper<? super V, ? extends Closeable> closeable,
+  DeclaredStatement<V> thenTryDo(@NotNull Mapper<? super V, ? extends Closeable> closeable,
       @NotNull Observer<? super V> observer);
 
   @NotNull
-  <R> DeferredStatement<R> thenTryIf(@NotNull Mapper<? super V, ? extends Closeable> closeable,
+  <R> DeclaredStatement<R> thenTryIf(@NotNull Mapper<? super V, ? extends Closeable> closeable,
       @NotNull Mapper<? super V, ? extends AsyncStatement<R>> mapper);
 
   @NotNull
-  DeferredStatement<V> whenDone(@NotNull Action action);
-
-  @NotNull
-  AsyncStatement<V> evaluate();
+  DeclaredStatement<V> whenDone(@NotNull Action action);
 }

@@ -67,6 +67,8 @@ class DefaultAsyncStatement<V> implements AsyncStatement<V>, Serializable {
 
   private final ChainHead<?> mHead;
 
+  private final boolean mIsFork;
+
   private final Logger mLogger;
 
   private final Object mMutex;
@@ -91,6 +93,7 @@ class DefaultAsyncStatement<V> implements AsyncStatement<V>, Serializable {
     // forking
     mObserver = (Observer<AsyncResult<?>>) ConstantConditions.notNull("observer", observer);
     mExecutor = ConstantConditions.notNull("executor", executor);
+    mIsFork = (observer instanceof ForkObserver);
     mLogger = Logger.newLogger(printer, level, this);
     final ChainHead<V> head = new ChainHead<V>();
     head.setLogger(mLogger);
@@ -115,6 +118,7 @@ class DefaultAsyncStatement<V> implements AsyncStatement<V>, Serializable {
     // serialization
     mObserver = observer;
     mExecutor = executor;
+    mIsFork = (observer instanceof ForkObserver);
     mLogger = Logger.newLogger(printer, level, this);
     mMutex = head.getMutex();
     mHead = head;
@@ -143,6 +147,7 @@ class DefaultAsyncStatement<V> implements AsyncStatement<V>, Serializable {
     // chaining
     mObserver = observer;
     mExecutor = executor;
+    mIsFork = (observer instanceof ForkObserver);
     mLogger = logger;
     mMutex = head.getMutex();
     mHead = head;
@@ -158,6 +163,7 @@ class DefaultAsyncStatement<V> implements AsyncStatement<V>, Serializable {
     // copy
     mObserver = observer;
     mExecutor = executor;
+    mIsFork = (observer instanceof ForkObserver);
     mLogger = logger;
     mMutex = head.getMutex();
     mHead = head;
@@ -170,6 +176,13 @@ class DefaultAsyncStatement<V> implements AsyncStatement<V>, Serializable {
       RuntimeInterruptedException.throwIfInterrupt(t);
       head.fail(t);
     }
+  }
+
+  @NotNull
+  private static Class<?>[] cloneExceptionTypes(@Nullable final Class<?>... exceptionTypes) {
+    // TODO: 28/01/2018 null => NO_EXCEPTION ??
+    return ((exceptionTypes != null) && (exceptionTypes.length > 0)) ? exceptionTypes.clone()
+        : ANY_EXCEPTION;
   }
 
   private static void close(@Nullable final Closeable closeable,
@@ -187,15 +200,9 @@ class DefaultAsyncStatement<V> implements AsyncStatement<V>, Serializable {
     }
   }
 
-  @NotNull
-  private static Class<?>[] safeExceptionTypes(@Nullable final Class<?>... exceptionTypes) {
-    return ((exceptionTypes != null) && (exceptionTypes.length > 0)) ? exceptionTypes.clone()
-        : ANY_EXCEPTION;
-  }
-
   public boolean cancel(final boolean mayInterruptIfRunning) {
     final Observer<? extends AsyncResult<?>> observer = mObserver;
-    if (observer instanceof ForkObserver) {
+    if (mIsFork) {
       if (((ForkObserver<?, ?>) observer).cancel(mayInterruptIfRunning)) {
         return true;
       }
@@ -296,6 +303,27 @@ class DefaultAsyncStatement<V> implements AsyncStatement<V>, Serializable {
   }
 
   @NotNull
+  @SuppressWarnings("unchecked")
+  public AsyncStatement<V> evaluate() {
+    final Logger logger = mLogger;
+    final ChainHead<?> head = mHead;
+    final ChainHead<?> newHead = head.copy();
+    newHead.setLogger(logger);
+    StatementChain<?, ?> newTail = newHead;
+    StatementChain<?, ?> next = head;
+    while (next != mTail) {
+      next = next.mNext;
+      StatementChain<?, ?> chain = next.copy();
+      chain.setLogger(logger);
+      ((StatementChain<?, Object>) newTail).setNext((StatementChain<Object, ?>) chain);
+      newTail = chain;
+    }
+
+    return new DefaultAsyncStatement<V>(renewObserver(), mExecutor, logger, newHead,
+        (StatementChain<?, V>) newTail);
+  }
+
+  @NotNull
   public <S> AsyncStatement<V> fork(
       @NotNull final Forker<S, ? super AsyncStatement<V>, ? super V, ? super AsyncResult<V>>
           forker) {
@@ -320,6 +348,7 @@ class DefaultAsyncStatement<V> implements AsyncStatement<V>, Serializable {
 
   @Nullable
   public FailureException getFailure(final long timeout, @NotNull final TimeUnit timeUnit) {
+    checkSupported();
     deadLockWarning(timeout);
     final ChainHead<?> head = mHead;
     synchronized (mMutex) {
@@ -327,7 +356,7 @@ class DefaultAsyncStatement<V> implements AsyncStatement<V>, Serializable {
         if (TimeUnits.waitUntil(mMutex, new Condition() {
 
           public boolean isTrue() {
-            checkCanGet();
+            checkFinal();
             return head.getState().isDone();
           }
         }, timeout, timeUnit)) {
@@ -349,6 +378,7 @@ class DefaultAsyncStatement<V> implements AsyncStatement<V>, Serializable {
 
   @SuppressWarnings("unchecked")
   public V getValue(final long timeout, @NotNull final TimeUnit timeUnit) {
+    checkSupported();
     deadLockWarning(timeout);
     final ChainHead<?> head = mHead;
     synchronized (mMutex) {
@@ -356,7 +386,7 @@ class DefaultAsyncStatement<V> implements AsyncStatement<V>, Serializable {
         if (TimeUnits.waitUntil(mMutex, new Condition() {
 
           public boolean isTrue() {
-            checkCanGet();
+            checkFinal();
             return head.getState().isDone();
           }
         }, timeout, timeUnit)) {
@@ -381,27 +411,6 @@ class DefaultAsyncStatement<V> implements AsyncStatement<V>, Serializable {
   @NotNull
   public AsyncStatement<V> on(@NotNull final ScheduledExecutor executor) {
     return chain(new ChainHandler<V, V>(new ExecutorHandler<V>(executor)), mExecutor, executor);
-  }
-
-  @NotNull
-  @SuppressWarnings("unchecked")
-  public AsyncStatement<V> reEvaluate() {
-    final Logger logger = mLogger;
-    final ChainHead<?> head = mHead;
-    final ChainHead<?> newHead = head.copy();
-    newHead.setLogger(logger);
-    StatementChain<?, ?> newTail = newHead;
-    StatementChain<?, ?> next = head;
-    while (next != mTail) {
-      next = next.mNext;
-      StatementChain<?, ?> chain = next.copy();
-      chain.setLogger(logger);
-      ((StatementChain<?, Object>) newTail).setNext((StatementChain<Object, ?>) chain);
-      newTail = chain;
-    }
-
-    return new DefaultAsyncStatement<V>(renewObserver(), mExecutor, logger, newHead,
-        (StatementChain<?, V>) newTail);
   }
 
   @NotNull
@@ -449,28 +458,12 @@ class DefaultAsyncStatement<V> implements AsyncStatement<V>, Serializable {
         new TryIfHandler<V, R>(closeable, mapper, logger.getLogPrinter(), logger.getLogLevel()));
   }
 
-  public void to(@NotNull final AsyncResult<? super V> result) {
-    ConstantConditions.notNull("result", result);
-    then(new Mapper<V, Void>() {
-
-      public Void apply(final V value) {
-        result.set(value);
-        return null;
-      }
-    }).elseCatch(new Mapper<Throwable, Void>() {
-
-      public Void apply(final Throwable failure) {
-        result.fail(failure);
-        return null;
-      }
-    });
-  }
-
   public void waitDone() {
     waitDone(-1, TimeUnit.MILLISECONDS);
   }
 
   public boolean waitDone(final long timeout, @NotNull final TimeUnit timeUnit) {
+    checkSupported();
     deadLockWarning(timeout);
     @SuppressWarnings("UnnecessaryLocalVariable") final ChainHead<?> head = mHead;
     synchronized (mMutex) {
@@ -534,6 +527,23 @@ class DefaultAsyncStatement<V> implements AsyncStatement<V>, Serializable {
     }
   }
 
+  public void to(@NotNull final AsyncResult<? super V> result) {
+    ConstantConditions.notNull("result", result);
+    then(new Mapper<V, Void>() {
+
+      public Void apply(final V value) {
+        result.set(value);
+        return null;
+      }
+    }).elseCatch(new Mapper<Throwable, Void>() {
+
+      public Void apply(final Throwable failure) {
+        result.fail(failure);
+        return null;
+      }
+    });
+  }
+
   @SuppressWarnings("unchecked")
   public V value() {
     synchronized (mMutex) {
@@ -559,7 +569,7 @@ class DefaultAsyncStatement<V> implements AsyncStatement<V>, Serializable {
     final Logger logger = mLogger;
     final Runnable chaining;
     final Observer<? extends AsyncResult<?>> observer = mObserver;
-    if (observer instanceof ForkObserver) {
+    if (mIsFork) {
       final AsyncStatement<R> forked =
           new DefaultAsyncStatement<V>(((ForkObserver<?, V>) observer).newObserver(),
               logger.getLogPrinter(), logger.getLogLevel()).chain(chain, chainExecutor,
@@ -591,13 +601,15 @@ class DefaultAsyncStatement<V> implements AsyncStatement<V>, Serializable {
     return statement;
   }
 
-  private void checkCanGet() {
+  private void checkFinal() {
     if (mChain != null) {
       throw new IllegalStateException("the statement is not final");
     }
+  }
 
-    if (mObserver instanceof ForkObserver) {
-      throw new IllegalStateException("the statement has been forked");
+  private void checkSupported() {
+    if (mIsFork) {
+      throw new UnsupportedOperationException("the statement has been forked");
     }
   }
 
@@ -655,12 +667,6 @@ class DefaultAsyncStatement<V> implements AsyncStatement<V>, Serializable {
     public boolean isDone() {
       return mIsDone;
     }
-  }
-
-  private interface RenewableObserver<V> extends Observer<V> {
-
-    @NotNull
-    Observer<V> renew();
   }
 
   private static class ChainForkObserver<S, V>
@@ -936,7 +942,7 @@ class DefaultAsyncStatement<V> implements AsyncStatement<V>, Serializable {
     private ElseCatchHandler(@NotNull final Mapper<? super Throwable, ? extends V> mapper,
         @Nullable final Class<?>[] exceptionTypes) {
       mMapper = ConstantConditions.notNull("mapper", mapper);
-      mTypes = safeExceptionTypes(exceptionTypes);
+      mTypes = cloneExceptionTypes(exceptionTypes);
       if (Arrays.asList(mTypes).contains(null)) {
         throw new NullPointerException("exception type array contains null values");
       }
@@ -989,7 +995,7 @@ class DefaultAsyncStatement<V> implements AsyncStatement<V>, Serializable {
     private ElseDoHandler(@NotNull final Observer<? super Throwable> observer,
         @Nullable final Class<?>[] exceptionTypes) {
       mObserver = ConstantConditions.notNull("observer", observer);
-      mTypes = safeExceptionTypes(exceptionTypes);
+      mTypes = cloneExceptionTypes(exceptionTypes);
       if (Arrays.asList(mTypes).contains(null)) {
         throw new NullPointerException("exception type array contains null values");
       }
@@ -1041,7 +1047,7 @@ class DefaultAsyncStatement<V> implements AsyncStatement<V>, Serializable {
         @NotNull final Mapper<? super Throwable, ? extends AsyncStatement<? extends V>> mapper,
         @Nullable final Class<?>[] exceptionTypes) {
       mMapper = ConstantConditions.notNull("mapper", mapper);
-      mTypes = safeExceptionTypes(exceptionTypes);
+      mTypes = cloneExceptionTypes(exceptionTypes);
       if (Arrays.asList(mTypes).contains(null)) {
         throw new NullPointerException("exception type array contains null values");
       }
@@ -1213,7 +1219,7 @@ class DefaultAsyncStatement<V> implements AsyncStatement<V>, Serializable {
 
     @NotNull
     public ForkObserver<S, V> renew() {
-      return new ForkObserver<S, V>(mStatement.reEvaluate(), mForker);
+      return new ForkObserver<S, V>(mStatement.evaluate(), mForker);
     }
 
     public void accept(final AsyncResult<V> result) {

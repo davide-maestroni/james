@@ -14,29 +14,17 @@
  * limitations under the License.
  */
 
-package dm.jail.async;
+package dm.jail;
 
 import org.jetbrains.annotations.NotNull;
 
-import java.io.Serializable;
+import dm.jail.async.Observer;
 
 /**
- * Created by davide-maestroni on 01/09/2018.
+ * Created by davide-maestroni on 01/28/2018.
  */
-public interface AsyncState<V> extends Serializable {
+interface RenewableObserver<V> extends Observer<V> {
 
   @NotNull
-  Throwable failure();
-
-  boolean isCancelled();
-
-  boolean isEvaluating();
-
-  boolean isFailed();
-
-  boolean isSet();
-
-  void to(@NotNull AsyncResult<? super V> result);
-
-  V value();
+  Observer<V> renew();
 }
