@@ -339,6 +339,7 @@ public class ScheduledExecutors {
 
     private static class ExecutorProxy implements Serializable {
 
+      @NotNull
       Object readResolve() throws ObjectStreamException {
         return backgroundExecutor();
       }
@@ -360,6 +361,7 @@ public class ScheduledExecutors {
 
     private static class ExecutorProxy implements Serializable {
 
+      @NotNull
       Object readResolve() throws ObjectStreamException {
         return defaultExecutor();
       }
@@ -402,6 +404,7 @@ public class ScheduledExecutors {
 
     private static class ExecutorProxy implements Serializable {
 
+      @NotNull
       Object readResolve() throws ObjectStreamException {
         return foregroundExecutor();
       }
@@ -435,6 +438,7 @@ public class ScheduledExecutors {
         mPoolSize = poolSize;
       }
 
+      @NotNull
       Object readResolve() throws ObjectStreamException {
         return (mPoolSize == Integer.MIN_VALUE) ? new ScheduledExecutors.PoolExecutor()
             : new ScheduledExecutors.PoolExecutor(mPoolSize);

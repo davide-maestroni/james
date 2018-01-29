@@ -260,6 +260,7 @@ class DefaultDeclaredStatement<V> implements DeclaredStatement<V> {
 
     private static final NullObserver<?> sInstance = new NullObserver<Object>();
 
+    @NotNull
     Object readResolve() throws ObjectStreamException {
       return sInstance;
     }

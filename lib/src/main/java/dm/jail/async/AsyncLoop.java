@@ -33,101 +33,108 @@ import dm.jail.executor.ScheduledExecutor;
 public interface AsyncLoop<V> extends AsyncStatement<Iterable<V>>, Serializable {
 
   @NotNull
+  <S> AsyncLoop<V> backoffOn(@NotNull ScheduledExecutor executor,
+      @NotNull Backoffer<S, V> backoffer);
+
+  @NotNull
+  <S> AsyncLoop<V> backoffOn(@NotNull ScheduledExecutor executor, @Nullable Provider<S> init,
+      @Nullable LoopUpdater<S, ? super V, ? super PendingState> value,
+      @Nullable LoopUpdater<S, ? super Throwable, ? super PendingState> failure,
+      @Nullable LoopCompleter<S, ? super PendingState> done);
+
+  @NotNull
   AsyncLoop<V> evaluate();
-
-  @NotNull
-  <S> AsyncLoop<V> fork(
-      @NotNull Forker<S, ? super AsyncStatement<Iterable<V>>, ? super Iterable<V>, ? super
-          AsyncResult<Iterable<V>>> forker);
-
-  @NotNull
-  <S> AsyncLoop<V> fork(@Nullable Mapper<? super AsyncStatement<Iterable<V>>, S> init,
-      @Nullable ForkUpdater<S, ? super AsyncStatement<Iterable<V>>, ? super Iterable<V>> value,
-      @Nullable ForkUpdater<S, ? super AsyncStatement<Iterable<V>>, ? super Throwable> failure,
-      @Nullable ForkCompleter<S, ? super AsyncStatement<Iterable<V>>> done,
-      @Nullable ForkUpdater<S, ? super AsyncStatement<Iterable<V>>, ? super
-          AsyncResult<Iterable<V>>> statement);
 
   @NotNull
   AsyncLoop<V> on(@NotNull ScheduledExecutor executor);
 
   @NotNull
-  <R> AsyncLoop<R> forEach(@NotNull Mapper<V, R> mapper);
-  // TODO: 16/01/2018 ordered?
+  <R> AsyncLoop<R> forEach(@NotNull Mapper<? super V, R> mapper);
 
   @NotNull
-  AsyncLoop<V> forEachCatch(@NotNull Mapper<Throwable, V> mapper);
+  AsyncLoop<V> forEachCatch(@NotNull Mapper<? super Throwable, V> mapper);
 
   @NotNull
-  AsyncLoop<V> forEachDo(@NotNull Observer<V> observer);
-  // TODO: 16/01/2018 ordered?
+  AsyncLoop<V> forEachDo(@NotNull Observer<? super V> observer);
 
   @NotNull
-  AsyncLoop<V> forEachElseDo(@NotNull Observer<Throwable> observer);
-  // TODO: 16/01/2018 ordered?
+  AsyncLoop<V> forEachElseDo(@NotNull Observer<? super Throwable> observer);
 
   @NotNull
-  AsyncLoop<V> forEachElseIf(@NotNull Mapper<Throwable, AsyncStatement<V>> mapper);
+  AsyncLoop<V> forEachElseIf(
+      @NotNull Mapper<? super Throwable, ? extends AsyncStatement<? extends V>> mapper);
 
   @NotNull
-  AsyncLoop<V> forEachElseLoop(@NotNull Mapper<Throwable, Iterable<V>> mapper);
-  // TODO: 16/01/2018 ordered?
+  AsyncLoop<V> forEachElseIfOrdered(
+      @NotNull Mapper<? super Throwable, ? extends AsyncStatement<? extends V>> mapper);
 
   @NotNull
-  AsyncLoop<V> forEachElseLoopIf(@NotNull Mapper<Throwable, AsyncLoop<V>> mapper);
+  AsyncLoop<V> forEachElseLoop(
+      @NotNull Mapper<? super Throwable, ? extends Iterable<? extends V>> mapper);
 
   @NotNull
-  <R> AsyncLoop<R> forEachIf(@NotNull Mapper<V, AsyncStatement<R>> mapper);
+  AsyncLoop<V> forEachElseLoopIf(
+      @NotNull Mapper<? super Throwable, ? extends AsyncLoop<? extends V>> mapper);
 
   @NotNull
-  <R> AsyncLoop<R> forEachLoop(@NotNull Mapper<V, Iterable<R>> mapper);
-  // TODO: 16/01/2018 ordered?
+  AsyncLoop<V> forEachElseLoopIfOrdered(
+      @NotNull Mapper<? super Throwable, ? extends AsyncLoop<? extends V>> mapper);
 
   @NotNull
-  <R> AsyncLoop<R> forEachLoopIf(@NotNull Mapper<V, AsyncLoop<R>> mapper);
+  <R> AsyncLoop<R> forEachIf(@NotNull Mapper<? super V, ? extends AsyncStatement<R>> mapper);
 
   @NotNull
-  <R> AsyncLoop<R> forEachTry(@NotNull Mapper<V, Closeable> closeable,
-      @NotNull Mapper<V, R> mapper);
-  // TODO: 16/01/2018 ordered?
+  <R> AsyncLoop<R> forEachIfOrdered(@NotNull Mapper<? super V, ? extends AsyncStatement<R>> mapper);
 
   @NotNull
-  AsyncLoop<V> forEachTryDo(@NotNull Mapper<V, Closeable> closeable, @NotNull Observer<V> observer);
-  // TODO: 16/01/2018 ordered?
+  <R> AsyncLoop<R> forEachLoop(@NotNull Mapper<? super V, ? extends Iterable<R>> mapper);
 
   @NotNull
-  <R> AsyncLoop<R> forEachTryIf(@NotNull Mapper<V, Closeable> closeable,
-      @NotNull Mapper<V, AsyncStatement<R>> mapper);
-  // TODO: 16/01/2018 ordered?
+  <R> AsyncLoop<R> forEachLoopIf(@NotNull Mapper<? super V, ? extends AsyncLoop<R>> mapper);
 
   @NotNull
-  <R> AsyncLoop<R> forEachTryLoop(@NotNull Mapper<V, Closeable> closeable,
-      @NotNull Mapper<V, Iterable<R>> mapper);
-  // TODO: 16/01/2018 ordered?
+  <R> AsyncLoop<R> forEachLoopIfOrdered(@NotNull Mapper<? super V, ? extends AsyncLoop<R>> mapper);
 
   @NotNull
-  <R> AsyncLoop<R> forEachTryLoopIf(@NotNull Mapper<V, Closeable> closeable,
-      @NotNull Mapper<V, AsyncLoop<R>> mapper);
-  // TODO: 16/01/2018 ordered?
+  <R> AsyncLoop<R> forEachTry(@NotNull Mapper<? super V, ? extends Closeable> closeable,
+      @NotNull Mapper<? super V, R> mapper);
 
   @NotNull
-  <R, S> AsyncLoop<R> forEachTryYield(@NotNull Mapper<V, Closeable> closeable,
-      @NotNull Looper<S, V, R> looper);
+  AsyncLoop<V> forEachTryDo(@NotNull Mapper<? super V, ? extends Closeable> closeable,
+      @NotNull Observer<? super V> observer);
 
   @NotNull
-  <R, S> AsyncLoop<R> forEachTryYield(@NotNull Mapper<V, Closeable> closeable,
-      @Nullable Provider<S> init, @Nullable Mapper<S, Boolean> loop,
-      @Nullable LoopUpdater<S, V, R> value, @Nullable LoopUpdater<S, Throwable, R> failure,
-      @Nullable LoopCompleter<S, R> complete);
+  <R> AsyncLoop<R> forEachTryIf(@NotNull Mapper<? super V, ? extends Closeable> closeable,
+      @NotNull Mapper<? super V, ? extends AsyncStatement<R>> mapper);
 
   @NotNull
-  <R, S> AsyncLoop<R> forEachYield(@NotNull Looper<S, V, R> looper);
-  // TODO: 16/01/2018 ordered?
+  <R> AsyncLoop<R> forEachTryIfOrdered(@NotNull Mapper<? super V, ? extends Closeable> closeable,
+      @NotNull Mapper<? super V, ? extends AsyncStatement<R>> mapper);
 
   @NotNull
-  <R, S> AsyncLoop<R> forEachYield(@Nullable Provider<S> init, @Nullable Mapper<S, Boolean> loop,
-      @Nullable LoopUpdater<S, V, R> value, @Nullable LoopUpdater<S, Throwable, R> failure,
-      @Nullable LoopCompleter<S, R> complete);
+  <R> AsyncLoop<R> forEachTryLoop(@NotNull Mapper<? super V, ? extends Closeable> closeable,
+      @NotNull Mapper<? super V, ? extends Iterable<R>> mapper);
+
+  @NotNull
+  <R> AsyncLoop<R> forEachTryLoopIf(@NotNull Mapper<? super V, ? extends Closeable> closeable,
+      @NotNull Mapper<? super V, ? extends AsyncLoop<R>> mapper);
+
+  @NotNull
+  <R> AsyncLoop<R> forEachTryLoopIfOrdered(
+      @NotNull Mapper<? super V, ? extends Closeable> closeable,
+      @NotNull Mapper<? super V, ? extends AsyncLoop<R>> mapper);
+
+  @NotNull
+  <S> AsyncLoop<V> forkLoop(
+      @NotNull Forker<S, ? super AsyncLoop<V>, ? super Iterable<V>, ? super
+          AsyncResultCollection<V>> forker);
+
+  @NotNull
+  <S> AsyncLoop<V> forkLoop(@Nullable Mapper<? super AsyncLoop<V>, S> init,
+      @Nullable ForkUpdater<S, ? super AsyncLoop<V>, ? super V> value,
+      @Nullable ForkUpdater<S, ? super AsyncLoop<V>, ? super Throwable> failure,
+      @Nullable ForkCompleter<S, ? super AsyncLoop<V>> done,
+      @Nullable ForkUpdater<S, ? super AsyncLoop<V>, ? super AsyncResultCollection<V>> statement);
 
   @NotNull
   AsyncLoop<V> parallelOn(@NotNull ScheduledExecutor executor);
@@ -167,10 +174,62 @@ public interface AsyncLoop<V> extends AsyncStatement<Iterable<V>>, Serializable 
   @NotNull
   Iterator<V> valueIterator(long timeout, @NotNull TimeUnit timeUnit);
 
+  @NotNull
+  <R, S> AsyncLoop<R> yield(@NotNull Looper<S, ? super V, R> looper);
+
+  @NotNull
+  <R, S> AsyncLoop<R> yield(@Nullable Provider<S> init, @Nullable Mapper<S, ? extends Boolean> loop,
+      @Nullable LoopUpdater<S, ? super V, ? super Generator<R>> value,
+      @Nullable LoopUpdater<S, ? super Throwable, ? super Generator<R>> failure,
+      @Nullable LoopCompleter<S, ? super Generator<R>> done);
+
+  @NotNull
+  <R, S> AsyncLoop<R> yieldOrdered(@NotNull Looper<S, ? super V, R> looper);
+
+  @NotNull
+  <R, S> AsyncLoop<R> yieldOrdered(@Nullable Provider<S> init,
+      @Nullable Mapper<S, ? extends Boolean> loop,
+      @Nullable LoopUpdater<S, ? super V, ? super Generator<R>> value,
+      @Nullable LoopUpdater<S, ? super Throwable, ? super Generator<R>> failure,
+      @Nullable LoopCompleter<S, ? super Generator<R>> done);
+
+  @NotNull
+  <R, S> AsyncLoop<R> yieldTry(@NotNull Mapper<? super V, ? extends Closeable> closeable,
+      @NotNull Looper<S, ? super V, R> looper);
+
+  @NotNull
+  <R, S> AsyncLoop<R> yieldTry(@NotNull Mapper<? super V, ? extends Closeable> closeable,
+      @Nullable Provider<S> init, @Nullable Mapper<S, ? extends Boolean> loop,
+      @Nullable LoopUpdater<S, ? super V, ? super Generator<R>> value,
+      @Nullable LoopUpdater<S, ? super Throwable, ? super Generator<R>> failure,
+      @Nullable LoopCompleter<S, ? super Generator<R>> done);
+
+  @NotNull
+  <R, S> AsyncLoop<R> yieldTryOrdered(@NotNull Mapper<? super V, ? extends Closeable> closeable,
+      @NotNull Looper<S, ? super V, R> looper);
+
+  @NotNull
+  <R, S> AsyncLoop<R> yieldTryOrdered(@NotNull Mapper<? super V, ? extends Closeable> closeable,
+      @Nullable Provider<S> init, @Nullable Mapper<S, ? extends Boolean> loop,
+      @Nullable LoopUpdater<S, ? super V, ? super Generator<R>> value,
+      @Nullable LoopUpdater<S, ? super Throwable, ? super Generator<R>> failure,
+      @Nullable LoopCompleter<S, ? super Generator<R>> done);
+
+  interface Backoffer<S, V> {
+
+    void done(S stack, @NotNull PendingState state);
+
+    S failure(S stack, @NotNull Throwable failure, @NotNull PendingState state);
+
+    S init();
+
+    S value(S stack, V value, @NotNull PendingState state);
+  }
+
   interface Generator<V> {
 
     @NotNull
-    Generator<V> yieldFailure(Throwable failure);
+    Generator<V> yieldFailure(@NotNull Throwable failure);
 
     @NotNull
     Generator<V> yieldFailures(@Nullable Iterable<Throwable> failures);
@@ -190,24 +249,37 @@ public interface AsyncLoop<V> extends AsyncStatement<Iterable<V>>, Serializable 
 
   interface LoopCompleter<S, R> {
 
-    void complete(S stack, Generator<R> generator);
+    void complete(S stack, @NotNull R state);
   }
 
   interface LoopUpdater<S, V, R> {
 
-    S update(S stack, V value, Generator<R> generator);
+    S update(S stack, V value, @NotNull R state);
   }
 
   interface Looper<S, V, R> {
 
-    void done(S stack, Generator<R> generator);
+    void done(S stack, @NotNull Generator<R> generator);
 
-    S failure(S stack, Throwable failure, Generator<R> generator);
+    S failure(S stack, @NotNull Throwable failure, @NotNull Generator<R> generator);
 
     S init();
 
     boolean loop(S stack);
 
-    S value(S stack, V value, Generator<R> generator);
+    S value(S stack, V value, @NotNull Generator<R> generator);
+  }
+
+  interface PendingState {
+
+    int pendingOps();
+
+    int pendingTasks();
+
+    void wait(long time, @NotNull TimeUnit timeUnit);
+
+    boolean waitOps(int pendingOps, long time, @NotNull TimeUnit timeUnit);
+
+    boolean waitTasks(int pendingTasks, long time, @NotNull TimeUnit timeUnit);
   }
 }

@@ -721,6 +721,7 @@ class DefaultAsyncStatement<V> implements AsyncStatement<V>, Serializable {
         mObserver = observer;
       }
 
+      @NotNull
       Object readResolve() throws ObjectStreamException {
         try {
           final ForkObserver<S, V> observer = mObserver;
@@ -753,17 +754,18 @@ class DefaultAsyncStatement<V> implements AsyncStatement<V>, Serializable {
       return new ChainProxy<V, R>(mHandler);
     }
 
-    private static class ChainProxy<V, R> extends SerializableProxy {
+    private static class ChainProxy<V, R> implements Serializable {
 
-      private ChainProxy(AsyncStatementHandler<V, R> handler) {
-        super(handler);
+      private final AsyncStatementHandler<V, R> mHandler;
+
+      private ChainProxy(@NotNull final AsyncStatementHandler<V, R> handler) {
+        mHandler = handler;
       }
 
-      @SuppressWarnings("unchecked")
+      @NotNull
       Object readResolve() throws ObjectStreamException {
         try {
-          final Object[] args = deserializeArgs();
-          return new ChainHandler<V, R>((AsyncStatementHandler<V, R>) args[0]);
+          return new ChainHandler<V, R>(mHandler);
 
         } catch (final Throwable t) {
           throw new InvalidObjectException(t.getMessage());
@@ -1029,11 +1031,12 @@ class DefaultAsyncStatement<V> implements AsyncStatement<V>, Serializable {
 
     private static class HandlerProxy<V> extends SerializableProxy {
 
-      private HandlerProxy(Mapper<? super Throwable, ? extends V> mapper,
-          Class<?>[] exceptionTypes) {
+      private HandlerProxy(final Mapper<? super Throwable, ? extends V> mapper,
+          final Class<?>[] exceptionTypes) {
         super(proxy(mapper), exceptionTypes);
       }
 
+      @NotNull
       @SuppressWarnings("unchecked")
       Object readResolve() throws ObjectStreamException {
         try {
@@ -1070,10 +1073,12 @@ class DefaultAsyncStatement<V> implements AsyncStatement<V>, Serializable {
 
     private static class HandlerProxy<V> extends SerializableProxy {
 
-      private HandlerProxy(Observer<? super Throwable> observer, Class<?>[] exceptionTypes) {
+      private HandlerProxy(final Observer<? super Throwable> observer,
+          final Class<?>[] exceptionTypes) {
         super(proxy(observer), exceptionTypes);
       }
 
+      @NotNull
       @SuppressWarnings("unchecked")
       Object readResolve() throws ObjectStreamException {
         try {
@@ -1122,11 +1127,13 @@ class DefaultAsyncStatement<V> implements AsyncStatement<V>, Serializable {
 
     private static class HandlerProxy<V> extends SerializableProxy {
 
-      private HandlerProxy(Mapper<? super Throwable, ? extends AsyncStatement<? extends V>> mapper,
-          Class<?>[] exceptionTypes) {
+      private HandlerProxy(
+          final Mapper<? super Throwable, ? extends AsyncStatement<? extends V>> mapper,
+          final Class<?>[] exceptionTypes) {
         super(proxy(mapper), exceptionTypes);
       }
 
+      @NotNull
       @SuppressWarnings("unchecked")
       Object readResolve() throws ObjectStreamException {
         try {
@@ -1267,11 +1274,12 @@ class DefaultAsyncStatement<V> implements AsyncStatement<V>, Serializable {
 
     private static class ObserverProxy<S, V> extends SerializableProxy {
 
-      private ObserverProxy(AsyncStatement<V> statement,
-          Forker<S, ? super AsyncStatement<V>, ? super V, ? super AsyncResult<V>> forker) {
+      private ObserverProxy(final AsyncStatement<V> statement,
+          final Forker<S, ? super AsyncStatement<V>, ? super V, ? super AsyncResult<V>> forker) {
         super(statement, proxy(forker));
       }
 
+      @NotNull
       @SuppressWarnings("unchecked")
       Object readResolve() throws ObjectStreamException {
         try {
@@ -1477,6 +1485,7 @@ class DefaultAsyncStatement<V> implements AsyncStatement<V>, Serializable {
       super(proxy(observer), executor, printer, logLevel, chains);
     }
 
+    @NotNull
     @SuppressWarnings("unchecked")
     Object readResolve() throws ObjectStreamException {
       try {
@@ -1513,10 +1522,11 @@ class DefaultAsyncStatement<V> implements AsyncStatement<V>, Serializable {
 
     private static class HandlerProxy<V, R> extends SerializableProxy {
 
-      private HandlerProxy(Observer<? super V> observer) {
+      private HandlerProxy(final Observer<? super V> observer) {
         super(proxy(observer));
       }
 
+      @NotNull
       @SuppressWarnings("unchecked")
       Object readResolve() throws ObjectStreamException {
         try {
@@ -1551,10 +1561,11 @@ class DefaultAsyncStatement<V> implements AsyncStatement<V>, Serializable {
 
     private static class HandlerProxy<V, R> extends SerializableProxy {
 
-      private HandlerProxy(Mapper<? super V, ? extends R> mapper) {
+      private HandlerProxy(final Mapper<? super V, ? extends R> mapper) {
         super(proxy(mapper));
       }
 
+      @NotNull
       @SuppressWarnings("unchecked")
       Object readResolve() throws ObjectStreamException {
         try {
@@ -1588,10 +1599,11 @@ class DefaultAsyncStatement<V> implements AsyncStatement<V>, Serializable {
 
     private static class HandlerProxy<V, R> extends SerializableProxy {
 
-      private HandlerProxy(Mapper<? super V, ? extends AsyncStatement<R>> mapper) {
+      private HandlerProxy(final Mapper<? super V, ? extends AsyncStatement<R>> mapper) {
         super(proxy(mapper));
       }
 
+      @NotNull
       @SuppressWarnings("unchecked")
       Object readResolve() throws ObjectStreamException {
         try {
@@ -1635,11 +1647,12 @@ class DefaultAsyncStatement<V> implements AsyncStatement<V>, Serializable {
 
     private static class HandlerProxy<V, R> extends SerializableProxy {
 
-      private HandlerProxy(Mapper<? super V, ? extends Closeable> closeable,
-          AsyncStatementHandler<V, R> handler, LogPrinter printer, Level level) {
+      private HandlerProxy(final Mapper<? super V, ? extends Closeable> closeable,
+          final AsyncStatementHandler<V, R> handler, final LogPrinter printer, final Level level) {
         super(proxy(closeable), handler, printer, level);
       }
 
+      @NotNull
       @SuppressWarnings("unchecked")
       Object readResolve() throws ObjectStreamException {
         try {
@@ -1690,11 +1703,13 @@ class DefaultAsyncStatement<V> implements AsyncStatement<V>, Serializable {
 
     private static class HandlerProxy<V, R> extends SerializableProxy {
 
-      private HandlerProxy(Mapper<? super V, ? extends Closeable> closeable,
-          Mapper<? super V, ? extends AsyncStatement<R>> mapper, LogPrinter printer, Level level) {
+      private HandlerProxy(final Mapper<? super V, ? extends Closeable> closeable,
+          final Mapper<? super V, ? extends AsyncStatement<R>> mapper, final LogPrinter printer,
+          final Level level) {
         super(proxy(closeable), proxy(mapper), printer, level);
       }
 
+      @NotNull
       @SuppressWarnings("unchecked")
       Object readResolve() throws ObjectStreamException {
         try {
@@ -1735,10 +1750,11 @@ class DefaultAsyncStatement<V> implements AsyncStatement<V>, Serializable {
 
     private static class HandlerProxy<V> extends SerializableProxy {
 
-      private HandlerProxy(Action action) {
+      private HandlerProxy(final Action action) {
         super(proxy(action));
       }
 
+      @NotNull
       @SuppressWarnings("unchecked")
       Object readResolve() throws ObjectStreamException {
         try {

@@ -46,6 +46,7 @@ class SystemLogPrinter extends TemplateLogPrinter implements Serializable {
     System.out.println(message);
   }
 
+  @NotNull
   Object readResolve() throws ObjectStreamException {
     return sInstance;
   }

@@ -67,6 +67,7 @@ public class TestAsyncStatement {
 
   // TODO: 26/01/2018 evaluate/then/fork serialization (elseDo, elseIf, thenDo, thenIf, thenTry,
   // TODO: thenDoTry, thenIfTry, whenDone)
+  // TODO: 29/01/2018 addTo
 
   @NotNull
   private static AsyncStatement<String> createStatement() {

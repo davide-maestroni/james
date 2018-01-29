@@ -28,7 +28,6 @@ import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 
 import dm.jail.util.ConstantConditions;
-import dm.jail.util.SerializableProxy;
 
 /**
  * Scheduled thread pool executor wrapping an executor service.
@@ -129,17 +128,18 @@ class ScheduledThreadPoolExecutorService extends ScheduledThreadPoolExecutor
     }
   }
 
-  private static class ExecutorProxy extends SerializableProxy {
+  private static class ExecutorProxy implements Serializable {
 
-    private ExecutorProxy(final ExecutorService service) {
-      super(service);
+    private final ExecutorService mService;
+
+    private ExecutorProxy(@NotNull final ExecutorService service) {
+      mService = service;
     }
 
-    @SuppressWarnings("unchecked")
+    @NotNull
     Object readResolve() throws ObjectStreamException {
       try {
-        final Object[] args = deserializeArgs();
-        return new ScheduledThreadPoolExecutorService((ExecutorService) args[0]);
+        return new ScheduledThreadPoolExecutorService(mService);
 
       } catch (final Throwable t) {
         throw new InvalidObjectException(t.getMessage());

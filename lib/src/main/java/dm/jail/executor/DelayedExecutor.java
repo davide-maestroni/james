@@ -24,7 +24,6 @@ import java.io.Serializable;
 import java.util.concurrent.TimeUnit;
 
 import dm.jail.util.ConstantConditions;
-import dm.jail.util.SerializableProxy;
 
 /**
  * Created by davide-maestroni on 08/03/2017.
@@ -84,18 +83,25 @@ class DelayedExecutor extends ScheduledExecutorDecorator implements Serializable
     return new ExecutorProxy(mExecutor, mDelay, mTimeUnit);
   }
 
-  private static class ExecutorProxy extends SerializableProxy {
+  private static class ExecutorProxy implements Serializable {
 
-    private ExecutorProxy(final ScheduledExecutor executor, final long delay,
-        final TimeUnit timeUnit) {
-      super(executor, delay, timeUnit);
+    private final long mDelay;
+
+    private final ScheduledExecutor mExecutor;
+
+    private final TimeUnit mTimeUnit;
+
+    private ExecutorProxy(@NotNull final ScheduledExecutor executor, final long delay,
+        @NotNull final TimeUnit timeUnit) {
+      mExecutor = executor;
+      mDelay = delay;
+      mTimeUnit = timeUnit;
     }
 
-    @SuppressWarnings("unchecked")
+    @NotNull
     Object readResolve() throws ObjectStreamException {
       try {
-        final Object[] args = deserializeArgs();
-        return new DelayedExecutor((ScheduledExecutor) args[0], (Long) args[1], (TimeUnit) args[2]);
+        return new DelayedExecutor(mExecutor, mDelay, mTimeUnit);
 
       } catch (final Throwable t) {
         throw new InvalidObjectException(t.getMessage());

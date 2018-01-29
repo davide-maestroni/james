@@ -70,6 +70,7 @@ class ImmediateExecutor extends SyncExecutor implements Serializable {
     command.run();
   }
 
+  @NotNull
   Object readResolve() throws ObjectStreamException {
     return sInstance;
   }

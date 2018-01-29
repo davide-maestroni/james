@@ -94,6 +94,7 @@ public abstract class SimpleState<V> implements AsyncState<V> {
 
     private static final PendingState<?> sInstance = new PendingState<Object>();
 
+    @NotNull
     Object readResolve() throws ObjectStreamException {
       return sInstance;
     }

@@ -26,7 +26,6 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 
 import dm.jail.util.ConstantConditions;
-import dm.jail.util.SerializableProxy;
 import dm.jail.util.Threads;
 
 /**
@@ -103,17 +102,18 @@ class ServiceExecutor extends AsyncExecutor implements Serializable {
     return new ExecutorProxy(mService);
   }
 
-  private static class ExecutorProxy extends SerializableProxy {
+  private static class ExecutorProxy implements Serializable {
 
-    private ExecutorProxy(final ScheduledExecutorService service) {
-      super(service);
+    private final ScheduledExecutorService mService;
+
+    private ExecutorProxy(@NotNull final ScheduledExecutorService service) {
+      mService = service;
     }
 
-    @SuppressWarnings("unchecked")
+    @NotNull
     Object readResolve() throws ObjectStreamException {
       try {
-        final Object[] args = deserializeArgs();
-        return new ServiceExecutor((ScheduledExecutorService) args[0]);
+        return new ServiceExecutor(mService);
 
       } catch (final Throwable t) {
         throw new InvalidObjectException(t.getMessage());

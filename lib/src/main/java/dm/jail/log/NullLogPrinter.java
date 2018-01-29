@@ -48,6 +48,7 @@ class NullLogPrinter extends TemplateLogPrinter implements Serializable {
       @Nullable final String message, @Nullable final Throwable throwable) {
   }
 
+  @NotNull
   Object readResolve() throws ObjectStreamException {
     return sInstance;
   }

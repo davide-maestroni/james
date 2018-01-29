@@ -54,6 +54,7 @@ class LoopExecutor extends SyncExecutor implements Serializable {
     LocalExecutor.run(command, delay, timeUnit);
   }
 
+  @NotNull
   Object readResolve() throws ObjectStreamException {
     return sInstance;
   }

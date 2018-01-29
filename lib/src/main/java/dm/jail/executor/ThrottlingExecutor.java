@@ -26,7 +26,6 @@ import java.util.concurrent.TimeUnit;
 
 import dm.jail.util.ConstantConditions;
 import dm.jail.util.DoubleQueue;
-import dm.jail.util.SerializableProxy;
 import dm.jail.util.WeakIdentityHashMap;
 
 /**
@@ -131,17 +130,21 @@ class ThrottlingExecutor extends ScheduledExecutorDecorator implements Serializa
     return new ExecutorProxy(mExecutor, mMaxRunning);
   }
 
-  private static class ExecutorProxy extends SerializableProxy {
+  private static class ExecutorProxy implements Serializable {
 
-    private ExecutorProxy(final ScheduledExecutor executor, final int maxCommands) {
-      super(executor, maxCommands);
+    private final ScheduledExecutor mExecutor;
+
+    private final int mMaxCommands;
+
+    private ExecutorProxy(@NotNull final ScheduledExecutor executor, final int maxCommands) {
+      mExecutor = executor;
+      mMaxCommands = maxCommands;
     }
 
-    @SuppressWarnings("unchecked")
+    @NotNull
     Object readResolve() throws ObjectStreamException {
       try {
-        final Object[] args = deserializeArgs();
-        return new ThrottlingExecutor((ScheduledExecutor) args[0], (Integer) args[1]);
+        return new ThrottlingExecutor(mExecutor, mMaxCommands);
 
       } catch (final Throwable t) {
         throw new InvalidObjectException(t.getMessage());

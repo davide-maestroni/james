@@ -32,7 +32,6 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 
 import dm.jail.util.ConstantConditions;
-import dm.jail.util.SerializableProxy;
 import dm.jail.util.WeakIdentityHashMap;
 
 /**
@@ -180,18 +179,21 @@ class PriorityExecutor {
       return new ExecutorProxy(mExecutor, mPriority);
     }
 
-    private static class ExecutorProxy extends SerializableProxy {
+    private static class ExecutorProxy implements Serializable {
 
-      private ExecutorProxy(final ScheduledExecutor executor, final int priority) {
-        super(executor, priority);
+      private final ScheduledExecutor mExecutor;
+
+      private final int mPriority;
+
+      private ExecutorProxy(@NotNull final ScheduledExecutor executor, final int priority) {
+        mExecutor = executor;
+        mPriority = priority;
       }
 
-      @SuppressWarnings("unchecked")
+      @NotNull
       Object readResolve() throws ObjectStreamException {
         try {
-          final Object[] args = deserializeArgs();
-          return new PriorityExecutor.SerializableExecutor((ScheduledExecutor) args[0],
-              (Integer) args[1]);
+          return new PriorityExecutor.SerializableExecutor(mExecutor, mPriority);
 
         } catch (final Throwable t) {
           throw new InvalidObjectException(t.getMessage());

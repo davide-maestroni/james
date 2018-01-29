@@ -24,7 +24,6 @@ import java.io.Serializable;
 import java.lang.ref.WeakReference;
 import java.util.concurrent.TimeUnit;
 
-import dm.jail.util.SerializableProxy;
 import dm.jail.util.WeakIdentityHashMap;
 
 /**
@@ -104,17 +103,18 @@ class ZeroDelayExecutor extends ScheduledExecutorDecorator implements Serializab
     return new ExecutorProxy(mExecutor);
   }
 
-  private static class ExecutorProxy extends SerializableProxy {
+  private static class ExecutorProxy implements Serializable {
+
+    private final ScheduledExecutor mExecutor;
 
     private ExecutorProxy(final ScheduledExecutor executor) {
-      super(executor);
+      mExecutor = executor;
     }
 
-    @SuppressWarnings("unchecked")
+    @NotNull
     Object readResolve() throws ObjectStreamException {
       try {
-        final Object[] args = deserializeArgs();
-        return new ZeroDelayExecutor((ScheduledExecutor) args[0]);
+        return new ZeroDelayExecutor(mExecutor);
 
       } catch (final Throwable t) {
         throw new InvalidObjectException(t.getMessage());

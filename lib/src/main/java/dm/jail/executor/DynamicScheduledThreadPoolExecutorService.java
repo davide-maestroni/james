@@ -113,6 +113,7 @@ class DynamicScheduledThreadPoolExecutorService extends ScheduledThreadPoolExecu
       super(corePoolSize, maximumPoolSize, keepAliveTime, keepAliveUnit, proxy(threadFactory));
     }
 
+    @NotNull
     @SuppressWarnings("unchecked")
     Object readResolve() throws ObjectStreamException {
       try {

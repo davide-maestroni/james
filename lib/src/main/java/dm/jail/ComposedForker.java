@@ -90,7 +90,7 @@ class ComposedForker<S, V>
   }
 
   private Object writeReplace() throws ObjectStreamException {
-    return new BuffererProxy<S, V>(mInit, mValue, mFailure, mStatement, mDone);
+    return new BuffererProxy<S, V>(mInit, mValue, mFailure, mDone, mStatement);
   }
 
   private static class BuffererProxy<S, V> extends SerializableProxy {
@@ -98,11 +98,13 @@ class ComposedForker<S, V>
     private BuffererProxy(final Mapper<? super AsyncStatement<V>, S> init,
         final ForkUpdater<S, ? super AsyncStatement<V>, ? super V> value,
         final ForkUpdater<S, ? super AsyncStatement<V>, ? super Throwable> failure,
-        final ForkUpdater<S, ? super AsyncStatement<V>, ? super AsyncResult<? extends V>> statement,
-        final ForkCompleter<S, ? super AsyncStatement<V>> done) {
+        final ForkCompleter<S, ? super AsyncStatement<V>> done,
+        final ForkUpdater<S, ? super AsyncStatement<V>, ? super AsyncResult<? extends V>>
+            statement) {
       super(proxy(init), proxy(value), proxy(failure), proxy(statement), proxy(done));
     }
 
+    @NotNull
     @SuppressWarnings("unchecked")
     Object readResolve() throws ObjectStreamException {
       try {
@@ -110,8 +112,8 @@ class ComposedForker<S, V>
         return new ComposedForker<S, V>((Mapper<? super AsyncStatement<V>, S>) args[0],
             (ForkUpdater<S, ? super AsyncStatement<V>, ? super V>) args[1],
             (ForkUpdater<S, ? super AsyncStatement<V>, ? super Throwable>) args[2],
-            (ForkCompleter<S, ? super AsyncStatement<V>>) args[4],
-            (ForkUpdater<S, ? super AsyncStatement<V>, ? super AsyncResult<? extends V>>) args[3]);
+            (ForkCompleter<S, ? super AsyncStatement<V>>) args[3],
+            (ForkUpdater<S, ? super AsyncStatement<V>, ? super AsyncResult<? extends V>>) args[4]);
 
       } catch (final Throwable t) {
         throw new InvalidObjectException(t.getMessage());
@@ -128,6 +130,7 @@ class ComposedForker<S, V>
       return stack;
     }
 
+    @NotNull
     Object readResolve() throws ObjectStreamException {
       return sInstance;
     }
@@ -141,6 +144,7 @@ class ComposedForker<S, V>
       return null;
     }
 
+    @NotNull
     Object readResolve() throws ObjectStreamException {
       return sInstance;
     }
@@ -158,6 +162,7 @@ class ComposedForker<S, V>
       return stack;
     }
 
+    @NotNull
     Object readResolve() throws ObjectStreamException {
       return sInstance;
     }
@@ -169,6 +174,7 @@ class ComposedForker<S, V>
     private static final DefaultUpdateValue<?, ?, ?> sInstance =
         new DefaultUpdateValue<Object, Object, Object>();
 
+    @NotNull
     Object readResolve() throws ObjectStreamException {
       return sInstance;
     }

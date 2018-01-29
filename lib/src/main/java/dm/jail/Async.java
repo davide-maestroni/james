@@ -324,10 +324,12 @@ public class Async {
 
     private static class ObserverProxy<V> extends SerializableProxy {
 
-      private ObserverProxy(Observer<AsyncResult<V>> observer, ScheduledExecutor executor) {
+      private ObserverProxy(final Observer<AsyncResult<V>> observer,
+          final ScheduledExecutor executor) {
         super(proxy(observer), executor);
       }
 
+      @NotNull
       @SuppressWarnings("unchecked")
       Object readResolve() throws ObjectStreamException {
         try {
