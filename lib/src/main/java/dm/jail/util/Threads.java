@@ -18,6 +18,8 @@ package dm.jail.util;
 
 import org.jetbrains.annotations.NotNull;
 
+import java.lang.Thread.State;
+
 /**
  * Created by davide-maestroni on 08/05/2017.
  */
@@ -29,6 +31,16 @@ public class Threads {
       new WeakIdentityHashMap<ThreadOwner, Void>();
 
   private Threads() {
+  }
+
+  public static boolean interruptIfWaiting(@NotNull final Thread thread) {
+    final State state = thread.getState();
+    if ((state == State.WAITING) || (state == State.TIMED_WAITING)) {
+      thread.interrupt();
+      return true;
+    }
+
+    return false;
   }
 
   public static boolean isOwnedThread() {

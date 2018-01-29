@@ -63,9 +63,10 @@ public class TestAsyncStatement {
   // TODO: 27/01/2018 evaluating getValue
   // TODO: 27/01/2018 catch filtered exception type
   // TODO: 27/01/2018 forker throws
-
-  // TODO: 26/01/2018 evaluate/then/fork serialization
   // TODO: 26/01/2018 NPE then and below + if => null statement
+
+  // TODO: 26/01/2018 evaluate/then/fork serialization (elseDo, elseIf, thenDo, thenIf, thenTry,
+  // TODO: thenDoTry, thenIfTry, whenDone)
 
   @NotNull
   private static AsyncStatement<String> createStatement() {
@@ -135,7 +136,7 @@ public class TestAsyncStatement {
   @Test
   public void cancelled() {
     final AsyncStatement<Void> statement = new Async().statementDeclaration();
-    statement.cancel(true);
+    statement.cancel(false);
     assertThat(statement.isCancelled()).isTrue();
   }
 
@@ -665,7 +666,7 @@ public class TestAsyncStatement {
     final AsyncStatement<String> statement = createStatementFork(new Async().value("test"));
     assertThat(statement.isFinal()).isTrue();
     assertThat(statement.isDone()).isFalse();
-    assertThat(statement.cancel(true)).isFalse();
+    assertThat(statement.cancel(false)).isFalse();
     assertThat(statement.isCancelled()).isFalse();
     assertThat(statement.then(new Mapper<String, String>() {
 
@@ -1108,7 +1109,7 @@ public class TestAsyncStatement {
   }
 
   @Test
-  public void testSerialize() throws IOException, ClassNotFoundException {
+  public void serialize() throws IOException, ClassNotFoundException {
     final AsyncStatement<String> statement = createStatement();
     final ByteArrayOutputStream byteOutputStream = new ByteArrayOutputStream();
     final ObjectOutputStream objectOutputStream = new ObjectOutputStream(byteOutputStream);
@@ -1122,7 +1123,7 @@ public class TestAsyncStatement {
   }
 
   @Test
-  public void testSerializeAsync() throws IOException, ClassNotFoundException {
+  public void serializeAsync() throws IOException, ClassNotFoundException {
     final AsyncStatement<String> statement = createStatementAsync();
     final ByteArrayOutputStream byteOutputStream = new ByteArrayOutputStream();
     final ObjectOutputStream objectOutputStream = new ObjectOutputStream(byteOutputStream);
@@ -1136,7 +1137,7 @@ public class TestAsyncStatement {
   }
 
   @Test(expected = IOException.class)
-  public void testSerializeError() throws IOException, ClassNotFoundException {
+  public void serializeError() throws IOException, ClassNotFoundException {
     final AsyncStatement<String> promise =
         new Async().statement(new Observer<AsyncResult<String>>() {
 
@@ -1154,7 +1155,7 @@ public class TestAsyncStatement {
   }
 
   @Test(expected = IOException.class)
-  public void testSerializeErrorChain() throws IOException, ClassNotFoundException {
+  public void serializeErrorChain() throws IOException, ClassNotFoundException {
     final AsyncStatement<String> promise =
         createStatement().elseCatch(new Mapper<Throwable, String>() {
 
@@ -1172,7 +1173,21 @@ public class TestAsyncStatement {
   }
 
   @Test
-  public void testSerializeFork() throws IOException, ClassNotFoundException {
+  public void serializeEvaluated() throws IOException, ClassNotFoundException {
+    final AsyncStatement<String> statement = createStatement().evaluate();
+    final ByteArrayOutputStream byteOutputStream = new ByteArrayOutputStream();
+    final ObjectOutputStream objectOutputStream = new ObjectOutputStream(byteOutputStream);
+    objectOutputStream.writeObject(statement);
+    final ByteArrayInputStream byteInputStream =
+        new ByteArrayInputStream(byteOutputStream.toByteArray());
+    final ObjectInputStream objectInputStream = new ObjectInputStream(byteInputStream);
+    @SuppressWarnings("unchecked") final AsyncStatement<String> deserialized =
+        (AsyncStatement<String>) objectInputStream.readObject();
+    assertThat(deserialized.getValue()).isEqualTo("TEST");
+  }
+
+  @Test
+  public void serializeFork() throws IOException, ClassNotFoundException {
     final AsyncStatement<String> statement = createStatementFork(new Async().value("test"));
     final ByteArrayOutputStream byteOutputStream = new ByteArrayOutputStream();
     final ObjectOutputStream objectOutputStream = new ObjectOutputStream(byteOutputStream);
@@ -1188,6 +1203,21 @@ public class TestAsyncStatement {
         return input;
       }
     }).getValue()).isEqualTo("TEST");
+  }
+
+  @Test
+  public void serializeForked() throws IOException, ClassNotFoundException {
+    final AsyncStatement<String> statement =
+        createStatementFork(new Async().value("test")).then(new ToUpper());
+    final ByteArrayOutputStream byteOutputStream = new ByteArrayOutputStream();
+    final ObjectOutputStream objectOutputStream = new ObjectOutputStream(byteOutputStream);
+    objectOutputStream.writeObject(statement);
+    final ByteArrayInputStream byteInputStream =
+        new ByteArrayInputStream(byteOutputStream.toByteArray());
+    final ObjectInputStream objectInputStream = new ObjectInputStream(byteInputStream);
+    @SuppressWarnings("unchecked") final AsyncStatement<String> deserialized =
+        (AsyncStatement<String>) objectInputStream.readObject();
+    assertThat(deserialized.getValue()).isEqualTo("TEST");
   }
 
   @Test
@@ -1227,6 +1257,12 @@ public class TestAsyncStatement {
         });
     assertThat(ConstantConditions.notNull(statement.getFailure()).getCause()).isExactlyInstanceOf(
         IllegalArgumentException.class);
+  }
+
+  @Test(expected = NullPointerException.class)
+  @SuppressWarnings("ConstantConditions")
+  public void thenDoNPE() {
+    new Async().value(null).thenDo(null);
   }
 
   @Test
@@ -1280,6 +1316,28 @@ public class TestAsyncStatement {
         IllegalArgumentException.class);
   }
 
+  @Test(expected = NullPointerException.class)
+  @SuppressWarnings("ConstantConditions")
+  public void thenIfNPE() {
+    new Async().value(null).thenIf(null);
+  }
+
+  @Test
+  public void thenIfStatementNPE() {
+    assertThat(new Async().value(null).thenIf(new Mapper<Object, AsyncStatement<Object>>() {
+
+      public AsyncStatement<Object> apply(final Object input) {
+        return null;
+      }
+    }).failure()).isExactlyInstanceOf(NullPointerException.class);
+  }
+
+  @Test(expected = NullPointerException.class)
+  @SuppressWarnings("ConstantConditions")
+  public void thenNPE() {
+    new Async().value(null).then(null);
+  }
+
   @Test
   public void thenTry() {
     final AtomicCloseable closeable = new AtomicCloseable();
@@ -1297,6 +1355,17 @@ public class TestAsyncStatement {
         });
     assertThat(statement.getValue()).isEqualTo("TEST");
     assertThat(closeable.isCalled()).isTrue();
+  }
+
+  @Test(expected = NullPointerException.class)
+  @SuppressWarnings("ConstantConditions")
+  public void thenTryCloseableNPE() {
+    new Async().value(null).thenTry(null, new Mapper<Object, Object>() {
+
+      public Object apply(final Object input) {
+        return null;
+      }
+    });
   }
 
   @Test
@@ -1318,6 +1387,17 @@ public class TestAsyncStatement {
     assertThat(statement.getValue()).isEqualTo("test");
     assertThat(ref.get()).isEqualTo("test");
     assertThat(closeable.isCalled()).isTrue();
+  }
+
+  @Test(expected = NullPointerException.class)
+  @SuppressWarnings("ConstantConditions")
+  public void thenTryDoCloseableNPE() {
+    new Async().value(null).thenTryDo(null, new Observer<Object>() {
+
+      public void accept(final Object input) {
+
+      }
+    });
   }
 
   @Test
@@ -1381,6 +1461,17 @@ public class TestAsyncStatement {
         });
     assertThat(statement.getValue()).isEqualTo("test");
     assertThat(ref.get()).isEqualTo("test");
+  }
+
+  @Test(expected = NullPointerException.class)
+  @SuppressWarnings("ConstantConditions")
+  public void thenTryDoNPE() {
+    new Async().value(null).thenTryDo(new Mapper<Object, Closeable>() {
+
+      public Closeable apply(final Object input) {
+        return null;
+      }
+    }, null);
   }
 
   @Test
@@ -1541,6 +1632,17 @@ public class TestAsyncStatement {
     assertThat(statement.getFailure()).isNotNull();
   }
 
+  @Test(expected = NullPointerException.class)
+  @SuppressWarnings("ConstantConditions")
+  public void thenTryIfCloseableNPE() {
+    new Async().value(null).thenTryIf(null, new Mapper<Object, AsyncStatement<Object>>() {
+
+      public AsyncStatement<Object> apply(final Object input) {
+        return new Async().value(null);
+      }
+    });
+  }
+
   @Test
   public void thenTryIfException() {
     final AsyncStatement<Integer> statement =
@@ -1600,6 +1702,17 @@ public class TestAsyncStatement {
     assertThat(statement.isFailed()).isTrue();
   }
 
+  @Test(expected = NullPointerException.class)
+  @SuppressWarnings("ConstantConditions")
+  public void thenTryIfNPE() {
+    new Async().value(null).thenTryIf(new Mapper<Object, Closeable>() {
+
+      public Closeable apply(final Object input) {
+        return null;
+      }
+    }, null);
+  }
+
   @Test
   public void thenTryIfNull() {
     final AsyncStatement<Integer> statement =
@@ -1615,6 +1728,32 @@ public class TestAsyncStatement {
           }
         });
     assertThat(statement.getValue()).isEqualTo(4);
+  }
+
+  @Test
+  public void thenTryIfStatementNPE() {
+    assertThat(new Async().value(null).thenTryIf(new Mapper<Object, Closeable>() {
+
+      public Closeable apply(final Object input) {
+        return null;
+      }
+    }, new Mapper<Object, AsyncStatement<Object>>() {
+
+      public AsyncStatement<Object> apply(final Object input) {
+        return null;
+      }
+    }).failure()).isExactlyInstanceOf(NullPointerException.class);
+  }
+
+  @Test(expected = NullPointerException.class)
+  @SuppressWarnings("ConstantConditions")
+  public void thenTryNPE() {
+    new Async().value(null).thenTry(new Mapper<Object, Closeable>() {
+
+      public Closeable apply(final Object input) {
+        return null;
+      }
+    }, null);
   }
 
   @Test
@@ -1687,11 +1826,23 @@ public class TestAsyncStatement {
     assertThat(statement.isSet()).isTrue();
   }
 
+  @Test(expected = NullPointerException.class)
+  @SuppressWarnings("ConstantConditions")
+  public void waitDoneNPE() {
+    new Async().value(null).waitDone(0, null);
+  }
+
   @Test
   public void waitDoneOn() {
     final AsyncStatement<String> statement =
         new Async().on(withDelay(backgroundExecutor(), 100, TimeUnit.MILLISECONDS)).value("test");
     assertThat(statement.waitDone(1, TimeUnit.SECONDS)).isTrue();
+  }
+
+  @Test(expected = NullPointerException.class)
+  @SuppressWarnings("ConstantConditions")
+  public void whenDoneNPE() {
+    new Async().value(null).whenDone(null);
   }
 
   private static class AtomicCloseable implements Closeable {
@@ -1705,6 +1856,12 @@ public class TestAsyncStatement {
     public void close() throws IOException {
       mIsCalled.set(true);
     }
+  }
 
+  private static class ToUpper implements Mapper<String, String> {
+
+    public String apply(final String input) {
+      return input.toUpperCase();
+    }
   }
 }

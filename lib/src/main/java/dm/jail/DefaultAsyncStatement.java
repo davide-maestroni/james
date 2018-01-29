@@ -32,6 +32,7 @@ import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import java.util.concurrent.atomic.AtomicReference;
 
 import dm.jail.async.Action;
 import dm.jail.async.AsyncResult;
@@ -304,7 +305,7 @@ class DefaultAsyncStatement<V> implements AsyncStatement<V>, Serializable {
     StatementChain<?, ?> chain = mHead;
     final CancellationException exception = new CancellationException();
     if (mayInterruptIfRunning && (observer instanceof InterruptibleObserver)) {
-      if (chain.cancel(exception)) {
+      if (chain.cancel(exception, mayInterruptIfRunning)) {
         ((InterruptibleObserver<?>) observer).interrupt();
         return true;
       }
@@ -313,7 +314,7 @@ class DefaultAsyncStatement<V> implements AsyncStatement<V>, Serializable {
     }
 
     while (!chain.isTail()) {
-      if (chain.cancel(exception)) {
+      if (chain.cancel(exception, mayInterruptIfRunning)) {
         return true;
       }
 
@@ -697,7 +698,7 @@ class DefaultAsyncStatement<V> implements AsyncStatement<V>, Serializable {
       mObserver = observer;
     }
 
-    public void accept(final AsyncResult<V> result) throws Exception {
+    public void accept(final AsyncResult<V> result) {
       mObserver.chain(result);
     }
 
@@ -707,11 +708,37 @@ class DefaultAsyncStatement<V> implements AsyncStatement<V>, Serializable {
       observer.accept(null);
       return new ChainForkObserver<S, V>(observer);
     }
+
+    private Object writeReplace() throws ObjectStreamException {
+      return new ObserverProxy<S, V>(mObserver);
+    }
+
+    private static class ObserverProxy<S, V> implements Serializable {
+
+      private final ForkObserver<S, V> mObserver;
+
+      private ObserverProxy(@NotNull final ForkObserver<S, V> observer) {
+        mObserver = observer;
+      }
+
+      Object readResolve() throws ObjectStreamException {
+        try {
+          final ForkObserver<S, V> observer = mObserver;
+          observer.accept(null);
+          return new ChainForkObserver<S, V>(observer);
+
+        } catch (final Throwable t) {
+          throw new InvalidObjectException(t.getMessage());
+        }
+      }
+    }
   }
 
   private static class ChainHandler<V, R> extends StatementChain<V, R> implements Serializable {
 
     private final AsyncStatementHandler<V, R> mHandler;
+
+    private final AtomicReference<Thread> mThread = new AtomicReference<Thread>();
 
     ChainHandler(@NotNull final AsyncStatementHandler<V, R> handler) {
       mHandler = handler;
@@ -745,31 +772,44 @@ class DefaultAsyncStatement<V> implements AsyncStatement<V>, Serializable {
     }
 
     void fail(final StatementChain<R, ?> next, final Throwable failure) {
+      final AtomicReference<Thread> thread = mThread;
+      thread.set(Thread.currentThread());
       try {
         getLogger().dbg("Processing failure with reason: %s", failure);
         mHandler.failure(failure, next);
 
       } catch (final CancellationException e) {
+        thread.set(null);
         getLogger().wrn(e, "Statement has been cancelled");
         next.fail(e);
 
       } catch (final Throwable t) {
+        thread.set(null);
         RuntimeInterruptedException.throwIfInterrupt(t);
         getLogger().err(t, "Error while processing failure with reason: %s", failure);
         next.fail(t);
       }
     }
 
+    boolean interrupt() {
+      final Thread thread = mThread.get();
+      return (thread != null) && Threads.interruptIfWaiting(thread);
+    }
+
     void set(final StatementChain<R, ?> next, final V value) {
+      final AtomicReference<Thread> thread = mThread;
+      thread.set(Thread.currentThread());
       try {
         getLogger().dbg("Processing value: %s", value);
         mHandler.value(value, next);
 
       } catch (final CancellationException e) {
+        thread.set(null);
         getLogger().wrn(e, "Statement has been cancelled");
         next.fail(e);
 
       } catch (final Throwable t) {
+        thread.set(null);
         RuntimeInterruptedException.throwIfInterrupt(t);
         getLogger().err(t, "Error while processing value: %s", value);
         next.fail(t);
@@ -943,6 +983,10 @@ class DefaultAsyncStatement<V> implements AsyncStatement<V>, Serializable {
     @Override
     public void fail(final StatementChain<V, ?> next, final Throwable failure) {
       next.fail(failure);
+    }
+
+    boolean interrupt() {
+      return false;
     }
 
     @Override
@@ -1180,7 +1224,7 @@ class DefaultAsyncStatement<V> implements AsyncStatement<V>, Serializable {
       return mStatement.cancel(mayInterruptIfRunning);
     }
 
-    void chain(final AsyncResult<V> result) throws Exception {
+    void chain(final AsyncResult<V> result) {
       mExecutor.execute(new Runnable() {
 
         public void run() {
@@ -1338,10 +1382,13 @@ class DefaultAsyncStatement<V> implements AsyncStatement<V>, Serializable {
       set(mNext, value);
     }
 
-    boolean cancel(@NotNull final Throwable exception) {
+    boolean cancel(@NotNull final Throwable exception, final boolean mayInterruptIfRunning) {
       if (mInnerState.fail(exception)) {
         fail(mNext, exception);
         return true;
+
+      } else if (mayInterruptIfRunning) {
+        return interrupt();
       }
 
       return false;
@@ -1359,6 +1406,8 @@ class DefaultAsyncStatement<V> implements AsyncStatement<V>, Serializable {
     void setLogger(@NotNull final Logger logger) {
       mLogger = logger.subContextLogger(this);
     }
+
+    abstract boolean interrupt();
 
     boolean isTail() {
       return false;
@@ -1749,6 +1798,10 @@ class DefaultAsyncStatement<V> implements AsyncStatement<V>, Serializable {
       }
 
       chain.fail(reason);
+    }
+
+    boolean interrupt() {
+      return false;
     }
 
     @Override

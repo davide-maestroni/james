@@ -22,7 +22,6 @@ import org.jetbrains.annotations.Nullable;
 import java.io.InvalidObjectException;
 import java.io.ObjectStreamException;
 import java.io.Serializable;
-import java.lang.Thread.State;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicReference;
@@ -44,6 +43,7 @@ import dm.jail.log.LogPrinter.Level;
 import dm.jail.util.ConstantConditions;
 import dm.jail.util.RuntimeInterruptedException;
 import dm.jail.util.SerializableProxy;
+import dm.jail.util.Threads;
 
 /**
  * Created by davide-maestroni on 01/12/2018.
@@ -296,12 +296,13 @@ public class Async {
       mExecutor.execute(new Runnable() {
 
         public void run() {
-          mThread.set(Thread.currentThread());
+          final AtomicReference<Thread> thread = mThread;
+          thread.set(Thread.currentThread());
           try {
             mObserver.accept(result);
 
           } catch (final Throwable t) {
-            mThread.set(null);
+            thread.set(null);
             // TODO: 16/01/2018 invert order of call?
             RuntimeInterruptedException.throwIfInterrupt(t);
             result.fail(t);
@@ -313,10 +314,7 @@ public class Async {
     public void interrupt() {
       final Thread thread = mThread.get();
       if (thread != null) {
-        final State state = thread.getState();
-        if ((state == State.WAITING) || (state == State.TIMED_WAITING)) {
-          thread.interrupt();
-        }
+        Threads.interruptIfWaiting(thread);
       }
     }
 
