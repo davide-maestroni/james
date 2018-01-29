@@ -35,6 +35,7 @@ import java.util.concurrent.TimeoutException;
 
 import dm.jail.async.Action;
 import dm.jail.async.AsyncResult;
+import dm.jail.async.AsyncResultCollection;
 import dm.jail.async.AsyncStatement;
 import dm.jail.async.FailureException;
 import dm.jail.async.InterruptibleObserver;
@@ -59,6 +60,8 @@ import dm.jail.util.TimeUnits.Condition;
 class DefaultAsyncStatement<V> implements AsyncStatement<V>, Serializable {
 
   private static final Class<?>[] ANY_EXCEPTION = new Class<?>[]{Throwable.class};
+
+  private static final Class<?>[] NO_EXCEPTION = new Class<?>[]{};
 
   private final ScheduledExecutor mExecutor;
 
@@ -180,9 +183,8 @@ class DefaultAsyncStatement<V> implements AsyncStatement<V>, Serializable {
 
   @NotNull
   private static Class<?>[] cloneExceptionTypes(@Nullable final Class<?>... exceptionTypes) {
-    // TODO: 28/01/2018 null => NO_EXCEPTION ??
-    return ((exceptionTypes != null) && (exceptionTypes.length > 0)) ? exceptionTypes.clone()
-        : ANY_EXCEPTION;
+    return (exceptionTypes != null) ? (exceptionTypes.length > 0) ? exceptionTypes.clone()
+        : ANY_EXCEPTION : NO_EXCEPTION;
   }
 
   private static void close(@Nullable final Closeable closeable,
@@ -197,6 +199,88 @@ class DefaultAsyncStatement<V> implements AsyncStatement<V>, Serializable {
     } catch (final IOException e) {
       logger.err(e, "Error while closing closeable: " + closeable);
       throw e;
+    }
+  }
+
+  public void addTo(@NotNull final AsyncResultCollection<? super V> result) {
+    ConstantConditions.notNull("result", result);
+    then(new Mapper<V, Void>() {
+
+      public Void apply(final V value) {
+        result.addValue(value);
+        return null;
+      }
+    }).elseCatch(new Mapper<Throwable, Void>() {
+
+      public Void apply(final Throwable failure) {
+        result.addFailure(failure);
+        return null;
+      }
+    });
+  }
+
+  @NotNull
+  @SuppressWarnings("ConstantConditions")
+  public Throwable failure() {
+    synchronized (mMutex) {
+      if (!isFailed()) {
+        throw new IllegalStateException("the statement is not failed");
+      }
+
+      return mHead.getFailure().getCause();
+    }
+  }
+
+  public boolean isCancelled() {
+    synchronized (mMutex) {
+      final FailureException failure = mHead.getFailure();
+      return (failure != null) && failure.isCancelled();
+    }
+  }
+
+  public boolean isEvaluating() {
+    synchronized (mMutex) {
+      return (mState == StatementState.Evaluating);
+    }
+  }
+
+  public boolean isFailed() {
+    synchronized (mMutex) {
+      return (mState == StatementState.Failed);
+    }
+  }
+
+  public boolean isSet() {
+    synchronized (mMutex) {
+      return (mState == StatementState.Set);
+    }
+  }
+
+  public void to(@NotNull final AsyncResult<? super V> result) {
+    ConstantConditions.notNull("result", result);
+    then(new Mapper<V, Void>() {
+
+      public Void apply(final V value) {
+        result.set(value);
+        return null;
+      }
+    }).elseCatch(new Mapper<Throwable, Void>() {
+
+      public Void apply(final Throwable failure) {
+        result.fail(failure);
+        return null;
+      }
+    });
+  }
+
+  @SuppressWarnings("unchecked")
+  public V value() {
+    synchronized (mMutex) {
+      if (!isSet()) {
+        throw new IllegalStateException("the statement is not set");
+      }
+
+      return (V) mHead.getValue();
     }
   }
 
@@ -488,71 +572,6 @@ class DefaultAsyncStatement<V> implements AsyncStatement<V>, Serializable {
   @NotNull
   public AsyncStatement<V> whenDone(@NotNull final Action action) {
     return chain(new WhenDoneHandler<V>(action));
-  }
-
-  @NotNull
-  @SuppressWarnings("ConstantConditions")
-  public Throwable failure() {
-    synchronized (mMutex) {
-      if (!isFailed()) {
-        throw new IllegalStateException("the statement is not failed");
-      }
-
-      return mHead.getFailure().getCause();
-    }
-  }
-
-  public boolean isCancelled() {
-    synchronized (mMutex) {
-      final FailureException failure = mHead.getFailure();
-      return (failure != null) && failure.isCancelled();
-    }
-  }
-
-  public boolean isEvaluating() {
-    synchronized (mMutex) {
-      return (mState == StatementState.Evaluating);
-    }
-  }
-
-  public boolean isFailed() {
-    synchronized (mMutex) {
-      return (mState == StatementState.Failed);
-    }
-  }
-
-  public boolean isSet() {
-    synchronized (mMutex) {
-      return (mState == StatementState.Set);
-    }
-  }
-
-  public void to(@NotNull final AsyncResult<? super V> result) {
-    ConstantConditions.notNull("result", result);
-    then(new Mapper<V, Void>() {
-
-      public Void apply(final V value) {
-        result.set(value);
-        return null;
-      }
-    }).elseCatch(new Mapper<Throwable, Void>() {
-
-      public Void apply(final Throwable failure) {
-        result.fail(failure);
-        return null;
-      }
-    });
-  }
-
-  @SuppressWarnings("unchecked")
-  public V value() {
-    synchronized (mMutex) {
-      if (!isSet()) {
-        throw new IllegalStateException("the statement is not set");
-      }
-
-      return (V) mHead.getValue();
-    }
   }
 
   @NotNull
@@ -1140,7 +1159,7 @@ class DefaultAsyncStatement<V> implements AsyncStatement<V>, Serializable {
 
     private final List<AsyncResult<V>> mResults = new ArrayList<AsyncResult<V>>();
 
-    private Throwable mError;
+    private Throwable mFailure;
 
     private S mStack;
 
@@ -1165,9 +1184,9 @@ class DefaultAsyncStatement<V> implements AsyncStatement<V>, Serializable {
       mExecutor.execute(new Runnable() {
 
         public void run() {
-          final Throwable error = mError;
-          if (error != null) {
-            result.fail(error);
+          final Throwable failure = mFailure;
+          if (failure != null) {
+            result.fail(failure);
             return;
           }
 
@@ -1177,12 +1196,8 @@ class DefaultAsyncStatement<V> implements AsyncStatement<V>, Serializable {
 
           } catch (final Throwable t) {
             RuntimeInterruptedException.throwIfInterrupt(t);
-            final Throwable failure = mError;
-            if (failure != null) {
-              for (final AsyncResult<V> result : mResults) {
-                result.fail(t);
-              }
-            }
+            mFailure = t;
+            clearResults(t);
           }
         }
       });
@@ -1191,6 +1206,15 @@ class DefaultAsyncStatement<V> implements AsyncStatement<V>, Serializable {
     @NotNull
     Observer<AsyncResult<V>> newObserver() {
       return new ChainForkObserver<S, V>(this);
+    }
+
+    private void clearResults(@NotNull final Throwable failure) {
+      final List<AsyncResult<V>> results = mResults;
+      for (final AsyncResult<V> result : results) {
+        result.fail(failure);
+      }
+
+      results.clear();
     }
 
     private Object writeReplace() throws ObjectStreamException {
@@ -1235,12 +1259,9 @@ class DefaultAsyncStatement<V> implements AsyncStatement<V>, Serializable {
                 mExecutor.execute(new Runnable() {
 
                   public void run() {
-                    final Throwable error = mError;
-                    if (error != null) {
-                      for (final AsyncResult<V> result : mResults) {
-                        result.fail(error);
-                      }
-
+                    final Throwable failure = mFailure;
+                    if (failure != null) {
+                      clearResults(failure);
                       return;
                     }
 
@@ -1252,10 +1273,8 @@ class DefaultAsyncStatement<V> implements AsyncStatement<V>, Serializable {
 
                     } catch (final Throwable t) {
                       RuntimeInterruptedException.throwIfInterrupt(t);
-                      mError = t;
-                      for (final AsyncResult<V> result : mResults) {
-                        result.fail(t);
-                      }
+                      mFailure = t;
+                      clearResults(t);
                     }
                   }
                 });
@@ -1263,31 +1282,26 @@ class DefaultAsyncStatement<V> implements AsyncStatement<V>, Serializable {
               }
             }).elseCatch(new Mapper<Throwable, Void>() {
 
-              public Void apply(final Throwable failure) {
+              public Void apply(final Throwable throwable) {
                 mExecutor.execute(new Runnable() {
 
                   public void run() {
-                    final Throwable error = mError;
-                    if (error != null) {
-                      for (final AsyncResult<V> result : mResults) {
-                        result.fail(error);
-                      }
-
+                    final Throwable failure = mFailure;
+                    if (failure != null) {
+                      clearResults(failure);
                       return;
                     }
 
                     try {
                       final Forker<S, AsyncStatement<V>, V, AsyncResult<V>> forker = mForker;
                       final AsyncStatement<V> statement = mStatement;
-                      final S stack = forker.failure(statement, mStack, failure);
+                      final S stack = forker.failure(statement, mStack, throwable);
                       mStack = forker.done(statement, stack);
 
                     } catch (final Throwable t) {
                       RuntimeInterruptedException.throwIfInterrupt(t);
-                      mError = t;
-                      for (final AsyncResult<V> result : mResults) {
-                        result.fail(t);
-                      }
+                      mFailure = t;
+                      clearResults(t);
                     }
                   }
                 });
@@ -1297,7 +1311,7 @@ class DefaultAsyncStatement<V> implements AsyncStatement<V>, Serializable {
 
           } catch (final Throwable t) {
             RuntimeInterruptedException.throwIfInterrupt(t);
-            mError = t;
+            mFailure = t;
           }
         }
       });
@@ -1592,11 +1606,12 @@ class DefaultAsyncStatement<V> implements AsyncStatement<V>, Serializable {
 
     @Override
     void value(final V value, @NotNull final AsyncResult<R> result) throws Exception {
+      final Closeable closeable = mCloseable.apply(value);
       try {
         mHandler.value(value, result);
 
       } finally {
-        close(mCloseable.apply(value), mLogger);
+        close(closeable, mLogger);
       }
     }
   }

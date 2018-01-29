@@ -28,6 +28,7 @@ import java.util.concurrent.TimeoutException;
 
 import dm.jail.async.Action;
 import dm.jail.async.AsyncResult;
+import dm.jail.async.AsyncResultCollection;
 import dm.jail.async.AsyncStatement;
 import dm.jail.async.DeclaredStatement;
 import dm.jail.async.FailureException;
@@ -61,6 +62,39 @@ class DefaultDeclaredStatement<V> implements DeclaredStatement<V> {
       boolean autoEvaluate) {
     mStatement = statement;
     mAutoEvaluate = autoEvaluate;
+  }
+
+  public void addTo(@NotNull final AsyncResultCollection<? super V> result) {
+    mStatement.addTo(result);
+  }
+
+  @NotNull
+  public Throwable failure() {
+    return mStatement.failure();
+  }
+
+  public boolean isCancelled() {
+    return mStatement.isCancelled();
+  }
+
+  public boolean isEvaluating() {
+    return mStatement.isEvaluating();
+  }
+
+  public boolean isFailed() {
+    return mStatement.isFailed();
+  }
+
+  public boolean isSet() {
+    return mStatement.isSet();
+  }
+
+  public void to(@NotNull final AsyncResult<? super V> result) {
+    throw new UnsupportedOperationException();
+  }
+
+  public V value() {
+    return mStatement.value();
   }
 
   @NotNull
@@ -201,35 +235,6 @@ class DefaultDeclaredStatement<V> implements DeclaredStatement<V> {
 
   public boolean waitDone(final long timeout, @NotNull final TimeUnit timeUnit) {
     throw new UnsupportedOperationException();
-  }
-
-  @NotNull
-  public Throwable failure() {
-    return mStatement.failure();
-  }
-
-  public boolean isCancelled() {
-    return mStatement.isCancelled();
-  }
-
-  public boolean isEvaluating() {
-    return mStatement.isEvaluating();
-  }
-
-  public boolean isFailed() {
-    return mStatement.isFailed();
-  }
-
-  public boolean isSet() {
-    return mStatement.isSet();
-  }
-
-  public void to(@NotNull final AsyncResult<? super V> result) {
-    throw new UnsupportedOperationException();
-  }
-
-  public V value() {
-    return mStatement.value();
   }
 
   @NotNull
