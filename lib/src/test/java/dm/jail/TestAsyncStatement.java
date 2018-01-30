@@ -17,7 +17,6 @@
 package dm.jail;
 
 import org.jetbrains.annotations.NotNull;
-import org.jetbrains.annotations.Nullable;
 import org.junit.Test;
 
 import java.io.ByteArrayInputStream;
@@ -27,7 +26,6 @@ import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.io.Serializable;
-import java.util.ArrayList;
 import java.util.Random;
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.ExecutionException;
@@ -38,7 +36,6 @@ import java.util.concurrent.atomic.AtomicReference;
 
 import dm.jail.async.Action;
 import dm.jail.async.AsyncResult;
-import dm.jail.async.AsyncResultCollection;
 import dm.jail.async.AsyncState;
 import dm.jail.async.AsyncStatement;
 import dm.jail.async.AsyncStatement.ForkCompleter;
@@ -132,8 +129,8 @@ public class TestAsyncStatement {
     final TestResultCollection<String> resultCollection = new TestResultCollection<String>();
     final AsyncStatement<String> statement = new Async().value("test");
     statement.addTo(resultCollection);
-    assertThat(resultCollection.states).hasSize(1);
-    assertThat(resultCollection.states.get(0).value()).isEqualTo("test");
+    assertThat(resultCollection.getStates()).hasSize(1);
+    assertThat(resultCollection.getStates().get(0).value()).isEqualTo("test");
   }
 
   @Test
@@ -141,8 +138,8 @@ public class TestAsyncStatement {
     final TestResultCollection<String> resultCollection = new TestResultCollection<String>();
     final AsyncStatement<String> statement = new Async().failure(new Exception("test"));
     statement.addTo(resultCollection);
-    assertThat(resultCollection.states).hasSize(1);
-    assertThat(resultCollection.states.get(0).failure().getMessage()).isEqualTo("test");
+    assertThat(resultCollection.getStates()).hasSize(1);
+    assertThat(resultCollection.getStates().get(0).failure().getMessage()).isEqualTo("test");
   }
 
   @Test
@@ -543,7 +540,8 @@ public class TestAsyncStatement {
 
   @Test
   public void evaluating() {
-    final AsyncStatement<Void> statement = new Async().statementDeclaration();
+    final AsyncStatement<String> statement =
+        new Async().value("test").on(withDelay(backgroundExecutor(), 1, TimeUnit.SECONDS));
     assertThat(statement.isEvaluating()).isTrue();
   }
 
@@ -2014,19 +2012,6 @@ public class TestAsyncStatement {
     new Async().value(null).whenDone(null);
   }
 
-  private static class AtomicCloseable implements Closeable {
-
-    private final AtomicBoolean mIsCalled = new AtomicBoolean();
-
-    boolean isCalled() {
-      return mIsCalled.get();
-    }
-
-    public void close() throws IOException {
-      mIsCalled.set(true);
-    }
-  }
-
   private static class Identity<V> implements Mapper<V, V> {
 
     public V apply(final V input) {
@@ -2069,48 +2054,6 @@ public class TestAsyncStatement {
   private static class Sink<V> implements Observer<V> {
 
     public void accept(final V input) {
-    }
-  }
-
-  private static class TestResultCollection<V> implements AsyncResultCollection<V> {
-
-    private ArrayList<AsyncState<V>> states = new ArrayList<AsyncState<V>>();
-
-    @NotNull
-    public AsyncResultCollection<V> addFailure(@NotNull final Throwable failure) {
-      states.add(SimpleState.<V>ofFailure(failure));
-      return this;
-    }
-
-    @NotNull
-    public AsyncResultCollection<V> addFailures(@Nullable final Iterable<Throwable> failures) {
-      if (failures != null) {
-        for (final Throwable failure : failures) {
-          states.add(SimpleState.<V>ofFailure(failure));
-        }
-      }
-
-      return this;
-    }
-
-    @NotNull
-    public AsyncResultCollection<V> addValue(final V value) {
-      states.add(SimpleState.ofValue(value));
-      return this;
-    }
-
-    @NotNull
-    public AsyncResultCollection<V> addValues(@Nullable final Iterable<V> values) {
-      if (values != null) {
-        for (final V value : values) {
-          states.add(SimpleState.ofValue(value));
-        }
-      }
-
-      return this;
-    }
-
-    public void set() {
     }
   }
 

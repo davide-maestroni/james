@@ -166,6 +166,11 @@ public class Async {
   }
 
   @NotNull
+  public <V> AsyncLoop<V> loop(@NotNull final AsyncStatement<? extends Iterable<V>> statement) {
+    return loop(new LoopObserver<V>(statement));
+  }
+
+  @NotNull
   public <V> AsyncLoop<V> loop(@NotNull final Observer<AsyncResultCollection<V>> observer) {
     return null;
   }
@@ -355,6 +360,37 @@ public class Async {
 
     public void accept(final AsyncResult<V> result) {
       result.fail(mFailure);
+    }
+  }
+
+  private static class LoopObserver<V>
+      implements RenewableObserver<AsyncResultCollection<V>>, Serializable {
+
+    private final AsyncStatement<? extends Iterable<V>> mStatement;
+
+    private LoopObserver(@NotNull final AsyncStatement<? extends Iterable<V>> statement) {
+      mStatement = ConstantConditions.notNull("statement", statement);
+    }
+
+    @NotNull
+    public Observer<AsyncResultCollection<V>> renew() {
+      return new LoopObserver<V>(mStatement.evaluate());
+    }
+
+    public void accept(final AsyncResultCollection<V> results) {
+      mStatement.then(new Mapper<Iterable<V>, Void>() {
+
+        public Void apply(final Iterable<V> values) {
+          results.addValues(values).set();
+          return null;
+        }
+      }).elseCatch(new Mapper<Throwable, Void>() {
+
+        public Void apply(final Throwable failure) {
+          results.addFailure(failure).set();
+          return null;
+        }
+      });
     }
   }
 

@@ -48,6 +48,12 @@ public abstract class SimpleState<V> implements AsyncState<V> {
     return (SimpleState<V>) PendingState.sInstance;
   }
 
+  @NotNull
+  @SuppressWarnings("unchecked")
+  public static <V> SimpleState<V> settled() {
+    return (SimpleState<V>) SettledState.sInstance;
+  }
+
   private static class FailureState<V> extends SimpleState<V> implements Serializable {
 
     private final Throwable mFailure;
@@ -100,7 +106,7 @@ public abstract class SimpleState<V> implements AsyncState<V> {
     }
 
     public void addTo(@NotNull final AsyncResultCollection<? super V> results) {
-      throw new IllegalStateException();
+      throw new UnsupportedOperationException();
     }
 
     @NotNull
@@ -125,7 +131,50 @@ public abstract class SimpleState<V> implements AsyncState<V> {
     }
 
     public void to(@NotNull final AsyncResult<? super V> result) {
+      throw new UnsupportedOperationException();
+    }
+
+    public V value() {
       throw new IllegalStateException();
+    }
+  }
+
+  private static class SettledState<V> extends SimpleState<V> implements Serializable {
+
+    private static final SettledState<?> sInstance = new SettledState<Object>();
+
+    @NotNull
+    Object readResolve() throws ObjectStreamException {
+      return sInstance;
+    }
+
+    public void addTo(@NotNull final AsyncResultCollection<? super V> results) {
+      throw new UnsupportedOperationException();
+    }
+
+    @NotNull
+    public Throwable failure() {
+      throw new IllegalStateException();
+    }
+
+    public boolean isCancelled() {
+      return false;
+    }
+
+    public boolean isFailed() {
+      return false;
+    }
+
+    public boolean isEvaluating() {
+      return false;
+    }
+
+    public boolean isSet() {
+      return false;
+    }
+
+    public void to(@NotNull final AsyncResult<? super V> result) {
+      throw new UnsupportedOperationException();
     }
 
     public V value() {

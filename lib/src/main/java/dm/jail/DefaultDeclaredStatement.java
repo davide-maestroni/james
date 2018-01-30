@@ -43,6 +43,8 @@ class DefaultDeclaredStatement<V> implements DeclaredStatement<V> {
 
   private final boolean mAutoEvaluate;
 
+  private final boolean mEvaluated;
+
   private final AsyncStatement<V> mStatement;
 
   DefaultDeclaredStatement(
@@ -56,15 +58,18 @@ class DefaultDeclaredStatement<V> implements DeclaredStatement<V> {
     }
 
     mAutoEvaluate = false;
+    mEvaluated = false;
   }
 
-  private DefaultDeclaredStatement(@NotNull final AsyncStatement<V> statement,
-      boolean autoEvaluate) {
+  private DefaultDeclaredStatement(@NotNull final AsyncStatement<V> statement, boolean autoEvaluate,
+      boolean evaluated) {
     mStatement = statement;
     mAutoEvaluate = autoEvaluate;
+    mEvaluated = evaluated;
   }
 
   public void addTo(@NotNull final AsyncResultCollection<? super V> results) {
+    checkSupported();
     mStatement.addTo(results);
   }
 
@@ -78,7 +83,7 @@ class DefaultDeclaredStatement<V> implements DeclaredStatement<V> {
   }
 
   public boolean isEvaluating() {
-    return mStatement.isEvaluating();
+    return mEvaluated && mStatement.isEvaluating();
   }
 
   public boolean isFailed() {
@@ -90,7 +95,8 @@ class DefaultDeclaredStatement<V> implements DeclaredStatement<V> {
   }
 
   public void to(@NotNull final AsyncResult<? super V> result) {
-    throw new UnsupportedOperationException();
+    checkSupported();
+    mStatement.to(result);
   }
 
   public V value() {
@@ -99,7 +105,8 @@ class DefaultDeclaredStatement<V> implements DeclaredStatement<V> {
 
   @NotNull
   public DeclaredStatement<V> autoEvaluate() {
-    return new DefaultDeclaredStatement<V>(mStatement, true);
+    final boolean evaluated = mEvaluated;
+    return new DefaultDeclaredStatement<V>(mStatement, !evaluated, evaluated);
   }
 
   @NotNull
@@ -185,6 +192,12 @@ class DefaultDeclaredStatement<V> implements DeclaredStatement<V> {
     return newInstance(mStatement.whenDone(action));
   }
 
+  @NotNull
+  public AsyncStatement<V> evaluated() {
+    final AsyncStatement<V> statement = mStatement;
+    return (mEvaluated) ? statement : statement.evaluate();
+  }
+
   public boolean cancel(final boolean mayInterruptIfRunning) {
     return mStatement.cancel(mayInterruptIfRunning);
   }
@@ -194,12 +207,14 @@ class DefaultDeclaredStatement<V> implements DeclaredStatement<V> {
   }
 
   public V get() throws InterruptedException, ExecutionException {
-    throw new UnsupportedOperationException();
+    checkSupported();
+    return mStatement.get();
   }
 
   public V get(final long timeout, @NotNull final TimeUnit timeUnit) throws InterruptedException,
       ExecutionException, TimeoutException {
-    throw new UnsupportedOperationException();
+    checkSupported();
+    return mStatement.get(timeout, timeUnit);
   }
 
   @NotNull
@@ -209,20 +224,24 @@ class DefaultDeclaredStatement<V> implements DeclaredStatement<V> {
 
   @Nullable
   public FailureException getFailure() {
-    throw new UnsupportedOperationException();
+    checkSupported();
+    return mStatement.getFailure();
   }
 
   @Nullable
   public FailureException getFailure(final long timeout, @NotNull final TimeUnit timeUnit) {
-    throw new UnsupportedOperationException();
+    checkSupported();
+    return mStatement.getFailure(timeout, timeUnit);
   }
 
   public V getValue() {
-    throw new UnsupportedOperationException();
+    checkSupported();
+    return mStatement.getValue();
   }
 
   public V getValue(final long timeout, @NotNull final TimeUnit timeUnit) {
-    throw new UnsupportedOperationException();
+    checkSupported();
+    return mStatement.getValue(timeout, timeUnit);
   }
 
   public boolean isFinal() {
@@ -230,17 +249,26 @@ class DefaultDeclaredStatement<V> implements DeclaredStatement<V> {
   }
 
   public void waitDone() {
-    throw new UnsupportedOperationException();
+    checkSupported();
+    mStatement.waitDone();
   }
 
   public boolean waitDone(final long timeout, @NotNull final TimeUnit timeUnit) {
-    throw new UnsupportedOperationException();
+    checkSupported();
+    return mStatement.waitDone(timeout, timeUnit);
+  }
+
+  private void checkSupported() {
+    if (!mEvaluated) {
+      throw new UnsupportedOperationException();
+    }
   }
 
   @NotNull
   private <R> DeclaredStatement<R> newInstance(@NotNull final AsyncStatement<R> statement) {
-    final AsyncStatement<R> newStatement = (mAutoEvaluate) ? statement.evaluate() : statement;
-    return new DefaultDeclaredStatement<R>(newStatement, false);
+    final boolean autoEvaluate = mAutoEvaluate;
+    final AsyncStatement<R> newStatement = autoEvaluate ? statement.evaluate() : statement;
+    return new DefaultDeclaredStatement<R>(newStatement, false, autoEvaluate || mEvaluated);
   }
 
   private static class DeferredObserver<V>

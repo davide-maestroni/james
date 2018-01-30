@@ -82,4 +82,7 @@ public interface DeclaredStatement<V> extends AsyncStatement<V>, Serializable {
 
   @NotNull
   DeclaredStatement<V> whenDone(@NotNull Action action);
+
+  @NotNull
+  AsyncStatement<V> evaluated();
 }
