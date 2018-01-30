@@ -62,21 +62,6 @@ import static org.assertj.core.api.Assertions.assertThat;
  */
 public class TestAsyncStatement {
 
-  // TODO: 27/01/2018 observer throws 
-  // TODO: 27/01/2018 closeable null + throws
-  // TODO: 27/01/2018 cancel forked branch
-  // TODO: 27/01/2018 fork functions
-  // TODO: 27/01/2018 chain illegalstate
-  // TODO: 27/01/2018 chain get + fork get
-  // TODO: 27/01/2018 evaluating getValue
-  // TODO: 27/01/2018 catch filtered exception type
-  // TODO: 27/01/2018 forker throws
-  // TODO: 26/01/2018 NPE then and below + if => null statement
-  // TODO: 26/01/2018 evaluate/then/fork serialization (elseDo, elseIf, thenDo, thenIf, thenTry,
-  // TODO: thenDoTry, thenIfTry, whenDone)
-
-  // TODO: 29/01/2018 addTo
-
   @NotNull
   private static AsyncStatement<String> createStatement() {
     return new Async().value("test").then(new Mapper<String, String>() {
@@ -149,6 +134,15 @@ public class TestAsyncStatement {
     statement.addTo(resultCollection);
     assertThat(resultCollection.states).hasSize(1);
     assertThat(resultCollection.states.get(0).value()).isEqualTo("test");
+  }
+
+  @Test
+  public void addToFailure() {
+    final TestResultCollection<String> resultCollection = new TestResultCollection<String>();
+    final AsyncStatement<String> statement = new Async().failure(new Exception("test"));
+    statement.addTo(resultCollection);
+    assertThat(resultCollection.states).hasSize(1);
+    assertThat(resultCollection.states.get(0).failure().getMessage()).isEqualTo("test");
   }
 
   @Test

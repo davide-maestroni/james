@@ -56,8 +56,8 @@ public abstract class SimpleState<V> implements AsyncState<V> {
       mFailure = ConstantConditions.notNull("failure", failure);
     }
 
-    public void addTo(@NotNull final AsyncResultCollection<? super V> result) {
-      result.addFailure(mFailure);
+    public void addTo(@NotNull final AsyncResultCollection<? super V> results) {
+      results.addFailure(mFailure);
     }
 
     @NotNull
@@ -99,7 +99,7 @@ public abstract class SimpleState<V> implements AsyncState<V> {
       return sInstance;
     }
 
-    public void addTo(@NotNull final AsyncResultCollection<? super V> result) {
+    public void addTo(@NotNull final AsyncResultCollection<? super V> results) {
       throw new IllegalStateException();
     }
 
@@ -141,8 +141,8 @@ public abstract class SimpleState<V> implements AsyncState<V> {
       mValue = value;
     }
 
-    public void addTo(@NotNull final AsyncResultCollection<? super V> result) {
-      result.addValue(mValue);
+    public void addTo(@NotNull final AsyncResultCollection<? super V> results) {
+      results.addValue(mValue);
     }
 
     @NotNull

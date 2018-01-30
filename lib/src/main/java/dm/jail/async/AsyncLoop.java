@@ -168,6 +168,8 @@ public interface AsyncLoop<V> extends AsyncStatement<Iterable<V>>, Serializable 
   @NotNull
   List<V> takeValues(int maxSize, long timeout, @NotNull TimeUnit timeUnit);
 
+  void to(@NotNull AsyncResultCollection<? super V> results);
+
   @NotNull
   <R, S> AsyncLoop<R> tryYield(@NotNull Mapper<? super V, ? extends Closeable> closeable,
       @NotNull Looper<S, ? super V, R> looper);

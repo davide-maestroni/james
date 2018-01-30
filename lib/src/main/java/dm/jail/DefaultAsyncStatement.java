@@ -203,18 +203,18 @@ class DefaultAsyncStatement<V> implements AsyncStatement<V>, Serializable {
     }
   }
 
-  public void addTo(@NotNull final AsyncResultCollection<? super V> result) {
-    ConstantConditions.notNull("result", result);
+  public void addTo(@NotNull final AsyncResultCollection<? super V> results) {
+    ConstantConditions.notNull("result", results);
     then(new Mapper<V, Void>() {
 
       public Void apply(final V value) {
-        result.addValue(value);
+        results.addValue(value);
         return null;
       }
     }).elseCatch(new Mapper<Throwable, Void>() {
 
       public Void apply(final Throwable failure) {
-        result.addFailure(failure);
+        results.addFailure(failure);
         return null;
       }
     });

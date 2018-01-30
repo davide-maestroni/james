@@ -25,7 +25,7 @@ import java.io.Serializable;
  */
 public interface AsyncState<V> extends Serializable {
 
-  void addTo(@NotNull AsyncResultCollection<? super V> result);
+  void addTo(@NotNull AsyncResultCollection<? super V> results);
 
   @NotNull
   Throwable failure();
