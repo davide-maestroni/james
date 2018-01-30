@@ -654,6 +654,7 @@ class DefaultAsyncStatement<V> implements AsyncStatement<V>, Serializable {
     return observer;
   }
 
+  @NotNull
   private Object writeReplace() throws ObjectStreamException {
     final ArrayList<StatementChain<?, ?>> chains = new ArrayList<StatementChain<?, ?>>();
     final ChainHead<?> head = mHead;
@@ -709,6 +710,7 @@ class DefaultAsyncStatement<V> implements AsyncStatement<V>, Serializable {
       return new ChainForkObserver<S, V>(observer);
     }
 
+    @NotNull
     private Object writeReplace() throws ObjectStreamException {
       return new ObserverProxy<S, V>(mObserver);
     }
@@ -750,6 +752,7 @@ class DefaultAsyncStatement<V> implements AsyncStatement<V>, Serializable {
       return new ChainHandler<V, R>(mHandler);
     }
 
+    @NotNull
     private Object writeReplace() throws ObjectStreamException {
       return new ChainProxy<V, R>(mHandler);
     }
@@ -1025,6 +1028,7 @@ class DefaultAsyncStatement<V> implements AsyncStatement<V>, Serializable {
       super.failure(failure, result);
     }
 
+    @NotNull
     private Object writeReplace() throws ObjectStreamException {
       return new HandlerProxy<V>(mMapper, mTypes);
     }
@@ -1067,6 +1071,7 @@ class DefaultAsyncStatement<V> implements AsyncStatement<V>, Serializable {
       }
     }
 
+    @NotNull
     private Object writeReplace() throws ObjectStreamException {
       return new HandlerProxy<V>(mObserver, mTypes);
     }
@@ -1121,6 +1126,7 @@ class DefaultAsyncStatement<V> implements AsyncStatement<V>, Serializable {
       }
     }
 
+    @NotNull
     private Object writeReplace() throws ObjectStreamException {
       return new HandlerProxy<V>(mMapper, mTypes);
     }
@@ -1268,6 +1274,7 @@ class DefaultAsyncStatement<V> implements AsyncStatement<V>, Serializable {
       results.clear();
     }
 
+    @NotNull
     private Object writeReplace() throws ObjectStreamException {
       return new ObserverProxy<S, V>(mStatement, mForker);
     }
@@ -1516,6 +1523,7 @@ class DefaultAsyncStatement<V> implements AsyncStatement<V>, Serializable {
       mObserver = ConstantConditions.notNull("observer", observer);
     }
 
+    @NotNull
     private Object writeReplace() throws ObjectStreamException {
       return new HandlerProxy<V, R>(mObserver);
     }
@@ -1555,6 +1563,7 @@ class DefaultAsyncStatement<V> implements AsyncStatement<V>, Serializable {
       mMapper = ConstantConditions.notNull("mapper", mapper);
     }
 
+    @NotNull
     private Object writeReplace() throws ObjectStreamException {
       return new HandlerProxy<V, R>(mMapper);
     }
@@ -1593,6 +1602,7 @@ class DefaultAsyncStatement<V> implements AsyncStatement<V>, Serializable {
       mMapper = ConstantConditions.notNull("mapper", mapper);
     }
 
+    @NotNull
     private Object writeReplace() throws ObjectStreamException {
       return new HandlerProxy<V, R>(mMapper);
     }
@@ -1639,6 +1649,7 @@ class DefaultAsyncStatement<V> implements AsyncStatement<V>, Serializable {
       mLogger = Logger.newLogger(printer, level, this);
     }
 
+    @NotNull
     private Object writeReplace() throws ObjectStreamException {
       final Logger logger = mLogger;
       return new HandlerProxy<V, R>(mCloseable, mHandler, logger.getLogPrinter(),
@@ -1695,6 +1706,7 @@ class DefaultAsyncStatement<V> implements AsyncStatement<V>, Serializable {
       mLogger = Logger.newLogger(printer, level, this);
     }
 
+    @NotNull
     private Object writeReplace() throws ObjectStreamException {
       final Logger logger = mLogger;
       return new HandlerProxy<V, R>(mCloseable, mMapper, logger.getLogPrinter(),
@@ -1744,6 +1756,7 @@ class DefaultAsyncStatement<V> implements AsyncStatement<V>, Serializable {
       mAction = ConstantConditions.notNull("action", action);
     }
 
+    @NotNull
     private Object writeReplace() throws ObjectStreamException {
       return new HandlerProxy<V>(mAction);
     }

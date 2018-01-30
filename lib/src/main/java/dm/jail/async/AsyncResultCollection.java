@@ -22,7 +22,7 @@ import org.jetbrains.annotations.Nullable;
 /**
  * Created by davide-maestroni on 01/08/2018.
  */
-public interface AsyncResultCollection<V> extends AsyncResult<Iterable<V>> {
+public interface AsyncResultCollection<V> {
 
   @NotNull
   AsyncResultCollection<V> addFailure(@NotNull Throwable failure);
@@ -34,7 +34,7 @@ public interface AsyncResultCollection<V> extends AsyncResult<Iterable<V>> {
   AsyncResultCollection<V> addValue(V value);
 
   @NotNull
-  AsyncResultCollection<V> addValues(@Nullable Iterable<V> value);
+  AsyncResultCollection<V> addValues(@Nullable Iterable<V> values);
 
   void set();
 }

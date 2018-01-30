@@ -169,6 +169,28 @@ public interface AsyncLoop<V> extends AsyncStatement<Iterable<V>>, Serializable 
   List<V> takeValues(int maxSize, long timeout, @NotNull TimeUnit timeUnit);
 
   @NotNull
+  <R, S> AsyncLoop<R> tryYield(@NotNull Mapper<? super V, ? extends Closeable> closeable,
+      @NotNull Looper<S, ? super V, R> looper);
+
+  @NotNull
+  <R, S> AsyncLoop<R> tryYield(@NotNull Mapper<? super V, ? extends Closeable> closeable,
+      @Nullable Provider<S> init, @Nullable Mapper<S, ? extends Boolean> loop,
+      @Nullable LoopUpdater<S, ? super V, ? super Generator<R>> value,
+      @Nullable LoopUpdater<S, ? super Throwable, ? super Generator<R>> failure,
+      @Nullable LoopCompleter<S, ? super Generator<R>> done);
+
+  @NotNull
+  <R, S> AsyncLoop<R> tryYieldOrdered(@NotNull Mapper<? super V, ? extends Closeable> closeable,
+      @NotNull Looper<S, ? super V, R> looper);
+
+  @NotNull
+  <R, S> AsyncLoop<R> tryYieldOrdered(@NotNull Mapper<? super V, ? extends Closeable> closeable,
+      @Nullable Provider<S> init, @Nullable Mapper<S, ? extends Boolean> loop,
+      @Nullable LoopUpdater<S, ? super V, ? super Generator<R>> value,
+      @Nullable LoopUpdater<S, ? super Throwable, ? super Generator<R>> failure,
+      @Nullable LoopCompleter<S, ? super Generator<R>> done);
+
+  @NotNull
   Iterator<V> valueIterator();
 
   @NotNull
@@ -189,28 +211,6 @@ public interface AsyncLoop<V> extends AsyncStatement<Iterable<V>>, Serializable 
   @NotNull
   <R, S> AsyncLoop<R> yieldOrdered(@Nullable Provider<S> init,
       @Nullable Mapper<S, ? extends Boolean> loop,
-      @Nullable LoopUpdater<S, ? super V, ? super Generator<R>> value,
-      @Nullable LoopUpdater<S, ? super Throwable, ? super Generator<R>> failure,
-      @Nullable LoopCompleter<S, ? super Generator<R>> done);
-
-  @NotNull
-  <R, S> AsyncLoop<R> yieldTry(@NotNull Mapper<? super V, ? extends Closeable> closeable,
-      @NotNull Looper<S, ? super V, R> looper);
-
-  @NotNull
-  <R, S> AsyncLoop<R> yieldTry(@NotNull Mapper<? super V, ? extends Closeable> closeable,
-      @Nullable Provider<S> init, @Nullable Mapper<S, ? extends Boolean> loop,
-      @Nullable LoopUpdater<S, ? super V, ? super Generator<R>> value,
-      @Nullable LoopUpdater<S, ? super Throwable, ? super Generator<R>> failure,
-      @Nullable LoopCompleter<S, ? super Generator<R>> done);
-
-  @NotNull
-  <R, S> AsyncLoop<R> yieldTryOrdered(@NotNull Mapper<? super V, ? extends Closeable> closeable,
-      @NotNull Looper<S, ? super V, R> looper);
-
-  @NotNull
-  <R, S> AsyncLoop<R> yieldTryOrdered(@NotNull Mapper<? super V, ? extends Closeable> closeable,
-      @Nullable Provider<S> init, @Nullable Mapper<S, ? extends Boolean> loop,
       @Nullable LoopUpdater<S, ? super V, ? super Generator<R>> value,
       @Nullable LoopUpdater<S, ? super Throwable, ? super Generator<R>> failure,
       @Nullable LoopCompleter<S, ? super Generator<R>> done);

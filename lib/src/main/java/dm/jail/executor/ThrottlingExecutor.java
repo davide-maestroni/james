@@ -126,6 +126,7 @@ class ThrottlingExecutor extends ScheduledExecutorDecorator implements Serializa
     return throttlingCommand;
   }
 
+  @NotNull
   private Object writeReplace() throws ObjectStreamException {
     return new ExecutorProxy(mExecutor, mMaxRunning);
   }

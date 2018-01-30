@@ -98,6 +98,7 @@ class ScheduledThreadPoolExecutorService extends ScheduledThreadPoolExecutor
         delay, unit);
   }
 
+  @NotNull
   private Object writeReplace() throws ObjectStreamException {
     return new ExecutorProxy(mExecutor);
   }

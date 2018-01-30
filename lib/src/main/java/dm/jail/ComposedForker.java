@@ -89,6 +89,7 @@ class ComposedForker<S, V>
     return mValue.update(statement, stack, value);
   }
 
+  @NotNull
   private Object writeReplace() throws ObjectStreamException {
     return new BuffererProxy<S, V>(mInit, mValue, mFailure, mDone, mStatement);
   }

@@ -98,6 +98,7 @@ class ServiceExecutor extends AsyncExecutor implements Serializable {
     return Boolean.TRUE.equals(mIsManaged.get());
   }
 
+  @NotNull
   private Object writeReplace() throws ObjectStreamException {
     return new ExecutorProxy(mService);
   }

@@ -79,6 +79,7 @@ class DelayedExecutor extends ScheduledExecutorDecorator implements Serializable
     super.execute(command, newDelay, newUnit);
   }
 
+  @NotNull
   private Object writeReplace() throws ObjectStreamException {
     return new ExecutorProxy(mExecutor, mDelay, mTimeUnit);
   }

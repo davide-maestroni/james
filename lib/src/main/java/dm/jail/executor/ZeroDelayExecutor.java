@@ -99,6 +99,7 @@ class ZeroDelayExecutor extends ScheduledExecutorDecorator implements Serializab
     }
   }
 
+  @NotNull
   private Object writeReplace() throws ObjectStreamException {
     return new ExecutorProxy(mExecutor);
   }

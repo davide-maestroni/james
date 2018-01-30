@@ -101,6 +101,7 @@ class DynamicScheduledThreadPoolExecutorService extends ScheduledThreadPoolExecu
     mThreadFactory = threadFactory;
   }
 
+  @NotNull
   private Object writeReplace() throws ObjectStreamException {
     return new ExecutorProxy(mCorePoolSize, mMaxPoolSize, mKeepAliveTime, mKeepAliveUnit,
         mThreadFactory);

@@ -175,6 +175,7 @@ class PriorityExecutor {
       mPriority = priority;
     }
 
+    @NotNull
     private Object writeReplace() throws ObjectStreamException {
       return new ExecutorProxy(mExecutor, mPriority);
     }

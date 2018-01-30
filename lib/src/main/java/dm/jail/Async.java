@@ -318,6 +318,7 @@ public class Async {
       }
     }
 
+    @NotNull
     private Object writeReplace() throws ObjectStreamException {
       return new ObserverProxy<V>(mObserver, mExecutor);
     }

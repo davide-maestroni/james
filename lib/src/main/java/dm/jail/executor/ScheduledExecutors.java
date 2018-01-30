@@ -333,6 +333,7 @@ public class ScheduledExecutors {
       super(optimizedExecutor(Thread.MIN_PRIORITY));
     }
 
+    @NotNull
     private Object writeReplace() throws ObjectStreamException {
       return new ExecutorProxy();
     }
@@ -355,6 +356,7 @@ public class ScheduledExecutors {
       super(optimizedExecutor(Thread.NORM_PRIORITY));
     }
 
+    @NotNull
     private Object writeReplace() throws ObjectStreamException {
       return new ExecutorProxy();
     }
@@ -398,6 +400,7 @@ public class ScheduledExecutors {
       super(optimizedExecutor(Thread.MAX_PRIORITY));
     }
 
+    @NotNull
     private Object writeReplace() throws ObjectStreamException {
       return new ExecutorProxy();
     }
@@ -426,6 +429,7 @@ public class ScheduledExecutors {
       mPoolSize = poolSize;
     }
 
+    @NotNull
     private Object writeReplace() throws ObjectStreamException {
       return new ExecutorProxy(mPoolSize);
     }

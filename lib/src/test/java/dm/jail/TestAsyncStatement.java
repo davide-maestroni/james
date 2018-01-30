@@ -17,6 +17,7 @@
 package dm.jail;
 
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 import org.junit.Test;
 
 import java.io.ByteArrayInputStream;
@@ -25,6 +26,8 @@ import java.io.Closeable;
 import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
+import java.io.Serializable;
+import java.util.ArrayList;
 import java.util.Random;
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.ExecutionException;
@@ -33,7 +36,9 @@ import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 
+import dm.jail.async.Action;
 import dm.jail.async.AsyncResult;
+import dm.jail.async.AsyncResultCollection;
 import dm.jail.async.AsyncState;
 import dm.jail.async.AsyncStatement;
 import dm.jail.async.AsyncStatement.ForkCompleter;
@@ -42,6 +47,9 @@ import dm.jail.async.AsyncStatement.Forker;
 import dm.jail.async.Mapper;
 import dm.jail.async.Observer;
 import dm.jail.async.SimpleState;
+import dm.jail.log.LogPrinter;
+import dm.jail.log.LogPrinters;
+import dm.jail.log.Logger;
 import dm.jail.util.ConstantConditions;
 import dm.jail.util.RuntimeTimeoutException;
 
@@ -64,9 +72,9 @@ public class TestAsyncStatement {
   // TODO: 27/01/2018 catch filtered exception type
   // TODO: 27/01/2018 forker throws
   // TODO: 26/01/2018 NPE then and below + if => null statement
-
   // TODO: 26/01/2018 evaluate/then/fork serialization (elseDo, elseIf, thenDo, thenIf, thenTry,
   // TODO: thenDoTry, thenIfTry, whenDone)
+
   // TODO: 29/01/2018 addTo
 
   @NotNull
@@ -132,6 +140,15 @@ public class TestAsyncStatement {
         return SimpleState.ofValue(value);
       }
     });
+  }
+
+  @Test
+  public void addTo() {
+    final TestResultCollection<String> resultCollection = new TestResultCollection<String>();
+    final AsyncStatement<String> statement = new Async().value("test");
+    statement.addTo(resultCollection);
+    assertThat(resultCollection.states).hasSize(1);
+    assertThat(resultCollection.states.get(0).value()).isEqualTo("test");
   }
 
   @Test
@@ -1137,6 +1154,56 @@ public class TestAsyncStatement {
     assertThat(deserialized.getValue()).isEqualTo("TEST");
   }
 
+  @Test
+  public void serializeElse() throws IOException, ClassNotFoundException {
+    final AsyncStatement<String> statement =
+        new Async().<String>failure(new IllegalArgumentException("test")).elseCatch(
+            new ToMessage());
+    final ByteArrayOutputStream byteOutputStream = new ByteArrayOutputStream();
+    final ObjectOutputStream objectOutputStream = new ObjectOutputStream(byteOutputStream);
+    objectOutputStream.writeObject(statement);
+    final ByteArrayInputStream byteInputStream =
+        new ByteArrayInputStream(byteOutputStream.toByteArray());
+    final ObjectInputStream objectInputStream = new ObjectInputStream(byteInputStream);
+    @SuppressWarnings("unchecked") final AsyncStatement<String> deserialized =
+        (AsyncStatement<String>) objectInputStream.readObject();
+    assertThat(deserialized.getValue()).isEqualTo("test");
+  }
+
+  @Test
+  public void serializeElseDo() throws IOException, ClassNotFoundException {
+    final AsyncStatement<String> statement =
+        new Async().<String>failure(new IllegalArgumentException("test")).elseDo(
+            new PrintMessage(LogPrinters.systemPrinter()));
+    final ByteArrayOutputStream byteOutputStream = new ByteArrayOutputStream();
+    final ObjectOutputStream objectOutputStream = new ObjectOutputStream(byteOutputStream);
+    objectOutputStream.writeObject(statement);
+    final ByteArrayInputStream byteInputStream =
+        new ByteArrayInputStream(byteOutputStream.toByteArray());
+    final ObjectInputStream objectInputStream = new ObjectInputStream(byteInputStream);
+    @SuppressWarnings("unchecked") final AsyncStatement<String> deserialized =
+        (AsyncStatement<String>) objectInputStream.readObject();
+    assertThat(
+        ConstantConditions.notNull(deserialized.getFailure()).getCause().getMessage()).isEqualTo(
+        "test");
+  }
+
+  @Test
+  public void serializeElseIf() throws IOException, ClassNotFoundException {
+    final AsyncStatement<String> statement =
+        new Async().<String>failure(new IllegalArgumentException("test")).elseIf(
+            new ToMessageStatement());
+    final ByteArrayOutputStream byteOutputStream = new ByteArrayOutputStream();
+    final ObjectOutputStream objectOutputStream = new ObjectOutputStream(byteOutputStream);
+    objectOutputStream.writeObject(statement);
+    final ByteArrayInputStream byteInputStream =
+        new ByteArrayInputStream(byteOutputStream.toByteArray());
+    final ObjectInputStream objectInputStream = new ObjectInputStream(byteInputStream);
+    @SuppressWarnings("unchecked") final AsyncStatement<String> deserialized =
+        (AsyncStatement<String>) objectInputStream.readObject();
+    assertThat(deserialized.getValue()).isEqualTo("test");
+  }
+
   @Test(expected = IOException.class)
   public void serializeError() throws IOException, ClassNotFoundException {
     final AsyncStatement<String> promise =
@@ -1219,6 +1286,113 @@ public class TestAsyncStatement {
     @SuppressWarnings("unchecked") final AsyncStatement<String> deserialized =
         (AsyncStatement<String>) objectInputStream.readObject();
     assertThat(deserialized.getValue()).isEqualTo("TEST");
+  }
+
+  @Test
+  public void serializeThen() throws IOException, ClassNotFoundException {
+    final AsyncStatement<String> statement = new Async().value("test").then(new ToUpper());
+    final ByteArrayOutputStream byteOutputStream = new ByteArrayOutputStream();
+    final ObjectOutputStream objectOutputStream = new ObjectOutputStream(byteOutputStream);
+    objectOutputStream.writeObject(statement);
+    final ByteArrayInputStream byteInputStream =
+        new ByteArrayInputStream(byteOutputStream.toByteArray());
+    final ObjectInputStream objectInputStream = new ObjectInputStream(byteInputStream);
+    @SuppressWarnings("unchecked") final AsyncStatement<String> deserialized =
+        (AsyncStatement<String>) objectInputStream.readObject();
+    assertThat(deserialized.getValue()).isEqualTo("TEST");
+  }
+
+  @Test
+  public void serializeThenDo() throws IOException, ClassNotFoundException {
+    final AsyncStatement<String> statement =
+        new Async().value("test").thenDo(new PrintString(LogPrinters.systemPrinter()));
+    final ByteArrayOutputStream byteOutputStream = new ByteArrayOutputStream();
+    final ObjectOutputStream objectOutputStream = new ObjectOutputStream(byteOutputStream);
+    objectOutputStream.writeObject(statement);
+    final ByteArrayInputStream byteInputStream =
+        new ByteArrayInputStream(byteOutputStream.toByteArray());
+    final ObjectInputStream objectInputStream = new ObjectInputStream(byteInputStream);
+    @SuppressWarnings("unchecked") final AsyncStatement<String> deserialized =
+        (AsyncStatement<String>) objectInputStream.readObject();
+    assertThat(deserialized.getValue()).isEqualTo("test");
+  }
+
+  @Test
+  public void serializeThenIf() throws IOException, ClassNotFoundException {
+    final AsyncStatement<String> statement =
+        new Async().value("test").thenIf(new ToUpperStatement());
+    final ByteArrayOutputStream byteOutputStream = new ByteArrayOutputStream();
+    final ObjectOutputStream objectOutputStream = new ObjectOutputStream(byteOutputStream);
+    objectOutputStream.writeObject(statement);
+    final ByteArrayInputStream byteInputStream =
+        new ByteArrayInputStream(byteOutputStream.toByteArray());
+    final ObjectInputStream objectInputStream = new ObjectInputStream(byteInputStream);
+    @SuppressWarnings("unchecked") final AsyncStatement<String> deserialized =
+        (AsyncStatement<String>) objectInputStream.readObject();
+    assertThat(deserialized.getValue()).isEqualTo("TEST");
+  }
+
+  @Test
+  public void serializeThenTry() throws IOException, ClassNotFoundException {
+    final AsyncStatement<AtomicBoolean> statement = new Async().value(new AtomicBoolean())
+                                                               .thenTry(new ToCloseable(),
+                                                                   new Identity<AtomicBoolean>());
+    final ByteArrayOutputStream byteOutputStream = new ByteArrayOutputStream();
+    final ObjectOutputStream objectOutputStream = new ObjectOutputStream(byteOutputStream);
+    objectOutputStream.writeObject(statement);
+    final ByteArrayInputStream byteInputStream =
+        new ByteArrayInputStream(byteOutputStream.toByteArray());
+    final ObjectInputStream objectInputStream = new ObjectInputStream(byteInputStream);
+    @SuppressWarnings("unchecked") final AsyncStatement<AtomicBoolean> deserialized =
+        (AsyncStatement<AtomicBoolean>) objectInputStream.readObject();
+    assertThat(deserialized.getValue().get()).isTrue();
+  }
+
+  @Test
+  public void serializeThenTryDo() throws IOException, ClassNotFoundException {
+    final AsyncStatement<AtomicBoolean> statement = new Async().value(new AtomicBoolean())
+                                                               .thenTryDo(new ToCloseable(),
+                                                                   new Sink<AtomicBoolean>());
+    final ByteArrayOutputStream byteOutputStream = new ByteArrayOutputStream();
+    final ObjectOutputStream objectOutputStream = new ObjectOutputStream(byteOutputStream);
+    objectOutputStream.writeObject(statement);
+    final ByteArrayInputStream byteInputStream =
+        new ByteArrayInputStream(byteOutputStream.toByteArray());
+    final ObjectInputStream objectInputStream = new ObjectInputStream(byteInputStream);
+    @SuppressWarnings("unchecked") final AsyncStatement<AtomicBoolean> deserialized =
+        (AsyncStatement<AtomicBoolean>) objectInputStream.readObject();
+    assertThat(deserialized.getValue().get()).isTrue();
+  }
+
+  @Test
+  public void serializeThenTryIf() throws IOException, ClassNotFoundException {
+    final AsyncStatement<AtomicBoolean> statement = new Async().value(new AtomicBoolean())
+                                                               .thenTryIf(new ToCloseable(),
+                                                                   new ToStatement<AtomicBoolean>
+                                                                       ());
+    final ByteArrayOutputStream byteOutputStream = new ByteArrayOutputStream();
+    final ObjectOutputStream objectOutputStream = new ObjectOutputStream(byteOutputStream);
+    objectOutputStream.writeObject(statement);
+    final ByteArrayInputStream byteInputStream =
+        new ByteArrayInputStream(byteOutputStream.toByteArray());
+    final ObjectInputStream objectInputStream = new ObjectInputStream(byteInputStream);
+    @SuppressWarnings("unchecked") final AsyncStatement<AtomicBoolean> deserialized =
+        (AsyncStatement<AtomicBoolean>) objectInputStream.readObject();
+    assertThat(deserialized.getValue().get()).isTrue();
+  }
+
+  @Test
+  public void serializeWhenDone() throws IOException, ClassNotFoundException {
+    final AsyncStatement<String> statement = new Async().value("test").whenDone(new NoOp());
+    final ByteArrayOutputStream byteOutputStream = new ByteArrayOutputStream();
+    final ObjectOutputStream objectOutputStream = new ObjectOutputStream(byteOutputStream);
+    objectOutputStream.writeObject(statement);
+    final ByteArrayInputStream byteInputStream =
+        new ByteArrayInputStream(byteOutputStream.toByteArray());
+    final ObjectInputStream objectInputStream = new ObjectInputStream(byteInputStream);
+    @SuppressWarnings("unchecked") final AsyncStatement<String> deserialized =
+        (AsyncStatement<String>) objectInputStream.readObject();
+    assertThat(deserialized.getValue()).isEqualTo("test");
   }
 
   @Test
@@ -1859,10 +2033,137 @@ public class TestAsyncStatement {
     }
   }
 
+  private static class Identity<V> implements Mapper<V, V> {
+
+    public V apply(final V input) {
+      return input;
+    }
+  }
+
+  private static class NoOp implements Action {
+
+    public void perform() {
+    }
+  }
+
+  private static class PrintMessage implements Observer<Throwable>, Serializable {
+
+    private final LogPrinter mLogPrinter;
+
+    private PrintMessage(@NotNull final LogPrinter logPrinter) {
+      mLogPrinter = logPrinter;
+    }
+
+    public void accept(final Throwable input) {
+      Logger.newLogger(mLogPrinter, null, this).err(input);
+    }
+  }
+
+  private static class PrintString implements Observer<String>, Serializable {
+
+    private final LogPrinter mLogPrinter;
+
+    private PrintString(@NotNull final LogPrinter logPrinter) {
+      mLogPrinter = logPrinter;
+    }
+
+    public void accept(final String input) {
+      Logger.newLogger(mLogPrinter, null, this).dbg(input);
+    }
+  }
+
+  private static class Sink<V> implements Observer<V> {
+
+    public void accept(final V input) {
+    }
+  }
+
+  private static class TestResultCollection<V> implements AsyncResultCollection<V> {
+
+    private ArrayList<AsyncState<V>> states = new ArrayList<AsyncState<V>>();
+
+    @NotNull
+    public AsyncResultCollection<V> addFailure(@NotNull final Throwable failure) {
+      states.add(SimpleState.<V>ofFailure(failure));
+      return this;
+    }
+
+    @NotNull
+    public AsyncResultCollection<V> addFailures(@Nullable final Iterable<Throwable> failures) {
+      if (failures != null) {
+        for (final Throwable failure : failures) {
+          states.add(SimpleState.<V>ofFailure(failure));
+        }
+      }
+
+      return this;
+    }
+
+    @NotNull
+    public AsyncResultCollection<V> addValue(final V value) {
+      states.add(SimpleState.ofValue(value));
+      return this;
+    }
+
+    @NotNull
+    public AsyncResultCollection<V> addValues(@Nullable final Iterable<V> values) {
+      if (values != null) {
+        for (final V value : values) {
+          states.add(SimpleState.ofValue(value));
+        }
+      }
+
+      return this;
+    }
+
+    public void set() {
+    }
+  }
+
+  private static class ToCloseable implements Mapper<AtomicBoolean, Closeable> {
+
+    public Closeable apply(final AtomicBoolean input) {
+      return new Closeable() {
+
+        public void close() {
+          input.set(true);
+        }
+      };
+    }
+  }
+
+  private static class ToMessage implements Mapper<Throwable, String> {
+
+    public String apply(final Throwable input) {
+      return input.getMessage();
+    }
+  }
+
+  private static class ToMessageStatement implements Mapper<Throwable, AsyncStatement<String>> {
+
+    public AsyncStatement<String> apply(final Throwable input) {
+      return new Async().value(input.getMessage());
+    }
+  }
+
+  private static class ToStatement<V> implements Mapper<V, AsyncStatement<V>> {
+
+    public AsyncStatement<V> apply(final V input) {
+      return new Async().value(input);
+    }
+  }
+
   private static class ToUpper implements Mapper<String, String> {
 
     public String apply(final String input) {
       return input.toUpperCase();
+    }
+  }
+
+  private static class ToUpperStatement implements Mapper<String, AsyncStatement<String>> {
+
+    public AsyncStatement<String> apply(final String input) {
+      return new Async().value(input.toUpperCase());
     }
   }
 }
