@@ -34,16 +34,16 @@ public interface DeclaredStatement<V> extends AsyncStatement<V>, Serializable {
 
   @NotNull
   DeclaredStatement<V> elseCatch(@NotNull Mapper<? super Throwable, ? extends V> mapper,
-      @Nullable Class<?>[] exceptionTypes);
+      @Nullable Class<?>... exceptionTypes);
 
   @NotNull
   DeclaredStatement<V> elseDo(@NotNull Observer<? super Throwable> observer,
-      @Nullable Class<?>[] exceptionTypes);
+      @Nullable Class<?>... exceptionTypes);
 
   @NotNull
   DeclaredStatement<V> elseIf(
       @NotNull Mapper<? super Throwable, ? extends AsyncStatement<? extends V>> mapper,
-      @Nullable Class<?>[] exceptionTypes);
+      @Nullable Class<?>... exceptionTypes);
 
   @NotNull
   <S> DeclaredStatement<V> fork(

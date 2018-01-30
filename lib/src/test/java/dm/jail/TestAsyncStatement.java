@@ -1266,6 +1266,26 @@ public class TestAsyncStatement {
   }
 
   @Test
+  public void serializeForkDefault() throws IOException, ClassNotFoundException {
+    final AsyncStatement<String> statement =
+        new Async().value("test").fork(null, null, null, null, null);
+    final ByteArrayOutputStream byteOutputStream = new ByteArrayOutputStream();
+    final ObjectOutputStream objectOutputStream = new ObjectOutputStream(byteOutputStream);
+    objectOutputStream.writeObject(statement);
+    final ByteArrayInputStream byteInputStream =
+        new ByteArrayInputStream(byteOutputStream.toByteArray());
+    final ObjectInputStream objectInputStream = new ObjectInputStream(byteInputStream);
+    @SuppressWarnings("unchecked") final AsyncStatement<String> deserialized =
+        (AsyncStatement<String>) objectInputStream.readObject();
+    assertThat(deserialized.then(new Mapper<String, String>() {
+
+      public String apply(final String input) {
+        return input;
+      }
+    }).failure()).isExactlyInstanceOf(UnsupportedOperationException.class);
+  }
+
+  @Test
   public void serializeForked() throws IOException, ClassNotFoundException {
     final AsyncStatement<String> statement =
         createStatementFork(new Async().value("test")).then(new ToUpper());

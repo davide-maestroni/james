@@ -102,7 +102,7 @@ class ComposedForker<S, V>
         final ForkCompleter<S, ? super AsyncStatement<V>> done,
         final ForkUpdater<S, ? super AsyncStatement<V>, ? super AsyncResult<? extends V>>
             statement) {
-      super(proxy(init), proxy(value), proxy(failure), proxy(statement), proxy(done));
+      super(proxy(init), proxy(value), proxy(failure), proxy(done), proxy(statement));
     }
 
     @NotNull

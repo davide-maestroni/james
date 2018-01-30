@@ -16,9 +16,15 @@
 
 package dm.jail;
 
+import org.jetbrains.annotations.NotNull;
 import org.junit.Test;
 
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
 import java.io.Closeable;
+import java.io.IOException;
+import java.io.ObjectInputStream;
+import java.io.ObjectOutputStream;
 import java.util.Random;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
@@ -26,10 +32,14 @@ import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicReference;
 
 import dm.jail.async.Action;
+import dm.jail.async.AsyncResult;
+import dm.jail.async.AsyncState;
 import dm.jail.async.AsyncStatement;
+import dm.jail.async.AsyncStatement.Forker;
 import dm.jail.async.DeclaredStatement;
 import dm.jail.async.Mapper;
 import dm.jail.async.Observer;
+import dm.jail.async.SimpleState;
 import dm.jail.util.ConstantConditions;
 import dm.jail.util.RuntimeTimeoutException;
 
@@ -43,9 +53,60 @@ import static org.assertj.core.api.Assertions.assertThat;
  */
 public class TestDeclaredStatement {
 
-  // TODO: 30/01/2018 else*
-  // TODO: 30/01/2018 fork
-  // TODO: 30/01/2018 serialization
+  @NotNull
+  private static DeclaredStatement<String> createStatement() {
+    return new Async().statementDeclaration().then(new Mapper<Void, String>() {
+
+      public String apply(final Void input) {
+        return "test";
+      }
+    });
+  }
+
+  @NotNull
+  private static DeclaredStatement<String> createStatementFork(
+      @NotNull final DeclaredStatement<String> statement) {
+    return fork(statement.then(new Mapper<String, String>() {
+
+      public String apply(final String input) {
+        return input.toUpperCase();
+      }
+    }));
+  }
+
+  @NotNull
+  private static <V> DeclaredStatement<V> fork(@NotNull final DeclaredStatement<V> statement) {
+    return statement.fork(new Forker<AsyncState<V>, AsyncStatement<V>, V, AsyncResult<V>>() {
+
+      public AsyncState<V> done(@NotNull final AsyncStatement<V> statement,
+          final AsyncState<V> stack) {
+        return stack;
+      }
+
+      public AsyncState<V> failure(@NotNull final AsyncStatement<V> statement,
+          final AsyncState<V> stack, @NotNull final Throwable failure) {
+        return SimpleState.ofFailure(failure);
+      }
+
+      public AsyncState<V> init(@NotNull final AsyncStatement<V> statement) {
+        return null;
+      }
+
+      public AsyncState<V> statement(@NotNull final AsyncStatement<V> statement,
+          final AsyncState<V> stack, @NotNull final AsyncResult<V> result) {
+        if (stack != null) {
+          stack.to(result);
+        }
+
+        return null;
+      }
+
+      public AsyncState<V> value(@NotNull final AsyncStatement<V> statement,
+          final AsyncState<V> stack, final V value) {
+        return SimpleState.ofValue(value);
+      }
+    });
+  }
 
   @Test
   public void addTo() {
@@ -204,6 +265,170 @@ public class TestDeclaredStatement {
   }
 
   @Test
+  public void elseCatch() {
+    final AsyncStatement<String> statement =
+        new Async().statementDeclaration().then(new Mapper<Void, String>() {
+
+          public String apply(final Void input) throws Exception {
+            throw new IllegalStateException("test");
+          }
+        }).elseCatch(new Mapper<Throwable, String>() {
+
+          public String apply(final Throwable error) {
+            return error.getMessage();
+          }
+        }).evaluated();
+    assertThat(statement.getValue()).isEqualTo("test");
+  }
+
+  @Test
+  public void elseCatchFiltered() {
+    final AsyncStatement<String> statement =
+        new Async().statementDeclaration().then(new Mapper<Void, String>() {
+
+          public String apply(final Void input) throws Exception {
+            throw new IllegalStateException("test");
+          }
+        }).elseCatch(new Mapper<Throwable, String>() {
+
+          public String apply(final Throwable error) {
+            return error.getMessage();
+          }
+        }, IllegalStateException.class).evaluated();
+    assertThat(statement.getValue()).isEqualTo("test");
+  }
+
+  @Test
+  public void elseCatchNotFiltered() {
+    final AsyncStatement<String> statement =
+        new Async().statementDeclaration().then(new Mapper<Void, String>() {
+
+          public String apply(final Void input) throws Exception {
+            throw new IllegalStateException("test");
+          }
+        }).elseCatch(new Mapper<Throwable, String>() {
+
+          public String apply(final Throwable error) {
+            return error.getMessage();
+          }
+        }, IOException.class).evaluated();
+    assertThat(ConstantConditions.notNull(statement.getFailure()).getCause()).isExactlyInstanceOf(
+        IllegalStateException.class);
+  }
+
+  @Test
+  public void elseDo() {
+    final AtomicReference<String> ref = new AtomicReference<String>();
+    final AsyncStatement<String> statement =
+        new Async().statementDeclaration().then(new Mapper<Void, String>() {
+
+          public String apply(final Void input) throws Exception {
+            throw new IllegalStateException("test");
+          }
+        }).elseDo(new Observer<Throwable>() {
+
+          public void accept(final Throwable input) {
+            ref.set(input.getMessage());
+          }
+        }).evaluated();
+    assertThat(ConstantConditions.notNull(statement.getFailure()).getCause()).isExactlyInstanceOf(
+        IllegalStateException.class);
+    assertThat(ref.get()).isEqualTo("test");
+  }
+
+  @Test
+  public void elseDoFiltered() {
+    final AtomicReference<String> ref = new AtomicReference<String>();
+    final AsyncStatement<String> statement =
+        new Async().statementDeclaration().then(new Mapper<Void, String>() {
+
+          public String apply(final Void input) throws Exception {
+            throw new IllegalStateException("test");
+          }
+        }).elseDo(new Observer<Throwable>() {
+
+          public void accept(final Throwable input) {
+            ref.set(input.getMessage());
+          }
+        }, IllegalStateException.class).evaluated();
+    assertThat(ConstantConditions.notNull(statement.getFailure()).getCause()).isExactlyInstanceOf(
+        IllegalStateException.class);
+    assertThat(ref.get()).isEqualTo("test");
+  }
+
+  @Test
+  public void elseDoNotFiltered() {
+    final AtomicReference<String> ref = new AtomicReference<String>();
+    final AsyncStatement<String> statement =
+        new Async().statementDeclaration().then(new Mapper<Void, String>() {
+
+          public String apply(final Void input) throws Exception {
+            throw new IllegalStateException("test");
+          }
+        }).elseDo(new Observer<Throwable>() {
+
+          public void accept(final Throwable input) {
+            ref.set(input.getMessage());
+          }
+        }, IOException.class).evaluated();
+    assertThat(ConstantConditions.notNull(statement.getFailure()).getCause()).isExactlyInstanceOf(
+        IllegalStateException.class);
+    assertThat(ref.get()).isNull();
+  }
+
+  @Test
+  public void elseIf() {
+    final AsyncStatement<Integer> statement =
+        new Async().statementDeclaration().then(new Mapper<Void, Integer>() {
+
+          public Integer apply(final Void input) throws Exception {
+            throw new IllegalStateException("test");
+          }
+        }).elseIf(new Mapper<Throwable, AsyncStatement<Integer>>() {
+
+          public AsyncStatement<Integer> apply(final Throwable input) {
+            return new Async().value(input.getMessage().length());
+          }
+        }).evaluated();
+    assertThat(statement.getValue()).isEqualTo(4);
+  }
+
+  @Test
+  public void elseIfFiltered() {
+    final AsyncStatement<Integer> statement =
+        new Async().statementDeclaration().then(new Mapper<Void, Integer>() {
+
+          public Integer apply(final Void input) throws Exception {
+            throw new IllegalStateException("test");
+          }
+        }).elseIf(new Mapper<Throwable, AsyncStatement<Integer>>() {
+
+          public AsyncStatement<Integer> apply(final Throwable input) {
+            return new Async().value(input.getMessage().length());
+          }
+        }, IllegalStateException.class).evaluated();
+    assertThat(statement.getValue()).isEqualTo(4);
+  }
+
+  @Test
+  public void elseIfNotFiltered() {
+    final AsyncStatement<Integer> statement =
+        new Async().statementDeclaration().then(new Mapper<Void, Integer>() {
+
+          public Integer apply(final Void input) throws Exception {
+            throw new IllegalStateException("test");
+          }
+        }).elseIf(new Mapper<Throwable, AsyncStatement<Integer>>() {
+
+          public AsyncStatement<Integer> apply(final Throwable input) {
+            return new Async().value(input.getMessage().length());
+          }
+        }, IOException.class).evaluated();
+    assertThat(ConstantConditions.notNull(statement.getFailure()).getCause()).isExactlyInstanceOf(
+        IllegalStateException.class);
+  }
+
+  @Test
   public void evaluated() {
     final Random random = new Random();
     final DeclaredStatement<Integer> statement =
@@ -305,6 +530,44 @@ public class TestDeclaredStatement {
           }
         });
     assertThat(statement.failure());
+  }
+
+  @Test
+  public void fork() {
+    final DeclaredStatement<String> statement =
+        createStatementFork(new Async().statementDeclaration().then(new Mapper<Void, String>() {
+
+          public String apply(final Void input) {
+            return "test";
+          }
+        }));
+    assertThat(statement.isFinal()).isTrue();
+    assertThat(statement.isDone()).isFalse();
+    assertThat(statement.autoEvaluate().then(new Mapper<String, String>() {
+
+      public String apply(final String input) {
+        return input;
+      }
+    }).value()).isEqualTo("TEST");
+  }
+
+  @Test
+  public void forkDefaultStatement() {
+    final DeclaredStatement<String> statement = //
+        new Async().statementDeclaration().then(new Mapper<Void, String>() {
+
+          public String apply(final Void input) {
+            return "test";
+          }
+        }).fork(null, null, null, null, null);
+    assertThat(statement.isFinal()).isTrue();
+    assertThat(statement.isDone()).isFalse();
+    assertThat(statement.then(new Mapper<String, String>() {
+
+      public String apply(final String input) {
+        return input;
+      }
+    }).evaluate().failure()).isExactlyInstanceOf(UnsupportedOperationException.class);
   }
 
   @Test
@@ -544,6 +807,141 @@ public class TestDeclaredStatement {
           }
         }).evaluated();
     assertThat(statement.isFinal()).isTrue();
+  }
+
+  @Test
+  public void serialize() throws IOException, ClassNotFoundException {
+    final DeclaredStatement<String> statement = createStatement();
+    final ByteArrayOutputStream byteOutputStream = new ByteArrayOutputStream();
+    final ObjectOutputStream objectOutputStream = new ObjectOutputStream(byteOutputStream);
+    objectOutputStream.writeObject(statement);
+    final ByteArrayInputStream byteInputStream =
+        new ByteArrayInputStream(byteOutputStream.toByteArray());
+    final ObjectInputStream objectInputStream = new ObjectInputStream(byteInputStream);
+    @SuppressWarnings("unchecked") final DeclaredStatement<String> deserialized =
+        (DeclaredStatement<String>) objectInputStream.readObject();
+    assertThat(deserialized.evaluated().getValue()).isEqualTo("test");
+  }
+
+  @Test
+  public void serializeAutoEvaluated() throws IOException, ClassNotFoundException {
+    final DeclaredStatement<String> statement = createStatement().autoEvaluate();
+    final ByteArrayOutputStream byteOutputStream = new ByteArrayOutputStream();
+    final ObjectOutputStream objectOutputStream = new ObjectOutputStream(byteOutputStream);
+    objectOutputStream.writeObject(statement);
+    final ByteArrayInputStream byteInputStream =
+        new ByteArrayInputStream(byteOutputStream.toByteArray());
+    final ObjectInputStream objectInputStream = new ObjectInputStream(byteInputStream);
+    @SuppressWarnings("unchecked") final DeclaredStatement<String> deserialized =
+        (DeclaredStatement<String>) objectInputStream.readObject();
+    assertThat(deserialized.then(new ToUpper()).getValue()).isEqualTo("TEST");
+  }
+
+  @Test
+  public void serializeEvaluated() throws IOException, ClassNotFoundException {
+    final AsyncStatement<String> statement = createStatement().evaluated();
+    final ByteArrayOutputStream byteOutputStream = new ByteArrayOutputStream();
+    final ObjectOutputStream objectOutputStream = new ObjectOutputStream(byteOutputStream);
+    objectOutputStream.writeObject(statement);
+    final ByteArrayInputStream byteInputStream =
+        new ByteArrayInputStream(byteOutputStream.toByteArray());
+    final ObjectInputStream objectInputStream = new ObjectInputStream(byteInputStream);
+    @SuppressWarnings("unchecked") final AsyncStatement<String> deserialized =
+        (AsyncStatement<String>) objectInputStream.readObject();
+    assertThat(deserialized.getValue()).isEqualTo("test");
+  }
+
+  @Test
+  public void serializeFork() throws IOException, ClassNotFoundException {
+    final DeclaredStatement<String> statement = createStatementFork(createStatement());
+    final ByteArrayOutputStream byteOutputStream = new ByteArrayOutputStream();
+    final ObjectOutputStream objectOutputStream = new ObjectOutputStream(byteOutputStream);
+    objectOutputStream.writeObject(statement);
+    final ByteArrayInputStream byteInputStream =
+        new ByteArrayInputStream(byteOutputStream.toByteArray());
+    final ObjectInputStream objectInputStream = new ObjectInputStream(byteInputStream);
+    @SuppressWarnings("unchecked") final DeclaredStatement<String> deserialized =
+        (DeclaredStatement<String>) objectInputStream.readObject();
+    assertThat(deserialized.then(new ToUpper()).evaluate().getValue()).isEqualTo("TEST");
+  }
+
+  @Test
+  public void serializeForkAutoEvaluate() throws IOException, ClassNotFoundException {
+    final DeclaredStatement<String> statement =
+        createStatementFork(createStatement()).autoEvaluate();
+    final ByteArrayOutputStream byteOutputStream = new ByteArrayOutputStream();
+    final ObjectOutputStream objectOutputStream = new ObjectOutputStream(byteOutputStream);
+    objectOutputStream.writeObject(statement);
+    final ByteArrayInputStream byteInputStream =
+        new ByteArrayInputStream(byteOutputStream.toByteArray());
+    final ObjectInputStream objectInputStream = new ObjectInputStream(byteInputStream);
+    @SuppressWarnings("unchecked") final DeclaredStatement<String> deserialized =
+        (DeclaredStatement<String>) objectInputStream.readObject();
+    assertThat(deserialized.then(new ToUpper()).getValue()).isEqualTo("TEST");
+  }
+
+  @Test
+  public void serializeForkEvaluated() throws IOException, ClassNotFoundException {
+    final AsyncStatement<String> statement = createStatementFork(createStatement()).evaluated();
+    final ByteArrayOutputStream byteOutputStream = new ByteArrayOutputStream();
+    final ObjectOutputStream objectOutputStream = new ObjectOutputStream(byteOutputStream);
+    objectOutputStream.writeObject(statement);
+    final ByteArrayInputStream byteInputStream =
+        new ByteArrayInputStream(byteOutputStream.toByteArray());
+    final ObjectInputStream objectInputStream = new ObjectInputStream(byteInputStream);
+    @SuppressWarnings("unchecked") final AsyncStatement<String> deserialized =
+        (AsyncStatement<String>) objectInputStream.readObject();
+    assertThat(deserialized.then(new ToUpper()).getValue()).isEqualTo("TEST");
+  }
+
+  @Test
+  public void serializeForked() throws IOException, ClassNotFoundException {
+    final DeclaredStatement<String> statement =
+        createStatementFork(createStatement()).then(new ToUpper());
+    final ByteArrayOutputStream byteOutputStream = new ByteArrayOutputStream();
+    final ObjectOutputStream objectOutputStream = new ObjectOutputStream(byteOutputStream);
+    objectOutputStream.writeObject(statement);
+    final ByteArrayInputStream byteInputStream =
+        new ByteArrayInputStream(byteOutputStream.toByteArray());
+    final ObjectInputStream objectInputStream = new ObjectInputStream(byteInputStream);
+    @SuppressWarnings("unchecked") final DeclaredStatement<String> deserialized =
+        (DeclaredStatement<String>) objectInputStream.readObject();
+    assertThat(deserialized.evaluated().getValue()).isEqualTo("TEST");
+  }
+
+  @Test
+  public void serializeForkedAutoEvaluate() throws IOException, ClassNotFoundException {
+    final DeclaredStatement<String> statement =
+        createStatementFork(createStatement()).then(new ToUpper()).autoEvaluate();
+    final ByteArrayOutputStream byteOutputStream = new ByteArrayOutputStream();
+    final ObjectOutputStream objectOutputStream = new ObjectOutputStream(byteOutputStream);
+    objectOutputStream.writeObject(statement);
+    final ByteArrayInputStream byteInputStream =
+        new ByteArrayInputStream(byteOutputStream.toByteArray());
+    final ObjectInputStream objectInputStream = new ObjectInputStream(byteInputStream);
+    @SuppressWarnings("unchecked") final DeclaredStatement<String> deserialized =
+        (DeclaredStatement<String>) objectInputStream.readObject();
+    assertThat(deserialized.then(new Mapper<String, String>() {
+
+      public String apply(final String input) {
+        return input;
+      }
+    }).getValue()).isEqualTo("TEST");
+  }
+
+  @Test
+  public void serializeForkedEvaluated() throws IOException, ClassNotFoundException {
+    final AsyncStatement<String> statement =
+        createStatementFork(createStatement()).then(new ToUpper()).evaluated();
+    final ByteArrayOutputStream byteOutputStream = new ByteArrayOutputStream();
+    final ObjectOutputStream objectOutputStream = new ObjectOutputStream(byteOutputStream);
+    objectOutputStream.writeObject(statement);
+    final ByteArrayInputStream byteInputStream =
+        new ByteArrayInputStream(byteOutputStream.toByteArray());
+    final ObjectInputStream objectInputStream = new ObjectInputStream(byteInputStream);
+    @SuppressWarnings("unchecked") final AsyncStatement<String> deserialized =
+        (AsyncStatement<String>) objectInputStream.readObject();
+    assertThat(deserialized.getValue()).isEqualTo("TEST");
   }
 
   @Test
@@ -803,5 +1201,12 @@ public class TestDeclaredStatement {
         }).evaluated();
     assertThat(statement.getValue()).isNull();
     assertThat(ref.get()).isEqualTo("test");
+  }
+
+  private static class ToUpper implements Mapper<String, String> {
+
+    public String apply(final String input) {
+      return input.toUpperCase();
+    }
   }
 }
