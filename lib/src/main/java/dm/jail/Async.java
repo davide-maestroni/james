@@ -122,9 +122,8 @@ public class Async {
   }
 
   @NotNull
-  public Async on(@NotNull final ScheduledExecutor executor) {
-    return new Async(mIsUnevaluated, ConstantConditions.notNull("executor", executor), mLogPrinter,
-        mLogLevel);
+  public Async on(@Nullable final ScheduledExecutor executor) {
+    return new Async(mIsUnevaluated, executor, mLogPrinter, mLogLevel);
   }
 
   @NotNull

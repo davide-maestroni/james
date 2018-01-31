@@ -201,12 +201,6 @@ public class TestAsync {
     assertThat(logPrinter.isErrCalled()).isTrue();
   }
 
-  @Test(expected = NullPointerException.class)
-  @SuppressWarnings("ConstantConditions")
-  public void onNPE() {
-    new Async().on(null);
-  }
-
   @Test
   @SuppressWarnings("ConstantConditions")
   public void statementAsyncFailure() {
