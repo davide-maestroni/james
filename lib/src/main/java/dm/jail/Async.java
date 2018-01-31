@@ -46,16 +46,19 @@ public class Async {
 
   private final ScheduledExecutor mExecutor;
 
+  private final boolean mIsUnevaluated;
+
   private final Level mLogLevel;
 
   private final LogPrinter mLogPrinter;
 
   public Async() {
-    this(null, null, null);
+    this(false, null, null, null);
   }
 
-  private Async(@Nullable final ScheduledExecutor executor, @Nullable final LogPrinter printer,
-      @Nullable final Level level) {
+  private Async(final boolean isUnevaluated, @Nullable final ScheduledExecutor executor,
+      @Nullable final LogPrinter printer, @Nullable final Level level) {
+    mIsUnevaluated = isUnevaluated;
     mExecutor = executor;
     mLogPrinter = printer;
     mLogLevel = level;
@@ -73,16 +76,21 @@ public class Async {
 
   @NotNull
   public Async log(@Nullable final Level level) {
-    return new Async(mExecutor, mLogPrinter, level);
+    return new Async(mIsUnevaluated, mExecutor, mLogPrinter, level);
   }
 
   @NotNull
   public Async log(@Nullable final LogPrinter printer) {
-    return new Async(mExecutor, printer, mLogLevel);
+    return new Async(mIsUnevaluated, mExecutor, printer, mLogLevel);
   }
 
   @NotNull
+  @SuppressWarnings("unchecked")
   public <V> AsyncLoop<V> loop(@NotNull final AsyncStatement<? extends Iterable<V>> statement) {
+    if (!mIsUnevaluated && (statement instanceof AsyncLoop)) {
+      return (AsyncLoop<V>) statement;
+    }
+
     return loop(new LoopObserver<V>(statement));
   }
 
@@ -93,34 +101,44 @@ public class Async {
 
   @NotNull
   public <S, V, R> AsyncLoop<R> loopOf(
-      @NotNull final Combiner<S, ? super AsyncStatement<V>, ? super V, ? super
-          AsyncResultCollection<? extends R>> combiner,
-      @NotNull final Iterable<? extends AsyncStatement<? extends V>> statements) {
+      @NotNull final Combiner<S, ? super AsyncLoop<V>, ? super V, ? super AsyncResultCollection<?
+          extends R>> combiner,
+      @NotNull final Iterable<? extends AsyncLoop<? extends V>> loops) {
     return null;
   }
 
   @NotNull
-  public <S, V, R> AsyncLoop<R> loopOf(@Nullable final Mapper<? super AsyncStatement<V>, S> init,
-      @Nullable final CombinationUpdater<S, ? super AsyncStatement<V>, ? super V, ? super
+  public <S, V, R> AsyncLoop<R> loopOf(@Nullable final Mapper<? super List<AsyncLoop<V>>, S> init,
+      @Nullable final CombinationUpdater<S, ? super AsyncLoop<V>, ? super V, ? super
           AsyncResultCollection<? extends R>> value,
-      @Nullable final CombinationUpdater<S, ? super AsyncStatement<V>, ? super Throwable, ? super
+      @Nullable final CombinationUpdater<S, ? super AsyncLoop<V>, ? super Throwable, ? super
           AsyncResultCollection<? extends R>> failure,
-      @Nullable final CombinationCompleter<S, ? super AsyncStatement<V>, ? super
+      @Nullable final CombinationCompleter<S, ? super AsyncLoop<V>, ? super
           AsyncResultCollection<? extends R>> done,
-      @Nullable final CombinationSettler<S, ? super AsyncStatement<V>, ? super
-          AsyncResultCollection<? extends R>> settle,
-      @NotNull final Iterable<? extends AsyncStatement<? extends V>> statements) {
+      @Nullable final CombinationSettler<S, ? super AsyncLoop<V>, ? super AsyncResultCollection<?
+          extends R>> settle,
+      @NotNull final Iterable<? extends AsyncLoop<? extends V>> loops) {
     return null;
   }
 
   @NotNull
   public Async on(@NotNull final ScheduledExecutor executor) {
-    return new Async(ConstantConditions.notNull("executor", executor), mLogPrinter, mLogLevel);
+    return new Async(mIsUnevaluated, ConstantConditions.notNull("executor", executor), mLogPrinter,
+        mLogLevel);
+  }
+
+  @NotNull
+  public <V> AsyncLoop<V> singleLoop(@NotNull final AsyncStatement<? extends V> statement) {
+    return loop(new SingleLoopObserver<V>(statement));
   }
 
   @NotNull
   public <V> AsyncStatement<V> statement(@NotNull final Observer<AsyncResult<V>> observer) {
-    return new DefaultAsyncStatement<V>(statementObserver(observer), true, mLogPrinter, mLogLevel);
+    final boolean isUnevaluated = mIsUnevaluated;
+    final Observer<AsyncResult<V>> statementObserver = statementObserver(observer);
+    return new DefaultAsyncStatement<V>(
+        (isUnevaluated) ? new UnevaluatedObserver<V>(statementObserver) : statementObserver,
+        !isUnevaluated, mLogPrinter, mLogLevel);
   }
 
   @NotNull
@@ -133,7 +151,7 @@ public class Async {
 
   @NotNull
   public <S, V, R> AsyncStatement<R> statementOf(
-      @Nullable final Mapper<? super AsyncStatement<V>, S> init,
+      @Nullable final Mapper<? super List<AsyncStatement<V>>, S> init,
       @Nullable final CombinationUpdater<S, ? super AsyncStatement<V>, ? super V, ? super
           AsyncResult<? extends R>> value,
       @Nullable final CombinationUpdater<S, ? super AsyncStatement<V>, ? super Throwable, ? super
@@ -147,21 +165,8 @@ public class Async {
   }
 
   @NotNull
-  public <V> AsyncStatement<V> unevaluatedFailure(@NotNull final Throwable failure) {
-    return unevaluatedStatement(new FailureObserver<V>(failure));
-  }
-
-  @NotNull
-  public <V> AsyncStatement<V> unevaluatedStatement(
-      @NotNull final Observer<AsyncResult<V>> observer) {
-    // TODO: 30/01/2018 value, failure, loop, etc.
-    return new DefaultAsyncStatement<V>(new UnevaluatedObserver<V>(statementObserver(observer)),
-        false, mLogPrinter, mLogLevel);
-  }
-
-  @NotNull
-  public <V> AsyncStatement<V> unevaluatedValue(final V value) {
-    return unevaluatedStatement(new ValueObserver<V>(value));
+  public Async unevaluated() {
+    return new Async(true, mExecutor, mLogPrinter, mLogLevel);
   }
 
   @NotNull
@@ -331,6 +336,39 @@ public class Async {
 
         public Void apply(final Iterable<V> values) {
           results.addValues(values).set();
+          return null;
+        }
+      }).elseCatch(new Mapper<Throwable, Void>() {
+
+        public Void apply(final Throwable failure) {
+          results.addFailure(failure).set();
+          return null;
+        }
+      });
+    }
+  }
+
+  private static class SingleLoopObserver<V>
+      implements RenewableObserver<AsyncResultCollection<V>>, Serializable {
+
+    private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
+
+    private final AsyncStatement<? extends V> mStatement;
+
+    private SingleLoopObserver(@NotNull final AsyncStatement<? extends V> statement) {
+      mStatement = ConstantConditions.notNull("statement", statement);
+    }
+
+    @NotNull
+    public Observer<AsyncResultCollection<V>> renew() {
+      return new SingleLoopObserver<V>(mStatement.evaluate());
+    }
+
+    public void accept(final AsyncResultCollection<V> results) {
+      mStatement.then(new Mapper<V, Void>() {
+
+        public Void apply(final V value) {
+          results.addValue(value).set();
           return null;
         }
       }).elseCatch(new Mapper<Throwable, Void>() {

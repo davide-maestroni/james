@@ -291,7 +291,7 @@ public class TestAsync {
 
   @Test
   public void unevaluated() {
-    final AsyncStatement<Integer> unevaluatedStatement = new Async().unevaluatedValue(3);
+    final AsyncStatement<Integer> unevaluatedStatement = new Async().unevaluated().value(3);
     assertThat(unevaluatedStatement.isSet()).isFalse();
     assertThat(unevaluatedStatement.isDone()).isFalse();
     final AsyncStatement<Integer> statement = unevaluatedStatement.evaluate();
@@ -303,7 +303,7 @@ public class TestAsync {
 
   @Test
   public void unevaluatedEvaluate() {
-    final AsyncStatement<Integer> unevaluatedStatement = new Async().unevaluatedValue(3);
+    final AsyncStatement<Integer> unevaluatedStatement = new Async().unevaluated().value(3);
     assertThat(unevaluatedStatement.isSet()).isFalse();
     assertThat(unevaluatedStatement.isDone()).isFalse();
     final AsyncStatement<Integer> statement = unevaluatedStatement.evaluate();

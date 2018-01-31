@@ -137,7 +137,7 @@ public class TestAsyncStatement {
   @Test(expected = UnsupportedOperationException.class)
   public void addToException() {
     final TestResultCollection<String> resultCollection = new TestResultCollection<String>();
-    final AsyncStatement<String> statement = new Async().unevaluatedValue("test");
+    final AsyncStatement<String> statement = new Async().unevaluated().value("test");
     statement.addTo(resultCollection);
   }
 
@@ -152,7 +152,7 @@ public class TestAsyncStatement {
 
   @Test
   public void cancelUnevaluated() {
-    final AsyncStatement<String> statement = new Async().unevaluatedValue("test");
+    final AsyncStatement<String> statement = new Async().unevaluated().value("test");
     assertThat(statement.isCancelled()).isFalse();
     assertThat(statement.isDone()).isFalse();
     assertThat(statement.cancel(false)).isTrue();
@@ -162,7 +162,7 @@ public class TestAsyncStatement {
 
   @Test
   public void cancelled() {
-    final AsyncStatement<Void> statement = new Async().unevaluatedValue(null);
+    final AsyncStatement<Void> statement = new Async().unevaluated().value(null);
     statement.cancel(false);
     assertThat(statement.isCancelled()).isTrue();
   }
@@ -560,7 +560,7 @@ public class TestAsyncStatement {
   public void evaluated() {
     final Random random = new Random();
     final AsyncStatement<Integer> statement =
-        new Async().unevaluatedStatement(new Observer<AsyncResult<Integer>>() {
+        new Async().unevaluated().statement(new Observer<AsyncResult<Integer>>() {
 
           public void accept(final AsyncResult<Integer> result) {
             result.set(random.nextInt());
@@ -574,7 +574,7 @@ public class TestAsyncStatement {
   public void evaluatedEvaluate() {
     final Random random = new Random();
     final AsyncStatement<Integer> statement =
-        new Async().unevaluatedStatement(new Observer<AsyncResult<Integer>>() {
+        new Async().unevaluated().statement(new Observer<AsyncResult<Integer>>() {
 
           public void accept(final AsyncResult<Integer> result) {
             result.set(random.nextInt());
@@ -600,7 +600,8 @@ public class TestAsyncStatement {
   @Test
   public void evaluatingEvaluated() {
     final AsyncStatement<String> statement = //
-        new Async().unevaluatedValue("test")
+        new Async().unevaluated()
+                   .value("test")
                    .on(withDelay(backgroundExecutor(), 1, SECONDS))
                    .then(new Mapper<String, String>() {
 
@@ -629,7 +630,8 @@ public class TestAsyncStatement {
   @Test
   public void evaluatingUnevaluated() {
     final AsyncStatement<String> statement = //
-        new Async().unevaluatedValue("test")
+        new Async().unevaluated()
+                   .value("test")
                    .on(withDelay(backgroundExecutor(), 1, SECONDS))
                    .then(new Mapper<String, String>() {
 
@@ -699,7 +701,7 @@ public class TestAsyncStatement {
 
   @Test(expected = IllegalStateException.class)
   public void failureInvalidStateEvaluating() {
-    final AsyncStatement<Void> statement = new Async().unevaluatedFailure(new Exception());
+    final AsyncStatement<Void> statement = new Async().unevaluated().failure(new Exception());
     assertThat(statement.failure());
   }
 
@@ -1469,7 +1471,7 @@ public class TestAsyncStatement {
 
   @Test
   public void serializeUnevaluated() throws IOException, ClassNotFoundException {
-    final AsyncStatement<String> statement = new Async().unevaluatedValue("test");
+    final AsyncStatement<String> statement = new Async().unevaluated().value("test");
     final ByteArrayOutputStream byteOutputStream = new ByteArrayOutputStream();
     final ObjectOutputStream objectOutputStream = new ObjectOutputStream(byteOutputStream);
     objectOutputStream.writeObject(statement);
@@ -1484,7 +1486,7 @@ public class TestAsyncStatement {
   @Test
   public void serializeUnevaluatedFork() throws IOException, ClassNotFoundException {
     final AsyncStatement<String> statement =
-        createStatementFork(new Async().unevaluatedValue("test"));
+        createStatementFork(new Async().unevaluated().value("test"));
     final ByteArrayOutputStream byteOutputStream = new ByteArrayOutputStream();
     final ObjectOutputStream objectOutputStream = new ObjectOutputStream(byteOutputStream);
     objectOutputStream.writeObject(statement);
@@ -1499,7 +1501,7 @@ public class TestAsyncStatement {
   @Test
   public void serializeUnevaluatedForked() throws IOException, ClassNotFoundException {
     final AsyncStatement<String> statement =
-        createStatementFork(new Async().unevaluatedValue("test")).then(new ToUpper());
+        createStatementFork(new Async().unevaluated().value("test")).then(new ToUpper());
     final ByteArrayOutputStream byteOutputStream = new ByteArrayOutputStream();
     final ObjectOutputStream objectOutputStream = new ObjectOutputStream(byteOutputStream);
     objectOutputStream.writeObject(statement);
@@ -2093,7 +2095,7 @@ public class TestAsyncStatement {
   @Test(expected = UnsupportedOperationException.class)
   public void toException() {
     final TestResult<String> result = new TestResult<String>();
-    final AsyncStatement<String> statement = new Async().unevaluatedValue("test");
+    final AsyncStatement<String> statement = new Async().unevaluated().value("test");
     statement.to(result);
   }
 
@@ -2134,7 +2136,7 @@ public class TestAsyncStatement {
 
   @Test(expected = IllegalStateException.class)
   public void valueInvalidStateEvaluating() {
-    final AsyncStatement<Void> statement = new Async().unevaluatedValue(null);
+    final AsyncStatement<Void> statement = new Async().unevaluated().value(null);
     statement.value();
   }
 
