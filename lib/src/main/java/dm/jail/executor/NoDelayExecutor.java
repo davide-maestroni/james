@@ -24,20 +24,23 @@ import java.io.Serializable;
 import java.lang.ref.WeakReference;
 import java.util.concurrent.TimeUnit;
 
+import dm.jail.config.BuildConfig;
 import dm.jail.util.WeakIdentityHashMap;
 
 /**
- * Executor decorator employing a shared synchronous executor when commands are enqueued with a 0
- * delay on one of the managed threads.
+ * Executor decorator employing a synchronous executor when commands are enqueued with a 0 delay on
+ * one of the managed threads.
  * <p>
  * Created by davide-maestroni on 04/09/2016.
  */
-class ZeroDelayExecutor extends ScheduledExecutorDecorator implements Serializable {
+class NoDelayExecutor extends ScheduledExecutorDecorator implements Serializable {
 
-  private static final WeakIdentityHashMap<ScheduledExecutor, WeakReference<ZeroDelayExecutor>>
-      sExecutors = new WeakIdentityHashMap<ScheduledExecutor, WeakReference<ZeroDelayExecutor>>();
+  private static final WeakIdentityHashMap<ScheduledExecutor, WeakReference<NoDelayExecutor>>
+      sExecutors = new WeakIdentityHashMap<ScheduledExecutor, WeakReference<NoDelayExecutor>>();
 
   private static final LoopExecutor sSyncExecutor = LoopExecutor.instance();
+
+  private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
 
   private final ScheduledExecutor mExecutor;
 
@@ -46,7 +49,7 @@ class ZeroDelayExecutor extends ScheduledExecutorDecorator implements Serializab
    *
    * @param executor the wrapped instance.
    */
-  private ZeroDelayExecutor(@NotNull final ScheduledExecutor executor) {
+  private NoDelayExecutor(@NotNull final ScheduledExecutor executor) {
     super(executor);
     mExecutor = executor;
   }
@@ -58,24 +61,24 @@ class ZeroDelayExecutor extends ScheduledExecutorDecorator implements Serializab
    * @return the zero delay executor.
    */
   @NotNull
-  static ZeroDelayExecutor of(@NotNull final ScheduledExecutor wrapped) {
-    if (wrapped instanceof ZeroDelayExecutor) {
-      return (ZeroDelayExecutor) wrapped;
+  static NoDelayExecutor of(@NotNull final ScheduledExecutor wrapped) {
+    if (wrapped instanceof NoDelayExecutor) {
+      return (NoDelayExecutor) wrapped;
     }
 
-    ZeroDelayExecutor zeroDelayExecutor;
+    NoDelayExecutor noDelayExecutor;
     synchronized (sExecutors) {
-      final WeakIdentityHashMap<ScheduledExecutor, WeakReference<ZeroDelayExecutor>> executors =
+      final WeakIdentityHashMap<ScheduledExecutor, WeakReference<NoDelayExecutor>> executors =
           sExecutors;
-      final WeakReference<ZeroDelayExecutor> executor = executors.get(wrapped);
-      zeroDelayExecutor = (executor != null) ? executor.get() : null;
-      if (zeroDelayExecutor == null) {
-        zeroDelayExecutor = new ZeroDelayExecutor(wrapped);
-        executors.put(wrapped, new WeakReference<ZeroDelayExecutor>(zeroDelayExecutor));
+      final WeakReference<NoDelayExecutor> executor = executors.get(wrapped);
+      noDelayExecutor = (executor != null) ? executor.get() : null;
+      if (noDelayExecutor == null) {
+        noDelayExecutor = new NoDelayExecutor(wrapped);
+        executors.put(wrapped, new WeakReference<NoDelayExecutor>(noDelayExecutor));
       }
     }
 
-    return zeroDelayExecutor;
+    return noDelayExecutor;
   }
 
   @Override
@@ -106,6 +109,8 @@ class ZeroDelayExecutor extends ScheduledExecutorDecorator implements Serializab
 
   private static class ExecutorProxy implements Serializable {
 
+    private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
+
     private final ScheduledExecutor mExecutor;
 
     private ExecutorProxy(final ScheduledExecutor executor) {
@@ -115,7 +120,7 @@ class ZeroDelayExecutor extends ScheduledExecutorDecorator implements Serializab
     @NotNull
     Object readResolve() throws ObjectStreamException {
       try {
-        return new ZeroDelayExecutor(mExecutor);
+        return new NoDelayExecutor(mExecutor);
 
       } catch (final Throwable t) {
         throw new InvalidObjectException(t.getMessage());

@@ -14,26 +14,14 @@
  * limitations under the License.
  */
 
-package dm.jail.util;
+package dm.jail;
 
-import org.jetbrains.annotations.NotNull;
-
-import java.util.concurrent.TimeoutException;
+import dm.jail.async.Observer;
 
 /**
- * Created by davide-maestroni on 01/15/2018.
+ * Created by davide-maestroni on 01/27/2018.
  */
-public class RuntimeTimeoutException extends RuntimeException {
+interface InterruptibleObserver<I> extends Observer<I> {
 
-  public RuntimeTimeoutException() {
-  }
-
-  public RuntimeTimeoutException(final String message) {
-    super(message);
-  }
-
-  @NotNull
-  public TimeoutException toTimeoutException() {
-    return new TimeoutException(getMessage());
-  }
+  void interrupt();
 }

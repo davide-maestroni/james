@@ -17,20 +17,19 @@
 package dm.jail;
 
 import org.jetbrains.annotations.NotNull;
-import org.jetbrains.annotations.Nullable;
 import org.junit.Test;
 
-import java.util.List;
+import java.util.ArrayList;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicBoolean;
 
 import dm.jail.async.AsyncResult;
+import dm.jail.async.AsyncState;
 import dm.jail.async.AsyncStatement;
-import dm.jail.async.DeclaredStatement;
+import dm.jail.async.AsyncStatement.Forker;
 import dm.jail.async.Mapper;
 import dm.jail.async.Observer;
+import dm.jail.async.SimpleState;
 import dm.jail.executor.ScheduledExecutors;
-import dm.jail.log.LogPrinter;
 import dm.jail.log.LogPrinter.Level;
 import dm.jail.log.LogPrinters;
 
@@ -41,45 +40,87 @@ import static org.assertj.core.api.Assertions.assertThat;
  */
 public class TestAsync {
 
+  private static void aaa() {
+
+    class ForkStack<V> {
+
+      AsyncStatement<String> forked;
+
+      ArrayList<AsyncResult<V>> results = new ArrayList<AsyncResult<V>>();
+
+      AsyncState<V> state;
+
+      long timestamp = -1;
+    }
+
+    new Async().value("hello")
+               .fork(
+                   new Forker<ForkStack<String>, AsyncStatement<String>, String,
+                       AsyncResult<String>>() {
+
+                     public ForkStack<String> done(@NotNull final AsyncStatement<String> statement,
+                         final ForkStack<String> stack) {
+                       return stack;
+                     }
+
+                     public ForkStack<String> failure(
+                         @NotNull final AsyncStatement<String> statement,
+                         final ForkStack<String> stack, @NotNull final Throwable failure) {
+                       stack.state = SimpleState.ofFailure(failure);
+                       for (final AsyncResult<String> result : stack.results) {
+                         result.fail(failure);
+                       }
+
+                       stack.results.clear();
+                       return stack;
+                     }
+
+                     public ForkStack<String> init(
+                         @NotNull final AsyncStatement<String> statement) {
+                       return new ForkStack<String>();
+                     }
+
+                     public ForkStack<String> statement(
+                         @NotNull final AsyncStatement<String> statement,
+                         final ForkStack<String> stack, @NotNull final AsyncResult<String> result) {
+                       final AsyncState<String> state = stack.state;
+                       if (state == null) {
+                         stack.results.add(result);
+
+                       } else if (state.isFailed()) {
+                         result.fail(state.failure());
+
+                       } else if (System.currentTimeMillis() - stack.timestamp <= 10000) {
+                         result.set(state.value());
+
+                       } else {
+                         if (stack.forked == null) {
+                           stack.forked = statement.evaluate().fork(this);
+                         }
+
+                         stack.forked.to(result);
+                       }
+
+                       return stack;
+                     }
+
+                     public ForkStack<String> value(@NotNull final AsyncStatement<String> statement,
+                         final ForkStack<String> stack, final String value) {
+                       stack.timestamp = System.currentTimeMillis();
+                       stack.state = SimpleState.ofValue(value);
+                       for (final AsyncResult<String> result : stack.results) {
+                         result.set(value);
+                       }
+
+                       stack.results.clear();
+                       return stack;
+                     }
+                   });
+  }
+
   @Test
   public void constructor() {
     new Async();
-  }
-
-  @Test
-  public void declared() {
-    final DeclaredStatement<Integer> declaredStatement =
-        new Async().statementDeclaration().then(new Mapper<Void, Integer>() {
-
-          public Integer apply(final Void ignored) {
-            return 3;
-          }
-        });
-    assertThat(declaredStatement.isSet()).isFalse();
-    assertThat(declaredStatement.isDone()).isFalse();
-    final AsyncStatement<Integer> statement = declaredStatement.evaluate();
-    assertThat(declaredStatement.isSet()).isFalse();
-    assertThat(declaredStatement.isDone()).isFalse();
-    assertThat(statement.isDone()).isTrue();
-    assertThat(statement.getValue()).isEqualTo(3);
-  }
-
-  @Test
-  public void declaredEvaluate() {
-    final DeclaredStatement<Integer> declaredStatement =
-        new Async().statementDeclaration().then(new Mapper<Void, Integer>() {
-
-          public Integer apply(final Void ignored) {
-            return 3;
-          }
-        });
-    assertThat(declaredStatement.isSet()).isFalse();
-    assertThat(declaredStatement.isDone()).isFalse();
-    final AsyncStatement<Integer> statement = declaredStatement.evaluate();
-    assertThat(declaredStatement.isSet()).isFalse();
-    assertThat(declaredStatement.isDone()).isFalse();
-    assertThat(statement.isDone()).isTrue();
-    assertThat(statement.getValue()).isEqualTo(3);
   }
 
   @Test
@@ -113,9 +154,9 @@ public class TestAsync {
         throw new Exception();
       }
     }).cancel(true);
-    assertThat(logPrinter.dbgCalled.get()).isTrue();
-    assertThat(logPrinter.wrnCalled.get()).isTrue();
-    assertThat(logPrinter.errCalled.get()).isTrue();
+    assertThat(logPrinter.isDbgCalled()).isTrue();
+    assertThat(logPrinter.isWrnCalled()).isTrue();
+    assertThat(logPrinter.isErrCalled()).isTrue();
   }
 
   @Test
@@ -127,9 +168,9 @@ public class TestAsync {
         throw new Exception();
       }
     }).cancel(true);
-    assertThat(logPrinter.dbgCalled.get()).isFalse();
-    assertThat(logPrinter.wrnCalled.get()).isFalse();
-    assertThat(logPrinter.errCalled.get()).isTrue();
+    assertThat(logPrinter.isDbgCalled()).isFalse();
+    assertThat(logPrinter.isWrnCalled()).isFalse();
+    assertThat(logPrinter.isErrCalled()).isTrue();
   }
 
   @Test
@@ -141,9 +182,9 @@ public class TestAsync {
         throw new Exception();
       }
     }).cancel(true);
-    assertThat(logPrinter.dbgCalled.get()).isFalse();
-    assertThat(logPrinter.wrnCalled.get()).isFalse();
-    assertThat(logPrinter.errCalled.get()).isFalse();
+    assertThat(logPrinter.isDbgCalled()).isFalse();
+    assertThat(logPrinter.isWrnCalled()).isFalse();
+    assertThat(logPrinter.isErrCalled()).isFalse();
   }
 
   @Test
@@ -155,9 +196,9 @@ public class TestAsync {
         throw new Exception();
       }
     }).cancel(true);
-    assertThat(logPrinter.dbgCalled.get()).isFalse();
-    assertThat(logPrinter.wrnCalled.get()).isTrue();
-    assertThat(logPrinter.errCalled.get()).isTrue();
+    assertThat(logPrinter.isDbgCalled()).isFalse();
+    assertThat(logPrinter.isWrnCalled()).isTrue();
+    assertThat(logPrinter.isErrCalled()).isTrue();
   }
 
   @Test(expected = NullPointerException.class)
@@ -249,31 +290,31 @@ public class TestAsync {
   }
 
   @Test
-  public void value() {
-    assertThat(new Async().value(3).getValue()).isEqualTo(3);
+  public void unevaluated() {
+    final AsyncStatement<Integer> unevaluatedStatement = new Async().unevaluatedValue(3);
+    assertThat(unevaluatedStatement.isSet()).isFalse();
+    assertThat(unevaluatedStatement.isDone()).isFalse();
+    final AsyncStatement<Integer> statement = unevaluatedStatement.evaluate();
+    assertThat(unevaluatedStatement.isSet()).isFalse();
+    assertThat(unevaluatedStatement.isDone()).isFalse();
+    assertThat(statement.isDone()).isTrue();
+    assertThat(statement.getValue()).isEqualTo(3);
   }
 
-  private static class TestLogPrinter implements LogPrinter {
+  @Test
+  public void unevaluatedEvaluate() {
+    final AsyncStatement<Integer> unevaluatedStatement = new Async().unevaluatedValue(3);
+    assertThat(unevaluatedStatement.isSet()).isFalse();
+    assertThat(unevaluatedStatement.isDone()).isFalse();
+    final AsyncStatement<Integer> statement = unevaluatedStatement.evaluate();
+    assertThat(unevaluatedStatement.isSet()).isFalse();
+    assertThat(unevaluatedStatement.isDone()).isFalse();
+    assertThat(statement.isDone()).isTrue();
+    assertThat(statement.getValue()).isEqualTo(3);
+  }
 
-    private final AtomicBoolean dbgCalled = new AtomicBoolean();
-
-    private final AtomicBoolean errCalled = new AtomicBoolean();
-
-    private final AtomicBoolean wrnCalled = new AtomicBoolean();
-
-    public void dbg(@NotNull final List<Object> contexts, @Nullable final String message,
-        @Nullable final Throwable throwable) {
-      dbgCalled.set(true);
-    }
-
-    public void err(@NotNull final List<Object> contexts, @Nullable final String message,
-        @Nullable final Throwable throwable) {
-      errCalled.set(true);
-    }
-
-    public void wrn(@NotNull final List<Object> contexts, @Nullable final String message,
-        @Nullable final Throwable throwable) {
-      wrnCalled.set(true);
-    }
+  @Test
+  public void value() {
+    assertThat(new Async().value(3).getValue()).isEqualTo(3);
   }
 }

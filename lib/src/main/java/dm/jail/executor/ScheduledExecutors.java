@@ -26,6 +26,7 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
 
+import dm.jail.config.BuildConfig;
 import dm.jail.util.ConstantConditions;
 
 /**
@@ -260,6 +261,18 @@ public class ScheduledExecutors {
   }
 
   /**
+   * Returns an executor employing a synchronous one when executions are enqueued with a 0 delay on
+   * one of the managed threads.
+   *
+   * @param executor the wrapped instance.
+   * @return the executor instance.
+   */
+  @NotNull
+  public static ScheduledExecutor withNoDelay(@NotNull final ScheduledExecutor executor) {
+    return NoDelayExecutor.of(executor);
+  }
+
+  /**
    * Returns an executor providing ordering of executions based on priority.
    * <p>
    * Each enqueued command will age every time an higher priority one takes the precedence, so that
@@ -302,18 +315,6 @@ public class ScheduledExecutors {
     return ThrottlingExecutor.of(executor, maxExecutions);
   }
 
-  /**
-   * Returns an executor employing a shared synchronous one when executions are enqueued with a 0
-   * delay on one of the managed threads.
-   *
-   * @param executor the wrapped instance.
-   * @return the executor instance.
-   */
-  @NotNull
-  public static ScheduledExecutor withZeroDelay(@NotNull final ScheduledExecutor executor) {
-    return ZeroDelayExecutor.of(executor);
-  }
-
   @NotNull
   private static ScheduledExecutor optimizedExecutor(final int threadPriority) {
     final int processors = Runtime.getRuntime().availableProcessors();
@@ -325,6 +326,8 @@ public class ScheduledExecutors {
 
   private static class BackgroundExecutor extends ScheduledExecutorDecorator
       implements Serializable {
+
+    private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
 
     /**
      * Constructor.
@@ -340,6 +343,8 @@ public class ScheduledExecutors {
 
     private static class ExecutorProxy implements Serializable {
 
+      private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
+
       @NotNull
       Object readResolve() throws ObjectStreamException {
         return backgroundExecutor();
@@ -348,6 +353,8 @@ public class ScheduledExecutors {
   }
 
   private static class DefaultExecutor extends ScheduledExecutorDecorator implements Serializable {
+
+    private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
 
     /**
      * Constructor.
@@ -363,6 +370,8 @@ public class ScheduledExecutors {
 
     private static class ExecutorProxy implements Serializable {
 
+      private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
+
       @NotNull
       Object readResolve() throws ObjectStreamException {
         return defaultExecutor();
@@ -371,6 +380,8 @@ public class ScheduledExecutors {
   }
 
   private static class ExecutorThreadFactory implements ThreadFactory, Serializable {
+
+    private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
 
     private final int mPriority;
 
@@ -393,6 +404,8 @@ public class ScheduledExecutors {
   private static class ForegroundExecutor extends ScheduledExecutorDecorator
       implements Serializable {
 
+    private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
+
     /**
      * Constructor.
      */
@@ -407,6 +420,8 @@ public class ScheduledExecutors {
 
     private static class ExecutorProxy implements Serializable {
 
+      private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
+
       @NotNull
       Object readResolve() throws ObjectStreamException {
         return foregroundExecutor();
@@ -415,6 +430,8 @@ public class ScheduledExecutors {
   }
 
   private static class PoolExecutor extends ScheduledExecutorDecorator implements Serializable {
+
+    private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
 
     private final int mPoolSize;
 
@@ -435,6 +452,8 @@ public class ScheduledExecutors {
     }
 
     private static class ExecutorProxy implements Serializable {
+
+      private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
 
       private final int mPoolSize;
 

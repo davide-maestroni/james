@@ -48,6 +48,9 @@ public interface AsyncStatement<V> extends AsyncState<V>, Future<V>, Serializabl
   AsyncStatement<V> evaluate();
 
   @NotNull
+  AsyncStatement<V> evaluated();
+
+  @NotNull
   <S> AsyncStatement<V> fork(
       @NotNull Forker<S, ? super AsyncStatement<V>, ? super V, ? super AsyncResult<V>> forker);
 

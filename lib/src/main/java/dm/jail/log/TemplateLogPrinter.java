@@ -25,6 +25,8 @@ import java.util.Date;
 import java.util.List;
 import java.util.Locale;
 
+import dm.jail.config.BuildConfig;
+
 /**
  * Abstract implementation of a log.
  * <p>
@@ -47,6 +49,8 @@ public abstract class TemplateLogPrinter implements LogPrinter, Serializable {
   private static final String FORMAT_EXCEPTION = " caused by:%n%s";
 
   private static final String FORMAT_LOG = "%s\t%s\t%s\t%s<%s>";
+
+  private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
 
   private static ThreadLocal<SimpleDateFormat> sDateFormatter =
       new ThreadLocal<SimpleDateFormat>() {

@@ -14,53 +14,38 @@
  * limitations under the License.
  */
 
-package dm.jail.util;
+package dm.jail.async;
 
 import org.jetbrains.annotations.NotNull;
-import org.jetbrains.annotations.Nullable;
 
 /**
  * Exception wrapping a thread interrupted exception caught inside a method execution.
  * <p>
  * Created by davide-maestroni on 09/08/2014.
  */
-public class RuntimeInterruptedException extends RuntimeException {
+public class RuntimeInterruptedException extends FailureException {
 
   /**
    * Constructor.
    *
    * @param cause the wrapped exception.
    */
-  public RuntimeInterruptedException(@Nullable final InterruptedException cause) {
+  public RuntimeInterruptedException(@NotNull final InterruptedException cause) {
     super(cause);
     Thread.currentThread().interrupt();
   }
 
-  /**
-   * Checks if the specified throwable is not an interrupted exception.
-   *
-   * @param t the throwable.
-   * @throws RuntimeInterruptedException if the specified throwable is an instance of
-   *                                     {@code RuntimeInterruptedException} or
-   *                                     {@code InterruptedException}.
-   */
-  public static void throwIfInterrupt(@Nullable final Throwable t) {
-    if (t instanceof RuntimeInterruptedException) {
-      throw ((RuntimeInterruptedException) t);
+  public static Throwable wrapIfInterrupt(final Throwable t) {
+    if (t instanceof InterruptedException) {
+      return new RuntimeInterruptedException((InterruptedException) t);
     }
 
-    if (t instanceof InterruptedException) {
-      throw new RuntimeInterruptedException((InterruptedException) t);
-    }
+    return t;
   }
 
   @NotNull
+  @SuppressWarnings("unchecked")
   public InterruptedException toInterruptedException() {
-    final Throwable cause = getCause();
-    if (cause instanceof InterruptedException) {
-      return (InterruptedException) cause;
-    }
-
-    return new InterruptedException(getMessage());
+    return (InterruptedException) getCause();
   }
 }

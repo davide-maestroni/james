@@ -20,17 +20,20 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 import java.io.ObjectStreamException;
-import java.io.Serializable;
 import java.util.List;
+
+import dm.jail.config.BuildConfig;
 
 /**
  * LogPrinter implementation simply discarding all messages.
  * <p>
  * Created by davide-maestroni on 10/04/2014.
  */
-class NullLogPrinter extends TemplateLogPrinter implements Serializable {
+class NullLogPrinter extends TemplateLogPrinter {
 
   private static final NullLogPrinter sInstance = new NullLogPrinter();
+
+  private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
 
   /**
    * Avoid explicit instantiation.

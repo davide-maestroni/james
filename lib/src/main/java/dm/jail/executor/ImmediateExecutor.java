@@ -22,7 +22,8 @@ import java.io.ObjectStreamException;
 import java.io.Serializable;
 import java.util.concurrent.TimeUnit;
 
-import dm.jail.util.RuntimeInterruptedException;
+import dm.jail.async.RuntimeInterruptedException;
+import dm.jail.config.BuildConfig;
 import dm.jail.util.TimeUnits;
 
 /**
@@ -40,6 +41,8 @@ import dm.jail.util.TimeUnits;
 class ImmediateExecutor extends SyncExecutor implements Serializable {
 
   private static final ImmediateExecutor sInstance = new ImmediateExecutor();
+
+  private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
 
   /**
    * Avoid explicit instantiation.

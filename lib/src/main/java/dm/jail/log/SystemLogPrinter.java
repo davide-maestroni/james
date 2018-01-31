@@ -19,16 +19,19 @@ package dm.jail.log;
 import org.jetbrains.annotations.NotNull;
 
 import java.io.ObjectStreamException;
-import java.io.Serializable;
+
+import dm.jail.config.BuildConfig;
 
 /**
  * Simple log implementation writing messages to the system output.
  * <p>
  * Created by davide-maestroni on 10/03/2014.
  */
-class SystemLogPrinter extends TemplateLogPrinter implements Serializable {
+class SystemLogPrinter extends TemplateLogPrinter {
 
   private static final SystemLogPrinter sInstance = new SystemLogPrinter();
+
+  private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
 
   /**
    * Avoid explicit instantiation.

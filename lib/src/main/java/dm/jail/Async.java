@@ -22,26 +22,20 @@ import org.jetbrains.annotations.Nullable;
 import java.io.InvalidObjectException;
 import java.io.ObjectStreamException;
 import java.io.Serializable;
-import java.util.ArrayList;
 import java.util.List;
-import java.util.concurrent.atomic.AtomicReference;
 
 import dm.jail.async.AsyncLoop;
 import dm.jail.async.AsyncResult;
 import dm.jail.async.AsyncResultCollection;
-import dm.jail.async.AsyncState;
 import dm.jail.async.AsyncStatement;
-import dm.jail.async.AsyncStatement.Forker;
-import dm.jail.async.DeclaredStatement;
-import dm.jail.async.InterruptibleObserver;
 import dm.jail.async.Mapper;
 import dm.jail.async.Observer;
-import dm.jail.async.SimpleState;
+import dm.jail.async.RuntimeInterruptedException;
+import dm.jail.config.BuildConfig;
 import dm.jail.executor.ScheduledExecutor;
 import dm.jail.log.LogPrinter;
 import dm.jail.log.LogPrinter.Level;
 import dm.jail.util.ConstantConditions;
-import dm.jail.util.RuntimeInterruptedException;
 import dm.jail.util.SerializableProxy;
 import dm.jail.util.Threads;
 
@@ -65,84 +59,6 @@ public class Async {
     mExecutor = executor;
     mLogPrinter = printer;
     mLogLevel = level;
-  }
-
-  private static void test() {
-
-    class ForkStack<V> {
-
-      AsyncStatement<String> forked;
-
-      ArrayList<AsyncResult<V>> results = new ArrayList<AsyncResult<V>>();
-
-      AsyncState<V> state;
-
-      long timestamp = -1;
-    }
-
-    new Async().value("hello")
-               .fork(
-                   new Forker<ForkStack<String>, AsyncStatement<String>, String,
-                       AsyncResult<String>>() {
-
-                     public ForkStack<String> done(@NotNull final AsyncStatement<String> statement,
-                         final ForkStack<String> stack) {
-                       return stack;
-                     }
-
-                     public ForkStack<String> failure(
-                         @NotNull final AsyncStatement<String> statement,
-                         final ForkStack<String> stack, @NotNull final Throwable failure) {
-                       stack.state = SimpleState.ofFailure(failure);
-                       for (final AsyncResult<String> result : stack.results) {
-                         result.fail(failure);
-                       }
-
-                       stack.results.clear();
-                       return stack;
-                     }
-
-                     public ForkStack<String> init(
-                         @NotNull final AsyncStatement<String> statement) {
-                       return new ForkStack<String>();
-                     }
-
-                     public ForkStack<String> statement(
-                         @NotNull final AsyncStatement<String> statement,
-                         final ForkStack<String> stack, @NotNull final AsyncResult<String> result) {
-                       final AsyncState<String> state = stack.state;
-                       if (state == null) {
-                         stack.results.add(result);
-
-                       } else if (state.isFailed()) {
-                         result.fail(state.failure());
-
-                       } else if (System.currentTimeMillis() - stack.timestamp <= 10000) {
-                         result.set(state.value());
-
-                       } else {
-                         if (stack.forked == null) {
-                           stack.forked = statement.evaluate().fork(this);
-                         }
-
-                         stack.forked.to(result);
-                       }
-
-                       return stack;
-                     }
-
-                     public ForkStack<String> value(@NotNull final AsyncStatement<String> statement,
-                         final ForkStack<String> stack, final String value) {
-                       stack.timestamp = System.currentTimeMillis();
-                       stack.state = SimpleState.ofValue(value);
-                       for (final AsyncResult<String> result : stack.results) {
-                         result.set(value);
-                       }
-
-                       stack.results.clear();
-                       return stack;
-                     }
-                   });
   }
 
   @NotNull
@@ -204,18 +120,7 @@ public class Async {
 
   @NotNull
   public <V> AsyncStatement<V> statement(@NotNull final Observer<AsyncResult<V>> observer) {
-    final ScheduledExecutor executor = mExecutor;
-    if (executor != null) {
-      return new DefaultAsyncStatement<V>(new ExecutorObserver<V>(observer, executor), mLogPrinter,
-          mLogLevel);
-    }
-
-    return new DefaultAsyncStatement<V>(observer, mLogPrinter, mLogLevel);
-  }
-
-  @NotNull
-  public DeclaredStatement<Void> statementDeclaration() {
-    return new DefaultDeclaredStatement<Void>(new StatementMapper(this));
+    return new DefaultAsyncStatement<V>(statementObserver(observer), true, mLogPrinter, mLogLevel);
   }
 
   @NotNull
@@ -242,6 +147,24 @@ public class Async {
   }
 
   @NotNull
+  public <V> AsyncStatement<V> unevaluatedFailure(@NotNull final Throwable failure) {
+    return unevaluatedStatement(new FailureObserver<V>(failure));
+  }
+
+  @NotNull
+  public <V> AsyncStatement<V> unevaluatedStatement(
+      @NotNull final Observer<AsyncResult<V>> observer) {
+    // TODO: 30/01/2018 value, failure, loop, etc.
+    return new DefaultAsyncStatement<V>(new UnevaluatedObserver<V>(statementObserver(observer)),
+        false, mLogPrinter, mLogLevel);
+  }
+
+  @NotNull
+  public <V> AsyncStatement<V> unevaluatedValue(final V value) {
+    return unevaluatedStatement(new ValueObserver<V>(value));
+  }
+
+  @NotNull
   public <V> AsyncStatement<V> value(final V value) {
     return statement(new ValueObserver<V>(value));
   }
@@ -249,6 +172,17 @@ public class Async {
   @NotNull
   public <V> AsyncLoop<V> values(@NotNull final Iterable<V> values) {
     return null;
+  }
+
+  @NotNull
+  private <V> Observer<AsyncResult<V>> statementObserver(
+      @NotNull final Observer<AsyncResult<V>> observer) {
+    final ScheduledExecutor executor = mExecutor;
+    if (executor != null) {
+      return new ExecutorObserver<V>(observer, executor);
+    }
+
+    return observer;
   }
 
   interface CombinationCompleter<S, A, R> {
@@ -285,11 +219,15 @@ public class Async {
   private static class ExecutorObserver<V>
       implements InterruptibleObserver<AsyncResult<V>>, Serializable {
 
+    private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
+
     private final ScheduledExecutor mExecutor;
+
+    private final Object mMutex = new Object();
 
     private final Observer<AsyncResult<V>> mObserver;
 
-    private final AtomicReference<Thread> mThread = new AtomicReference<Thread>();
+    private Thread mThread;
 
     private ExecutorObserver(@NotNull final Observer<AsyncResult<V>> observer,
         @NotNull final ScheduledExecutor executor) {
@@ -301,25 +239,30 @@ public class Async {
       mExecutor.execute(new Runnable() {
 
         public void run() {
-          final AtomicReference<Thread> thread = mThread;
-          thread.set(Thread.currentThread());
+          synchronized (mMutex) {
+            mThread = Thread.currentThread();
+          }
+
           try {
             mObserver.accept(result);
 
           } catch (final Throwable t) {
-            thread.set(null);
-            // TODO: 16/01/2018 invert order of call?
-            RuntimeInterruptedException.throwIfInterrupt(t);
-            result.fail(t);
+            synchronized (mMutex) {
+              mThread = null;
+            }
+
+            result.fail(RuntimeInterruptedException.wrapIfInterrupt(t));
           }
         }
       });
     }
 
     public void interrupt() {
-      final Thread thread = mThread.get();
-      if (thread != null) {
-        Threads.interruptIfWaiting(thread);
+      synchronized (mMutex) {
+        final Thread thread = mThread;
+        if (thread != null) {
+          Threads.interruptIfWaiting(thread);
+        }
       }
     }
 
@@ -329,6 +272,8 @@ public class Async {
     }
 
     private static class ObserverProxy<V> extends SerializableProxy {
+
+      private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
 
       private ObserverProxy(final Observer<AsyncResult<V>> observer,
           final ScheduledExecutor executor) {
@@ -352,6 +297,8 @@ public class Async {
 
   private static class FailureObserver<V> implements Observer<AsyncResult<V>>, Serializable {
 
+    private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
+
     private final Throwable mFailure;
 
     private FailureObserver(@NotNull final Throwable failure) {
@@ -365,6 +312,8 @@ public class Async {
 
   private static class LoopObserver<V>
       implements RenewableObserver<AsyncResultCollection<V>>, Serializable {
+
+    private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
 
     private final AsyncStatement<? extends Iterable<V>> mStatement;
 
@@ -394,21 +343,55 @@ public class Async {
     }
   }
 
-  private static class StatementMapper
-      implements Mapper<Observer<AsyncResult<Void>>, AsyncStatement<Void>>, Serializable {
+  private static class UnevaluatedObserver<V>
+      implements RenewableObserver<AsyncResult<V>>, Serializable {
 
-    private final Async mAsync;
+    private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
 
-    private StatementMapper(@NotNull final Async async) {
-      mAsync = async;
+    private final Observer<AsyncResult<V>> mObserver;
+
+    UnevaluatedObserver(@NotNull final Observer<AsyncResult<V>> observer) {
+      mObserver = ConstantConditions.notNull("observer", observer);
     }
 
-    public AsyncStatement<Void> apply(final Observer<AsyncResult<Void>> observer) {
-      return mAsync.statement(observer);
+    @NotNull
+    private Object writeReplace() throws ObjectStreamException {
+      return new ObserverProxy<V>(mObserver);
+    }
+
+    private static class ObserverProxy<V> extends SerializableProxy {
+
+      private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
+
+      private ObserverProxy(final Observer<AsyncResult<V>> observer) {
+        super(proxy(observer));
+      }
+
+      @NotNull
+      @SuppressWarnings("unchecked")
+      Object readResolve() throws ObjectStreamException {
+        try {
+          final Object[] args = deserializeArgs();
+          return new UnevaluatedObserver<V>((Observer<AsyncResult<V>>) args[0]);
+
+        } catch (final Throwable t) {
+          throw new InvalidObjectException(t.getMessage());
+        }
+      }
+    }
+
+    public void accept(final AsyncResult<V> result) {
+    }
+
+    @NotNull
+    public Observer<AsyncResult<V>> renew() {
+      return mObserver;
     }
   }
 
   private static class ValueObserver<V> implements Observer<AsyncResult<V>>, Serializable {
+
+    private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
 
     private final V mValue;
 

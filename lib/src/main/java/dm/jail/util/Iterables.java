@@ -91,7 +91,7 @@ public class Iterables {
 
     } else {
       size = 0;
-      for (final Object ignored : iterable) {
+      for (final Iterator<?> iterator = iterable.iterator(); iterator.hasNext(); iterator.next()) {
         ++size;
       }
     }

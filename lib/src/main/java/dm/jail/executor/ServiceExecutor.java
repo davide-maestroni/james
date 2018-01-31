@@ -25,6 +25,7 @@ import java.util.WeakHashMap;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 
+import dm.jail.config.BuildConfig;
 import dm.jail.util.ConstantConditions;
 import dm.jail.util.Threads;
 
@@ -37,6 +38,8 @@ class ServiceExecutor extends AsyncExecutor implements Serializable {
 
   private static final WeakHashMap<ScheduledExecutorService, Boolean> mOwners =
       new WeakHashMap<ScheduledExecutorService, Boolean>();
+
+  private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
 
   private final ThreadLocal<Boolean> mIsManaged = new ThreadLocal<Boolean>();
 
@@ -105,6 +108,8 @@ class ServiceExecutor extends AsyncExecutor implements Serializable {
 
   private static class ExecutorProxy implements Serializable {
 
+    private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
+
     private final ScheduledExecutorService mService;
 
     private ExecutorProxy(@NotNull final ScheduledExecutorService service) {
@@ -127,6 +132,8 @@ class ServiceExecutor extends AsyncExecutor implements Serializable {
    * executor is stopped.
    */
   private static class StoppableServiceExecutor extends ServiceExecutor {
+
+    private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
 
     private final ScheduledExecutorService mService;
 

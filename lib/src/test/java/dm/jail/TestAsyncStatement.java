@@ -43,15 +43,16 @@ import dm.jail.async.AsyncStatement.ForkUpdater;
 import dm.jail.async.AsyncStatement.Forker;
 import dm.jail.async.Mapper;
 import dm.jail.async.Observer;
+import dm.jail.async.RuntimeTimeoutException;
 import dm.jail.async.SimpleState;
 import dm.jail.log.LogPrinter;
 import dm.jail.log.LogPrinters;
 import dm.jail.log.Logger;
 import dm.jail.util.ConstantConditions;
-import dm.jail.util.RuntimeTimeoutException;
 
 import static dm.jail.executor.ScheduledExecutors.backgroundExecutor;
 import static dm.jail.executor.ScheduledExecutors.withDelay;
+import static java.util.concurrent.TimeUnit.SECONDS;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
@@ -133,6 +134,13 @@ public class TestAsyncStatement {
     assertThat(resultCollection.getStates().get(0).value()).isEqualTo("test");
   }
 
+  @Test(expected = UnsupportedOperationException.class)
+  public void addToException() {
+    final TestResultCollection<String> resultCollection = new TestResultCollection<String>();
+    final AsyncStatement<String> statement = new Async().unevaluatedValue("test");
+    statement.addTo(resultCollection);
+  }
+
   @Test
   public void addToFailure() {
     final TestResultCollection<String> resultCollection = new TestResultCollection<String>();
@@ -143,8 +151,18 @@ public class TestAsyncStatement {
   }
 
   @Test
+  public void cancelUnevaluated() {
+    final AsyncStatement<String> statement = new Async().unevaluatedValue("test");
+    assertThat(statement.isCancelled()).isFalse();
+    assertThat(statement.isDone()).isFalse();
+    assertThat(statement.cancel(false)).isTrue();
+    assertThat(statement.isCancelled()).isTrue();
+    assertThat(statement.isDone()).isTrue();
+  }
+
+  @Test
   public void cancelled() {
-    final AsyncStatement<Void> statement = new Async().statementDeclaration();
+    final AsyncStatement<Void> statement = new Async().unevaluatedValue(null);
     statement.cancel(false);
     assertThat(statement.isCancelled()).isTrue();
   }
@@ -539,6 +557,33 @@ public class TestAsyncStatement {
   }
 
   @Test
+  public void evaluated() {
+    final Random random = new Random();
+    final AsyncStatement<Integer> statement =
+        new Async().unevaluatedStatement(new Observer<AsyncResult<Integer>>() {
+
+          public void accept(final AsyncResult<Integer> result) {
+            result.set(random.nextInt());
+          }
+        }).evaluated();
+    assertThat(statement.getValue()).isEqualTo(statement.evaluated().getValue());
+    assertThat(statement.evaluated().getValue()).isEqualTo(statement.evaluated().getValue());
+  }
+
+  @Test
+  public void evaluatedEvaluate() {
+    final Random random = new Random();
+    final AsyncStatement<Integer> statement =
+        new Async().unevaluatedStatement(new Observer<AsyncResult<Integer>>() {
+
+          public void accept(final AsyncResult<Integer> result) {
+            result.set(random.nextInt());
+          }
+        });
+    assertThat(statement.evaluated().getValue()).isNotEqualTo(statement.evaluate().getValue());
+  }
+
+  @Test
   public void evaluating() {
     final AsyncStatement<String> statement =
         new Async().value("test").on(withDelay(backgroundExecutor(), 1, TimeUnit.SECONDS));
@@ -549,6 +594,21 @@ public class TestAsyncStatement {
   public void evaluatingBackground() {
     final AsyncStatement<String> statement =
         new Async().value("test").on(withDelay(backgroundExecutor(), 1, TimeUnit.SECONDS));
+    assertThat(statement.isEvaluating()).isTrue();
+  }
+
+  @Test
+  public void evaluatingEvaluated() {
+    final AsyncStatement<String> statement = //
+        new Async().unevaluatedValue("test")
+                   .on(withDelay(backgroundExecutor(), 1, SECONDS))
+                   .then(new Mapper<String, String>() {
+
+                     public String apply(final String input) {
+                       return input.toUpperCase();
+                     }
+                   })
+                   .evaluated();
     assertThat(statement.isEvaluating()).isTrue();
   }
 
@@ -564,6 +624,20 @@ public class TestAsyncStatement {
     final AsyncStatement<String> statement =
         new Async().on(withDelay(backgroundExecutor(), 1, TimeUnit.SECONDS)).value("test");
     assertThat(statement.isEvaluating()).isTrue();
+  }
+
+  @Test
+  public void evaluatingUnevaluated() {
+    final AsyncStatement<String> statement = //
+        new Async().unevaluatedValue("test")
+                   .on(withDelay(backgroundExecutor(), 1, SECONDS))
+                   .then(new Mapper<String, String>() {
+
+                     public String apply(final String input) {
+                       return input.toUpperCase();
+                     }
+                   });
+    assertThat(statement.isEvaluating()).isFalse();
   }
 
   @Test(expected = IllegalStateException.class)
@@ -625,7 +699,7 @@ public class TestAsyncStatement {
 
   @Test(expected = IllegalStateException.class)
   public void failureInvalidStateEvaluating() {
-    final AsyncStatement<Void> statement = new Async().statementDeclaration();
+    final AsyncStatement<Void> statement = new Async().unevaluatedFailure(new Exception());
     assertThat(statement.failure());
   }
 
@@ -1394,6 +1468,50 @@ public class TestAsyncStatement {
   }
 
   @Test
+  public void serializeUnevaluated() throws IOException, ClassNotFoundException {
+    final AsyncStatement<String> statement = new Async().unevaluatedValue("test");
+    final ByteArrayOutputStream byteOutputStream = new ByteArrayOutputStream();
+    final ObjectOutputStream objectOutputStream = new ObjectOutputStream(byteOutputStream);
+    objectOutputStream.writeObject(statement);
+    final ByteArrayInputStream byteInputStream =
+        new ByteArrayInputStream(byteOutputStream.toByteArray());
+    final ObjectInputStream objectInputStream = new ObjectInputStream(byteInputStream);
+    @SuppressWarnings("unchecked") final AsyncStatement<String> deserialized =
+        (AsyncStatement<String>) objectInputStream.readObject();
+    assertThat(deserialized.evaluated().getValue()).isEqualTo("test");
+  }
+
+  @Test
+  public void serializeUnevaluatedFork() throws IOException, ClassNotFoundException {
+    final AsyncStatement<String> statement =
+        createStatementFork(new Async().unevaluatedValue("test"));
+    final ByteArrayOutputStream byteOutputStream = new ByteArrayOutputStream();
+    final ObjectOutputStream objectOutputStream = new ObjectOutputStream(byteOutputStream);
+    objectOutputStream.writeObject(statement);
+    final ByteArrayInputStream byteInputStream =
+        new ByteArrayInputStream(byteOutputStream.toByteArray());
+    final ObjectInputStream objectInputStream = new ObjectInputStream(byteInputStream);
+    @SuppressWarnings("unchecked") final AsyncStatement<String> deserialized =
+        (AsyncStatement<String>) objectInputStream.readObject();
+    assertThat(deserialized.then(new ToUpper()).evaluate().getValue()).isEqualTo("TEST");
+  }
+
+  @Test
+  public void serializeUnevaluatedForked() throws IOException, ClassNotFoundException {
+    final AsyncStatement<String> statement =
+        createStatementFork(new Async().unevaluatedValue("test")).then(new ToUpper());
+    final ByteArrayOutputStream byteOutputStream = new ByteArrayOutputStream();
+    final ObjectOutputStream objectOutputStream = new ObjectOutputStream(byteOutputStream);
+    objectOutputStream.writeObject(statement);
+    final ByteArrayInputStream byteInputStream =
+        new ByteArrayInputStream(byteOutputStream.toByteArray());
+    final ObjectInputStream objectInputStream = new ObjectInputStream(byteInputStream);
+    @SuppressWarnings("unchecked") final AsyncStatement<String> deserialized =
+        (AsyncStatement<String>) objectInputStream.readObject();
+    assertThat(deserialized.evaluated().getValue()).isEqualTo("TEST");
+  }
+
+  @Test
   public void serializeWhenDone() throws IOException, ClassNotFoundException {
     final AsyncStatement<String> statement = new Async().value("test").whenDone(new NoOp());
     final ByteArrayOutputStream byteOutputStream = new ByteArrayOutputStream();
@@ -1517,6 +1635,18 @@ public class TestAsyncStatement {
         return null;
       }
     }).failure()).isExactlyInstanceOf(NullPointerException.class);
+  }
+
+  @Test(expected = IllegalStateException.class)
+  public void thenIllegal() {
+    final AsyncStatement<String> statement = new Async().value("test");
+    statement.then(new Mapper<String, String>() {
+
+      public String apply(final String input) {
+        return input.toUpperCase();
+      }
+    });
+    statement.then(new ToUpper());
   }
 
   @Test(expected = NullPointerException.class)
@@ -1960,6 +2090,13 @@ public class TestAsyncStatement {
     assertThat(statement.getValue()).isEqualTo("TEST");
   }
 
+  @Test(expected = UnsupportedOperationException.class)
+  public void toException() {
+    final TestResult<String> result = new TestResult<String>();
+    final AsyncStatement<String> statement = new Async().unevaluatedValue("test");
+    statement.to(result);
+  }
+
   @Test
   public void value() {
     final AsyncStatement<String> statement = new Async().value("hello");
@@ -1997,7 +2134,7 @@ public class TestAsyncStatement {
 
   @Test(expected = IllegalStateException.class)
   public void valueInvalidStateEvaluating() {
-    final AsyncStatement<Void> statement = new Async().statementDeclaration();
+    final AsyncStatement<Void> statement = new Async().unevaluatedValue(null);
     statement.value();
   }
 
@@ -2024,6 +2161,13 @@ public class TestAsyncStatement {
     final AsyncStatement<String> statement =
         new Async().on(withDelay(backgroundExecutor(), 100, TimeUnit.MILLISECONDS)).value("test");
     assertThat(statement.waitDone(1, TimeUnit.SECONDS)).isTrue();
+  }
+
+  @Test
+  public void waitDoneTimeout() {
+    final AsyncStatement<Object> statement =
+        new Async().value(null).on(withDelay(backgroundExecutor(), 1, TimeUnit.SECONDS));
+    assertThat(statement.waitDone(1, TimeUnit.MILLISECONDS)).isFalse();
   }
 
   @Test(expected = NullPointerException.class)

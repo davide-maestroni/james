@@ -20,12 +20,12 @@ import org.jetbrains.annotations.NotNull;
 
 import java.io.InvalidObjectException;
 import java.io.ObjectStreamException;
-import java.io.Serializable;
 import java.util.concurrent.SynchronousQueue;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 
+import dm.jail.config.BuildConfig;
 import dm.jail.util.SerializableProxy;
 
 /**
@@ -36,8 +36,9 @@ import dm.jail.util.SerializableProxy;
  * <p>
  * Created by davide-maestroni on 01/23/2015.
  */
-class DynamicScheduledThreadPoolExecutorService extends ScheduledThreadPoolExecutorService
-    implements Serializable {
+class DynamicScheduledThreadPoolExecutorService extends ScheduledThreadPoolExecutorService {
+
+  private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
 
   private final int mCorePoolSize;
 
@@ -108,6 +109,8 @@ class DynamicScheduledThreadPoolExecutorService extends ScheduledThreadPoolExecu
   }
 
   private static class ExecutorProxy extends SerializableProxy {
+
+    private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
 
     private ExecutorProxy(final int corePoolSize, final int maximumPoolSize,
         final long keepAliveTime, final TimeUnit keepAliveUnit, final ThreadFactory threadFactory) {

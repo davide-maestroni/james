@@ -24,6 +24,7 @@ import java.io.Serializable;
 import java.lang.ref.WeakReference;
 import java.util.concurrent.TimeUnit;
 
+import dm.jail.config.BuildConfig;
 import dm.jail.util.ConstantConditions;
 import dm.jail.util.DoubleQueue;
 import dm.jail.util.WeakIdentityHashMap;
@@ -39,6 +40,8 @@ import dm.jail.util.WeakIdentityHashMap;
  * Created by davide-maestroni on 07/18/2015.
  */
 class ThrottlingExecutor extends ScheduledExecutorDecorator implements Serializable {
+
+  private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
 
   private final WeakIdentityHashMap<Runnable, WeakReference<ThrottlingCommand>> mCommands =
       new WeakIdentityHashMap<Runnable, WeakReference<ThrottlingCommand>>();
@@ -132,6 +135,8 @@ class ThrottlingExecutor extends ScheduledExecutorDecorator implements Serializa
   }
 
   private static class ExecutorProxy implements Serializable {
+
+    private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
 
     private final ScheduledExecutor mExecutor;
 

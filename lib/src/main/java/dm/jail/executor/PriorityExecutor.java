@@ -31,6 +31,7 @@ import java.util.concurrent.PriorityBlockingQueue;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 
+import dm.jail.config.BuildConfig;
 import dm.jail.util.ConstantConditions;
 import dm.jail.util.WeakIdentityHashMap;
 
@@ -165,6 +166,8 @@ class PriorityExecutor {
   private static class SerializableExecutor extends ScheduledExecutorDecorator
       implements Serializable {
 
+    private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
+
     private final ScheduledExecutor mExecutor;
 
     private final int mPriority;
@@ -181,6 +184,8 @@ class PriorityExecutor {
     }
 
     private static class ExecutorProxy implements Serializable {
+
+      private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
 
       private final ScheduledExecutor mExecutor;
 

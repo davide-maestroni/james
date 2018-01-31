@@ -16,10 +16,26 @@
 
 package dm.jail.async;
 
-/**
- * Created by davide-maestroni on 01/27/2018.
- */
-public interface InterruptibleObserver<I> extends Observer<I> {
+import org.jetbrains.annotations.NotNull;
 
-  void interrupt();
+import java.util.concurrent.TimeoutException;
+
+/**
+ * Created by davide-maestroni on 01/15/2018.
+ */
+public class RuntimeTimeoutException extends FailureException {
+
+  public RuntimeTimeoutException() {
+    super(new TimeoutException());
+  }
+
+  public RuntimeTimeoutException(final String message) {
+    super(new TimeoutException(message));
+  }
+
+  @NotNull
+  @SuppressWarnings("unchecked")
+  public TimeoutException toTimeoutException() {
+    return (TimeoutException) getCause();
+  }
 }

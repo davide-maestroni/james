@@ -22,12 +22,13 @@ import java.io.ObjectStreamException;
 import java.io.Serializable;
 import java.util.concurrent.CancellationException;
 
+import dm.jail.config.BuildConfig;
 import dm.jail.util.ConstantConditions;
 
 /**
  * Created by davide-maestroni on 01/11/2018.
  */
-public abstract class SimpleState<V> implements AsyncState<V> {
+public abstract class SimpleState<V> implements AsyncState<V>, Serializable {
 
   private SimpleState() {
   }
@@ -54,7 +55,9 @@ public abstract class SimpleState<V> implements AsyncState<V> {
     return (SimpleState<V>) SettledState.sInstance;
   }
 
-  private static class FailureState<V> extends SimpleState<V> implements Serializable {
+  private static class FailureState<V> extends SimpleState<V> {
+
+    private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
 
     private final Throwable mFailure;
 
@@ -96,9 +99,11 @@ public abstract class SimpleState<V> implements AsyncState<V> {
     }
   }
 
-  private static class PendingState<V> extends SimpleState<V> implements Serializable {
+  private static class PendingState<V> extends SimpleState<V> {
 
     private static final PendingState<?> sInstance = new PendingState<Object>();
+
+    private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
 
     @NotNull
     Object readResolve() throws ObjectStreamException {
@@ -139,9 +144,11 @@ public abstract class SimpleState<V> implements AsyncState<V> {
     }
   }
 
-  private static class SettledState<V> extends SimpleState<V> implements Serializable {
+  private static class SettledState<V> extends SimpleState<V> {
 
     private static final SettledState<?> sInstance = new SettledState<Object>();
+
+    private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
 
     @NotNull
     Object readResolve() throws ObjectStreamException {
@@ -182,7 +189,9 @@ public abstract class SimpleState<V> implements AsyncState<V> {
     }
   }
 
-  private static class ValueState<V> extends SimpleState<V> implements Serializable {
+  private static class ValueState<V> extends SimpleState<V> {
+
+    private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
 
     private final V mValue;
 

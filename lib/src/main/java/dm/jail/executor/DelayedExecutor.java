@@ -23,12 +23,15 @@ import java.io.ObjectStreamException;
 import java.io.Serializable;
 import java.util.concurrent.TimeUnit;
 
+import dm.jail.config.BuildConfig;
 import dm.jail.util.ConstantConditions;
 
 /**
  * Created by davide-maestroni on 08/03/2017.
  */
 class DelayedExecutor extends ScheduledExecutorDecorator implements Serializable {
+
+  private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
 
   private final long mDelay;
 
@@ -85,6 +88,8 @@ class DelayedExecutor extends ScheduledExecutorDecorator implements Serializable
   }
 
   private static class ExecutorProxy implements Serializable {
+
+    private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
 
     private final long mDelay;
 

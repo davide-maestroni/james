@@ -27,6 +27,7 @@ import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 
+import dm.jail.config.BuildConfig;
 import dm.jail.util.ConstantConditions;
 
 /**
@@ -36,6 +37,8 @@ import dm.jail.util.ConstantConditions;
  */
 class ScheduledThreadPoolExecutorService extends ScheduledThreadPoolExecutor
     implements Serializable {
+
+  private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
 
   private final ExecutorService mExecutor;
 
@@ -47,25 +50,6 @@ class ScheduledThreadPoolExecutorService extends ScheduledThreadPoolExecutor
   ScheduledThreadPoolExecutorService(@NotNull final ExecutorService service) {
     super(1);
     mExecutor = ConstantConditions.notNull("service", service);
-  }
-
-  @Override
-  public int hashCode() {
-    return mExecutor.hashCode();
-  }
-
-  @Override
-  public boolean equals(final Object o) {
-    if (this == o) {
-      return true;
-    }
-
-    if ((o == null) || (getClass() != o.getClass())) {
-      return false;
-    }
-
-    final ScheduledThreadPoolExecutorService that = (ScheduledThreadPoolExecutorService) o;
-    return mExecutor.equals(that.mExecutor);
   }
 
   @NotNull
@@ -130,6 +114,8 @@ class ScheduledThreadPoolExecutorService extends ScheduledThreadPoolExecutor
   }
 
   private static class ExecutorProxy implements Serializable {
+
+    private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
 
     private final ExecutorService mService;
 

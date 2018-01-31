@@ -23,10 +23,14 @@ import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.Collections;
 
+import dm.jail.config.BuildConfig;
+
 /**
  * Created by davide-maestroni on 07/21/2017.
  */
 public abstract class SerializableProxy implements Serializable {
+
+  private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
 
   private final ArrayList<Object> mObjects = new ArrayList<Object>();
 
@@ -66,6 +70,8 @@ public abstract class SerializableProxy implements Serializable {
   }
 
   private static class SerializableObject implements Serializable {
+
+    private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
 
     private final Class<?> mClass;
 

@@ -65,10 +65,6 @@ public interface AsyncLoop<V> extends AsyncStatement<Iterable<V>>, Serializable 
       @NotNull Mapper<? super Throwable, ? extends AsyncStatement<? extends V>> mapper);
 
   @NotNull
-  AsyncLoop<V> forEachElseIfOrdered(
-      @NotNull Mapper<? super Throwable, ? extends AsyncStatement<? extends V>> mapper);
-
-  @NotNull
   AsyncLoop<V> forEachElseLoop(
       @NotNull Mapper<? super Throwable, ? extends Iterable<? extends V>> mapper);
 
@@ -77,23 +73,13 @@ public interface AsyncLoop<V> extends AsyncStatement<Iterable<V>>, Serializable 
       @NotNull Mapper<? super Throwable, ? extends AsyncLoop<? extends V>> mapper);
 
   @NotNull
-  AsyncLoop<V> forEachElseLoopIfOrdered(
-      @NotNull Mapper<? super Throwable, ? extends AsyncLoop<? extends V>> mapper);
-
-  @NotNull
   <R> AsyncLoop<R> forEachIf(@NotNull Mapper<? super V, ? extends AsyncStatement<R>> mapper);
-
-  @NotNull
-  <R> AsyncLoop<R> forEachIfOrdered(@NotNull Mapper<? super V, ? extends AsyncStatement<R>> mapper);
 
   @NotNull
   <R> AsyncLoop<R> forEachLoop(@NotNull Mapper<? super V, ? extends Iterable<R>> mapper);
 
   @NotNull
   <R> AsyncLoop<R> forEachLoopIf(@NotNull Mapper<? super V, ? extends AsyncLoop<R>> mapper);
-
-  @NotNull
-  <R> AsyncLoop<R> forEachLoopIfOrdered(@NotNull Mapper<? super V, ? extends AsyncLoop<R>> mapper);
 
   @NotNull
   <R> AsyncLoop<R> forEachTry(@NotNull Mapper<? super V, ? extends Closeable> closeable,
@@ -108,20 +94,11 @@ public interface AsyncLoop<V> extends AsyncStatement<Iterable<V>>, Serializable 
       @NotNull Mapper<? super V, ? extends AsyncStatement<R>> mapper);
 
   @NotNull
-  <R> AsyncLoop<R> forEachTryIfOrdered(@NotNull Mapper<? super V, ? extends Closeable> closeable,
-      @NotNull Mapper<? super V, ? extends AsyncStatement<R>> mapper);
-
-  @NotNull
   <R> AsyncLoop<R> forEachTryLoop(@NotNull Mapper<? super V, ? extends Closeable> closeable,
       @NotNull Mapper<? super V, ? extends Iterable<R>> mapper);
 
   @NotNull
   <R> AsyncLoop<R> forEachTryLoopIf(@NotNull Mapper<? super V, ? extends Closeable> closeable,
-      @NotNull Mapper<? super V, ? extends AsyncLoop<R>> mapper);
-
-  @NotNull
-  <R> AsyncLoop<R> forEachTryLoopIfOrdered(
-      @NotNull Mapper<? super V, ? extends Closeable> closeable,
       @NotNull Mapper<? super V, ? extends AsyncLoop<R>> mapper);
 
   @NotNull
@@ -135,6 +112,56 @@ public interface AsyncLoop<V> extends AsyncStatement<Iterable<V>>, Serializable 
       @Nullable ForkUpdater<S, ? super AsyncLoop<V>, ? super Throwable> failure,
       @Nullable ForkCompleter<S, ? super AsyncLoop<V>> done,
       @Nullable ForkUpdater<S, ? super AsyncLoop<V>, ? super AsyncResultCollection<V>> statement);
+
+  @NotNull
+  AsyncLoop<V> orderedForEachElseIf(
+      @NotNull Mapper<? super Throwable, ? extends AsyncStatement<? extends V>> mapper);
+
+  @NotNull
+  AsyncLoop<V> orderedForEachElseLoopIf(
+      @NotNull Mapper<? super Throwable, ? extends AsyncLoop<? extends V>> mapper);
+
+  @NotNull
+  <R> AsyncLoop<R> orderedForEachIf(@NotNull Mapper<? super V, ? extends AsyncStatement<R>> mapper);
+
+  @NotNull
+  <R> AsyncLoop<R> orderedForEachLoopIf(@NotNull Mapper<? super V, ? extends AsyncLoop<R>> mapper);
+
+  @NotNull
+  <R> AsyncLoop<R> orderedForEachTryIf(@NotNull Mapper<? super V, ? extends Closeable> closeable,
+      @NotNull Mapper<? super V, ? extends AsyncStatement<R>> mapper);
+
+  @NotNull
+  <R> AsyncLoop<R> orderedForEachTryLoopIf(
+      @NotNull Mapper<? super V, ? extends Closeable> closeable,
+      @NotNull Mapper<? super V, ? extends AsyncLoop<R>> mapper);
+
+  @NotNull
+  AsyncLoop<V> orderedOn(@NotNull ScheduledExecutor executor);
+
+  @NotNull
+  AsyncLoop<V> orderedOn(@NotNull ScheduledExecutor executor, int minBatch, int maxBatch);
+
+  @NotNull
+  <R, S> AsyncLoop<R> orderedTryYield(@NotNull Mapper<? super V, ? extends Closeable> closeable,
+      @NotNull Looper<S, ? super V, R> looper);
+
+  @NotNull
+  <R, S> AsyncLoop<R> orderedTryYield(@NotNull Mapper<? super V, ? extends Closeable> closeable,
+      @Nullable Provider<S> init, @Nullable Mapper<S, ? extends Boolean> loop,
+      @Nullable LoopUpdater<S, ? super V, ? super Generator<R>> value,
+      @Nullable LoopUpdater<S, ? super Throwable, ? super Generator<R>> failure,
+      @Nullable LoopCompleter<S, ? super Generator<R>> done);
+
+  @NotNull
+  <R, S> AsyncLoop<R> orderedYield(@NotNull Looper<S, ? super V, R> looper);
+
+  @NotNull
+  <R, S> AsyncLoop<R> orderedYield(@Nullable Provider<S> init,
+      @Nullable Mapper<S, ? extends Boolean> loop,
+      @Nullable LoopUpdater<S, ? super V, ? super Generator<R>> value,
+      @Nullable LoopUpdater<S, ? super Throwable, ? super Generator<R>> failure,
+      @Nullable LoopCompleter<S, ? super Generator<R>> done);
 
   @NotNull
   AsyncLoop<V> parallelOn(@NotNull ScheduledExecutor executor);
@@ -182,17 +209,6 @@ public interface AsyncLoop<V> extends AsyncStatement<Iterable<V>>, Serializable 
       @Nullable LoopCompleter<S, ? super Generator<R>> done);
 
   @NotNull
-  <R, S> AsyncLoop<R> tryYieldOrdered(@NotNull Mapper<? super V, ? extends Closeable> closeable,
-      @NotNull Looper<S, ? super V, R> looper);
-
-  @NotNull
-  <R, S> AsyncLoop<R> tryYieldOrdered(@NotNull Mapper<? super V, ? extends Closeable> closeable,
-      @Nullable Provider<S> init, @Nullable Mapper<S, ? extends Boolean> loop,
-      @Nullable LoopUpdater<S, ? super V, ? super Generator<R>> value,
-      @Nullable LoopUpdater<S, ? super Throwable, ? super Generator<R>> failure,
-      @Nullable LoopCompleter<S, ? super Generator<R>> done);
-
-  @NotNull
   Iterator<V> valueIterator();
 
   @NotNull
@@ -203,16 +219,6 @@ public interface AsyncLoop<V> extends AsyncStatement<Iterable<V>>, Serializable 
 
   @NotNull
   <R, S> AsyncLoop<R> yield(@Nullable Provider<S> init, @Nullable Mapper<S, ? extends Boolean> loop,
-      @Nullable LoopUpdater<S, ? super V, ? super Generator<R>> value,
-      @Nullable LoopUpdater<S, ? super Throwable, ? super Generator<R>> failure,
-      @Nullable LoopCompleter<S, ? super Generator<R>> done);
-
-  @NotNull
-  <R, S> AsyncLoop<R> yieldOrdered(@NotNull Looper<S, ? super V, R> looper);
-
-  @NotNull
-  <R, S> AsyncLoop<R> yieldOrdered(@Nullable Provider<S> init,
-      @Nullable Mapper<S, ? extends Boolean> loop,
       @Nullable LoopUpdater<S, ? super V, ? super Generator<R>> value,
       @Nullable LoopUpdater<S, ? super Throwable, ? super Generator<R>> failure,
       @Nullable LoopCompleter<S, ? super Generator<R>> done);

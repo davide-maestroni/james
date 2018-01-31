@@ -22,6 +22,8 @@ import java.io.ObjectStreamException;
 import java.io.Serializable;
 import java.util.concurrent.TimeUnit;
 
+import dm.jail.config.BuildConfig;
+
 /**
  * Class implementing a synchronous loop executor.
  * <p>
@@ -33,6 +35,8 @@ import java.util.concurrent.TimeUnit;
 class LoopExecutor extends SyncExecutor implements Serializable {
 
   private static final LoopExecutor sInstance = new LoopExecutor();
+
+  private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
 
   /**
    * Avoid explicit instantiation.

@@ -34,11 +34,13 @@ public class FailureException extends RuntimeException {
   }
 
   @NotNull
+  @SuppressWarnings("unchecked")
   public static FailureException wrap(@NotNull final Throwable t) {
     return (FailureException) wrapIfNot(FailureException.class, t);
   }
 
   @NotNull
+  @SuppressWarnings("unchecked")
   public static RuntimeException wrapIfNot(@NotNull final Class<? extends RuntimeException> type,
       @NotNull final Throwable t) {
     if (!type.isInstance(t)) {
@@ -50,19 +52,25 @@ public class FailureException extends RuntimeException {
 
   @Override
   public String getMessage() {
-    final Throwable cause = getCause();
+    final Throwable cause = super.getCause();
     return (cause != null) ? cause.getMessage() : super.getMessage();
   }
 
   @Override
   public String getLocalizedMessage() {
-    final Throwable cause = getCause();
+    final Throwable cause = super.getCause();
     return (cause != null) ? cause.getLocalizedMessage() : super.getLocalizedMessage();
+  }
+
+  @NotNull
+  @Override
+  public final synchronized Throwable getCause() {
+    return super.getCause();
   }
 
   @Override
   public void printStackTrace() {
-    final Throwable cause = getCause();
+    final Throwable cause = super.getCause();
     if (cause != null) {
       cause.printStackTrace();
 
@@ -73,7 +81,7 @@ public class FailureException extends RuntimeException {
 
   @Override
   public void printStackTrace(final PrintStream printStream) {
-    final Throwable cause = getCause();
+    final Throwable cause = super.getCause();
     if (cause != null) {
       cause.printStackTrace(printStream);
 
@@ -84,7 +92,7 @@ public class FailureException extends RuntimeException {
 
   @Override
   public void printStackTrace(final PrintWriter printWriter) {
-    final Throwable cause = getCause();
+    final Throwable cause = super.getCause();
     if (cause != null) {
       cause.printStackTrace(printWriter);
 
@@ -95,19 +103,19 @@ public class FailureException extends RuntimeException {
 
   @Override
   public synchronized Throwable fillInStackTrace() {
-    final Throwable cause = getCause();
+    final Throwable cause = super.getCause();
     return (cause != null) ? cause.fillInStackTrace() : super.fillInStackTrace();
   }
 
   @Override
   public StackTraceElement[] getStackTrace() {
-    final Throwable cause = getCause();
+    final Throwable cause = super.getCause();
     return (cause != null) ? cause.getStackTrace() : super.getStackTrace();
   }
 
   @Override
   public void setStackTrace(final StackTraceElement[] stackTraceElements) {
-    final Throwable cause = getCause();
+    final Throwable cause = super.getCause();
     if (cause != null) {
       cause.setStackTrace(stackTraceElements);
 

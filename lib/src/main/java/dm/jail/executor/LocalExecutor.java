@@ -20,7 +20,7 @@ import org.jetbrains.annotations.NotNull;
 
 import java.util.concurrent.TimeUnit;
 
-import dm.jail.util.RuntimeInterruptedException;
+import dm.jail.async.RuntimeInterruptedException;
 import dm.jail.util.TimeUnits;
 
 /**

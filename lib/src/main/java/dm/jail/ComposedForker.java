@@ -29,6 +29,7 @@ import dm.jail.async.AsyncStatement.ForkCompleter;
 import dm.jail.async.AsyncStatement.ForkUpdater;
 import dm.jail.async.AsyncStatement.Forker;
 import dm.jail.async.Mapper;
+import dm.jail.config.BuildConfig;
 import dm.jail.util.SerializableProxy;
 
 /**
@@ -36,6 +37,8 @@ import dm.jail.util.SerializableProxy;
  */
 class ComposedForker<S, V>
     implements Forker<S, AsyncStatement<V>, V, AsyncResult<V>>, Serializable {
+
+  private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
 
   private final ForkCompleter<S, ? super AsyncStatement<V>> mDone;
 
@@ -96,6 +99,8 @@ class ComposedForker<S, V>
 
   private static class BuffererProxy<S, V> extends SerializableProxy {
 
+    private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
+
     private BuffererProxy(final Mapper<? super AsyncStatement<V>, S> init,
         final ForkUpdater<S, ? super AsyncStatement<V>, ? super V> value,
         final ForkUpdater<S, ? super AsyncStatement<V>, ? super Throwable> failure,
@@ -127,6 +132,8 @@ class ComposedForker<S, V>
 
     private static final DefaultComplete<?, ?> sInstance = new DefaultComplete<Object, Object>();
 
+    private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
+
     public S complete(@NotNull final AsyncStatement<V> statement, final S stack) {
       return stack;
     }
@@ -140,6 +147,8 @@ class ComposedForker<S, V>
   private static class DefaultInit<S, V> implements Mapper<AsyncStatement<V>, S>, Serializable {
 
     private static final DefaultInit<?, ?> sInstance = new DefaultInit<Object, Object>();
+
+    private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
 
     public S apply(final AsyncStatement<V> statement) {
       return null;
@@ -156,6 +165,8 @@ class ComposedForker<S, V>
 
     private static final DefaultUpdateResult<?, ?> sInstance =
         new DefaultUpdateResult<Object, Object>();
+
+    private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
 
     public S update(@NotNull final AsyncStatement<V> statement, final S stack,
         final AsyncResult<V> result) {
@@ -174,6 +185,8 @@ class ComposedForker<S, V>
 
     private static final DefaultUpdateValue<?, ?, ?> sInstance =
         new DefaultUpdateValue<Object, Object, Object>();
+
+    private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
 
     @NotNull
     Object readResolve() throws ObjectStreamException {
