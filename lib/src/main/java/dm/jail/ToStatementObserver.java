@@ -20,22 +20,31 @@ import org.jetbrains.annotations.NotNull;
 
 import java.io.Serializable;
 
+import dm.jail.async.AsyncLoop;
 import dm.jail.async.AsyncResult;
+import dm.jail.async.Observer;
 import dm.jail.config.BuildConfig;
+import dm.jail.util.ConstantConditions;
 
 /**
- * Created by davide-maestroni on 01/14/2018.
+ * Created by davide-maestroni on 02/02/2018.
  */
-class AsyncStatementHandler<V, R> implements Serializable {
+class ToStatementObserver<V> implements RenewableObserver<AsyncResult<Iterable<V>>>, Serializable {
 
   private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
 
-  void failure(@NotNull final Throwable failure, @NotNull final AsyncResult<R> result) throws Exception {
-    result.fail(failure);
+  private final AsyncLoop<V> mLoop;
+
+  ToStatementObserver(@NotNull final AsyncLoop<V> loop) {
+    mLoop = ConstantConditions.notNull("loop", loop);
   }
 
-  @SuppressWarnings("unchecked")
-  void value(final V value, @NotNull final AsyncResult<R> result) throws Exception {
-    result.set((R) value);
+  public void accept(final AsyncResult<Iterable<V>> result) {
+    mLoop.to(result);
+  }
+
+  @NotNull
+  public Observer<AsyncResult<Iterable<V>>> renew() {
+    return new ToStatementObserver<V>(mLoop.evaluate());
   }
 }

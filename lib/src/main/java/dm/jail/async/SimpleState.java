@@ -55,6 +55,8 @@ public abstract class SimpleState<V> implements AsyncState<V>, Serializable {
     return (SimpleState<V>) SettledState.sInstance;
   }
 
+  public abstract void addTo(@NotNull AsyncResultCollection<? super V> results);
+
   private static class FailureState<V> extends SimpleState<V> {
 
     private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;

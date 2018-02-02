@@ -35,7 +35,7 @@ import dm.jail.util.SerializableProxy;
 /**
  * Created by davide-maestroni on 01/19/2018.
  */
-class ComposedForker<S, V>
+class ComposedStatementForker<S, V>
     implements Forker<S, AsyncStatement<V>, V, AsyncResult<V>>, Serializable {
 
   private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
@@ -52,7 +52,7 @@ class ComposedForker<S, V>
   private final ForkUpdater<S, ? super AsyncStatement<V>, ? super V> mValue;
 
   @SuppressWarnings("unchecked")
-  ComposedForker(@Nullable final Mapper<? super AsyncStatement<V>, S> init,
+  ComposedStatementForker(@Nullable final Mapper<? super AsyncStatement<V>, S> init,
       @Nullable final ForkUpdater<S, ? super AsyncStatement<V>, ? super V> value,
       @Nullable final ForkUpdater<S, ? super AsyncStatement<V>, ? super Throwable> failure,
       @Nullable final ForkCompleter<S, ? super AsyncStatement<V>> done,
@@ -115,7 +115,7 @@ class ComposedForker<S, V>
     Object readResolve() throws ObjectStreamException {
       try {
         final Object[] args = deserializeArgs();
-        return new ComposedForker<S, V>((Mapper<? super AsyncStatement<V>, S>) args[0],
+        return new ComposedStatementForker<S, V>((Mapper<? super AsyncStatement<V>, S>) args[0],
             (ForkUpdater<S, ? super AsyncStatement<V>, ? super V>) args[1],
             (ForkUpdater<S, ? super AsyncStatement<V>, ? super Throwable>) args[2],
             (ForkCompleter<S, ? super AsyncStatement<V>>) args[3],

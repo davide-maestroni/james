@@ -20,12 +20,10 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 import java.io.Closeable;
-import java.io.IOException;
 import java.io.InvalidObjectException;
 import java.io.ObjectStreamException;
 import java.io.Serializable;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.CopyOnWriteArrayList;
@@ -35,7 +33,6 @@ import java.util.concurrent.TimeoutException;
 
 import dm.jail.async.Action;
 import dm.jail.async.AsyncResult;
-import dm.jail.async.AsyncResultCollection;
 import dm.jail.async.AsyncStatement;
 import dm.jail.async.FailureException;
 import dm.jail.async.Mapper;
@@ -58,10 +55,6 @@ import dm.jail.util.TimeUnits.Condition;
  * Created by davide-maestroni on 01/12/2018.
  */
 class DefaultAsyncStatement<V> implements AsyncStatement<V>, Serializable {
-
-  private static final Class<?>[] ANY_EXCEPTION = new Class<?>[]{Throwable.class};
-
-  private static final Class<?>[] NO_EXCEPTION = new Class<?>[]{};
 
   private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
 
@@ -90,7 +83,8 @@ class DefaultAsyncStatement<V> implements AsyncStatement<V>, Serializable {
 
   DefaultAsyncStatement(@NotNull final Observer<? super AsyncResult<V>> observer,
       final boolean isEvaluated, @Nullable final LogPrinter printer, @Nullable final Level level) {
-    this(observer, isEvaluated, ScheduledExecutors.immediateExecutor(), printer, level);
+    this(ConstantConditions.notNull("observer", observer), isEvaluated,
+        ScheduledExecutors.immediateExecutor(), printer, level);
   }
 
   @SuppressWarnings("unchecked")
@@ -98,8 +92,8 @@ class DefaultAsyncStatement<V> implements AsyncStatement<V>, Serializable {
       final boolean isEvaluated, @NotNull final ScheduledExecutor executor,
       @Nullable final LogPrinter printer, @Nullable final Level level) {
     // forking
-    mObserver = (Observer<AsyncResult<?>>) ConstantConditions.notNull("observer", observer);
-    mExecutor = ConstantConditions.notNull("executor", executor);
+    mObserver = (Observer<AsyncResult<?>>) observer;
+    mExecutor = executor;
     mIsEvaluated = isEvaluated;
     mIsFork = (observer instanceof ForkObserver);
     mLogger = Logger.newLogger(printer, level, this);
@@ -184,111 +178,6 @@ class DefaultAsyncStatement<V> implements AsyncStatement<V>, Serializable {
 
     } catch (final Throwable t) {
       head.fail(RuntimeInterruptedException.wrapIfInterrupt(t));
-    }
-  }
-
-  @NotNull
-  private static Class<?>[] cloneExceptionTypes(@Nullable final Class<?>... exceptionTypes) {
-    return (exceptionTypes != null) ? (exceptionTypes.length > 0) ? exceptionTypes.clone()
-        : ANY_EXCEPTION : NO_EXCEPTION;
-  }
-
-  private static void close(@Nullable final Closeable closeable,
-      @NotNull final Logger logger) throws IOException {
-    if (closeable == null) {
-      return;
-    }
-
-    try {
-      closeable.close();
-
-    } catch (final IOException e) {
-      logger.err(e, "Error while closing closeable: " + closeable);
-      throw e;
-    }
-  }
-
-  public void addTo(@NotNull final AsyncResultCollection<? super V> results) {
-    ConstantConditions.notNull("result", results);
-    checkEvaluated();
-    then(new Mapper<V, Void>() {
-
-      public Void apply(final V value) {
-        results.addValue(value);
-        return null;
-      }
-    }).elseCatch(new Mapper<Throwable, Void>() {
-
-      public Void apply(final Throwable failure) {
-        results.addFailure(failure);
-        return null;
-      }
-    });
-  }
-
-  @NotNull
-  @SuppressWarnings("ConstantConditions")
-  public Throwable failure() {
-    synchronized (mMutex) {
-      if (!isFailed()) {
-        throw new IllegalStateException("the statement is not failed");
-      }
-
-      return mHead.getFailure().getCause();
-    }
-  }
-
-  public boolean isCancelled() {
-    synchronized (mMutex) {
-      final FailureException failure = mHead.getFailure();
-      return (failure != null) && failure.isCancelled();
-    }
-  }
-
-  public boolean isEvaluating() {
-    synchronized (mMutex) {
-      return mIsEvaluated && (mState == StatementState.Evaluating);
-    }
-  }
-
-  public boolean isFailed() {
-    synchronized (mMutex) {
-      return (mState == StatementState.Failed);
-    }
-  }
-
-  public boolean isSet() {
-    synchronized (mMutex) {
-      return (mState == StatementState.Set);
-    }
-  }
-
-  public void to(@NotNull final AsyncResult<? super V> result) {
-    ConstantConditions.notNull("result", result);
-    checkEvaluated();
-    then(new Mapper<V, Void>() {
-
-      public Void apply(final V value) {
-        result.set(value);
-        return null;
-      }
-    }).elseCatch(new Mapper<Throwable, Void>() {
-
-      public Void apply(final Throwable failure) {
-        result.fail(failure);
-        return null;
-      }
-    });
-  }
-
-  @SuppressWarnings("unchecked")
-  public V value() {
-    synchronized (mMutex) {
-      if (!isSet()) {
-        throw new IllegalStateException("the statement is not set");
-      }
-
-      return (V) mHead.getValue();
     }
   }
 
@@ -378,20 +267,20 @@ class DefaultAsyncStatement<V> implements AsyncStatement<V>, Serializable {
   @NotNull
   public AsyncStatement<V> elseCatch(@NotNull final Mapper<? super Throwable, ? extends V> mapper,
       @Nullable final Class<?>[] exceptionTypes) {
-    return chain(new ElseCatchHandler<V>(mapper, exceptionTypes));
+    return chain(new ElseCatchStatementHandler<V>(mapper, Asyncs.cloneExceptionTypes(exceptionTypes)));
   }
 
   @NotNull
   public AsyncStatement<V> elseDo(@NotNull final Observer<? super Throwable> observer,
       @Nullable final Class<?>[] exceptionTypes) {
-    return chain(new ElseDoHandler<V>(observer, exceptionTypes));
+    return chain(new ElseDoStatementHandler<V>(observer, Asyncs.cloneExceptionTypes(exceptionTypes)));
   }
 
   @NotNull
   public AsyncStatement<V> elseIf(
       @NotNull final Mapper<? super Throwable, ? extends AsyncStatement<? extends V>> mapper,
       @Nullable final Class<?>[] exceptionTypes) {
-    return chain(new ElseIfHandler<V>(mapper, exceptionTypes));
+    return chain(new ElseIfStatementHandler<V>(mapper, Asyncs.cloneExceptionTypes(exceptionTypes)));
   }
 
   @NotNull
@@ -435,7 +324,7 @@ class DefaultAsyncStatement<V> implements AsyncStatement<V>, Serializable {
       @Nullable final ForkUpdater<S, ? super AsyncStatement<V>, ? super Throwable> failure,
       @Nullable final ForkCompleter<S, ? super AsyncStatement<V>> done,
       @Nullable final ForkUpdater<S, ? super AsyncStatement<V>, ? super AsyncResult<V>> statement) {
-    return fork(new ComposedForker<S, V>(init, value, failure, done, statement));
+    return fork(new ComposedStatementForker<S, V>(init, value, failure, done, statement));
   }
 
   @Nullable
@@ -507,23 +396,23 @@ class DefaultAsyncStatement<V> implements AsyncStatement<V>, Serializable {
 
   @NotNull
   public AsyncStatement<V> on(@NotNull final ScheduledExecutor executor) {
-    return chain(new ChainHandler<V, V>(new ExecutorHandler<V>(executor)), mExecutor, executor);
+    return chain(new ChainHandler<V, V>(new ExecutorStatementHandler<V>(executor)), mExecutor, executor);
   }
 
   @NotNull
   public <R> AsyncStatement<R> then(@NotNull final Mapper<? super V, R> mapper) {
-    return chain(new ThenHandler<V, R>(mapper));
+    return chain(new ThenStatementHandler<V, R>(mapper));
   }
 
   @NotNull
   public AsyncStatement<V> thenDo(@NotNull final Observer<? super V> observer) {
-    return chain(new ThenDoHandler<V, V>(observer));
+    return chain(new ThenDoStatementHandler<V, V>(observer));
   }
 
   @NotNull
   public <R> AsyncStatement<R> thenIf(
       @NotNull final Mapper<? super V, ? extends AsyncStatement<R>> mapper) {
-    return chain(new ThenIfHandler<V, R>(mapper));
+    return chain(new ThenIfStatementHandler<V, R>(mapper));
   }
 
   @NotNull
@@ -532,7 +421,7 @@ class DefaultAsyncStatement<V> implements AsyncStatement<V>, Serializable {
       @NotNull final Mapper<? super V, R> mapper) {
     final Logger logger = mLogger;
     return chain(
-        new TryHandler<V, R>(closeable, new ThenHandler<V, R>(mapper), logger.getLogPrinter(),
+        new TryStatementHandler<V, R>(closeable, new ThenStatementHandler<V, R>(mapper), logger.getLogPrinter(),
             logger.getLogLevel()));
   }
 
@@ -542,7 +431,7 @@ class DefaultAsyncStatement<V> implements AsyncStatement<V>, Serializable {
       @NotNull final Observer<? super V> observer) {
     final Logger logger = mLogger;
     return chain(
-        new TryHandler<V, V>(closeable, new ThenDoHandler<V, V>(observer), logger.getLogPrinter(),
+        new TryStatementHandler<V, V>(closeable, new ThenDoStatementHandler<V, V>(observer), logger.getLogPrinter(),
             logger.getLogLevel()));
   }
 
@@ -552,7 +441,7 @@ class DefaultAsyncStatement<V> implements AsyncStatement<V>, Serializable {
       @NotNull final Mapper<? super V, ? extends AsyncStatement<R>> mapper) {
     final Logger logger = mLogger;
     return chain(
-        new TryIfHandler<V, R>(closeable, mapper, logger.getLogPrinter(), logger.getLogLevel()));
+        new TryIfStatementHandler<V, R>(closeable, mapper, logger.getLogPrinter(), logger.getLogLevel()));
   }
 
   public void waitDone() {
@@ -584,7 +473,73 @@ class DefaultAsyncStatement<V> implements AsyncStatement<V>, Serializable {
 
   @NotNull
   public AsyncStatement<V> whenDone(@NotNull final Action action) {
-    return chain(new WhenDoneHandler<V>(action));
+    return chain(new DoneStatementHandler<V>(action));
+  }
+
+  @NotNull
+  @SuppressWarnings("ConstantConditions")
+  public Throwable failure() {
+    synchronized (mMutex) {
+      if (!isFailed()) {
+        throw new IllegalStateException("the statement is not failed");
+      }
+
+      return mHead.getFailure().getCause();
+    }
+  }
+
+  public boolean isCancelled() {
+    synchronized (mMutex) {
+      final FailureException failure = mHead.getFailure();
+      return (failure != null) && failure.isCancelled();
+    }
+  }
+
+  public boolean isEvaluating() {
+    synchronized (mMutex) {
+      return mIsEvaluated && (mState == StatementState.Evaluating);
+    }
+  }
+
+  public boolean isFailed() {
+    synchronized (mMutex) {
+      return (mState == StatementState.Failed);
+    }
+  }
+
+  public boolean isSet() {
+    synchronized (mMutex) {
+      return (mState == StatementState.Set);
+    }
+  }
+
+  public void to(@NotNull final AsyncResult<? super V> result) {
+    ConstantConditions.notNull("result", result);
+    checkEvaluated();
+    then(new Mapper<V, Void>() {
+
+      public Void apply(final V value) {
+        result.set(value);
+        return null;
+      }
+    }).elseCatch(new Mapper<Throwable, Void>() {
+
+      public Void apply(final Throwable failure) {
+        result.fail(failure);
+        return null;
+      }
+    });
+  }
+
+  @SuppressWarnings("unchecked")
+  public V value() {
+    synchronized (mMutex) {
+      if (!isSet()) {
+        throw new IllegalStateException("the statement is not set");
+      }
+
+      return (V) mHead.getValue();
+    }
   }
 
   @NotNull
@@ -693,20 +648,6 @@ class DefaultAsyncStatement<V> implements AsyncStatement<V>, Serializable {
     final Logger logger = mLogger;
     return new StatementProxy(mObserver, mIsEvaluated, mExecutor, logger.getLogPrinter(),
         logger.getLogLevel(), chains);
-  }
-
-  private enum StatementState {
-    Evaluating(false), Set(true), Failed(true), Extended(false);
-
-    private final boolean mIsDone;
-
-    StatementState(final boolean isDone) {
-      mIsDone = isDone;
-    }
-
-    public boolean isDone() {
-      return mIsDone;
-    }
   }
 
   private static class ChainForkObserver<S, V>
@@ -1003,223 +944,6 @@ class DefaultAsyncStatement<V> implements AsyncStatement<V>, Serializable {
     @Override
     public void set(final StatementChain<V, ?> next, final V value) {
       next.set(value);
-    }
-  }
-
-  private static class ElseCatchHandler<V> extends AsyncStatementHandler<V, V> {
-
-    private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
-
-    private final Mapper<? super Throwable, ? extends V> mMapper;
-
-    private final Class<?>[] mTypes;
-
-    private ElseCatchHandler(@NotNull final Mapper<? super Throwable, ? extends V> mapper,
-        @Nullable final Class<?>[] exceptionTypes) {
-      mMapper = ConstantConditions.notNull("mapper", mapper);
-      mTypes = cloneExceptionTypes(exceptionTypes);
-      if (Arrays.asList(mTypes).contains(null)) {
-        throw new NullPointerException("exception type array contains null values");
-      }
-    }
-
-    @Override
-    void failure(final Throwable failure, @NotNull final AsyncResult<V> result) throws Exception {
-      for (final Class<?> type : mTypes) {
-        if (type.isInstance(failure)) {
-          result.set(mMapper.apply(failure));
-          return;
-        }
-      }
-
-      super.failure(failure, result);
-    }
-
-    @NotNull
-    private Object writeReplace() throws ObjectStreamException {
-      return new HandlerProxy<V>(mMapper, mTypes);
-    }
-
-    private static class HandlerProxy<V> extends SerializableProxy {
-
-      private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
-
-      private HandlerProxy(final Mapper<? super Throwable, ? extends V> mapper,
-          final Class<?>[] exceptionTypes) {
-        super(proxy(mapper), exceptionTypes);
-      }
-
-      @NotNull
-      @SuppressWarnings("unchecked")
-      Object readResolve() throws ObjectStreamException {
-        try {
-          final Object[] args = deserializeArgs();
-          return new ElseCatchHandler<V>((Mapper<? super Throwable, ? extends V>) args[0],
-              (Class<?>[]) args[1]);
-
-        } catch (final Throwable t) {
-          throw new InvalidObjectException(t.getMessage());
-        }
-      }
-    }
-  }
-
-  private static class ElseDoHandler<V> extends AsyncStatementHandler<V, V> {
-
-    private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
-
-    private final Observer<? super Throwable> mObserver;
-
-    private final Class<?>[] mTypes;
-
-    private ElseDoHandler(@NotNull final Observer<? super Throwable> observer,
-        @Nullable final Class<?>[] exceptionTypes) {
-      mObserver = ConstantConditions.notNull("observer", observer);
-      mTypes = cloneExceptionTypes(exceptionTypes);
-      if (Arrays.asList(mTypes).contains(null)) {
-        throw new NullPointerException("exception type array contains null values");
-      }
-    }
-
-    @NotNull
-    private Object writeReplace() throws ObjectStreamException {
-      return new HandlerProxy<V>(mObserver, mTypes);
-    }
-
-    private static class HandlerProxy<V> extends SerializableProxy {
-
-      private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
-
-      private HandlerProxy(final Observer<? super Throwable> observer,
-          final Class<?>[] exceptionTypes) {
-        super(proxy(observer), exceptionTypes);
-      }
-
-      @NotNull
-      @SuppressWarnings("unchecked")
-      Object readResolve() throws ObjectStreamException {
-        try {
-          final Object[] args = deserializeArgs();
-          return new ElseDoHandler<V>((Observer<? super Throwable>) args[0], (Class<?>[]) args[1]);
-
-        } catch (final Throwable t) {
-          throw new InvalidObjectException(t.getMessage());
-        }
-      }
-    }
-
-    @Override
-    void failure(final Throwable failure, @NotNull final AsyncResult<V> result) throws Exception {
-      for (final Class<?> type : mTypes) {
-        if (type.isInstance(failure)) {
-          mObserver.accept(failure);
-          break;
-        }
-      }
-
-      super.failure(failure, result);
-    }
-  }
-
-  private static class ElseIfHandler<V> extends AsyncStatementHandler<V, V> {
-
-    private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
-
-    private final Mapper<? super Throwable, ? extends AsyncStatement<? extends V>> mMapper;
-
-    private final Class<?>[] mTypes;
-
-    private ElseIfHandler(
-        @NotNull final Mapper<? super Throwable, ? extends AsyncStatement<? extends V>> mapper,
-        @Nullable final Class<?>[] exceptionTypes) {
-      mMapper = ConstantConditions.notNull("mapper", mapper);
-      mTypes = cloneExceptionTypes(exceptionTypes);
-      if (Arrays.asList(mTypes).contains(null)) {
-        throw new NullPointerException("exception type array contains null values");
-      }
-    }
-
-    @NotNull
-    private Object writeReplace() throws ObjectStreamException {
-      return new HandlerProxy<V>(mMapper, mTypes);
-    }
-
-    private static class HandlerProxy<V> extends SerializableProxy {
-
-      private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
-
-      private HandlerProxy(
-          final Mapper<? super Throwable, ? extends AsyncStatement<? extends V>> mapper,
-          final Class<?>[] exceptionTypes) {
-        super(proxy(mapper), exceptionTypes);
-      }
-
-      @NotNull
-      @SuppressWarnings("unchecked")
-      Object readResolve() throws ObjectStreamException {
-        try {
-          final Object[] args = deserializeArgs();
-          return new ElseIfHandler<V>(
-              (Mapper<? super Throwable, ? extends AsyncStatement<? extends V>>) args[0],
-              (Class<?>[]) args[1]);
-
-        } catch (final Throwable t) {
-          throw new InvalidObjectException(t.getMessage());
-        }
-      }
-    }
-
-    @Override
-    void failure(final Throwable failure, @NotNull final AsyncResult<V> result) throws Exception {
-      for (final Class<?> type : mTypes) {
-        if (type.isInstance(failure)) {
-          mMapper.apply(failure).to(result);
-          return;
-        }
-      }
-
-      super.failure(failure, result);
-    }
-  }
-
-  private static class ExecutorHandler<V> extends AsyncStatementHandler<V, V> {
-
-    private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
-
-    private final ScheduledExecutor mExecutor;
-
-    private ExecutorHandler(@NotNull final ScheduledExecutor executor) {
-      mExecutor = ConstantConditions.notNull("executor", executor);
-    }
-
-    @Override
-    void value(final V value, @NotNull final AsyncResult<V> result) throws Exception {
-      mExecutor.execute(new Runnable() {
-
-        public void run() {
-          try {
-            result.set(value);
-
-          } catch (final Throwable t) {
-            result.fail(t);
-          }
-        }
-      });
-    }
-
-    @Override
-    void failure(final Throwable failure, @NotNull final AsyncResult<V> result) throws Exception {
-      if (failure instanceof CancellationException) {
-        result.fail(failure);
-
-      } else {
-        mExecutor.execute(new Runnable() {
-
-          public void run() {
-            result.fail(failure);
-          }
-        });
-      }
     }
   }
 
@@ -1527,303 +1251,6 @@ class DefaultAsyncStatement<V> implements AsyncStatement<V>, Serializable {
       } catch (final Throwable t) {
         throw new InvalidObjectException(t.getMessage());
       }
-    }
-  }
-
-  private static class ThenDoHandler<V, R> extends AsyncStatementHandler<V, R> {
-
-    private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
-
-    private final Observer<? super V> mObserver;
-
-    private ThenDoHandler(@NotNull final Observer<? super V> observer) {
-      mObserver = ConstantConditions.notNull("observer", observer);
-    }
-
-    @NotNull
-    private Object writeReplace() throws ObjectStreamException {
-      return new HandlerProxy<V, R>(mObserver);
-    }
-
-    private static class HandlerProxy<V, R> extends SerializableProxy {
-
-      private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
-
-      private HandlerProxy(final Observer<? super V> observer) {
-        super(proxy(observer));
-      }
-
-      @NotNull
-      @SuppressWarnings("unchecked")
-      Object readResolve() throws ObjectStreamException {
-        try {
-          final Object[] args = deserializeArgs();
-          return new ThenDoHandler<V, R>((Observer<? super V>) args[0]);
-
-        } catch (final Throwable t) {
-          throw new InvalidObjectException(t.getMessage());
-        }
-      }
-    }
-
-    @Override
-    void value(final V value, @NotNull final AsyncResult<R> result) throws Exception {
-      mObserver.accept(value);
-      super.value(value, result);
-    }
-  }
-
-  private static class ThenHandler<V, R> extends AsyncStatementHandler<V, R> {
-
-    private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
-
-    private final Mapper<? super V, ? extends R> mMapper;
-
-    private ThenHandler(@NotNull final Mapper<? super V, ? extends R> mapper) {
-      mMapper = ConstantConditions.notNull("mapper", mapper);
-    }
-
-    @NotNull
-    private Object writeReplace() throws ObjectStreamException {
-      return new HandlerProxy<V, R>(mMapper);
-    }
-
-    private static class HandlerProxy<V, R> extends SerializableProxy {
-
-      private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
-
-      private HandlerProxy(final Mapper<? super V, ? extends R> mapper) {
-        super(proxy(mapper));
-      }
-
-      @NotNull
-      @SuppressWarnings("unchecked")
-      Object readResolve() throws ObjectStreamException {
-        try {
-          final Object[] args = deserializeArgs();
-          return new ThenHandler<V, R>((Mapper<? super V, ? extends R>) args[0]);
-
-        } catch (final Throwable t) {
-          throw new InvalidObjectException(t.getMessage());
-        }
-      }
-    }
-
-    @Override
-    void value(final V value, @NotNull final AsyncResult<R> result) throws Exception {
-      result.set(mMapper.apply(value));
-    }
-  }
-
-  private static class ThenIfHandler<V, R> extends AsyncStatementHandler<V, R> {
-
-    private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
-
-    private final Mapper<? super V, ? extends AsyncStatement<R>> mMapper;
-
-    private ThenIfHandler(@NotNull final Mapper<? super V, ? extends AsyncStatement<R>> mapper) {
-      mMapper = ConstantConditions.notNull("mapper", mapper);
-    }
-
-    @NotNull
-    private Object writeReplace() throws ObjectStreamException {
-      return new HandlerProxy<V, R>(mMapper);
-    }
-
-    private static class HandlerProxy<V, R> extends SerializableProxy {
-
-      private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
-
-      private HandlerProxy(final Mapper<? super V, ? extends AsyncStatement<R>> mapper) {
-        super(proxy(mapper));
-      }
-
-      @NotNull
-      @SuppressWarnings("unchecked")
-      Object readResolve() throws ObjectStreamException {
-        try {
-          final Object[] args = deserializeArgs();
-          return new ThenIfHandler<V, R>((Mapper<? super V, ? extends AsyncStatement<R>>) args[0]);
-
-        } catch (final Throwable t) {
-          throw new InvalidObjectException(t.getMessage());
-        }
-      }
-    }
-
-    @Override
-    void value(final V value, @NotNull final AsyncResult<R> result) throws Exception {
-      mMapper.apply(value).to(result);
-    }
-  }
-
-  private static class TryHandler<V, R> extends AsyncStatementHandler<V, R> {
-
-    private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
-
-    private final Mapper<? super V, ? extends Closeable> mCloseable;
-
-    private final AsyncStatementHandler<V, R> mHandler;
-
-    private final Logger mLogger;
-
-    private TryHandler(@NotNull final Mapper<? super V, ? extends Closeable> closeable,
-        @NotNull final AsyncStatementHandler<V, R> handler, @Nullable final LogPrinter printer,
-        @Nullable final Level level) {
-      mCloseable = ConstantConditions.notNull("closeable", closeable);
-      mHandler = handler;
-      mLogger = Logger.newLogger(printer, level, this);
-    }
-
-    @NotNull
-    private Object writeReplace() throws ObjectStreamException {
-      final Logger logger = mLogger;
-      return new HandlerProxy<V, R>(mCloseable, mHandler, logger.getLogPrinter(),
-          logger.getLogLevel());
-    }
-
-    private static class HandlerProxy<V, R> extends SerializableProxy {
-
-      private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
-
-      private HandlerProxy(final Mapper<? super V, ? extends Closeable> closeable,
-          final AsyncStatementHandler<V, R> handler, final LogPrinter printer, final Level level) {
-        super(proxy(closeable), handler, printer, level);
-      }
-
-      @NotNull
-      @SuppressWarnings("unchecked")
-      Object readResolve() throws ObjectStreamException {
-        try {
-          final Object[] args = deserializeArgs();
-          return new TryHandler<V, R>((Mapper<? super V, ? extends Closeable>) args[0],
-              (AsyncStatementHandler<V, R>) args[1], (LogPrinter) args[2], (Level) args[3]);
-
-        } catch (final Throwable t) {
-          throw new InvalidObjectException(t.getMessage());
-        }
-      }
-    }
-
-    @Override
-    void value(final V value, @NotNull final AsyncResult<R> result) throws Exception {
-      final Closeable closeable = mCloseable.apply(value);
-      try {
-        mHandler.value(value, result);
-
-      } finally {
-        close(closeable, mLogger);
-      }
-    }
-  }
-
-  private static class TryIfHandler<V, R> extends AsyncStatementHandler<V, R> {
-
-    private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
-
-    private final Mapper<? super V, ? extends Closeable> mCloseable;
-
-    private final Logger mLogger;
-
-    private final Mapper<? super V, ? extends AsyncStatement<R>> mMapper;
-
-    private TryIfHandler(@NotNull final Mapper<? super V, ? extends Closeable> closeable,
-        @NotNull final Mapper<? super V, ? extends AsyncStatement<R>> mapper,
-        @Nullable final LogPrinter printer, @Nullable final Level level) {
-      mCloseable = ConstantConditions.notNull("closeable", closeable);
-      mMapper = ConstantConditions.notNull("mapper", mapper);
-      mLogger = Logger.newLogger(printer, level, this);
-    }
-
-    @NotNull
-    private Object writeReplace() throws ObjectStreamException {
-      final Logger logger = mLogger;
-      return new HandlerProxy<V, R>(mCloseable, mMapper, logger.getLogPrinter(),
-          logger.getLogLevel());
-    }
-
-    private static class HandlerProxy<V, R> extends SerializableProxy {
-
-      private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
-
-      private HandlerProxy(final Mapper<? super V, ? extends Closeable> closeable,
-          final Mapper<? super V, ? extends AsyncStatement<R>> mapper, final LogPrinter printer,
-          final Level level) {
-        super(proxy(closeable), proxy(mapper), printer, level);
-      }
-
-      @NotNull
-      @SuppressWarnings("unchecked")
-      Object readResolve() throws ObjectStreamException {
-        try {
-          final Object[] args = deserializeArgs();
-          return new TryIfHandler<V, R>((Mapper<? super V, ? extends Closeable>) args[0],
-              (Mapper<? super V, ? extends AsyncStatement<R>>) args[1], (LogPrinter) args[2],
-              (Level) args[3]);
-
-        } catch (final Throwable t) {
-          throw new InvalidObjectException(t.getMessage());
-        }
-      }
-    }
-
-    @Override
-    void value(final V value, @NotNull final AsyncResult<R> result) throws Exception {
-      mMapper.apply(value).whenDone(new Action() {
-
-        public void perform() throws Exception {
-          close(mCloseable.apply(value), mLogger);
-        }
-      }).to(result);
-    }
-  }
-
-  private static class WhenDoneHandler<V> extends AsyncStatementHandler<V, V> {
-
-    private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
-
-    private final Action mAction;
-
-    private WhenDoneHandler(@NotNull final Action action) {
-      mAction = ConstantConditions.notNull("action", action);
-    }
-
-    @NotNull
-    private Object writeReplace() throws ObjectStreamException {
-      return new HandlerProxy<V>(mAction);
-    }
-
-    private static class HandlerProxy<V> extends SerializableProxy {
-
-      private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
-
-      private HandlerProxy(final Action action) {
-        super(proxy(action));
-      }
-
-      @NotNull
-      @SuppressWarnings("unchecked")
-      Object readResolve() throws ObjectStreamException {
-        try {
-          final Object[] args = deserializeArgs();
-          return new WhenDoneHandler<V>((Action) args[0]);
-
-        } catch (final Throwable t) {
-          throw new InvalidObjectException(t.getMessage());
-        }
-      }
-    }
-
-    @Override
-    void failure(final Throwable failure, @NotNull final AsyncResult<V> result) throws Exception {
-      mAction.perform();
-      super.failure(failure, result);
-    }
-
-    @Override
-    void value(final V value, @NotNull final AsyncResult<V> result) throws Exception {
-      mAction.perform();
-      super.value(value, result);
     }
   }
 

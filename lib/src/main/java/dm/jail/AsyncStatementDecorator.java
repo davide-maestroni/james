@@ -26,7 +26,6 @@ import java.util.concurrent.TimeoutException;
 
 import dm.jail.async.Action;
 import dm.jail.async.AsyncResult;
-import dm.jail.async.AsyncResultCollection;
 import dm.jail.async.AsyncStatement;
 import dm.jail.async.FailureException;
 import dm.jail.async.Mapper;
@@ -43,39 +42,6 @@ abstract class AsyncStatementDecorator<V> implements AsyncStatement<V> {
 
   AsyncStatementDecorator(@NotNull final AsyncStatement<V> statement) {
     mStatement = ConstantConditions.notNull("statement", statement);
-  }
-
-  public void addTo(@NotNull final AsyncResultCollection<? super V> results) {
-    mStatement.addTo(results);
-  }
-
-  @NotNull
-  public Throwable failure() {
-    return mStatement.failure();
-  }
-
-  public boolean isCancelled() {
-    return mStatement.isCancelled();
-  }
-
-  public boolean isEvaluating() {
-    return mStatement.isEvaluating();
-  }
-
-  public boolean isFailed() {
-    return mStatement.isFailed();
-  }
-
-  public boolean isSet() {
-    return mStatement.isSet();
-  }
-
-  public void to(@NotNull final AsyncResult<? super V> result) {
-    mStatement.to(result);
-  }
-
-  public V value() {
-    return mStatement.value();
   }
 
   public boolean cancel(final boolean b) {
@@ -210,6 +176,35 @@ abstract class AsyncStatementDecorator<V> implements AsyncStatement<V> {
   @NotNull
   public AsyncStatement<V> whenDone(@NotNull final Action action) {
     return newInstance(mStatement.whenDone(action));
+  }
+
+  @NotNull
+  public Throwable failure() {
+    return mStatement.failure();
+  }
+
+  public boolean isCancelled() {
+    return mStatement.isCancelled();
+  }
+
+  public boolean isEvaluating() {
+    return mStatement.isEvaluating();
+  }
+
+  public boolean isFailed() {
+    return mStatement.isFailed();
+  }
+
+  public boolean isSet() {
+    return mStatement.isSet();
+  }
+
+  public void to(@NotNull final AsyncResult<? super V> result) {
+    mStatement.to(result);
+  }
+
+  public V value() {
+    return mStatement.value();
   }
 
   @NotNull

@@ -126,31 +126,6 @@ public class TestAsyncStatement {
   }
 
   @Test
-  public void addTo() {
-    final TestResultCollection<String> resultCollection = new TestResultCollection<String>();
-    final AsyncStatement<String> statement = new Async().value("test");
-    statement.addTo(resultCollection);
-    assertThat(resultCollection.getStates()).hasSize(1);
-    assertThat(resultCollection.getStates().get(0).value()).isEqualTo("test");
-  }
-
-  @Test(expected = UnsupportedOperationException.class)
-  public void addToException() {
-    final TestResultCollection<String> resultCollection = new TestResultCollection<String>();
-    final AsyncStatement<String> statement = new Async().unevaluated().value("test");
-    statement.addTo(resultCollection);
-  }
-
-  @Test
-  public void addToFailure() {
-    final TestResultCollection<String> resultCollection = new TestResultCollection<String>();
-    final AsyncStatement<String> statement = new Async().failure(new Exception("test"));
-    statement.addTo(resultCollection);
-    assertThat(resultCollection.getStates()).hasSize(1);
-    assertThat(resultCollection.getStates().get(0).failure().getMessage()).isEqualTo("test");
-  }
-
-  @Test
   public void cancelUnevaluated() {
     final AsyncStatement<String> statement = new Async().unevaluated().value("test");
     assertThat(statement.isCancelled()).isFalse();
@@ -1525,6 +1500,61 @@ public class TestAsyncStatement {
     @SuppressWarnings("unchecked") final AsyncStatement<String> deserialized =
         (AsyncStatement<String>) objectInputStream.readObject();
     assertThat(deserialized.getValue()).isEqualTo("test");
+  }
+
+  @Test
+  public void stateCancelled() {
+    final AsyncStatement<String> statement =
+        new Async().on(withDelay(backgroundExecutor(), 1, TimeUnit.SECONDS)).value("test");
+    statement.cancel(true);
+    statement.waitDone();
+    assertThat(statement.isCancelled()).isTrue();
+    assertThat(statement.isDone()).isTrue();
+    assertThat(statement.isEvaluating()).isFalse();
+    assertThat(statement.isFailed()).isTrue();
+    assertThat(statement.isSet()).isFalse();
+  }
+
+  @Test
+  public void stateEvaluating() {
+    final AsyncStatement<String> statement =
+        new Async().on(withDelay(backgroundExecutor(), 1, TimeUnit.SECONDS)).value("test");
+    assertThat(statement.isCancelled()).isFalse();
+    assertThat(statement.isDone()).isFalse();
+    assertThat(statement.isEvaluating()).isTrue();
+    assertThat(statement.isFailed()).isFalse();
+    assertThat(statement.isSet()).isFalse();
+  }
+
+  @Test
+  public void stateExtended() {
+    final AsyncStatement<String> statement = new Async().value("test");
+    statement.then(new ToUpper());
+    assertThat(statement.isCancelled()).isFalse();
+    assertThat(statement.isDone()).isTrue();
+    assertThat(statement.isEvaluating()).isFalse();
+    assertThat(statement.isFailed()).isFalse();
+    assertThat(statement.isSet()).isFalse();
+  }
+
+  @Test
+  public void stateFailed() {
+    final AsyncStatement<String> statement = new Async().failure(new Exception());
+    assertThat(statement.isCancelled()).isFalse();
+    assertThat(statement.isDone()).isTrue();
+    assertThat(statement.isEvaluating()).isFalse();
+    assertThat(statement.isFailed()).isTrue();
+    assertThat(statement.isSet()).isFalse();
+  }
+
+  @Test
+  public void stateSet() {
+    final AsyncStatement<String> statement = new Async().value("test");
+    assertThat(statement.isCancelled()).isFalse();
+    assertThat(statement.isDone()).isTrue();
+    assertThat(statement.isEvaluating()).isFalse();
+    assertThat(statement.isFailed()).isFalse();
+    assertThat(statement.isSet()).isTrue();
   }
 
   @Test

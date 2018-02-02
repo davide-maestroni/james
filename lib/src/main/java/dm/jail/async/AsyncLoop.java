@@ -46,31 +46,42 @@ public interface AsyncLoop<V> extends AsyncStatement<Iterable<V>>, Serializable 
   AsyncLoop<V> evaluate();
 
   @NotNull
+  AsyncLoop<V> evaluated();
+
+  @NotNull
   AsyncLoop<V> on(@NotNull ScheduledExecutor executor);
 
   @NotNull
   <R> AsyncLoop<R> forEach(@NotNull Mapper<? super V, R> mapper);
 
   @NotNull
-  AsyncLoop<V> forEachCatch(@NotNull Mapper<? super Throwable, V> mapper);
+  AsyncLoop<V> forEachCatch(@NotNull Mapper<? super Throwable, V> mapper,
+      @Nullable Class<?>... exceptionTypes);
 
   @NotNull
   AsyncLoop<V> forEachDo(@NotNull Observer<? super V> observer);
 
   @NotNull
-  AsyncLoop<V> forEachElseDo(@NotNull Observer<? super Throwable> observer);
+  AsyncLoop<V> forEachDone(@NotNull Action action);
+
+  @NotNull
+  AsyncLoop<V> forEachElseDo(@NotNull Observer<? super Throwable> observer,
+      @Nullable Class<?>... exceptionTypes);
 
   @NotNull
   AsyncLoop<V> forEachElseIf(
-      @NotNull Mapper<? super Throwable, ? extends AsyncStatement<? extends V>> mapper);
+      @NotNull Mapper<? super Throwable, ? extends AsyncStatement<? extends V>> mapper,
+      @Nullable Class<?>... exceptionTypes);
 
   @NotNull
   AsyncLoop<V> forEachElseLoop(
-      @NotNull Mapper<? super Throwable, ? extends Iterable<? extends V>> mapper);
+      @NotNull Mapper<? super Throwable, ? extends Iterable<? extends V>> mapper,
+      @Nullable Class<?>... exceptionTypes);
 
   @NotNull
   AsyncLoop<V> forEachElseLoopIf(
-      @NotNull Mapper<? super Throwable, ? extends AsyncLoop<? extends V>> mapper);
+      @NotNull Mapper<? super Throwable, ? extends AsyncLoop<? extends V>> mapper,
+      @Nullable Class<?>... exceptionTypes);
 
   @NotNull
   <R> AsyncLoop<R> forEachIf(@NotNull Mapper<? super V, ? extends AsyncStatement<R>> mapper);
@@ -103,8 +114,7 @@ public interface AsyncLoop<V> extends AsyncStatement<Iterable<V>>, Serializable 
 
   @NotNull
   <S> AsyncLoop<V> forkLoop(
-      @NotNull Forker<S, ? super AsyncLoop<V>, ? super Iterable<V>, ? super
-          AsyncResultCollection<V>> forker);
+      @NotNull Forker<S, ? super AsyncLoop<V>, ? super V, ? super AsyncResultCollection<V>> forker);
 
   @NotNull
   <S> AsyncLoop<V> forkLoop(@Nullable Mapper<? super AsyncLoop<V>, S> init,
@@ -114,12 +124,17 @@ public interface AsyncLoop<V> extends AsyncStatement<Iterable<V>>, Serializable 
       @Nullable ForkUpdater<S, ? super AsyncLoop<V>, ? super AsyncResultCollection<V>> statement);
 
   @NotNull
+  AsyncLoop<V> on(@NotNull ScheduledExecutor executor, int minBatch, int maxBatch);
+
+  @NotNull
   AsyncLoop<V> orderedForEachElseIf(
-      @NotNull Mapper<? super Throwable, ? extends AsyncStatement<? extends V>> mapper);
+      @NotNull Mapper<? super Throwable, ? extends AsyncStatement<? extends V>> mapper,
+      @Nullable Class<?>... exceptionTypes);
 
   @NotNull
   AsyncLoop<V> orderedForEachElseLoopIf(
-      @NotNull Mapper<? super Throwable, ? extends AsyncLoop<? extends V>> mapper);
+      @NotNull Mapper<? super Throwable, ? extends AsyncLoop<? extends V>> mapper,
+      @Nullable Class<?>... exceptionTypes);
 
   @NotNull
   <R> AsyncLoop<R> orderedForEachIf(@NotNull Mapper<? super V, ? extends AsyncStatement<R>> mapper);
