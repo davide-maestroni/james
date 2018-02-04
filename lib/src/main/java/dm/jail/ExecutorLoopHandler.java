@@ -43,13 +43,23 @@ class ExecutorLoopHandler<V> extends AsyncLoopHandler<V, V> {
   void addFailure(@NotNull final Throwable failure,
       @NotNull final AsyncResultCollection<V> results) throws Exception {
     if (failure instanceof CancellationException) {
-      results.addFailure(failure);
+      try {
+        results.addFailure(failure).set();
+
+      } catch (final Throwable ignored) {
+        // cannot take any action
+      }
 
     } else {
       mExecutor.execute(new Runnable() {
 
         public void run() {
-          results.addFailure(failure).set();
+          try {
+            results.addFailure(failure).set();
+
+          } catch (final Throwable ignored) {
+            // cannot take any action
+          }
         }
       });
     }
@@ -61,7 +71,12 @@ class ExecutorLoopHandler<V> extends AsyncLoopHandler<V, V> {
     mExecutor.execute(new Runnable() {
 
       public void run() {
-        results.addFailures(failures).set();
+        try {
+          results.addFailures(failures).set();
+
+        } catch (final Throwable ignored) {
+          // cannot take any action
+        }
       }
     });
   }

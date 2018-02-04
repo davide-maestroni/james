@@ -24,13 +24,13 @@ import java.io.InvalidObjectException;
 import java.io.ObjectStreamException;
 import java.io.Serializable;
 import java.util.ArrayList;
-import java.util.Iterator;
 import java.util.List;
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 
 import dm.jail.async.Action;
@@ -114,7 +114,7 @@ class DefaultAsyncLoop<V> implements AsyncLoop<V>, Serializable {
       observer.accept(head);
 
     } catch (final Throwable t) {
-      head.fail(RuntimeInterruptedException.wrapIfInterrupt(t));
+      head.failSafe(RuntimeInterruptedException.wrapIfInterrupt(t));
     }
   }
 
@@ -143,7 +143,7 @@ class DefaultAsyncLoop<V> implements AsyncLoop<V>, Serializable {
       observer.accept(head);
 
     } catch (final Throwable t) {
-      head.fail(RuntimeInterruptedException.wrapIfInterrupt(t));
+      head.failSafe(RuntimeInterruptedException.wrapIfInterrupt(t));
     }
   }
 
@@ -167,7 +167,7 @@ class DefaultAsyncLoop<V> implements AsyncLoop<V>, Serializable {
         observer.accept(head);
 
       } catch (final Throwable t) {
-        head.fail(RuntimeInterruptedException.wrapIfInterrupt(t));
+        head.failSafe(RuntimeInterruptedException.wrapIfInterrupt(t));
       }
     }
   }
@@ -234,9 +234,9 @@ class DefaultAsyncLoop<V> implements AsyncLoop<V>, Serializable {
   @NotNull
   public <S> AsyncLoop<V> backoffOn(@NotNull final ScheduledExecutor executor,
       @Nullable final Provider<S> init,
-      @Nullable final LoopUpdater<S, ? super V, ? super PendingState> value,
-      @Nullable final LoopUpdater<S, ? super Throwable, ? super PendingState> failure,
-      @Nullable final LoopCompleter<S, ? super PendingState> done) {
+      @Nullable final YieldUpdater<S, ? super V, ? super PendingState> value,
+      @Nullable final YieldUpdater<S, ? super Throwable, ? super PendingState> failure,
+      @Nullable final YieldCompleter<S, ? super PendingState> done) {
     return null;
   }
 
@@ -407,12 +407,6 @@ class DefaultAsyncLoop<V> implements AsyncLoop<V>, Serializable {
   }
 
   @NotNull
-  public AsyncLoop<V> on(@NotNull final ScheduledExecutor executor, final int minBatch,
-      final int maxBatch) {
-    return null;
-  }
-
-  @NotNull
   public AsyncLoop<V> orderedForEachElseIf(
       @NotNull final Mapper<? super Throwable, ? extends AsyncStatement<? extends V>> mapper,
       @Nullable Class<?>... exceptionTypes) {
@@ -465,15 +459,9 @@ class DefaultAsyncLoop<V> implements AsyncLoop<V>, Serializable {
   }
 
   @NotNull
-  public AsyncLoop<V> orderedOn(@NotNull final ScheduledExecutor executor, final int minBatch,
-      final int maxBatch) {
-    return null;
-  }
-
-  @NotNull
   public <R, S> AsyncLoop<R> orderedTryYield(
       @NotNull final Mapper<? super V, ? extends Closeable> closeable,
-      @NotNull final Looper<S, ? super V, R> looper) {
+      @NotNull final Yielder<S, ? super V, R> yielder) {
     return null;
   }
 
@@ -481,23 +469,23 @@ class DefaultAsyncLoop<V> implements AsyncLoop<V>, Serializable {
   public <R, S> AsyncLoop<R> orderedTryYield(
       @NotNull final Mapper<? super V, ? extends Closeable> closeable,
       @Nullable final Provider<S> init, @Nullable final Mapper<S, ? extends Boolean> loop,
-      @Nullable final LoopUpdater<S, ? super V, ? super Generator<R>> value,
-      @Nullable final LoopUpdater<S, ? super Throwable, ? super Generator<R>> failure,
-      @Nullable final LoopCompleter<S, ? super Generator<R>> done) {
+      @Nullable final YieldUpdater<S, ? super V, ? super YieldResults<R>> value,
+      @Nullable final YieldUpdater<S, ? super Throwable, ? super YieldResults<R>> failure,
+      @Nullable final YieldCompleter<S, ? super YieldResults<R>> done) {
     return null;
   }
 
   @NotNull
-  public <R, S> AsyncLoop<R> orderedYield(@NotNull final Looper<S, ? super V, R> looper) {
+  public <R, S> AsyncLoop<R> orderedYield(@NotNull final Yielder<S, ? super V, R> yielder) {
     return null;
   }
 
   @NotNull
   public <R, S> AsyncLoop<R> orderedYield(@Nullable final Provider<S> init,
       @Nullable final Mapper<S, ? extends Boolean> loop,
-      @Nullable final LoopUpdater<S, ? super V, ? super Generator<R>> value,
-      @Nullable final LoopUpdater<S, ? super Throwable, ? super Generator<R>> failure,
-      @Nullable final LoopCompleter<S, ? super Generator<R>> done) {
+      @Nullable final YieldUpdater<S, ? super V, ? super YieldResults<R>> value,
+      @Nullable final YieldUpdater<S, ? super Throwable, ? super YieldResults<R>> failure,
+      @Nullable final YieldCompleter<S, ? super YieldResults<R>> done) {
     return null;
   }
 
@@ -507,56 +495,12 @@ class DefaultAsyncLoop<V> implements AsyncLoop<V>, Serializable {
   }
 
   @NotNull
-  public AsyncLoop<V> parallelOn(@NotNull final ScheduledExecutor executor, final int minBatch,
-      final int maxBatch) {
+  public Generator<AsyncState<V>> stateGenerator() {
     return null;
   }
 
   @NotNull
-  public Iterator<AsyncState<V>> stateIterator() {
-    return null;
-  }
-
-  @NotNull
-  public Iterator<AsyncState<V>> stateIterator(final long timeout,
-      @NotNull final TimeUnit timeUnit) {
-    return null;
-  }
-
-  public AsyncState<V> takeState() {
-    return null;
-  }
-
-  public AsyncState<V> takeState(final long timeout, @NotNull final TimeUnit timeUnit) {
-    return null;
-  }
-
-  @NotNull
-  public List<AsyncState<V>> takeStates(final int maxSize) {
-    return null;
-  }
-
-  @NotNull
-  public List<AsyncState<V>> takeStates(final int maxSize, final long timeout,
-      @NotNull final TimeUnit timeUnit) {
-    return null;
-  }
-
-  public V takeValue() {
-    return null;
-  }
-
-  public V takeValue(final long timeout, @NotNull final TimeUnit timeUnit) {
-    return null;
-  }
-
-  @NotNull
-  public List<V> takeValues(final int maxSize) {
-    return null;
-  }
-
-  @NotNull
-  public List<V> takeValues(final int maxSize, final long timeout,
+  public Generator<AsyncState<V>> stateGenerator(final long timeout,
       @NotNull final TimeUnit timeUnit) {
     return null;
   }
@@ -588,7 +532,7 @@ class DefaultAsyncLoop<V> implements AsyncLoop<V>, Serializable {
   @NotNull
   public <R, S> AsyncLoop<R> tryYield(
       @NotNull final Mapper<? super V, ? extends Closeable> closeable,
-      @NotNull final Looper<S, ? super V, R> looper) {
+      @NotNull final Yielder<S, ? super V, R> yielder) {
     return null;
   }
 
@@ -596,33 +540,33 @@ class DefaultAsyncLoop<V> implements AsyncLoop<V>, Serializable {
   public <R, S> AsyncLoop<R> tryYield(
       @NotNull final Mapper<? super V, ? extends Closeable> closeable,
       @Nullable final Provider<S> init, @Nullable final Mapper<S, ? extends Boolean> loop,
-      @Nullable final LoopUpdater<S, ? super V, ? super Generator<R>> value,
-      @Nullable final LoopUpdater<S, ? super Throwable, ? super Generator<R>> failure,
-      @Nullable final LoopCompleter<S, ? super Generator<R>> done) {
+      @Nullable final YieldUpdater<S, ? super V, ? super YieldResults<R>> value,
+      @Nullable final YieldUpdater<S, ? super Throwable, ? super YieldResults<R>> failure,
+      @Nullable final YieldCompleter<S, ? super YieldResults<R>> done) {
     return null;
   }
 
   @NotNull
-  public Iterator<V> valueIterator() {
+  public Generator<V> valueGenerator() {
     return null;
   }
 
   @NotNull
-  public Iterator<V> valueIterator(final long timeout, @NotNull final TimeUnit timeUnit) {
+  public Generator<V> valueGenerator(final long timeout, @NotNull final TimeUnit timeUnit) {
     return null;
   }
 
   @NotNull
-  public <R, S> AsyncLoop<R> yield(@NotNull final Looper<S, ? super V, R> looper) {
+  public <R, S> AsyncLoop<R> yield(@NotNull final Yielder<S, ? super V, R> yielder) {
     return null;
   }
 
   @NotNull
   public <R, S> AsyncLoop<R> yield(@Nullable final Provider<S> init,
       @Nullable final Mapper<S, ? extends Boolean> loop,
-      @Nullable final LoopUpdater<S, ? super V, ? super Generator<R>> value,
-      @Nullable final LoopUpdater<S, ? super Throwable, ? super Generator<R>> failure,
-      @Nullable final LoopCompleter<S, ? super Generator<R>> done) {
+      @Nullable final YieldUpdater<S, ? super V, ? super YieldResults<R>> value,
+      @Nullable final YieldUpdater<S, ? super Throwable, ? super YieldResults<R>> failure,
+      @Nullable final YieldCompleter<S, ? super YieldResults<R>> done) {
     return null;
   }
 
@@ -1048,7 +992,6 @@ class DefaultAsyncLoop<V> implements AsyncLoop<V>, Serializable {
         }
       }
     }
-
   }
 
   private static class ChainHead<V> extends LoopChain<V, V> {
@@ -1080,7 +1023,7 @@ class DefaultAsyncLoop<V> implements AsyncLoop<V>, Serializable {
     @Nullable
     Runnable chain(final LoopChain<V, ?> chain) {
       final Runnable binding = mInnerState.chain(chain);
-      mState = StatementState.Extended;
+      mState = StatementState.Chained;
       return binding;
     }
 
@@ -1169,7 +1112,7 @@ class DefaultAsyncLoop<V> implements AsyncLoop<V>, Serializable {
       @Nullable
       @Override
       Runnable chain(final LoopChain<V, ?> chain) {
-        getLogger().dbg("Binding loop [%s => %s]", StatementState.Set, StatementState.Extended);
+        getLogger().dbg("Binding loop [%s => %s]", StatementState.Set, StatementState.Chained);
         mInnerState = new StateEvaluating();
         chain.prepend(consumeStates());
         return new Runnable() {
@@ -1234,11 +1177,11 @@ class DefaultAsyncLoop<V> implements AsyncLoop<V>, Serializable {
 
     private void innerFailSafe(final LoopChain<R, ?> next, @NotNull final Throwable failure) {
       mPendingCount.set(0);
-      next.fail(failure);
+      next.failSafe(failure);
     }
 
     private void innerSet(final LoopChain<R, ?> next) {
-      if (mPendingCount.decrementAndGet() != 0) {
+      if (mPendingCount.decrementAndGet() > 0) {
         return;
       }
 
@@ -1382,7 +1325,17 @@ class DefaultAsyncLoop<V> implements AsyncLoop<V>, Serializable {
 
     @Override
     void set(final LoopChain<R, ?> next) {
-      innerSet(next);
+      try {
+        mHandler.set(mResults.withNext(next));
+
+      } catch (final CancellationException e) {
+        getLogger().wrn(e, "Loop has been cancelled");
+        innerFailSafe(next, e);
+
+      } catch (final Throwable t) {
+        getLogger().err(t, "Error while completing loop");
+        innerFailSafe(next, RuntimeInterruptedException.wrapIfInterrupt(t));
+      }
     }
   }
 
@@ -1413,11 +1366,11 @@ class DefaultAsyncLoop<V> implements AsyncLoop<V>, Serializable {
         mQueue.clear();
       }
 
-      next.fail(failure);
+      next.failSafe(failure);
     }
 
     private void innerSet(final LoopChain<R, ?> next) {
-      if (mPendingCount.decrementAndGet() != 0) {
+      if (mPendingCount.decrementAndGet() > 0) {
         return;
       }
 
@@ -1519,7 +1472,9 @@ class DefaultAsyncLoop<V> implements AsyncLoop<V>, Serializable {
           mQueue.close();
         }
 
-        flushQueue(mNext);
+        final LoopChain<R, ?> next = mNext;
+        flushQueue(next);
+        innerSet(next);
       }
     }
 
@@ -1595,8 +1550,17 @@ class DefaultAsyncLoop<V> implements AsyncLoop<V>, Serializable {
 
     @Override
     void set(final LoopChain<R, ?> next) {
-      flushQueue(next);
-      innerSet(next);
+      try {
+        mHandler.set(new ChainResults(mQueue.addNested(), next));
+
+      } catch (final CancellationException e) {
+        getLogger().wrn(e, "Loop has been cancelled");
+        innerFailSafe(next, e);
+
+      } catch (final Throwable t) {
+        getLogger().err(t, "Error while completing loop");
+        innerFailSafe(next, RuntimeInterruptedException.wrapIfInterrupt(t));
+      }
     }
   }
 
@@ -1605,8 +1569,6 @@ class DefaultAsyncLoop<V> implements AsyncLoop<V>, Serializable {
     private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
 
     private final AsyncStatementHandler<V, R> mHandler;
-
-    private final Object mMutex = new Object();
 
     private final AtomicLong mPendingCount = new AtomicLong(1);
 
@@ -1618,14 +1580,12 @@ class DefaultAsyncLoop<V> implements AsyncLoop<V>, Serializable {
 
     private void innerFailSafe(final LoopChain<R, ?> next, @NotNull final Throwable failure) {
       mPendingCount.set(0);
-      next.fail(failure);
+      next.failSafe(failure);
     }
 
     private void innerSet(final LoopChain<R, ?> next) {
-      synchronized (mMutex) {
-        if (mPendingCount.decrementAndGet() != 0) {
-          return;
-        }
+      if (mPendingCount.decrementAndGet() > 0) {
+        return;
       }
 
       next.set();
@@ -1663,7 +1623,7 @@ class DefaultAsyncLoop<V> implements AsyncLoop<V>, Serializable {
 
       public void fail(@NotNull final Throwable failure) {
         final LoopChain<R, ?> next = mNext;
-        next.addFailure(failure);
+        next.addFailureSafe(failure);
         innerSet(next);
       }
 
@@ -1753,7 +1713,7 @@ class DefaultAsyncLoop<V> implements AsyncLoop<V>, Serializable {
           break;
 
         } catch (final Throwable t) {
-          getLogger().err(t, "Error while processing failure: %s", failure);
+          getLogger().err(t, "Error while processing failure with reason: %s", failure);
           innerFailSafe(next, RuntimeInterruptedException.wrapIfInterrupt(t));
           break;
         }
@@ -1787,20 +1747,27 @@ class DefaultAsyncLoop<V> implements AsyncLoop<V>, Serializable {
       addTo(mMutex, mQueue, next);
     }
 
+    private void flushQueueSafe(final LoopChain<R, ?> next) {
+      try {
+        flushQueue(next);
+
+      } catch (final Throwable t) {
+        getLogger().wrn(t, "Suppressed failure");
+      }
+    }
+
     private void innerFailSafe(final LoopChain<R, ?> next, @NotNull final Throwable failure) {
       mPendingCount.set(0);
       synchronized (mMutex) {
         mQueue.clear();
       }
 
-      next.fail(failure);
+      next.failSafe(failure);
     }
 
     private void innerSet(final LoopChain<R, ?> next) {
-      synchronized (mMutex) {
-        if (mPendingCount.decrementAndGet() != 0) {
-          return;
-        }
+      if (mPendingCount.decrementAndGet() > 0) {
+        return;
       }
 
       next.set();
@@ -1851,7 +1818,7 @@ class DefaultAsyncLoop<V> implements AsyncLoop<V>, Serializable {
           queue.close();
         }
 
-        flushQueue(mNext);
+        flushQueueSafe(mNext);
       }
 
       public void set(final R value) {
@@ -1957,8 +1924,6 @@ class DefaultAsyncLoop<V> implements AsyncLoop<V>, Serializable {
 
     private final AsyncStatementLoopHandler<V, R> mHandler;
 
-    private final Object mMutex = new Object();
-
     private final AtomicLong mPendingCount = new AtomicLong(1);
 
     private final ChainResults mResult = new ChainResults();
@@ -1969,14 +1934,12 @@ class DefaultAsyncLoop<V> implements AsyncLoop<V>, Serializable {
 
     private void innerFailSafe(final LoopChain<R, ?> next, @NotNull final Throwable failure) {
       mPendingCount.set(0);
-      next.fail(failure);
+      next.failSafe(failure);
     }
 
     private void innerSet(final LoopChain<R, ?> next) {
-      synchronized (mMutex) {
-        if (mPendingCount.decrementAndGet() != 0) {
-          return;
-        }
+      if (mPendingCount.decrementAndGet() > 0) {
+        return;
       }
 
       next.set();
@@ -2120,7 +2083,7 @@ class DefaultAsyncLoop<V> implements AsyncLoop<V>, Serializable {
           break;
 
         } catch (final Throwable t) {
-          getLogger().err(t, "Error while processing failure: %s", failure);
+          getLogger().err(t, "Error while processing failure with reason: %s", failure);
           innerFailSafe(next, RuntimeInterruptedException.wrapIfInterrupt(t));
           break;
         }
@@ -2161,14 +2124,12 @@ class DefaultAsyncLoop<V> implements AsyncLoop<V>, Serializable {
         mQueue.clear();
       }
 
-      next.fail(failure);
+      next.failSafe(failure);
     }
 
     private void innerSet(final LoopChain<R, ?> next) {
-      synchronized (mMutex) {
-        if (mPendingCount.decrementAndGet() != 0) {
-          return;
-        }
+      if (mPendingCount.decrementAndGet() > 0) {
+        return;
       }
 
       next.set();
@@ -2269,7 +2230,9 @@ class DefaultAsyncLoop<V> implements AsyncLoop<V>, Serializable {
           mQueue.close();
         }
 
-        flushQueue(mNext);
+        final LoopChain<R, ?> next = mNext;
+        flushQueue(next);
+        innerSet(next);
       }
     }
 
@@ -2344,7 +2307,7 @@ class DefaultAsyncLoop<V> implements AsyncLoop<V>, Serializable {
           break;
 
         } catch (final Throwable t) {
-          getLogger().err(t, "Error while processing failure: %s", failure);
+          getLogger().err(t, "Error while processing failure with reason: %s", failure);
           innerFailSafe(next, RuntimeInterruptedException.wrapIfInterrupt(t));
           break;
         }
@@ -2354,6 +2317,140 @@ class DefaultAsyncLoop<V> implements AsyncLoop<V>, Serializable {
     @Override
     void set(final LoopChain<R, ?> next) {
       innerSet(next);
+    }
+  }
+
+  private static class ChainYielder<S, V, R> extends LoopChain<V, R> implements Serializable {
+
+    private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
+
+    private final ScheduledExecutor mExecutor;
+
+    private final YielderGenerator<R> mGenerator = new YielderGenerator<R>();
+
+    private final Yielder<S, V, R> mYielder;
+
+    private boolean mIsFailed;
+
+    private boolean mIsInitialized;
+
+    private S mStack;
+
+    private ChainYielder(@NotNull final Yielder<S, V, R> yielder) {
+      mYielder = ConstantConditions.notNull("yielder", yielder);
+      mExecutor = ScheduledExecutors.withThrottling(ScheduledExecutors.immediateExecutor(), 1);
+    }
+
+    private static class YielderGenerator<V> implements YieldResults<V> {
+
+      private final AtomicBoolean mIsSet = new AtomicBoolean();
+
+      private volatile LoopChain<V, ?> mNext;
+
+      @NotNull
+      public YieldResults<V> yieldFailure(@NotNull final Throwable failure) {
+        checkSet();
+        return null;
+      }
+
+      @NotNull
+      public YieldResults<V> yieldFailures(@Nullable final Iterable<Throwable> failures) {
+        checkSet();
+        return null;
+      }
+
+      @NotNull
+      public YieldResults<V> yieldIf(@NotNull final AsyncStatement<V> statement) {
+        checkSet();
+        return null;
+      }
+
+      @NotNull
+      public YieldResults<V> yieldLoop(@NotNull final AsyncLoop<V> loop) {
+        checkSet();
+        return null;
+      }
+
+      @NotNull
+      public YieldResults<V> yieldValue(final V value) {
+        checkSet();
+        return null;
+      }
+
+      @NotNull
+      public YieldResults<V> yieldValues(@Nullable final Iterable<V> value) {
+        checkSet();
+        return null;
+      }
+
+      private void checkSet() {
+        if (mIsSet.get()) {
+          throw new IllegalStateException("loop has already complete");
+        }
+      }
+
+      private void set() {
+        mIsSet.set(true);
+      }
+
+      @NotNull
+      private YielderGenerator<V> withNext(final LoopChain<V, ?> next) {
+        mNext = next;
+        return this;
+      }
+    }
+
+    void addFailure(final LoopChain<R, ?> next, @NotNull final Throwable failure) {
+      mExecutor.execute(new Runnable() {
+
+        public void run() {
+          if (mIsFailed) {
+            getLogger().wrn(failure, "Suppressed failure");
+            return;
+          }
+
+          try {
+            final Yielder<S, V, R> yielder = mYielder;
+            if (!mIsInitialized) {
+              mIsInitialized = true;
+              mStack = yielder.init();
+            }
+
+            mStack = yielder.failure(mStack, failure, mGenerator.withNext(next));
+
+          } catch (final CancellationException e) {
+            getLogger().wrn(e, "Loop has been cancelled");
+            mIsInitialized = true;
+            next.failSafe(e);
+
+          } catch (final Throwable t) {
+            getLogger().err(t, "Error while processing failure with reason: %s", failure);
+            mIsInitialized = true;
+            next.failSafe(RuntimeInterruptedException.wrapIfInterrupt(t));
+          }
+        }
+      });
+    }
+
+    void addFailures(final LoopChain<R, ?> next, @NotNull final Iterable<Throwable> failures) {
+
+    }
+
+    void addValue(final LoopChain<R, ?> next, final V input) {
+
+    }
+
+    void addValues(final LoopChain<R, ?> next, @NotNull final Iterable<V> inputs) {
+
+    }
+
+    @NotNull
+    LoopChain<V, R> copy() {
+      return new ChainYielder<S, V, R>(mYielder);
+    }
+
+    void set(final LoopChain<R, ?> next) {
+
     }
   }
 
@@ -2605,10 +2702,10 @@ class DefaultAsyncLoop<V> implements AsyncLoop<V>, Serializable {
     @NotNull
     abstract LoopChain<V, R> copy();
 
-    final void fail(@NotNull final Throwable failure) {
+    final void failSafe(@NotNull final Throwable failure) {
       final Runnable command;
       synchronized (mMutex) {
-        command = mInnerState.fail(failure);
+        command = mInnerState.failSafe(failure);
       }
 
       if (command != null) {
@@ -2676,7 +2773,7 @@ class DefaultAsyncLoop<V> implements AsyncLoop<V>, Serializable {
       }
 
       @Nullable
-      Runnable fail(@NotNull final Throwable failure) {
+      Runnable failSafe(@NotNull final Throwable failure) {
         mInnerState = new StateFailed(failure);
         return NO_OP;
       }
@@ -2699,9 +2796,8 @@ class DefaultAsyncLoop<V> implements AsyncLoop<V>, Serializable {
       @Nullable
       @Override
       Runnable add() {
-        final Throwable failure = mFailure;
-        mLogger.wrn("Loop has already failed with reason: %s", failure);
-        throw FailureException.wrap(failure);
+        mLogger.wrn("Loop has already failed with reason: %s", mFailure);
+        throw FailureException.wrap(new IllegalStateException("loop has already complete"));
       }
 
       @Nullable
@@ -2719,7 +2815,7 @@ class DefaultAsyncLoop<V> implements AsyncLoop<V>, Serializable {
 
       @Nullable
       @Override
-      Runnable fail(@NotNull final Throwable failure) {
+      Runnable failSafe(@NotNull final Throwable failure) {
         mLogger.wrn(failure, "Suppressed failure");
         return null;
       }
@@ -2727,9 +2823,8 @@ class DefaultAsyncLoop<V> implements AsyncLoop<V>, Serializable {
       @Nullable
       @Override
       Runnable set() {
-        final Throwable failure = mFailure;
-        mLogger.wrn("Loop has already failed with reason: %s", failure);
-        throw FailureException.wrap(failure);
+        mLogger.wrn("Loop has already failed with reason: %s", mFailure);
+        throw new IllegalStateException("loop has already complete");
       }
     }
 
@@ -2756,17 +2851,17 @@ class DefaultAsyncLoop<V> implements AsyncLoop<V>, Serializable {
 
         } catch (final CancellationException e) {
           mLogger.wrn(e, "Loop has been cancelled");
-          fail(e);
+          failSafe(e);
 
         } catch (final Throwable t) {
           mLogger.wrn(t, "Error while processing values");
-          fail(t);
+          failSafe(t);
         }
       }
 
       @Nullable
       @Override
-      Runnable fail(@NotNull final Throwable failure) {
+      Runnable failSafe(@NotNull final Throwable failure) {
         mInnerState = new StateEvaluating();
         return new Runnable() {
 
@@ -2819,7 +2914,7 @@ class DefaultAsyncLoop<V> implements AsyncLoop<V>, Serializable {
 
       @Nullable
       @Override
-      Runnable fail(@NotNull final Throwable failure) {
+      Runnable failSafe(@NotNull final Throwable failure) {
         mLogger.wrn(failure, "Suppressed rejection");
         return null;
       }
@@ -2908,7 +3003,6 @@ class DefaultAsyncLoop<V> implements AsyncLoop<V>, Serializable {
         set(mNext);
       }
     }
-
   }
 
   private static class LoopProxy extends SerializableProxy {

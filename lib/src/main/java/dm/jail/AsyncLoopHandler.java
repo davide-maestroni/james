@@ -51,4 +51,8 @@ class AsyncLoopHandler<V, R> implements Serializable {
       @NotNull final AsyncResultCollection<R> results) throws Exception {
     results.addValues((Iterable<R>) values).set();
   }
+
+  void set(@NotNull final AsyncResultCollection<R> results) throws Exception {
+    results.set();
+  }
 }

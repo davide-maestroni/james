@@ -255,7 +255,12 @@ public class Async {
               mThread = null;
             }
 
-            result.fail(RuntimeInterruptedException.wrapIfInterrupt(t));
+            try {
+              result.fail(RuntimeInterruptedException.wrapIfInterrupt(t));
+
+            } catch (final Throwable ignored) {
+              // cannot take any action
+            }
           }
         }
       });

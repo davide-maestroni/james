@@ -32,15 +32,19 @@ import dm.jail.executor.ScheduledExecutor;
  */
 public interface AsyncLoop<V> extends AsyncStatement<Iterable<V>>, Serializable {
 
+  // TODO: 04/02/2018 forEachElse* => forEachCatch* (??)
+  // TODO: 04/02/2018 forEachCatch => elseForEach
+  // TODO: 04/02/2018 orderedForEach* => forEachOrdered
+
   @NotNull
   <S> AsyncLoop<V> backoffOn(@NotNull ScheduledExecutor executor,
       @NotNull Backoffer<S, V> backoffer);
 
   @NotNull
   <S> AsyncLoop<V> backoffOn(@NotNull ScheduledExecutor executor, @Nullable Provider<S> init,
-      @Nullable LoopUpdater<S, ? super V, ? super PendingState> value,
-      @Nullable LoopUpdater<S, ? super Throwable, ? super PendingState> failure,
-      @Nullable LoopCompleter<S, ? super PendingState> done);
+      @Nullable YieldUpdater<S, ? super V, ? super PendingState> value,
+      @Nullable YieldUpdater<S, ? super Throwable, ? super PendingState> failure,
+      @Nullable YieldCompleter<S, ? super PendingState> done);
 
   @NotNull
   AsyncLoop<V> evaluate();
@@ -124,9 +128,6 @@ public interface AsyncLoop<V> extends AsyncStatement<Iterable<V>>, Serializable 
       @Nullable ForkUpdater<S, ? super AsyncLoop<V>, ? super AsyncResultCollection<V>> statement);
 
   @NotNull
-  AsyncLoop<V> on(@NotNull ScheduledExecutor executor, int minBatch, int maxBatch);
-
-  @NotNull
   AsyncLoop<V> orderedForEachElseIf(
       @NotNull Mapper<? super Throwable, ? extends AsyncStatement<? extends V>> mapper,
       @Nullable Class<?>... exceptionTypes);
@@ -152,91 +153,65 @@ public interface AsyncLoop<V> extends AsyncStatement<Iterable<V>>, Serializable 
       @NotNull Mapper<? super V, ? extends AsyncLoop<R>> mapper);
 
   @NotNull
-  AsyncLoop<V> orderedOn(@NotNull ScheduledExecutor executor);
-
-  @NotNull
-  AsyncLoop<V> orderedOn(@NotNull ScheduledExecutor executor, int minBatch, int maxBatch);
+  AsyncLoop<V> orderedOn(@NotNull ScheduledExecutor executor); // TODO: 04/02/2018 onOrdered?
 
   @NotNull
   <R, S> AsyncLoop<R> orderedTryYield(@NotNull Mapper<? super V, ? extends Closeable> closeable,
-      @NotNull Looper<S, ? super V, R> looper);
+      @NotNull Yielder<S, ? super V, R> yielder);
 
   @NotNull
   <R, S> AsyncLoop<R> orderedTryYield(@NotNull Mapper<? super V, ? extends Closeable> closeable,
       @Nullable Provider<S> init, @Nullable Mapper<S, ? extends Boolean> loop,
-      @Nullable LoopUpdater<S, ? super V, ? super Generator<R>> value,
-      @Nullable LoopUpdater<S, ? super Throwable, ? super Generator<R>> failure,
-      @Nullable LoopCompleter<S, ? super Generator<R>> done);
+      @Nullable YieldUpdater<S, ? super V, ? super YieldResults<R>> value,
+      @Nullable YieldUpdater<S, ? super Throwable, ? super YieldResults<R>> failure,
+      @Nullable YieldCompleter<S, ? super YieldResults<R>> done);
 
   @NotNull
-  <R, S> AsyncLoop<R> orderedYield(@NotNull Looper<S, ? super V, R> looper);
+  <R, S> AsyncLoop<R> orderedYield(@NotNull Yielder<S, ? super V, R> yielder);
 
   @NotNull
   <R, S> AsyncLoop<R> orderedYield(@Nullable Provider<S> init,
       @Nullable Mapper<S, ? extends Boolean> loop,
-      @Nullable LoopUpdater<S, ? super V, ? super Generator<R>> value,
-      @Nullable LoopUpdater<S, ? super Throwable, ? super Generator<R>> failure,
-      @Nullable LoopCompleter<S, ? super Generator<R>> done);
+      @Nullable YieldUpdater<S, ? super V, ? super YieldResults<R>> value,
+      @Nullable YieldUpdater<S, ? super Throwable, ? super YieldResults<R>> failure,
+      @Nullable YieldCompleter<S, ? super YieldResults<R>> done);
 
   @NotNull
-  AsyncLoop<V> parallelOn(@NotNull ScheduledExecutor executor);
+  AsyncLoop<V> parallelOn(@NotNull ScheduledExecutor executor); // TODO: 04/02/2018 onParallel?
 
   @NotNull
-  AsyncLoop<V> parallelOn(@NotNull ScheduledExecutor executor, int minBatch, int maxBatch);
+  Generator<AsyncState<V>> stateGenerator();
 
   @NotNull
-  Iterator<AsyncState<V>> stateIterator();
-
-  @NotNull
-  Iterator<AsyncState<V>> stateIterator(long timeout, @NotNull TimeUnit timeUnit);
-
-  AsyncState<V> takeState();
-
-  AsyncState<V> takeState(long timeout, @NotNull TimeUnit timeUnit);
-
-  @NotNull
-  List<AsyncState<V>> takeStates(int maxSize);
-
-  @NotNull
-  List<AsyncState<V>> takeStates(int maxSize, long timeout, @NotNull TimeUnit timeUnit);
-
-  V takeValue();
-
-  V takeValue(long timeout, @NotNull TimeUnit timeUnit);
-
-  @NotNull
-  List<V> takeValues(int maxSize);
-
-  @NotNull
-  List<V> takeValues(int maxSize, long timeout, @NotNull TimeUnit timeUnit);
+  Generator<AsyncState<V>> stateGenerator(long timeout, @NotNull TimeUnit timeUnit);
 
   void to(@NotNull AsyncResultCollection<? super V> results);
 
   @NotNull
   <R, S> AsyncLoop<R> tryYield(@NotNull Mapper<? super V, ? extends Closeable> closeable,
-      @NotNull Looper<S, ? super V, R> looper);
+      @NotNull Yielder<S, ? super V, R> yielder); // TODO: 04/02/2018 remove?
 
   @NotNull
   <R, S> AsyncLoop<R> tryYield(@NotNull Mapper<? super V, ? extends Closeable> closeable,
       @Nullable Provider<S> init, @Nullable Mapper<S, ? extends Boolean> loop,
-      @Nullable LoopUpdater<S, ? super V, ? super Generator<R>> value,
-      @Nullable LoopUpdater<S, ? super Throwable, ? super Generator<R>> failure,
-      @Nullable LoopCompleter<S, ? super Generator<R>> done);
+      @Nullable YieldUpdater<S, ? super V, ? super YieldResults<R>> value,
+      @Nullable YieldUpdater<S, ? super Throwable, ? super YieldResults<R>> failure,
+      @Nullable YieldCompleter<S, ? super YieldResults<R>> done);
 
   @NotNull
-  Iterator<V> valueIterator();
+  Generator<V> valueGenerator();
 
   @NotNull
-  Iterator<V> valueIterator(long timeout, @NotNull TimeUnit timeUnit);
+  Generator<V> valueGenerator(long timeout, @NotNull TimeUnit timeUnit);
 
   @NotNull
-  <R, S> AsyncLoop<R> yield(@NotNull Looper<S, ? super V, R> looper);
+  <R, S> AsyncLoop<R> yield(@NotNull Yielder<S, ? super V, R> yielder);
 
   @NotNull
   <R, S> AsyncLoop<R> yield(@Nullable Provider<S> init, @Nullable Mapper<S, ? extends Boolean> loop,
-      @Nullable LoopUpdater<S, ? super V, ? super Generator<R>> value,
-      @Nullable LoopUpdater<S, ? super Throwable, ? super Generator<R>> failure,
-      @Nullable LoopCompleter<S, ? super Generator<R>> done);
+      @Nullable YieldUpdater<S, ? super V, ? super YieldResults<R>> value,
+      @Nullable YieldUpdater<S, ? super Throwable, ? super YieldResults<R>> failure,
+      @Nullable YieldCompleter<S, ? super YieldResults<R>> done);
 
   interface Backoffer<S, V> {
 
@@ -249,60 +224,72 @@ public interface AsyncLoop<V> extends AsyncStatement<Iterable<V>>, Serializable 
     S value(S stack, V value, @NotNull PendingState state);
   }
 
-  interface Generator<V> {
+  interface Generator<V> extends Iterable<V> {
 
     @NotNull
-    Generator<V> yieldFailure(@NotNull Throwable failure);
-
-    @NotNull
-    Generator<V> yieldFailures(@Nullable Iterable<Throwable> failures);
-
-    @NotNull
-    Generator<V> yieldIf(@NotNull AsyncStatement<V> statement);
-
-    @NotNull
-    Generator<V> yieldLoop(@NotNull AsyncLoop<V> loop);
-
-    @NotNull
-    Generator<V> yieldValue(V value);
-
-    @NotNull
-    Generator<V> yieldValues(@Nullable Iterable<V> value);
+    GeneratorIterator<V> iterator();
   }
 
-  interface LoopCompleter<S, R> {
+  interface GeneratorIterator<V> extends Iterator<V> {
+
+    @NotNull
+    List<V> next(int maxCount);
+  }
+
+  interface PendingState {
+
+    int pendingTasks();
+
+    int pendingValues();
+
+    void wait(long timeout, @NotNull TimeUnit timeUnit);
+
+    boolean waitOps(int maxCount, long timeout, @NotNull TimeUnit timeUnit);
+
+    boolean waitValues(int maxCount, long timeout, @NotNull TimeUnit timeUnit);
+  }
+
+  interface YieldCompleter<S, R> {
 
     void complete(S stack, @NotNull R state);
   }
 
-  interface LoopUpdater<S, V, R> {
+  interface YieldResults<V> {
+
+    @NotNull
+    YieldResults<V> yieldFailure(@NotNull Throwable failure);
+
+    @NotNull
+    YieldResults<V> yieldFailures(@Nullable Iterable<Throwable> failures);
+
+    @NotNull
+    YieldResults<V> yieldIf(@NotNull AsyncStatement<V> statement);
+
+    @NotNull
+    YieldResults<V> yieldLoop(@NotNull AsyncLoop<V> loop);
+
+    @NotNull
+    YieldResults<V> yieldValue(V value);
+
+    @NotNull
+    YieldResults<V> yieldValues(@Nullable Iterable<V> value);
+  }
+
+  interface YieldUpdater<S, V, R> {
 
     S update(S stack, V value, @NotNull R state);
   }
 
-  interface Looper<S, V, R> {
+  interface Yielder<S, V, R> {
 
-    void done(S stack, @NotNull Generator<R> generator);
+    void done(S stack, @NotNull YieldResults<R> results);
 
-    S failure(S stack, @NotNull Throwable failure, @NotNull Generator<R> generator);
+    S failure(S stack, @NotNull Throwable failure, @NotNull YieldResults<R> results);
 
     S init();
 
     boolean loop(S stack);
 
-    S value(S stack, V value, @NotNull Generator<R> generator);
-  }
-
-  interface PendingState {
-
-    int pendingOps();
-
-    int pendingTasks();
-
-    void wait(long time, @NotNull TimeUnit timeUnit);
-
-    boolean waitOps(int pendingOps, long time, @NotNull TimeUnit timeUnit);
-
-    boolean waitTasks(int pendingTasks, long time, @NotNull TimeUnit timeUnit);
+    S value(S stack, V value, @NotNull YieldResults<R> results);
   }
 }

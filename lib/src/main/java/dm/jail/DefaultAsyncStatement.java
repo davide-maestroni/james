@@ -107,7 +107,7 @@ class DefaultAsyncStatement<V> implements AsyncStatement<V>, Serializable {
       observer.accept(head);
 
     } catch (final Throwable t) {
-      head.fail(RuntimeInterruptedException.wrapIfInterrupt(t));
+      head.failSafe(RuntimeInterruptedException.wrapIfInterrupt(t));
     }
   }
 
@@ -136,7 +136,7 @@ class DefaultAsyncStatement<V> implements AsyncStatement<V>, Serializable {
       observer.accept(head);
 
     } catch (final Throwable t) {
-      head.fail(RuntimeInterruptedException.wrapIfInterrupt(t));
+      head.failSafe(RuntimeInterruptedException.wrapIfInterrupt(t));
     }
   }
 
@@ -177,7 +177,7 @@ class DefaultAsyncStatement<V> implements AsyncStatement<V>, Serializable {
       observer.accept(head);
 
     } catch (final Throwable t) {
-      head.fail(RuntimeInterruptedException.wrapIfInterrupt(t));
+      head.failSafe(RuntimeInterruptedException.wrapIfInterrupt(t));
     }
   }
 
@@ -267,13 +267,15 @@ class DefaultAsyncStatement<V> implements AsyncStatement<V>, Serializable {
   @NotNull
   public AsyncStatement<V> elseCatch(@NotNull final Mapper<? super Throwable, ? extends V> mapper,
       @Nullable final Class<?>[] exceptionTypes) {
-    return chain(new ElseCatchStatementHandler<V>(mapper, Asyncs.cloneExceptionTypes(exceptionTypes)));
+    return chain(
+        new ElseCatchStatementHandler<V>(mapper, Asyncs.cloneExceptionTypes(exceptionTypes)));
   }
 
   @NotNull
   public AsyncStatement<V> elseDo(@NotNull final Observer<? super Throwable> observer,
       @Nullable final Class<?>[] exceptionTypes) {
-    return chain(new ElseDoStatementHandler<V>(observer, Asyncs.cloneExceptionTypes(exceptionTypes)));
+    return chain(
+        new ElseDoStatementHandler<V>(observer, Asyncs.cloneExceptionTypes(exceptionTypes)));
   }
 
   @NotNull
@@ -396,7 +398,8 @@ class DefaultAsyncStatement<V> implements AsyncStatement<V>, Serializable {
 
   @NotNull
   public AsyncStatement<V> on(@NotNull final ScheduledExecutor executor) {
-    return chain(new ChainHandler<V, V>(new ExecutorStatementHandler<V>(executor)), mExecutor, executor);
+    return chain(new ChainHandler<V, V>(new ExecutorStatementHandler<V>(executor)), mExecutor,
+        executor);
   }
 
   @NotNull
@@ -420,9 +423,8 @@ class DefaultAsyncStatement<V> implements AsyncStatement<V>, Serializable {
       @NotNull final Mapper<? super V, ? extends Closeable> closeable,
       @NotNull final Mapper<? super V, R> mapper) {
     final Logger logger = mLogger;
-    return chain(
-        new TryStatementHandler<V, R>(closeable, new ThenStatementHandler<V, R>(mapper), logger.getLogPrinter(),
-            logger.getLogLevel()));
+    return chain(new TryStatementHandler<V, R>(closeable, new ThenStatementHandler<V, R>(mapper),
+        logger.getLogPrinter(), logger.getLogLevel()));
   }
 
   @NotNull
@@ -431,8 +433,8 @@ class DefaultAsyncStatement<V> implements AsyncStatement<V>, Serializable {
       @NotNull final Observer<? super V> observer) {
     final Logger logger = mLogger;
     return chain(
-        new TryStatementHandler<V, V>(closeable, new ThenDoStatementHandler<V, V>(observer), logger.getLogPrinter(),
-            logger.getLogLevel()));
+        new TryStatementHandler<V, V>(closeable, new ThenDoStatementHandler<V, V>(observer),
+            logger.getLogPrinter(), logger.getLogLevel()));
   }
 
   @NotNull
@@ -440,8 +442,8 @@ class DefaultAsyncStatement<V> implements AsyncStatement<V>, Serializable {
       @NotNull final Mapper<? super V, ? extends Closeable> closeable,
       @NotNull final Mapper<? super V, ? extends AsyncStatement<R>> mapper) {
     final Logger logger = mLogger;
-    return chain(
-        new TryIfStatementHandler<V, R>(closeable, mapper, logger.getLogPrinter(), logger.getLogLevel()));
+    return chain(new TryIfStatementHandler<V, R>(closeable, mapper, logger.getLogPrinter(),
+        logger.getLogLevel()));
   }
 
   public void waitDone() {
@@ -572,7 +574,7 @@ class DefaultAsyncStatement<V> implements AsyncStatement<V>, Serializable {
       } else {
         chain.setLogger(logger);
         chaining = head.chain(chain);
-        mState = StatementState.Extended;
+        mState = StatementState.Chained;
         mChain = chain;
         mMutex.notifyAll();
       }
@@ -749,11 +751,11 @@ class DefaultAsyncStatement<V> implements AsyncStatement<V>, Serializable {
 
       } catch (final CancellationException e) {
         getLogger().wrn(e, "Statement has been cancelled");
-        next.fail(e);
+        next.failSafe(e);
 
       } catch (final Throwable t) {
         getLogger().err(t, "Error while processing failure with reason: %s", failure);
-        next.fail(RuntimeInterruptedException.wrapIfInterrupt(t));
+        next.failSafe(RuntimeInterruptedException.wrapIfInterrupt(t));
       }
     }
 
@@ -764,11 +766,11 @@ class DefaultAsyncStatement<V> implements AsyncStatement<V>, Serializable {
 
       } catch (final CancellationException e) {
         getLogger().wrn(e, "Statement has been cancelled");
-        next.fail(e);
+        next.failSafe(e);
 
       } catch (final Throwable t) {
         getLogger().err(t, "Error while processing value: %s", value);
-        next.fail(RuntimeInterruptedException.wrapIfInterrupt(t));
+        next.failSafe(RuntimeInterruptedException.wrapIfInterrupt(t));
       }
     }
   }
@@ -870,7 +872,7 @@ class DefaultAsyncStatement<V> implements AsyncStatement<V>, Serializable {
         return new Runnable() {
 
           public void run() {
-            chain.fail(exception);
+            chain.failSafe(exception);
           }
         };
       }
@@ -1010,7 +1012,12 @@ class DefaultAsyncStatement<V> implements AsyncStatement<V>, Serializable {
     private void clearResults(@NotNull final Throwable failure) {
       final List<AsyncResult<V>> results = mResults;
       for (final AsyncResult<V> result : results) {
-        result.fail(failure);
+        try {
+          result.fail(failure);
+
+        } catch (final Throwable ignored) {
+          // cannot take any action
+        }
       }
 
       results.clear();
@@ -1130,9 +1137,8 @@ class DefaultAsyncStatement<V> implements AsyncStatement<V>, Serializable {
 
     public final void fail(@NotNull final Throwable failure) {
       ConstantConditions.notNull("failure", failure);
-      if (mInnerState.fail(failure)) {
-        fail(mNext, failure);
-      }
+      mInnerState.fail(failure);
+      fail(mNext, failure);
     }
 
     public final void set(final V value) {
@@ -1141,7 +1147,7 @@ class DefaultAsyncStatement<V> implements AsyncStatement<V>, Serializable {
     }
 
     boolean cancel(@NotNull final Throwable exception) {
-      if (mInnerState.fail(exception)) {
+      if (mInnerState.failSafe(exception)) {
         fail(mNext, exception);
         return true;
       }
@@ -1153,6 +1159,13 @@ class DefaultAsyncStatement<V> implements AsyncStatement<V>, Serializable {
     abstract StatementChain<V, R> copy();
 
     abstract void fail(StatementChain<R, ?> next, Throwable failure);
+
+    final void failSafe(@NotNull final Throwable failure) {
+      ConstantConditions.notNull("failure", failure);
+      if (mInnerState.failSafe(failure)) {
+        fail(mNext, failure);
+      }
+    }
 
     Logger getLogger() {
       return mLogger;
@@ -1174,7 +1187,11 @@ class DefaultAsyncStatement<V> implements AsyncStatement<V>, Serializable {
 
     private class StateEvaluating {
 
-      boolean fail(@NotNull final Throwable failure) {
+      void fail(@NotNull final Throwable failure) {
+        mInnerState = new StateFailed(failure);
+      }
+
+      boolean failSafe(@NotNull final Throwable failure) {
         mInnerState = new StateFailed(failure);
         return true;
       }
@@ -1193,31 +1210,49 @@ class DefaultAsyncStatement<V> implements AsyncStatement<V>, Serializable {
       }
 
       @Override
-      boolean fail(@NotNull final Throwable failure) {
+      void fail(@NotNull final Throwable failure) {
+        throwException();
+      }
+
+      void throwException() {
+        final Throwable failure = mFailure;
+        mLogger.wrn("Statement has already failed with reason: %s", failure);
+        throw FailureException.wrap(failure);
+      }
+
+      @Override
+      boolean failSafe(@NotNull final Throwable failure) {
         mLogger.wrn(failure, "Suppressed failure");
         return false;
       }
 
       @Override
       void set() {
-        final Throwable failure = mFailure;
-        mLogger.wrn("Statement has already failed with reason: %s", failure);
-        throw FailureException.wrap(failure);
+        throwException();
       }
     }
 
     private class StateSet extends StateEvaluating {
 
-      @Override
-      void set() {
+      void throwException() {
         mLogger.wrn("Statement has already a value");
-        throw new IllegalStateException("statement has already a value");
+        throw FailureException.wrap(new IllegalStateException("statement has already a value"));
       }
 
       @Override
-      boolean fail(@NotNull final Throwable failure) {
+      boolean failSafe(@NotNull final Throwable failure) {
         mLogger.wrn(failure, "Suppressed failure");
         return false;
+      }
+
+      @Override
+      void set() {
+        throwException();
+      }
+
+      @Override
+      void fail(@NotNull final Throwable failure) {
+        throwException();
       }
     }
   }

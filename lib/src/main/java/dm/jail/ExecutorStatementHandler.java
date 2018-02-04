@@ -42,13 +42,23 @@ class ExecutorStatementHandler<V> extends AsyncStatementHandler<V, V> {
   void failure(@NotNull final Throwable failure, @NotNull final AsyncResult<V> result) throws
       Exception {
     if (failure instanceof CancellationException) {
-      result.fail(failure);
+      try {
+        result.fail(failure);
+
+      } catch (final Throwable ignored) {
+        // cannot take any action
+      }
 
     } else {
       mExecutor.execute(new Runnable() {
 
         public void run() {
-          result.fail(failure);
+          try {
+            result.fail(failure);
+
+          } catch (final Throwable ignored) {
+            // cannot take any action
+          }
         }
       });
     }

@@ -93,6 +93,7 @@ public class TestAsyncStatement {
 
   @NotNull
   private static <V> AsyncStatement<V> fork(@NotNull final AsyncStatement<V> statement) {
+    // TODO: 04/02/2018 ForkStack default implementation
     return statement.fork(new Forker<AsyncState<V>, AsyncStatement<V>, V, AsyncResult<V>>() {
 
       public AsyncState<V> done(@NotNull final AsyncStatement<V> statement,

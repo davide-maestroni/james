@@ -20,7 +20,7 @@ package dm.jail;
  * Created by davide-maestroni on 02/01/2018.
  */
 enum StatementState {
-  Evaluating(false), Set(true), Failed(true), Extended(false);
+  Evaluating(false), Set(true), Failed(true), Chained(false); // TODO: 04/02/2018 extended?
 
   private final boolean mIsDone;
 
