@@ -30,7 +30,6 @@ import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
-import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 
 import dm.jail.async.Action;
@@ -53,10 +52,11 @@ import dm.jail.log.LogPrinter;
 import dm.jail.log.LogPrinter.Level;
 import dm.jail.log.Logger;
 import dm.jail.util.ConstantConditions;
-import dm.jail.util.DoubleQueue;
 import dm.jail.util.Iterables;
 import dm.jail.util.SerializableProxy;
 import dm.jail.util.Threads;
+import dm.jail.util.TimeUnits;
+import dm.jail.util.TimeUnits.Condition;
 
 /**
  * Created by davide-maestroni on 02/01/2018.
@@ -228,6 +228,7 @@ class DefaultAsyncLoop<V> implements AsyncLoop<V>, Serializable {
   @NotNull
   public <S> AsyncLoop<V> backoffOn(@NotNull final ScheduledExecutor executor,
       @NotNull final Backoffer<S, V> backoffer) {
+    // TODO: 05/02/2018 implement
     return null;
   }
 
@@ -237,7 +238,29 @@ class DefaultAsyncLoop<V> implements AsyncLoop<V>, Serializable {
       @Nullable final YieldUpdater<S, ? super V, ? super PendingState> value,
       @Nullable final YieldUpdater<S, ? super Throwable, ? super PendingState> failure,
       @Nullable final YieldCompleter<S, ? super PendingState> done) {
+    // TODO: 05/02/2018 implement
     return null;
+  }
+
+  @NotNull
+  public AsyncLoop<V> elseCatch(
+      @NotNull final Mapper<? super Throwable, ? extends Iterable<V>> mapper,
+      @Nullable final Class<?>[] exceptionTypes) {
+    return yield(new ElseCatchYielder<V>(mapper, Asyncs.cloneExceptionTypes(exceptionTypes)));
+  }
+
+  @NotNull
+  public AsyncLoop<V> elseDo(@NotNull final Observer<? super Throwable> observer,
+      @Nullable final Class<?>[] exceptionTypes) {
+    return yield(new ElseDoYielder<V>(observer, Asyncs.cloneExceptionTypes(exceptionTypes)));
+  }
+
+  @NotNull
+  public AsyncLoop<V> elseIf(
+      @NotNull final Mapper<? super Throwable, ? extends AsyncStatement<? extends Iterable<V>>>
+          mapper,
+      @Nullable final Class<?>[] exceptionTypes) {
+    return yield(new ElseIfYielder<V>(mapper, Asyncs.cloneExceptionTypes(exceptionTypes)));
   }
 
   @NotNull
@@ -267,21 +290,86 @@ class DefaultAsyncLoop<V> implements AsyncLoop<V>, Serializable {
   }
 
   @NotNull
+  public <S> AsyncLoop<V> fork(
+      @NotNull final Forker<S, ? super AsyncStatement<Iterable<V>>, ? super Iterable<V>, ? super
+          AsyncResult<Iterable<V>>> forker) {
+    return forkLoop(new LoopForker<S, V>(forker));
+  }
+
+  @NotNull
+  public <S> AsyncLoop<V> fork(@Nullable final Mapper<? super AsyncStatement<Iterable<V>>, S> init,
+      @Nullable final ForkUpdater<S, ? super AsyncStatement<Iterable<V>>, ? super Iterable<V>>
+          value,
+      @Nullable final ForkUpdater<S, ? super AsyncStatement<Iterable<V>>, ? super Throwable>
+          failure,
+      @Nullable final ForkCompleter<S, ? super AsyncStatement<Iterable<V>>> done,
+      @Nullable final ForkUpdater<S, ? super AsyncStatement<Iterable<V>>, ? super
+          AsyncResult<Iterable<V>>> statement) {
+    return fork(new ComposedStatementForker<S, Iterable<V>>(init, value, failure, done, statement));
+  }
+
+  @NotNull
   public AsyncLoop<V> on(@NotNull final ScheduledExecutor executor) {
+    final Logger logger = mLogger;
     final ScheduledExecutor throttledExecutor = ScheduledExecutors.withThrottling(executor, 1);
-    return chain(new ChainLoopHandler<V, V>(new ExecutorLoopHandler<V>(throttledExecutor)),
-        mExecutor, throttledExecutor);
+    return chain(new ChainLoopHandler<V, V>(
+        new ExecutorLoopHandler<V>(throttledExecutor, logger.getLogPrinter(),
+            logger.getLogLevel())), mExecutor, throttledExecutor);
+  }
+
+  @NotNull
+  public AsyncLoop<V> elseForEach(@NotNull final Mapper<? super Throwable, V> mapper,
+      @Nullable Class<?>... exceptionTypes) {
+    return chain(new ElseCatchLoopHandler<V>(mapper, Asyncs.cloneExceptionTypes(exceptionTypes)));
+  }
+
+  @NotNull
+  public AsyncLoop<V> elseForEachDo(@NotNull final Observer<? super Throwable> observer,
+      @Nullable Class<?>... exceptionTypes) {
+    return chain(new ElseDoLoopHandler<V>(observer, Asyncs.cloneExceptionTypes(exceptionTypes)));
+  }
+
+  @NotNull
+  public AsyncLoop<V> elseForEachIf(
+      @NotNull final Mapper<? super Throwable, ? extends AsyncStatement<? extends V>> mapper,
+      @Nullable Class<?>... exceptionTypes) {
+    return chain(new ElseIfStatementHandler<V>(mapper, Asyncs.cloneExceptionTypes(exceptionTypes)));
+  }
+
+  @NotNull
+  public AsyncLoop<V> elseForEachLoop(
+      @NotNull final Mapper<? super Throwable, ? extends Iterable<? extends V>> mapper,
+      @Nullable Class<?>... exceptionTypes) {
+    return chain(new ElseLoopLoopHandler<V>(mapper, Asyncs.cloneExceptionTypes(exceptionTypes)));
+  }
+
+  @NotNull
+  public AsyncLoop<V> elseForEachLoopIf(
+      @NotNull final Mapper<? super Throwable, ? extends AsyncLoop<? extends V>> mapper,
+      @Nullable Class<?>... exceptionTypes) {
+    return chain(
+        new ElseLoopIfStatementHandler<V>(mapper, Asyncs.cloneExceptionTypes(exceptionTypes)));
+  }
+
+  @NotNull
+  public AsyncLoop<V> elseForEachOrderedIf(
+      @NotNull final Mapper<? super Throwable, ? extends AsyncStatement<? extends V>> mapper,
+      @Nullable Class<?>... exceptionTypes) {
+    return chainOrdered(
+        new ElseIfStatementHandler<V>(mapper, Asyncs.cloneExceptionTypes(exceptionTypes)));
+  }
+
+  @NotNull
+  public AsyncLoop<V> elseForEachOrderedLoopIf(
+      @NotNull final Mapper<? super Throwable, ? extends AsyncLoop<? extends V>> mapper,
+      @Nullable Class<?>... exceptionTypes) {
+    return chainOrdered(
+        new ElseLoopIfStatementHandler<V>(mapper, Asyncs.cloneExceptionTypes(exceptionTypes)));
   }
 
   @NotNull
   public <R> AsyncLoop<R> forEach(@NotNull final Mapper<? super V, R> mapper) {
     return chain(new ThenLoopHandler<V, R>(mapper));
-  }
-
-  @NotNull
-  public AsyncLoop<V> forEachCatch(@NotNull final Mapper<? super Throwable, V> mapper,
-      @Nullable Class<?>... exceptionTypes) {
-    return chain(new ElseCatchLoopHandler<V>(mapper, Asyncs.cloneExceptionTypes(exceptionTypes)));
   }
 
   @NotNull
@@ -292,34 +380,6 @@ class DefaultAsyncLoop<V> implements AsyncLoop<V>, Serializable {
   @NotNull
   public AsyncLoop<V> forEachDone(@NotNull final Action action) {
     return chain(new DoneLoopHandler<V>(action));
-  }
-
-  @NotNull
-  public AsyncLoop<V> forEachElseDo(@NotNull final Observer<? super Throwable> observer,
-      @Nullable Class<?>... exceptionTypes) {
-    return chain(new ElseDoLoopHandler<V>(observer, Asyncs.cloneExceptionTypes(exceptionTypes)));
-  }
-
-  @NotNull
-  public AsyncLoop<V> forEachElseIf(
-      @NotNull final Mapper<? super Throwable, ? extends AsyncStatement<? extends V>> mapper,
-      @Nullable Class<?>... exceptionTypes) {
-    return chain(new ElseIfStatementHandler<V>(mapper, Asyncs.cloneExceptionTypes(exceptionTypes)));
-  }
-
-  @NotNull
-  public AsyncLoop<V> forEachElseLoop(
-      @NotNull final Mapper<? super Throwable, ? extends Iterable<? extends V>> mapper,
-      @Nullable Class<?>... exceptionTypes) {
-    return chain(new ElseLoopLoopHandler<V>(mapper, Asyncs.cloneExceptionTypes(exceptionTypes)));
-  }
-
-  @NotNull
-  public AsyncLoop<V> forEachElseLoopIf(
-      @NotNull final Mapper<? super Throwable, ? extends AsyncLoop<? extends V>> mapper,
-      @Nullable Class<?>... exceptionTypes) {
-    return chain(
-        new ElseLoopIfStatementHandler<V>(mapper, Asyncs.cloneExceptionTypes(exceptionTypes)));
   }
 
   @NotNull
@@ -338,6 +398,37 @@ class DefaultAsyncLoop<V> implements AsyncLoop<V>, Serializable {
   public <R> AsyncLoop<R> forEachLoopIf(
       @NotNull final Mapper<? super V, ? extends AsyncLoop<R>> mapper) {
     return chain(new ThenLoopIfStatementHandler<V, R>(mapper));
+  }
+
+  @NotNull
+  public <R> AsyncLoop<R> forEachOrderedIf(
+      @NotNull final Mapper<? super V, ? extends AsyncStatement<R>> mapper) {
+    return chainOrdered(new ThenIfStatementHandler<V, R>(mapper));
+  }
+
+  @NotNull
+  public <R> AsyncLoop<R> forEachOrderedLoopIf(
+      @NotNull final Mapper<? super V, ? extends AsyncLoop<R>> mapper) {
+    return chainOrdered(new ThenLoopIfStatementHandler<V, R>(mapper));
+  }
+
+  @NotNull
+  public <R> AsyncLoop<R> forEachOrderedTryIf(
+      @NotNull final Mapper<? super V, ? extends Closeable> closeable,
+      @NotNull final Mapper<? super V, ? extends AsyncStatement<R>> mapper) {
+    final Logger logger = mLogger;
+    return chainOrdered(new TryIfStatementHandler<V, R>(closeable, mapper, logger.getLogPrinter(),
+        logger.getLogLevel()));
+  }
+
+  @NotNull
+  public <R> AsyncLoop<R> forEachOrderedTryLoopIf(
+      @NotNull final Mapper<? super V, ? extends Closeable> closeable,
+      @NotNull final Mapper<? super V, ? extends AsyncLoop<R>> mapper) {
+    final Logger logger = mLogger;
+    return chainOrdered(
+        new TryStatementLoopHandler<V, R>(closeable, new ThenLoopIfStatementHandler<V, R>(mapper),
+            logger.getLogPrinter(), logger.getLogLevel()));
   }
 
   @NotNull
@@ -407,158 +498,54 @@ class DefaultAsyncLoop<V> implements AsyncLoop<V>, Serializable {
   }
 
   @NotNull
-  public AsyncLoop<V> orderedForEachElseIf(
-      @NotNull final Mapper<? super Throwable, ? extends AsyncStatement<? extends V>> mapper,
-      @Nullable Class<?>... exceptionTypes) {
-    return chainOrdered(
-        new ElseIfStatementHandler<V>(mapper, Asyncs.cloneExceptionTypes(exceptionTypes)));
-  }
-
-  @NotNull
-  public AsyncLoop<V> orderedForEachElseLoopIf(
-      @NotNull final Mapper<? super Throwable, ? extends AsyncLoop<? extends V>> mapper,
-      @Nullable Class<?>... exceptionTypes) {
-    return chainOrdered(
-        new ElseLoopIfStatementHandler<V>(mapper, Asyncs.cloneExceptionTypes(exceptionTypes)));
-  }
-
-  @NotNull
-  public <R> AsyncLoop<R> orderedForEachIf(
-      @NotNull final Mapper<? super V, ? extends AsyncStatement<R>> mapper) {
-    return chainOrdered(new ThenIfStatementHandler<V, R>(mapper));
-  }
-
-  @NotNull
-  public <R> AsyncLoop<R> orderedForEachLoopIf(
-      @NotNull final Mapper<? super V, ? extends AsyncLoop<R>> mapper) {
-    return chainOrdered(new ThenLoopIfStatementHandler<V, R>(mapper));
-  }
-
-  @NotNull
-  public <R> AsyncLoop<R> orderedForEachTryIf(
-      @NotNull final Mapper<? super V, ? extends Closeable> closeable,
-      @NotNull final Mapper<? super V, ? extends AsyncStatement<R>> mapper) {
+  public AsyncLoop<V> onParallel(@NotNull final ScheduledExecutor executor) {
     final Logger logger = mLogger;
-    return chainOrdered(new TryIfStatementHandler<V, R>(closeable, mapper, logger.getLogPrinter(),
-        logger.getLogLevel()));
+    return chain(new ChainLoopHandler<V, V>(
+            new ExecutorLoopHandler<V>(executor, logger.getLogPrinter(), logger.getLogLevel())),
+        mExecutor, executor);
   }
 
   @NotNull
-  public <R> AsyncLoop<R> orderedForEachTryLoopIf(
-      @NotNull final Mapper<? super V, ? extends Closeable> closeable,
-      @NotNull final Mapper<? super V, ? extends AsyncLoop<R>> mapper) {
+  public AsyncLoop<V> onParallelOrdered(@NotNull final ScheduledExecutor executor) {
     final Logger logger = mLogger;
-    return chainOrdered(
-        new TryStatementLoopHandler<V, R>(closeable, new ThenLoopIfStatementHandler<V, R>(mapper),
-            logger.getLogPrinter(), logger.getLogLevel()));
-  }
-
-  @NotNull
-  public AsyncLoop<V> orderedOn(@NotNull final ScheduledExecutor executor) {
-    return null;
-  }
-
-  @NotNull
-  public <R, S> AsyncLoop<R> orderedTryYield(
-      @NotNull final Mapper<? super V, ? extends Closeable> closeable,
-      @NotNull final Yielder<S, ? super V, R> yielder) {
-    return null;
-  }
-
-  @NotNull
-  public <R, S> AsyncLoop<R> orderedTryYield(
-      @NotNull final Mapper<? super V, ? extends Closeable> closeable,
-      @Nullable final Provider<S> init, @Nullable final Mapper<S, ? extends Boolean> loop,
-      @Nullable final YieldUpdater<S, ? super V, ? super YieldResults<R>> value,
-      @Nullable final YieldUpdater<S, ? super Throwable, ? super YieldResults<R>> failure,
-      @Nullable final YieldCompleter<S, ? super YieldResults<R>> done) {
-    return null;
-  }
-
-  @NotNull
-  public <R, S> AsyncLoop<R> orderedYield(@NotNull final Yielder<S, ? super V, R> yielder) {
-    return null;
-  }
-
-  @NotNull
-  public <R, S> AsyncLoop<R> orderedYield(@Nullable final Provider<S> init,
-      @Nullable final Mapper<S, ? extends Boolean> loop,
-      @Nullable final YieldUpdater<S, ? super V, ? super YieldResults<R>> value,
-      @Nullable final YieldUpdater<S, ? super Throwable, ? super YieldResults<R>> failure,
-      @Nullable final YieldCompleter<S, ? super YieldResults<R>> done) {
-    return null;
-  }
-
-  @NotNull
-  public AsyncLoop<V> parallelOn(@NotNull final ScheduledExecutor executor) {
-    return null;
+    return chain(new ChainLoopHandlerOrdered<V, V>(
+            new ExecutorLoopHandler<V>(executor, logger.getLogPrinter(), logger.getLogLevel())),
+        mExecutor, executor);
   }
 
   @NotNull
   public Generator<AsyncState<V>> stateGenerator() {
-    return null;
+    return stateGenerator(-1, TimeUnit.MILLISECONDS);
   }
 
   @NotNull
   public Generator<AsyncState<V>> stateGenerator(final long timeout,
       @NotNull final TimeUnit timeUnit) {
+    // TODO: 05/02/2018 implement
     return null;
   }
 
   public void to(@NotNull final AsyncResultCollection<? super V> results) {
-    ConstantConditions.notNull("results", results);
     checkEvaluated();
-    // TODO: 01/02/2018 yielder??
-    forEach(new Mapper<V, Void>() {
-
-      public Void apply(final V value) {
-        results.addValue(value);
-        return null;
-      }
-    }).forEachCatch(new Mapper<Throwable, Void>() {
-
-      public Void apply(final Throwable failure) {
-        results.addFailure(failure);
-        return null;
-      }
-    }).whenDone(new Action() {
-
-      public void perform() {
-        results.set();
-      }
-    });
-  }
-
-  @NotNull
-  public <R, S> AsyncLoop<R> tryYield(
-      @NotNull final Mapper<? super V, ? extends Closeable> closeable,
-      @NotNull final Yielder<S, ? super V, R> yielder) {
-    return null;
-  }
-
-  @NotNull
-  public <R, S> AsyncLoop<R> tryYield(
-      @NotNull final Mapper<? super V, ? extends Closeable> closeable,
-      @Nullable final Provider<S> init, @Nullable final Mapper<S, ? extends Boolean> loop,
-      @Nullable final YieldUpdater<S, ? super V, ? super YieldResults<R>> value,
-      @Nullable final YieldUpdater<S, ? super Throwable, ? super YieldResults<R>> failure,
-      @Nullable final YieldCompleter<S, ? super YieldResults<R>> done) {
-    return null;
+    chain(new ToResultLoopHandler<V>(results));
   }
 
   @NotNull
   public Generator<V> valueGenerator() {
-    return null;
+    return valueGenerator(-1, TimeUnit.MILLISECONDS);
   }
 
   @NotNull
   public Generator<V> valueGenerator(final long timeout, @NotNull final TimeUnit timeUnit) {
+    // TODO: 05/02/2018 implement
     return null;
   }
 
   @NotNull
   public <R, S> AsyncLoop<R> yield(@NotNull final Yielder<S, ? super V, R> yielder) {
-    return null;
+    final Logger logger = mLogger;
+    return chain(
+        new YieldLoopHandler<S, V, R>(yielder, logger.getLogPrinter(), logger.getLogLevel()));
   }
 
   @NotNull
@@ -567,7 +554,23 @@ class DefaultAsyncLoop<V> implements AsyncLoop<V>, Serializable {
       @Nullable final YieldUpdater<S, ? super V, ? super YieldResults<R>> value,
       @Nullable final YieldUpdater<S, ? super Throwable, ? super YieldResults<R>> failure,
       @Nullable final YieldCompleter<S, ? super YieldResults<R>> done) {
-    return null;
+    return yield(new ComposedYielder<S, V, R>(init, loop, value, failure, done));
+  }
+
+  @NotNull
+  public <R, S> AsyncLoop<R> yieldOrdered(@NotNull final Yielder<S, ? super V, R> yielder) {
+    final Logger logger = mLogger;
+    return chainOrdered(
+        new YieldLoopHandler<S, V, R>(yielder, logger.getLogPrinter(), logger.getLogLevel()));
+  }
+
+  @NotNull
+  public <R, S> AsyncLoop<R> yieldOrdered(@Nullable final Provider<S> init,
+      @Nullable final Mapper<S, ? extends Boolean> loop,
+      @Nullable final YieldUpdater<S, ? super V, ? super YieldResults<R>> value,
+      @Nullable final YieldUpdater<S, ? super Throwable, ? super YieldResults<R>> failure,
+      @Nullable final YieldCompleter<S, ? super YieldResults<R>> done) {
+    return yieldOrdered(new ComposedYielder<S, V, R>(init, loop, value, failure, done));
   }
 
   public boolean cancel(final boolean mayInterruptIfRunning) {
@@ -654,44 +657,68 @@ class DefaultAsyncLoop<V> implements AsyncLoop<V>, Serializable {
   }
 
   @NotNull
-  public AsyncStatement<Iterable<V>> elseCatch(
-      @NotNull final Mapper<? super Throwable, ? extends Iterable<V>> mapper,
-      @Nullable final Class<?>[] exceptionTypes) {
-    return toStatement().elseCatch(mapper, exceptionTypes);
+  @SuppressWarnings("ConstantConditions")
+  public Throwable failure() {
+    synchronized (mMutex) {
+      if (!isFailed()) {
+        throw new IllegalStateException("the statement is not failed");
+      }
+
+      return mHead.getFailure().getCause();
+    }
   }
 
-  @NotNull
-  public AsyncStatement<Iterable<V>> elseDo(@NotNull final Observer<? super Throwable> observer,
-      @Nullable final Class<?>[] exceptionTypes) {
-    return toStatement().elseDo(observer, exceptionTypes);
+  public boolean isCancelled() {
+    return false;
   }
 
-  @NotNull
-  public AsyncStatement<Iterable<V>> elseIf(
-      @NotNull final Mapper<? super Throwable, ? extends AsyncStatement<? extends Iterable<V>>>
-          mapper,
-      @Nullable final Class<?>[] exceptionTypes) {
-    return toStatement().elseIf(mapper, exceptionTypes);
+  public boolean isEvaluating() {
+    synchronized (mMutex) {
+      return mIsEvaluated && (mState == StatementState.Evaluating);
+    }
   }
 
-  @NotNull
-  public <S> AsyncStatement<Iterable<V>> fork(
-      @NotNull final Forker<S, ? super AsyncStatement<Iterable<V>>, ? super Iterable<V>, ? super
-          AsyncResult<Iterable<V>>> forker) {
-    return toStatement().fork(forker);
+  public boolean isFailed() {
+    synchronized (mMutex) {
+      return (mState == StatementState.Failed);
+    }
   }
 
-  @NotNull
-  public <S> AsyncStatement<Iterable<V>> fork(
-      @Nullable final Mapper<? super AsyncStatement<Iterable<V>>, S> init,
-      @Nullable final ForkUpdater<S, ? super AsyncStatement<Iterable<V>>, ? super Iterable<V>>
-          value,
-      @Nullable final ForkUpdater<S, ? super AsyncStatement<Iterable<V>>, ? super Throwable>
-          failure,
-      @Nullable final ForkCompleter<S, ? super AsyncStatement<Iterable<V>>> done,
-      @Nullable final ForkUpdater<S, ? super AsyncStatement<Iterable<V>>, ? super
-          AsyncResult<Iterable<V>>> statement) {
-    return toStatement().fork(init, value, failure, done, statement);
+  public boolean isSet() {
+    synchronized (mMutex) {
+      return (mState == StatementState.Set);
+    }
+  }
+
+  public void to(@NotNull final AsyncResult<? super Iterable<V>> result) {
+    checkEvaluated();
+    yield(new CollectionYielder<V>() {
+
+      @Override
+      public ArrayList<V> failure(final ArrayList<V> stack, @NotNull final Throwable failure,
+          @NotNull final YieldResults<V> results) throws Exception {
+        result.fail(failure);
+        return null;
+      }
+
+      @Override
+      public ArrayList<V> value(final ArrayList<V> stack, final V value,
+          @NotNull final YieldResults<V> results) {
+        result.set(stack);
+        return stack;
+      }
+    });
+  }
+
+  @SuppressWarnings("unchecked")
+  public Iterable<V> value() {
+    synchronized (mMutex) {
+      if (!isSet()) {
+        throw new IllegalStateException("the statement is not set");
+      }
+
+      return (Iterable<V>) mHead.getValues();
+    }
   }
 
   @Nullable
@@ -701,18 +728,58 @@ class DefaultAsyncLoop<V> implements AsyncLoop<V>, Serializable {
 
   @Nullable
   public FailureException getFailure(final long timeout, @NotNull final TimeUnit timeUnit) {
-    return null;
+    checkSupported();
+    deadLockWarning(timeout);
+    final ChainHead<?> head = mHead;
+    synchronized (mMutex) {
+      try {
+        if (TimeUnits.waitUntil(mMutex, new Condition() {
+
+          public boolean isTrue() {
+            checkFinal();
+            return head.getState().isDone();
+          }
+        }, timeout, timeUnit)) {
+          return head.getFailure();
+        }
+
+      } catch (final InterruptedException e) {
+        throw new RuntimeInterruptedException(e);
+      }
+    }
+
+    throw new RuntimeTimeoutException(
+        "timeout while waiting for statement failure [" + timeout + " " + timeUnit + "]");
   }
 
   public Iterable<V> getValue() {
     return getValue(-1, TimeUnit.MILLISECONDS);
   }
 
+  @SuppressWarnings("unchecked")
   public Iterable<V> getValue(final long timeout, @NotNull final TimeUnit timeUnit) {
     checkSupported();
     deadLockWarning(timeout);
-    checkFinal();
-    return null;
+    final ChainHead<?> head = mHead;
+    synchronized (mMutex) {
+      try {
+        if (TimeUnits.waitUntil(mMutex, new Condition() {
+
+          public boolean isTrue() {
+            checkFinal();
+            return head.getState().isDone();
+          }
+        }, timeout, timeUnit)) {
+          return (Iterable<V>) head.getValues();
+        }
+
+      } catch (final InterruptedException e) {
+        throw new RuntimeInterruptedException(e);
+      }
+    }
+
+    throw new RuntimeTimeoutException(
+        "timeout while waiting for statement value [" + timeout + " " + timeUnit + "]");
   }
 
   public boolean isFinal() {
@@ -774,41 +841,6 @@ class DefaultAsyncLoop<V> implements AsyncLoop<V>, Serializable {
   }
 
   @NotNull
-  public Throwable failure() {
-    return null;
-  }
-
-  public boolean isCancelled() {
-    return false;
-  }
-
-  public boolean isEvaluating() {
-    synchronized (mMutex) {
-      return mIsEvaluated && (mState == StatementState.Evaluating);
-    }
-  }
-
-  public boolean isFailed() {
-    synchronized (mMutex) {
-      return (mState == StatementState.Failed);
-    }
-  }
-
-  public boolean isSet() {
-    synchronized (mMutex) {
-      return (mState == StatementState.Set);
-    }
-  }
-
-  public void to(@NotNull final AsyncResult<? super Iterable<V>> result) {
-    // TODO: 02/02/2018 yielder
-  }
-
-  public Iterable<V> value() {
-    return null;
-  }
-
-  @NotNull
   private <R> AsyncLoop<R> chain(@NotNull final AsyncStatementHandler<V, R> handler) {
     return chain(new ChainStatementHandler<V, R>(handler), mExecutor, mExecutor);
   }
@@ -862,6 +894,11 @@ class DefaultAsyncLoop<V> implements AsyncLoop<V>, Serializable {
 
     ((LoopChain<?, Object>) mTail).setNext((LoopChain<Object, V>) chain);
     return loop;
+  }
+
+  @NotNull
+  private <R> AsyncLoop<R> chainOrdered(@NotNull final AsyncLoopHandler<V, R> handler) {
+    return chain(new ChainLoopHandlerOrdered<V, R>(handler), mExecutor, mExecutor);
   }
 
   @NotNull
@@ -1005,7 +1042,7 @@ class DefaultAsyncLoop<V> implements AsyncLoop<V>, Serializable {
     private ArrayList<SimpleState<V>> mStates = new ArrayList<SimpleState<V>>();
 
     @Nullable
-    public FailureException getException() {
+    public FailureException getFailure() {
       for (final SimpleState<V> state : mStates) {
         if (state.isFailed()) {
           return FailureException.wrap(state.failure());
@@ -1045,17 +1082,17 @@ class DefaultAsyncLoop<V> implements AsyncLoop<V>, Serializable {
     }
 
     @NotNull
-    DoubleQueue<V> getStates() {
-      final DoubleQueue<V> states = new DoubleQueue<V>();
+    List<V> getValues() {
+      final ArrayList<V> values = new ArrayList<V>();
       for (final SimpleState<V> state : mStates) {
         if (state.isFailed()) {
           throw FailureException.wrap(state.failure());
         }
 
-        states.add(state.value());
+        values.add(state.value());
       }
 
-      return states;
+      return values;
     }
 
     void innerAddFailure(@NotNull final Throwable failure) {
@@ -2320,140 +2357,6 @@ class DefaultAsyncLoop<V> implements AsyncLoop<V>, Serializable {
     }
   }
 
-  private static class ChainYielder<S, V, R> extends LoopChain<V, R> implements Serializable {
-
-    private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
-
-    private final ScheduledExecutor mExecutor;
-
-    private final YielderGenerator<R> mGenerator = new YielderGenerator<R>();
-
-    private final Yielder<S, V, R> mYielder;
-
-    private boolean mIsFailed;
-
-    private boolean mIsInitialized;
-
-    private S mStack;
-
-    private ChainYielder(@NotNull final Yielder<S, V, R> yielder) {
-      mYielder = ConstantConditions.notNull("yielder", yielder);
-      mExecutor = ScheduledExecutors.withThrottling(ScheduledExecutors.immediateExecutor(), 1);
-    }
-
-    private static class YielderGenerator<V> implements YieldResults<V> {
-
-      private final AtomicBoolean mIsSet = new AtomicBoolean();
-
-      private volatile LoopChain<V, ?> mNext;
-
-      @NotNull
-      public YieldResults<V> yieldFailure(@NotNull final Throwable failure) {
-        checkSet();
-        return null;
-      }
-
-      @NotNull
-      public YieldResults<V> yieldFailures(@Nullable final Iterable<Throwable> failures) {
-        checkSet();
-        return null;
-      }
-
-      @NotNull
-      public YieldResults<V> yieldIf(@NotNull final AsyncStatement<V> statement) {
-        checkSet();
-        return null;
-      }
-
-      @NotNull
-      public YieldResults<V> yieldLoop(@NotNull final AsyncLoop<V> loop) {
-        checkSet();
-        return null;
-      }
-
-      @NotNull
-      public YieldResults<V> yieldValue(final V value) {
-        checkSet();
-        return null;
-      }
-
-      @NotNull
-      public YieldResults<V> yieldValues(@Nullable final Iterable<V> value) {
-        checkSet();
-        return null;
-      }
-
-      private void checkSet() {
-        if (mIsSet.get()) {
-          throw new IllegalStateException("loop has already complete");
-        }
-      }
-
-      private void set() {
-        mIsSet.set(true);
-      }
-
-      @NotNull
-      private YielderGenerator<V> withNext(final LoopChain<V, ?> next) {
-        mNext = next;
-        return this;
-      }
-    }
-
-    void addFailure(final LoopChain<R, ?> next, @NotNull final Throwable failure) {
-      mExecutor.execute(new Runnable() {
-
-        public void run() {
-          if (mIsFailed) {
-            getLogger().wrn(failure, "Suppressed failure");
-            return;
-          }
-
-          try {
-            final Yielder<S, V, R> yielder = mYielder;
-            if (!mIsInitialized) {
-              mIsInitialized = true;
-              mStack = yielder.init();
-            }
-
-            mStack = yielder.failure(mStack, failure, mGenerator.withNext(next));
-
-          } catch (final CancellationException e) {
-            getLogger().wrn(e, "Loop has been cancelled");
-            mIsInitialized = true;
-            next.failSafe(e);
-
-          } catch (final Throwable t) {
-            getLogger().err(t, "Error while processing failure with reason: %s", failure);
-            mIsInitialized = true;
-            next.failSafe(RuntimeInterruptedException.wrapIfInterrupt(t));
-          }
-        }
-      });
-    }
-
-    void addFailures(final LoopChain<R, ?> next, @NotNull final Iterable<Throwable> failures) {
-
-    }
-
-    void addValue(final LoopChain<R, ?> next, final V input) {
-
-    }
-
-    void addValues(final LoopChain<R, ?> next, @NotNull final Iterable<V> inputs) {
-
-    }
-
-    @NotNull
-    LoopChain<V, R> copy() {
-      return new ChainYielder<S, V, R>(mYielder);
-    }
-
-    void set(final LoopChain<R, ?> next) {
-
-    }
-  }
-
   private static class ForkObserver<S, V>
       implements RenewableObserver<AsyncResultCollection<V>>, Serializable {
 
@@ -2584,7 +2487,7 @@ class DefaultAsyncLoop<V> implements AsyncLoop<V>, Serializable {
                 });
                 return null;
               }
-            }).forEachCatch(new Mapper<Throwable, Void>() {
+            }).elseForEach(new Mapper<Throwable, Void>() {
 
               public Void apply(final Throwable throwable) {
                 mExecutor.execute(new Runnable() {
@@ -3010,9 +2913,9 @@ class DefaultAsyncLoop<V> implements AsyncLoop<V>, Serializable {
     private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
 
     private LoopProxy(final Observer<AsyncResultCollection<?>> observer, final boolean isEvaluated,
-        final ScheduledExecutor executor, final LogPrinter printer, final Level logLevel,
+        final ScheduledExecutor executor, final LogPrinter printer, final Level level,
         final List<LoopChain<?, ?>> chains) {
-      super(proxy(observer), isEvaluated, executor, printer, logLevel, chains);
+      super(proxy(observer), isEvaluated, executor, printer, level, chains);
     }
 
     @NotNull

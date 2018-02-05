@@ -50,6 +50,11 @@
         <Bug pattern="NP_NULL_ON_SOME_PATH_FROM_RETURN_VALUE"/>
     </Match>
     <Match>
+        <Class name="dm.jail.DefaultAsyncLoop"/>
+        <Method name="failure"/>
+        <Bug pattern="NP_NULL_ON_SOME_PATH_FROM_RETURN_VALUE"/>
+    </Match>
+    <Match>
         <Package name="~dm\.james.*"/>
         <Bug code="Se,SnVI,RI,Wa,BC,DLS,Eq,NP"/>
     </Match>

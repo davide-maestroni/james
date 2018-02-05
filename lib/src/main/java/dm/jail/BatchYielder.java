@@ -18,16 +18,20 @@ package dm.jail;
 
 import org.jetbrains.annotations.NotNull;
 
+import java.io.Serializable;
 import java.util.ArrayList;
 
 import dm.jail.async.AsyncLoop.YieldResults;
 import dm.jail.async.AsyncLoop.Yielder;
+import dm.jail.config.BuildConfig;
 import dm.jail.util.ConstantConditions;
 
 /**
  * Created by davide-maestroni on 02/04/2018.
  */
-class BatchYielder<V> implements Yielder<ArrayList<V>, V, V> {
+class BatchYielder<V> implements Yielder<ArrayList<V>, V, V>, Serializable {
+
+  private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
 
   private final int mMaxBatch;
 

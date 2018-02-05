@@ -17,6 +17,7 @@
 package dm.jail.log;
 
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 
 import java.io.PrintWriter;
 import java.io.StringWriter;
@@ -68,5 +69,18 @@ public class LogPrinters {
   @NotNull
   public static LogPrinter systemPrinter() {
     return SystemLogPrinter.instance();
+  }
+
+  @NotNull
+  public static LogPrinter withFilter(@NotNull final LogFilter filter,
+      @NotNull final LogPrinter printer) {
+    // TODO: 05/02/2018 implement
+    return null;
+  }
+
+  public interface LogFilter {
+
+    @Nullable
+    String apply(@NotNull Object context, @Nullable String message, @Nullable Throwable throwable);
   }
 }

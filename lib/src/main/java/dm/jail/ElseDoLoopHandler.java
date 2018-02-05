@@ -21,6 +21,7 @@ import org.jetbrains.annotations.Nullable;
 
 import java.io.InvalidObjectException;
 import java.io.ObjectStreamException;
+import java.io.Serializable;
 import java.util.Arrays;
 
 import dm.jail.async.AsyncResultCollection;
@@ -33,7 +34,7 @@ import dm.jail.util.SerializableProxy;
 /**
  * Created by davide-maestroni on 02/01/2018.
  */
-class ElseDoLoopHandler<V> extends AsyncLoopHandler<V, V> {
+class ElseDoLoopHandler<V> extends AsyncLoopHandler<V, V> implements Serializable {
 
   private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
 

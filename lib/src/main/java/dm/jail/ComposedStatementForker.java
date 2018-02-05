@@ -94,37 +94,7 @@ class ComposedStatementForker<S, V>
 
   @NotNull
   private Object writeReplace() throws ObjectStreamException {
-    return new BuffererProxy<S, V>(mInit, mValue, mFailure, mDone, mStatement);
-  }
-
-  private static class BuffererProxy<S, V> extends SerializableProxy {
-
-    private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
-
-    private BuffererProxy(final Mapper<? super AsyncStatement<V>, S> init,
-        final ForkUpdater<S, ? super AsyncStatement<V>, ? super V> value,
-        final ForkUpdater<S, ? super AsyncStatement<V>, ? super Throwable> failure,
-        final ForkCompleter<S, ? super AsyncStatement<V>> done,
-        final ForkUpdater<S, ? super AsyncStatement<V>, ? super AsyncResult<? extends V>>
-            statement) {
-      super(proxy(init), proxy(value), proxy(failure), proxy(done), proxy(statement));
-    }
-
-    @NotNull
-    @SuppressWarnings("unchecked")
-    Object readResolve() throws ObjectStreamException {
-      try {
-        final Object[] args = deserializeArgs();
-        return new ComposedStatementForker<S, V>((Mapper<? super AsyncStatement<V>, S>) args[0],
-            (ForkUpdater<S, ? super AsyncStatement<V>, ? super V>) args[1],
-            (ForkUpdater<S, ? super AsyncStatement<V>, ? super Throwable>) args[2],
-            (ForkCompleter<S, ? super AsyncStatement<V>>) args[3],
-            (ForkUpdater<S, ? super AsyncStatement<V>, ? super AsyncResult<? extends V>>) args[4]);
-
-      } catch (final Throwable t) {
-        throw new InvalidObjectException(t.getMessage());
-      }
-    }
+    return new ForkerProxy<S, V>(mInit, mValue, mFailure, mDone, mStatement);
   }
 
   private static class DefaultComplete<S, V>
@@ -195,6 +165,36 @@ class ComposedStatementForker<S, V>
 
     public S update(@NotNull final AsyncStatement<V> statement, final S stack, final I input) {
       return stack;
+    }
+  }
+
+  private static class ForkerProxy<S, V> extends SerializableProxy {
+
+    private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
+
+    private ForkerProxy(final Mapper<? super AsyncStatement<V>, S> init,
+        final ForkUpdater<S, ? super AsyncStatement<V>, ? super V> value,
+        final ForkUpdater<S, ? super AsyncStatement<V>, ? super Throwable> failure,
+        final ForkCompleter<S, ? super AsyncStatement<V>> done,
+        final ForkUpdater<S, ? super AsyncStatement<V>, ? super AsyncResult<? extends V>>
+            statement) {
+      super(proxy(init), proxy(value), proxy(failure), proxy(done), proxy(statement));
+    }
+
+    @NotNull
+    @SuppressWarnings("unchecked")
+    Object readResolve() throws ObjectStreamException {
+      try {
+        final Object[] args = deserializeArgs();
+        return new ComposedStatementForker<S, V>((Mapper<? super AsyncStatement<V>, S>) args[0],
+            (ForkUpdater<S, ? super AsyncStatement<V>, ? super V>) args[1],
+            (ForkUpdater<S, ? super AsyncStatement<V>, ? super Throwable>) args[2],
+            (ForkCompleter<S, ? super AsyncStatement<V>>) args[3],
+            (ForkUpdater<S, ? super AsyncStatement<V>, ? super AsyncResult<? extends V>>) args[4]);
+
+      } catch (final Throwable t) {
+        throw new InvalidObjectException(t.getMessage());
+      }
     }
   }
 }

@@ -18,19 +18,15 @@ package dm.jail;
 
 import org.jetbrains.annotations.NotNull;
 
-import java.io.Serializable;
-
 import dm.jail.async.AsyncResult;
-import dm.jail.config.BuildConfig;
 
 /**
  * Created by davide-maestroni on 01/14/2018.
  */
-class AsyncStatementHandler<V, R> implements Serializable {
+class AsyncStatementHandler<V, R> {
 
-  private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
-
-  void failure(@NotNull final Throwable failure, @NotNull final AsyncResult<R> result) throws Exception {
+  void failure(@NotNull final Throwable failure, @NotNull final AsyncResult<R> result) throws
+      Exception {
     result.fail(failure);
   }
 

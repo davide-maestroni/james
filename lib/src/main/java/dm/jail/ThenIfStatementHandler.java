@@ -20,6 +20,7 @@ import org.jetbrains.annotations.NotNull;
 
 import java.io.InvalidObjectException;
 import java.io.ObjectStreamException;
+import java.io.Serializable;
 
 import dm.jail.async.AsyncResult;
 import dm.jail.async.AsyncStatement;
@@ -31,7 +32,7 @@ import dm.jail.util.SerializableProxy;
 /**
  * Created by davide-maestroni on 02/01/2018.
  */
-class ThenIfStatementHandler<V, R> extends AsyncStatementHandler<V, R> {
+class ThenIfStatementHandler<V, R> extends AsyncStatementHandler<V, R> implements Serializable {
 
   private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
 

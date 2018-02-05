@@ -17,70 +17,64 @@
 package dm.jail;
 
 import org.jetbrains.annotations.NotNull;
-import org.jetbrains.annotations.Nullable;
 
 import java.io.InvalidObjectException;
 import java.io.ObjectStreamException;
 import java.io.Serializable;
+import java.util.ArrayList;
+import java.util.Arrays;
 
-import dm.jail.async.AsyncResultCollection;
+import dm.jail.async.AsyncLoop.YieldResults;
 import dm.jail.async.Observer;
 import dm.jail.config.BuildConfig;
 import dm.jail.util.ConstantConditions;
-import dm.jail.util.Iterables;
 import dm.jail.util.SerializableProxy;
 
 /**
- * Created by davide-maestroni on 02/01/2018.
+ * Created by davide-maestroni on 02/05/2018.
  */
-class ThenDoLoopHandler<V, R> extends AsyncLoopHandler<V, R> implements Serializable {
+class ElseDoYielder<V> extends CollectionYielder<V> implements Serializable {
 
   private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
 
-  private final Observer<? super V> mObserver;
+  private final Observer<? super Throwable> mObserver;
 
-  ThenDoLoopHandler(@NotNull final Observer<? super V> observer) {
+  private final Class<?>[] mTypes;
+
+  ElseDoYielder(@NotNull final Observer<? super Throwable> observer,
+      @NotNull final Class<?>[] exceptionTypes) {
     mObserver = ConstantConditions.notNull("observer", observer);
-  }
-
-  @Override
-  void addValue(final V value, @NotNull final AsyncResultCollection<R> results) throws Exception {
-    mObserver.accept(value);
-    super.addValue(value, results);
-  }
-
-  @Override
-  @SuppressWarnings("unchecked")
-  void addValues(@Nullable final Iterable<V> values,
-      @NotNull final AsyncResultCollection<R> results) throws Exception {
-    if (values == null) {
-      return;
+    mTypes = ConstantConditions.notNull("exception types", exceptionTypes);
+    if (Arrays.asList(mTypes).contains(null)) {
+      throw new NullPointerException("exception type array contains null values");
     }
+  }
 
-    int index = 0;
-    try {
-      final Observer<? super V> observer = mObserver;
-      for (final V value : values) {
-        observer.accept(value);
-        ++index;
+  @Override
+  public ArrayList<V> failure(final ArrayList<V> stack, @NotNull final Throwable failure,
+      @NotNull final YieldResults<V> results) throws Exception {
+    for (final Class<?> type : mTypes) {
+      if (type.isInstance(failure)) {
+        mObserver.accept(failure);
+        break;
       }
-
-    } finally {
-      results.addValues((Iterable<R>) Iterables.asList(values).subList(0, index)).set();
     }
+
+    return super.failure(stack, failure, results);
   }
 
   @NotNull
   private Object writeReplace() throws ObjectStreamException {
-    return new HandlerProxy<V, R>(mObserver);
+    return new HandlerProxy<V>(mObserver, mTypes);
   }
 
-  private static class HandlerProxy<V, R> extends SerializableProxy {
+  private static class HandlerProxy<V> extends SerializableProxy {
 
     private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
 
-    private HandlerProxy(final Observer<? super V> observer) {
-      super(proxy(observer));
+    private HandlerProxy(final Observer<? super Throwable> mapper,
+        final Class<?>[] exceptionTypes) {
+      super(proxy(mapper), exceptionTypes);
     }
 
     @NotNull
@@ -88,7 +82,7 @@ class ThenDoLoopHandler<V, R> extends AsyncLoopHandler<V, R> implements Serializ
     Object readResolve() throws ObjectStreamException {
       try {
         final Object[] args = deserializeArgs();
-        return new ThenDoLoopHandler<V, R>((Observer<? super V>) args[0]);
+        return new ElseDoYielder<V>((Observer<? super Throwable>) args[0], (Class<?>[]) args[1]);
 
       } catch (final Throwable t) {
         throw new InvalidObjectException(t.getMessage());

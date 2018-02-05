@@ -398,8 +398,11 @@ class DefaultAsyncStatement<V> implements AsyncStatement<V>, Serializable {
 
   @NotNull
   public AsyncStatement<V> on(@NotNull final ScheduledExecutor executor) {
-    return chain(new ChainHandler<V, V>(new ExecutorStatementHandler<V>(executor)), mExecutor,
-        executor);
+    final Logger logger = mLogger;
+    return chain(new ChainHandler<V, V>(
+            new ExecutorStatementHandler<V>(executor, logger.getLogPrinter(), logger.getLogLevel
+                ())),
+        mExecutor, executor);
   }
 
   @NotNull
@@ -1262,9 +1265,9 @@ class DefaultAsyncStatement<V> implements AsyncStatement<V>, Serializable {
     private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
 
     private StatementProxy(final Observer<AsyncResult<?>> observer, final boolean isEvaluated,
-        final ScheduledExecutor executor, final LogPrinter printer, final Level logLevel,
+        final ScheduledExecutor executor, final LogPrinter printer, final Level level,
         final List<StatementChain<?, ?>> chains) {
-      super(proxy(observer), isEvaluated, executor, printer, logLevel, chains);
+      super(proxy(observer), isEvaluated, executor, printer, level, chains);
     }
 
     @NotNull

@@ -37,6 +37,9 @@ import static dm.jail.util.Reflections.asArgs;
 @SuppressWarnings("WeakerAccess")
 public class Logger {
 
+  // TODO: 05/02/2018 single context?
+  // TODO: 05/02/2018 print context object ID + detect outer class
+
   private static final int DEBUG_LEVEL = Level.DEBUG.ordinal();
 
   private static final Locale DEFAULT_LOCALE = Locale.ENGLISH;

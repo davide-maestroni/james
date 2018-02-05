@@ -17,34 +17,32 @@
 package dm.jail;
 
 import org.jetbrains.annotations.NotNull;
-import org.jetbrains.annotations.Nullable;
 
 import java.io.InvalidObjectException;
 import java.io.ObjectStreamException;
 import java.io.Serializable;
+import java.util.ArrayList;
 import java.util.Arrays;
 
-import dm.jail.async.AsyncResult;
-import dm.jail.async.AsyncStatement;
+import dm.jail.async.AsyncLoop.YieldResults;
 import dm.jail.async.Mapper;
 import dm.jail.config.BuildConfig;
 import dm.jail.util.ConstantConditions;
 import dm.jail.util.SerializableProxy;
 
 /**
- * Created by davide-maestroni on 02/01/2018.
+ * Created by davide-maestroni on 02/05/2018.
  */
-class ElseIfStatementHandler<V> extends AsyncStatementHandler<V, V> implements Serializable {
+class ElseCatchYielder<V> extends CollectionYielder<V> implements Serializable {
 
   private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
 
-  private final Mapper<? super Throwable, ? extends AsyncStatement<? extends V>> mMapper;
+  private final Mapper<? super Throwable, ? extends Iterable<V>> mMapper;
 
   private final Class<?>[] mTypes;
 
-  ElseIfStatementHandler(
-      @NotNull final Mapper<? super Throwable, ? extends AsyncStatement<? extends V>> mapper,
-      @Nullable final Class<?>[] exceptionTypes) {
+  ElseCatchYielder(@NotNull final Mapper<? super Throwable, ? extends Iterable<V>> mapper,
+      @NotNull final Class<?>[] exceptionTypes) {
     mMapper = ConstantConditions.notNull("mapper", mapper);
     mTypes = ConstantConditions.notNull("exception types", exceptionTypes);
     if (Arrays.asList(mTypes).contains(null)) {
@@ -53,16 +51,16 @@ class ElseIfStatementHandler<V> extends AsyncStatementHandler<V, V> implements S
   }
 
   @Override
-  void failure(@NotNull final Throwable failure, @NotNull final AsyncResult<V> result) throws
-      Exception {
+  public ArrayList<V> failure(final ArrayList<V> stack, @NotNull final Throwable failure,
+      @NotNull final YieldResults<V> results) throws Exception {
     for (final Class<?> type : mTypes) {
       if (type.isInstance(failure)) {
-        mMapper.apply(failure).to(result);
-        return;
+        results.yieldValues(mMapper.apply(failure));
+        return null;
       }
     }
 
-    super.failure(failure, result);
+    return super.failure(stack, failure, results);
   }
 
   @NotNull
@@ -74,8 +72,7 @@ class ElseIfStatementHandler<V> extends AsyncStatementHandler<V, V> implements S
 
     private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
 
-    private HandlerProxy(
-        final Mapper<? super Throwable, ? extends AsyncStatement<? extends V>> mapper,
+    private HandlerProxy(final Mapper<? super Throwable, ? extends Iterable<V>> mapper,
         final Class<?>[] exceptionTypes) {
       super(proxy(mapper), exceptionTypes);
     }
@@ -85,8 +82,7 @@ class ElseIfStatementHandler<V> extends AsyncStatementHandler<V, V> implements S
     Object readResolve() throws ObjectStreamException {
       try {
         final Object[] args = deserializeArgs();
-        return new ElseIfStatementHandler<V>(
-            (Mapper<? super Throwable, ? extends AsyncStatement<? extends V>>) args[0],
+        return new ElseCatchYielder<V>((Mapper<? super Throwable, ? extends Iterable<V>>) args[0],
             (Class<?>[]) args[1]);
 
       } catch (final Throwable t) {
