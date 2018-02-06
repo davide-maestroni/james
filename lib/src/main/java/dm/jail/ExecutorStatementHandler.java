@@ -28,7 +28,7 @@ import dm.jail.async.AsyncResult;
 import dm.jail.config.BuildConfig;
 import dm.jail.executor.ScheduledExecutor;
 import dm.jail.log.LogPrinter;
-import dm.jail.log.LogPrinter.Level;
+import dm.jail.log.LogLevel;
 import dm.jail.log.Logger;
 import dm.jail.util.ConstantConditions;
 
@@ -44,7 +44,7 @@ class ExecutorStatementHandler<V> extends AsyncStatementHandler<V, V> implements
   private final Logger mLogger;
 
   ExecutorStatementHandler(@NotNull final ScheduledExecutor executor,
-      @Nullable final LogPrinter printer, @Nullable final Level level) {
+      @Nullable final LogPrinter printer, @Nullable final LogLevel level) {
     mExecutor = ConstantConditions.notNull("executor", executor);
     mLogger = Logger.newLogger(printer, level, this);
   }
@@ -94,21 +94,21 @@ class ExecutorStatementHandler<V> extends AsyncStatementHandler<V, V> implements
 
     private final ScheduledExecutor mExecutor;
 
-    private final Level mLevel;
+    private final LogLevel mLogLevel;
 
-    private final LogPrinter mPrinter;
+    private final LogPrinter mLogPrinter;
 
     private HandlerProxy(final ScheduledExecutor executor, final LogPrinter printer,
-        final Level level) {
+        final LogLevel level) {
       mExecutor = executor;
-      mPrinter = printer;
-      mLevel = level;
+      mLogPrinter = printer;
+      mLogLevel = level;
     }
 
     @NotNull
     Object readResolve() throws ObjectStreamException {
       try {
-        return new ExecutorStatementHandler<V>(mExecutor, mPrinter, mLevel);
+        return new ExecutorStatementHandler<V>(mExecutor, mLogPrinter, mLogLevel);
 
       } catch (final Throwable t) {
         throw new InvalidObjectException(t.getMessage());

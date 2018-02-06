@@ -30,6 +30,11 @@ class AsyncStatementHandler<V, R> {
     result.fail(failure);
   }
 
+  @NotNull
+  AsyncStatementHandler<V, R> renew() {
+    return this;
+  }
+
   @SuppressWarnings("unchecked")
   void value(final V value, @NotNull final AsyncResult<R> result) throws Exception {
     result.set((R) value);

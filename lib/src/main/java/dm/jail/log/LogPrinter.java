@@ -73,38 +73,4 @@ public interface LogPrinter {
    * @param throwable the optional throwable or null.
    */
   void wrn(@NotNull List<Object> contexts, @Nullable String message, @Nullable Throwable throwable);
-
-  /**
-   * LogPrinter levels enumeration from more to less verbose.
-   */
-  enum Level {
-
-    /**
-     * The most verbose log level.
-     * <br>
-     * Debug logs are meant to describe in detail what's happening inside the routine.
-     */
-    DEBUG,
-
-    /**
-     * The medium log level.
-     * <br>
-     * Warning logs are meant to notify events that are not completely unexpected, but might be a
-     * clue that something wrong is happening.
-     */
-    WARNING,
-
-    /**
-     * The least verbose level.
-     * <br>
-     * Error logs notify unexpected events that are clearly an exception in the normal code
-     * execution.
-     */
-    ERROR,
-
-    /**
-     * Silences all the logs.
-     */
-    SILENT
-  }
 }

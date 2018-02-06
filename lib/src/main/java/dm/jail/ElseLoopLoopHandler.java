@@ -68,7 +68,7 @@ class ElseLoopLoopHandler<V> extends AsyncLoopHandler<V, V> implements Serializa
   }
 
   @Override
-  void addFailures(@Nullable final Iterable<Throwable> failures,
+  void addFailures(@Nullable final Iterable<? extends Throwable> failures,
       @NotNull final AsyncResultCollection<V> results) throws Exception {
     if (failures == null) {
       return;

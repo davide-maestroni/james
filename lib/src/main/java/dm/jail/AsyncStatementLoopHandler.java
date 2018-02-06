@@ -30,6 +30,11 @@ class AsyncStatementLoopHandler<V, R> {
     results.addFailure(failure).set();
   }
 
+  @NotNull
+  AsyncStatementLoopHandler<V, R> renew() {
+    return this;
+  }
+
   @SuppressWarnings("unchecked")
   void value(final V value, @NotNull final AsyncResultCollection<R> results) throws Exception {
     results.addValue((R) value).set();

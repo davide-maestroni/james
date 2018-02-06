@@ -32,10 +32,6 @@ import dm.jail.executor.ScheduledExecutor;
  */
 public interface AsyncLoop<V> extends AsyncStatement<Iterable<V>>, Serializable {
 
-  // TODO: 04/02/2018 forEachElse* => forEachCatch* (??)
-  // TODO: 04/02/2018 forEachCatch => elseForEach
-  // TODO: 04/02/2018 orderedForEach* => forEachOrdered
-
   @NotNull
   <S> AsyncLoop<V> backoffOn(@NotNull ScheduledExecutor executor,
       @NotNull Backoffer<S, V> backoffer);

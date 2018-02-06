@@ -49,7 +49,7 @@ class ThenLoopHandler<V, R> extends AsyncLoopHandler<V, R> implements Serializab
   }
 
   @Override
-  void addValues(@Nullable final Iterable<V> values,
+  void addValues(@Nullable final Iterable<? extends V> values,
       @NotNull final AsyncResultCollection<R> results) throws Exception {
     if (values == null) {
       return;

@@ -28,13 +28,13 @@ public interface AsyncResultCollection<V> {
   AsyncResultCollection<V> addFailure(@NotNull Throwable failure);
 
   @NotNull
-  AsyncResultCollection<V> addFailures(@Nullable Iterable<Throwable> failures);
+  AsyncResultCollection<V> addFailures(@Nullable Iterable<? extends Throwable> failures);
 
   @NotNull
   AsyncResultCollection<V> addValue(V value);
 
   @NotNull
-  AsyncResultCollection<V> addValues(@Nullable Iterable<V> values);
+  AsyncResultCollection<V> addValues(@Nullable Iterable<? extends V> values);
 
   void set();
 }

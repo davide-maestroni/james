@@ -31,7 +31,7 @@ class AsyncLoopHandler<V, R> {
     results.addFailure(failure).set();
   }
 
-  void addFailures(@Nullable final Iterable<Throwable> failures,
+  void addFailures(@Nullable final Iterable<? extends Throwable> failures,
       @NotNull final AsyncResultCollection<R> results) throws Exception {
     results.addFailures(failures).set();
   }
@@ -42,9 +42,14 @@ class AsyncLoopHandler<V, R> {
   }
 
   @SuppressWarnings("unchecked")
-  void addValues(@Nullable final Iterable<V> values,
+  void addValues(@Nullable final Iterable<? extends V> values,
       @NotNull final AsyncResultCollection<R> results) throws Exception {
     results.addValues((Iterable<R>) values).set();
+  }
+
+  @NotNull
+  AsyncLoopHandler<V, R> renew() {
+    return this;
   }
 
   void set(@NotNull final AsyncResultCollection<R> results) throws Exception {

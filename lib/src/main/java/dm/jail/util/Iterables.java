@@ -65,6 +65,25 @@ public class Iterables {
     return toSet(iterable);
   }
 
+  public static boolean contains(@NotNull final Iterable<?> iterable, final Object element) {
+    if (element != null) {
+      for (final Object object : iterable) {
+        if ((object == element) || element.equals(object)) {
+          return true;
+        }
+      }
+
+    } else {
+      for (final Object object : iterable) {
+        if (object == null) {
+          return true;
+        }
+      }
+    }
+
+    return false;
+  }
+
   public static <T> T first(@NotNull final Iterable<T> iterable) {
     return get(iterable, 0);
   }

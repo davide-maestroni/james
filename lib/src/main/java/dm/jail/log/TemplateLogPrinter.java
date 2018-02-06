@@ -61,7 +61,7 @@ public abstract class TemplateLogPrinter implements LogPrinter, Serializable {
         }
       };
 
-  private static String format(@NotNull final Level level, @NotNull final List<Object> contexts,
+  private static String format(@NotNull final LogLevel level, @NotNull final List<Object> contexts,
       @Nullable final String message) {
     return String.format(DEFAULT_LOCALE, FORMAT_LOG, sDateFormatter.get().format(new Date()),
         Thread.currentThread().getName(), contexts.toString(), level, message);
@@ -69,17 +69,17 @@ public abstract class TemplateLogPrinter implements LogPrinter, Serializable {
 
   public void dbg(@NotNull final List<Object> contexts, @Nullable final String message,
       @Nullable final Throwable throwable) {
-    log(Level.DEBUG, contexts, message, throwable);
+    log(LogLevel.DEBUG, contexts, message, throwable);
   }
 
   public void err(@NotNull final List<Object> contexts, @Nullable final String message,
       @Nullable final Throwable throwable) {
-    log(Level.ERROR, contexts, message, throwable);
+    log(LogLevel.ERROR, contexts, message, throwable);
   }
 
   public void wrn(@NotNull final List<Object> contexts, @Nullable final String message,
       @Nullable final Throwable throwable) {
-    log(Level.WARNING, contexts, message, throwable);
+    log(LogLevel.WARNING, contexts, message, throwable);
   }
 
   /**
@@ -90,7 +90,7 @@ public abstract class TemplateLogPrinter implements LogPrinter, Serializable {
    * @param message   the log message.
    * @param throwable the related exception.
    */
-  protected void log(@NotNull final Level level, @NotNull final List<Object> contexts,
+  protected void log(@NotNull final LogLevel level, @NotNull final List<Object> contexts,
       @Nullable final String message, @Nullable final Throwable throwable) {
     String formatted = format(level, contexts, message);
     if (throwable != null) {

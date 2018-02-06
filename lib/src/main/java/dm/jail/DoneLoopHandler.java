@@ -53,7 +53,7 @@ class DoneLoopHandler<V> extends AsyncLoopHandler<V, V> implements Serializable 
 
   @Override
   @SuppressWarnings("WhileLoopReplaceableByForEach")
-  void addFailures(@Nullable final Iterable<Throwable> failures,
+  void addFailures(@Nullable final Iterable<? extends Throwable> failures,
       @NotNull final AsyncResultCollection<V> results) throws Exception {
     if (failures == null) {
       return;
@@ -62,7 +62,7 @@ class DoneLoopHandler<V> extends AsyncLoopHandler<V, V> implements Serializable 
     int index = 0;
     try {
       final Action action = mAction;
-      final Iterator<Throwable> iterator = failures.iterator();
+      final Iterator<? extends Throwable> iterator = failures.iterator();
       while (iterator.hasNext()) {
         iterator.next();
         action.perform();
@@ -82,7 +82,7 @@ class DoneLoopHandler<V> extends AsyncLoopHandler<V, V> implements Serializable 
 
   @Override
   @SuppressWarnings("WhileLoopReplaceableByForEach")
-  void addValues(@Nullable final Iterable<V> values,
+  void addValues(@Nullable final Iterable<? extends V> values,
       @NotNull final AsyncResultCollection<V> results) throws Exception {
     if (values == null) {
       return;
@@ -91,7 +91,7 @@ class DoneLoopHandler<V> extends AsyncLoopHandler<V, V> implements Serializable 
     int index = 0;
     try {
       final Action action = mAction;
-      final Iterator<V> iterator = values.iterator();
+      final Iterator<? extends V> iterator = values.iterator();
       while (iterator.hasNext()) {
         iterator.next();
         action.perform();

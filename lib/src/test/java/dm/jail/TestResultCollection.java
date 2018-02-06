@@ -39,7 +39,8 @@ class TestResultCollection<V> implements AsyncResultCollection<V> {
   }
 
   @NotNull
-  public AsyncResultCollection<V> addFailures(@Nullable final Iterable<Throwable> failures) {
+  public AsyncResultCollection<V> addFailures(
+      @Nullable final Iterable<? extends Throwable> failures) {
     if (failures != null) {
       for (final Throwable failure : failures) {
         mStates.add(SimpleState.<V>ofFailure(failure));
@@ -56,7 +57,7 @@ class TestResultCollection<V> implements AsyncResultCollection<V> {
   }
 
   @NotNull
-  public AsyncResultCollection<V> addValues(@Nullable final Iterable<V> values) {
+  public AsyncResultCollection<V> addValues(@Nullable final Iterable<? extends V> values) {
     if (values != null) {
       for (final V value : values) {
         mStates.add(SimpleState.ofValue(value));

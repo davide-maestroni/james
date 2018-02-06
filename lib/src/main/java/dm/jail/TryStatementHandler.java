@@ -28,7 +28,7 @@ import dm.jail.async.AsyncResult;
 import dm.jail.async.Mapper;
 import dm.jail.config.BuildConfig;
 import dm.jail.log.LogPrinter;
-import dm.jail.log.LogPrinter.Level;
+import dm.jail.log.LogLevel;
 import dm.jail.log.Logger;
 import dm.jail.util.ConstantConditions;
 import dm.jail.util.SerializableProxy;
@@ -48,7 +48,7 @@ class TryStatementHandler<V, R> extends AsyncStatementHandler<V, R> implements S
 
   TryStatementHandler(@NotNull final Mapper<? super V, ? extends Closeable> closeable,
       @NotNull final AsyncStatementHandler<V, R> handler, @Nullable final LogPrinter printer,
-      @Nullable final Level level) {
+      @Nullable final LogLevel level) {
     mCloseable = ConstantConditions.notNull("closeable", closeable);
     mHandler = ConstantConditions.notNull("handler", handler);
     mLogger = Logger.newLogger(printer, level, this);
@@ -77,7 +77,7 @@ class TryStatementHandler<V, R> extends AsyncStatementHandler<V, R> implements S
     private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
 
     private HandlerProxy(final Mapper<? super V, ? extends Closeable> closeable,
-        final AsyncStatementHandler<V, R> handler, final LogPrinter printer, final Level level) {
+        final AsyncStatementHandler<V, R> handler, final LogPrinter printer, final LogLevel level) {
       super(proxy(closeable), handler, printer, level);
     }
 
@@ -87,7 +87,7 @@ class TryStatementHandler<V, R> extends AsyncStatementHandler<V, R> implements S
       try {
         final Object[] args = deserializeArgs();
         return new TryStatementHandler<V, R>((Mapper<? super V, ? extends Closeable>) args[0],
-            (AsyncStatementHandler<V, R>) args[1], (LogPrinter) args[2], (Level) args[3]);
+            (AsyncStatementHandler<V, R>) args[1], (LogPrinter) args[2], (LogLevel) args[3]);
 
       } catch (final Throwable t) {
         throw new InvalidObjectException(t.getMessage());

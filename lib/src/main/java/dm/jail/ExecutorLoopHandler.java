@@ -27,8 +27,8 @@ import java.util.concurrent.CancellationException;
 import dm.jail.async.AsyncResultCollection;
 import dm.jail.config.BuildConfig;
 import dm.jail.executor.ScheduledExecutor;
+import dm.jail.log.LogLevel;
 import dm.jail.log.LogPrinter;
-import dm.jail.log.LogPrinter.Level;
 import dm.jail.log.Logger;
 import dm.jail.util.ConstantConditions;
 
@@ -44,7 +44,7 @@ class ExecutorLoopHandler<V> extends AsyncLoopHandler<V, V> implements Serializa
   private final Logger mLogger;
 
   ExecutorLoopHandler(@NotNull final ScheduledExecutor executor, @Nullable final LogPrinter printer,
-      @Nullable final Level level) {
+      @Nullable final LogLevel level) {
     mExecutor = ConstantConditions.notNull("executor", executor);
     mLogger = Logger.newLogger(printer, level, this);
   }
@@ -72,7 +72,7 @@ class ExecutorLoopHandler<V> extends AsyncLoopHandler<V, V> implements Serializa
   }
 
   @Override
-  void addFailures(@Nullable final Iterable<Throwable> failures,
+  void addFailures(@Nullable final Iterable<? extends Throwable> failures,
       @NotNull final AsyncResultCollection<V> results) {
     mExecutor.execute(new HandlerRunnable(results) {
 
@@ -95,7 +95,7 @@ class ExecutorLoopHandler<V> extends AsyncLoopHandler<V, V> implements Serializa
   }
 
   @Override
-  void addValues(@Nullable final Iterable<V> values,
+  void addValues(@Nullable final Iterable<? extends V> values,
       @NotNull final AsyncResultCollection<V> results) {
     mExecutor.execute(new HandlerRunnable(results) {
 
@@ -118,21 +118,21 @@ class ExecutorLoopHandler<V> extends AsyncLoopHandler<V, V> implements Serializa
 
     private final ScheduledExecutor mExecutor;
 
-    private final Level mLevel;
+    private final LogLevel mLogLevel;
 
-    private final LogPrinter mPrinter;
+    private final LogPrinter mLogPrinter;
 
     private HandlerProxy(final ScheduledExecutor executor, final LogPrinter printer,
-        final Level level) {
+        final LogLevel level) {
       mExecutor = executor;
-      mPrinter = printer;
-      mLevel = level;
+      mLogPrinter = printer;
+      mLogLevel = level;
     }
 
     @NotNull
     Object readResolve() throws ObjectStreamException {
       try {
-        return new ExecutorLoopHandler<V>(mExecutor, mPrinter, mLevel);
+        return new ExecutorLoopHandler<V>(mExecutor, mLogPrinter, mLogLevel);
 
       } catch (final Throwable t) {
         throw new InvalidObjectException(t.getMessage());

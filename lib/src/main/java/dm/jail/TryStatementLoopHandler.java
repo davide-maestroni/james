@@ -28,7 +28,7 @@ import dm.jail.async.AsyncResultCollection;
 import dm.jail.async.Mapper;
 import dm.jail.config.BuildConfig;
 import dm.jail.log.LogPrinter;
-import dm.jail.log.LogPrinter.Level;
+import dm.jail.log.LogLevel;
 import dm.jail.log.Logger;
 import dm.jail.util.ConstantConditions;
 import dm.jail.util.SerializableProxy;
@@ -49,7 +49,7 @@ class TryStatementLoopHandler<V, R> extends AsyncStatementLoopHandler<V, R>
 
   TryStatementLoopHandler(@NotNull final Mapper<? super V, ? extends Closeable> closeable,
       @NotNull final AsyncStatementLoopHandler<V, R> handler, @Nullable final LogPrinter printer,
-      @Nullable final Level level) {
+      @Nullable final LogLevel level) {
     mCloseable = ConstantConditions.notNull("closeable", closeable);
     mHandler = ConstantConditions.notNull("handler", handler);
     mLogger = Logger.newLogger(printer, level, this);
@@ -79,7 +79,7 @@ class TryStatementLoopHandler<V, R> extends AsyncStatementLoopHandler<V, R>
 
     private HandlerProxy(final Mapper<? super V, ? extends Closeable> closeable,
         final AsyncStatementLoopHandler<V, R> handler, final LogPrinter printer,
-        final Level level) {
+        final LogLevel level) {
       super(proxy(closeable), handler, printer, level);
     }
 
@@ -89,7 +89,7 @@ class TryStatementLoopHandler<V, R> extends AsyncStatementLoopHandler<V, R>
       try {
         final Object[] args = deserializeArgs();
         return new TryStatementLoopHandler<V, R>((Mapper<? super V, ? extends Closeable>) args[0],
-            (AsyncStatementLoopHandler<V, R>) args[1], (LogPrinter) args[2], (Level) args[3]);
+            (AsyncStatementLoopHandler<V, R>) args[1], (LogPrinter) args[2], (LogLevel) args[3]);
 
       } catch (final Throwable t) {
         throw new InvalidObjectException(t.getMessage());

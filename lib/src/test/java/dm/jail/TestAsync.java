@@ -20,9 +20,11 @@ import org.jetbrains.annotations.NotNull;
 import org.junit.Test;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.concurrent.TimeUnit;
 
 import dm.jail.async.AsyncResult;
+import dm.jail.async.AsyncResultCollection;
 import dm.jail.async.AsyncState;
 import dm.jail.async.AsyncStatement;
 import dm.jail.async.AsyncStatement.Forker;
@@ -30,7 +32,7 @@ import dm.jail.async.Mapper;
 import dm.jail.async.Observer;
 import dm.jail.async.SimpleState;
 import dm.jail.executor.ScheduledExecutors;
-import dm.jail.log.LogPrinter.Level;
+import dm.jail.log.LogLevel;
 import dm.jail.log.LogPrinters;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -119,6 +121,16 @@ public class TestAsync {
   }
 
   @Test
+  public void bbb() {
+    assertThat(new Async().loop(new Observer<AsyncResultCollection<Object>>() {
+
+      public void accept(final AsyncResultCollection<Object> results) {
+        results.addFailures(Collections.<Throwable>singletonList(null)).set();
+      }
+    }).isFailed()).isTrue();
+  }
+
+  @Test
   public void constructor() {
     new Async();
   }
@@ -140,7 +152,7 @@ public class TestAsync {
   @Test
   public void immutable() {
     final Async async = new Async();
-    assertThat(async.log(Level.SILENT)).isNotSameAs(async);
+    assertThat(async.log(LogLevel.SILENT)).isNotSameAs(async);
     assertThat(async.log(LogPrinters.nullPrinter())).isNotSameAs(async);
     assertThat(async.on(ScheduledExecutors.immediateExecutor())).isNotSameAs(async);
   }
@@ -148,7 +160,7 @@ public class TestAsync {
   @Test
   public void logLevelDebug() {
     final TestLogPrinter logPrinter = new TestLogPrinter();
-    new Async().log(logPrinter).log(Level.DEBUG).value(null).then(new Mapper<Object, Object>() {
+    new Async().log(logPrinter).log(LogLevel.DEBUG).value(null).then(new Mapper<Object, Object>() {
 
       public Object apply(final Object input) throws Exception {
         throw new Exception();
@@ -162,7 +174,7 @@ public class TestAsync {
   @Test
   public void logLevelError() {
     final TestLogPrinter logPrinter = new TestLogPrinter();
-    new Async().log(logPrinter).log(Level.ERROR).value(null).then(new Mapper<Object, Object>() {
+    new Async().log(logPrinter).log(LogLevel.ERROR).value(null).then(new Mapper<Object, Object>() {
 
       public Object apply(final Object input) throws Exception {
         throw new Exception();
@@ -176,7 +188,7 @@ public class TestAsync {
   @Test
   public void logLevelSilent() {
     final TestLogPrinter logPrinter = new TestLogPrinter();
-    new Async().log(logPrinter).log(Level.SILENT).value(null).then(new Mapper<Object, Object>() {
+    new Async().log(logPrinter).log(LogLevel.SILENT).value(null).then(new Mapper<Object, Object>() {
 
       public Object apply(final Object input) throws Exception {
         throw new Exception();
@@ -190,7 +202,7 @@ public class TestAsync {
   @Test
   public void logLevelWarning() {
     final TestLogPrinter logPrinter = new TestLogPrinter();
-    new Async().log(logPrinter).log(Level.WARNING).value(null).then(new Mapper<Object, Object>() {
+    new Async().log(logPrinter).log(LogLevel.WARNING).value(null).then(new Mapper<Object, Object>() {
 
       public Object apply(final Object input) throws Exception {
         throw new Exception();

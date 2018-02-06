@@ -30,7 +30,7 @@ import dm.jail.async.AsyncStatement;
 import dm.jail.async.Mapper;
 import dm.jail.config.BuildConfig;
 import dm.jail.log.LogPrinter;
-import dm.jail.log.LogPrinter.Level;
+import dm.jail.log.LogLevel;
 import dm.jail.log.Logger;
 import dm.jail.util.ConstantConditions;
 import dm.jail.util.SerializableProxy;
@@ -50,7 +50,7 @@ class TryIfStatementHandler<V, R> extends AsyncStatementHandler<V, R> implements
 
   TryIfStatementHandler(@NotNull final Mapper<? super V, ? extends Closeable> closeable,
       @NotNull final Mapper<? super V, ? extends AsyncStatement<R>> mapper,
-      @Nullable final LogPrinter printer, @Nullable final Level level) {
+      @Nullable final LogPrinter printer, @Nullable final LogLevel level) {
     mCloseable = ConstantConditions.notNull("closeable", closeable);
     mMapper = ConstantConditions.notNull("mapper", mapper);
     mLogger = Logger.newLogger(printer, level, this);
@@ -79,7 +79,7 @@ class TryIfStatementHandler<V, R> extends AsyncStatementHandler<V, R> implements
 
     private HandlerProxy(final Mapper<? super V, ? extends Closeable> closeable,
         final Mapper<? super V, ? extends AsyncStatement<R>> mapper, final LogPrinter printer,
-        final Level level) {
+        final LogLevel level) {
       super(proxy(closeable), proxy(mapper), printer, level);
     }
 
@@ -90,7 +90,7 @@ class TryIfStatementHandler<V, R> extends AsyncStatementHandler<V, R> implements
         final Object[] args = deserializeArgs();
         return new TryIfStatementHandler<V, R>((Mapper<? super V, ? extends Closeable>) args[0],
             (Mapper<? super V, ? extends AsyncStatement<R>>) args[1], (LogPrinter) args[2],
-            (Level) args[3]);
+            (LogLevel) args[3]);
 
       } catch (final Throwable t) {
         throw new InvalidObjectException(t.getMessage());

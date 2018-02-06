@@ -48,7 +48,7 @@ class ToResultLoopHandler<V> extends AsyncLoopHandler<V, Void> implements Serial
   }
 
   @Override
-  void addFailures(@Nullable final Iterable<Throwable> failures,
+  void addFailures(@Nullable final Iterable<? extends Throwable> failures,
       @NotNull final AsyncResultCollection<Void> results) {
     mResults.addFailures(failures);
   }
@@ -59,7 +59,7 @@ class ToResultLoopHandler<V> extends AsyncLoopHandler<V, Void> implements Serial
   }
 
   @Override
-  void addValues(@Nullable final Iterable<V> values,
+  void addValues(@Nullable final Iterable<? extends V> values,
       @NotNull final AsyncResultCollection<Void> results) {
     mResults.addValues(values);
   }

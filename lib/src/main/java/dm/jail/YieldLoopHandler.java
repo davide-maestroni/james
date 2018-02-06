@@ -34,8 +34,8 @@ import dm.jail.async.AsyncStatement;
 import dm.jail.async.RuntimeInterruptedException;
 import dm.jail.config.BuildConfig;
 import dm.jail.executor.ScheduledExecutor;
+import dm.jail.log.LogLevel;
 import dm.jail.log.LogPrinter;
-import dm.jail.log.LogPrinter.Level;
 import dm.jail.log.Logger;
 import dm.jail.util.ConstantConditions;
 import dm.jail.util.SerializableProxy;
@@ -65,7 +65,7 @@ class YieldLoopHandler<S, V, R> extends AsyncLoopHandler<V, R> implements Serial
   private S mStack;
 
   YieldLoopHandler(@NotNull final Yielder<S, ? super V, R> yielder,
-      @Nullable final LogPrinter printer, @Nullable final Level level) {
+      @Nullable final LogPrinter printer, @Nullable final LogLevel level) {
     mYielder = ConstantConditions.notNull("yielder", yielder);
     mExecutor = withThrottling(immediateExecutor(), 1);
     mLogger = Logger.newLogger(printer, level, this);
@@ -84,7 +84,7 @@ class YieldLoopHandler<S, V, R> extends AsyncLoopHandler<V, R> implements Serial
   }
 
   @Override
-  void addFailures(@Nullable final Iterable<Throwable> failures,
+  void addFailures(@Nullable final Iterable<? extends Throwable> failures,
       @NotNull final AsyncResultCollection<R> results) {
     if (failures == null) {
       return;
@@ -114,7 +114,7 @@ class YieldLoopHandler<S, V, R> extends AsyncLoopHandler<V, R> implements Serial
   }
 
   @Override
-  void addValues(@Nullable final Iterable<V> values,
+  void addValues(@Nullable final Iterable<? extends V> values,
       @NotNull final AsyncResultCollection<R> results) {
     if (values == null) {
       return;
@@ -130,6 +130,13 @@ class YieldLoopHandler<S, V, R> extends AsyncLoopHandler<V, R> implements Serial
         }
       }
     });
+  }
+
+  @NotNull
+  @Override
+  AsyncLoopHandler<V, R> renew() {
+    final Logger logger = mLogger;
+    return new YieldLoopHandler<S, V, R>(mYielder, logger.getLogPrinter(), logger.getLogLevel());
   }
 
   @Override
@@ -171,7 +178,7 @@ class YieldLoopHandler<S, V, R> extends AsyncLoopHandler<V, R> implements Serial
     private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
 
     private HandlerProxy(final Yielder<S, ? super V, R> yielder, final LogPrinter printer,
-        final Level level) {
+        final LogLevel level) {
       super(proxy(yielder), printer, level);
     }
 
@@ -181,7 +188,7 @@ class YieldLoopHandler<S, V, R> extends AsyncLoopHandler<V, R> implements Serial
       try {
         final Object[] args = deserializeArgs();
         return new YieldLoopHandler<S, V, R>((Yielder<S, ? super V, R>) args[0],
-            (LogPrinter) args[1], (Level) args[2]);
+            (LogPrinter) args[1], (LogLevel) args[2]);
 
       } catch (final Throwable t) {
         throw new InvalidObjectException(t.getMessage());
@@ -240,7 +247,7 @@ class YieldLoopHandler<S, V, R> extends AsyncLoopHandler<V, R> implements Serial
 
           @NotNull
           public AsyncResultCollection<V> addFailures(
-              @Nullable final Iterable<Throwable> failures) {
+              @Nullable final Iterable<? extends Throwable> failures) {
             mResults.addFailures(failures);
             return this;
           }
@@ -252,7 +259,7 @@ class YieldLoopHandler<S, V, R> extends AsyncLoopHandler<V, R> implements Serial
           }
 
           @NotNull
-          public AsyncResultCollection<V> addValues(@Nullable final Iterable<V> values) {
+          public AsyncResultCollection<V> addValues(@Nullable final Iterable<? extends V> values) {
             mResults.addValues(values);
             return this;
           }

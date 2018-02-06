@@ -31,6 +31,8 @@ import dm.jail.executor.ScheduledExecutor;
  */
 public interface AsyncStatement<V> extends AsyncState<V>, Future<V>, Serializable {
 
+  void consume();
+
   @NotNull
   AsyncStatement<V> elseCatch(@NotNull Mapper<? super Throwable, ? extends V> mapper,
       @Nullable Class<?>... exceptionTypes);

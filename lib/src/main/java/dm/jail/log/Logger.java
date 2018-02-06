@@ -24,7 +24,6 @@ import java.util.List;
 import java.util.Locale;
 import java.util.concurrent.atomic.AtomicReference;
 
-import dm.jail.log.LogPrinter.Level;
 import dm.jail.util.ConstantConditions;
 
 import static dm.jail.util.Reflections.asArgs;
@@ -40,15 +39,16 @@ public class Logger {
   // TODO: 05/02/2018 single context?
   // TODO: 05/02/2018 print context object ID + detect outer class
 
-  private static final int DEBUG_LEVEL = Level.DEBUG.ordinal();
+  private static final int DEBUG_LEVEL = LogLevel.DEBUG.ordinal();
 
   private static final Locale DEFAULT_LOCALE = Locale.ENGLISH;
 
-  private static final int ERROR_LEVEL = Level.ERROR.ordinal();
+  private static final int ERROR_LEVEL = LogLevel.ERROR.ordinal();
 
-  private static final int WARNING_LEVEL = Level.WARNING.ordinal();
+  private static final int WARNING_LEVEL = LogLevel.WARNING.ordinal();
 
-  private static final AtomicReference<Level> sLogLevel = new AtomicReference<Level>(Level.ERROR);
+  private static final AtomicReference<LogLevel> sLogLevel =
+      new AtomicReference<LogLevel>(LogLevel.ERROR);
 
   private static final AtomicReference<LogPrinter> sLogPrinter =
       new AtomicReference<LogPrinter>(LogPrinters.systemPrinter());
@@ -59,7 +59,7 @@ public class Logger {
 
   private final int mLevel;
 
-  private final Level mLogLevel;
+  private final LogLevel mLogLevel;
 
   private final LogPrinter mLogPrinter;
 
@@ -71,7 +71,7 @@ public class Logger {
    * @param level    the log level.
    */
   private Logger(@NotNull final Object[] contexts, @Nullable final LogPrinter printer,
-      @Nullable final Level level) {
+      @Nullable final LogLevel level) {
     mContexts = contexts.clone();
     mLogPrinter = (printer == null) ? sLogPrinter.get() : printer;
     mLogLevel = (level == null) ? sLogLevel.get() : level;
@@ -85,7 +85,7 @@ public class Logger {
    * @return the log level.
    */
   @NotNull
-  public static Level getDefaultLevel() {
+  public static LogLevel getDefaultLevel() {
     return sLogLevel.get();
   }
 
@@ -94,7 +94,7 @@ public class Logger {
    *
    * @param level the log level.
    */
-  public static void setDefaultLevel(@NotNull final Level level) {
+  public static void setDefaultLevel(@NotNull final LogLevel level) {
     sLogLevel.set(ConstantConditions.notNull("level", level));
   }
 
@@ -126,7 +126,7 @@ public class Logger {
    * @return the new logger.
    */
   @NotNull
-  public static Logger newLogger(@Nullable final LogPrinter printer, @Nullable final Level level,
+  public static Logger newLogger(@Nullable final LogPrinter printer, @Nullable final LogLevel level,
       @NotNull final Object context) {
     return new Logger(asArgs(ConstantConditions.notNull("context", context)), printer, level);
   }
@@ -513,7 +513,7 @@ public class Logger {
    * @return the log level.
    */
   @NotNull
-  public Level getLogLevel() {
+  public LogLevel getLogLevel() {
     return mLogLevel;
   }
 
@@ -545,7 +545,7 @@ public class Logger {
     return new Logger(newContexts, mLogPrinter, mLogLevel);
   }
 
-  public boolean willPrint(@NotNull final Level level) {
+  public boolean willPrint(@NotNull final LogLevel level) {
     return (mLevel <= level.ordinal());
   }
 

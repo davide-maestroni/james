@@ -47,11 +47,11 @@ class ThenLoopLoopHandler<V, R> extends AsyncLoopHandler<V, R> implements Serial
   @Override
   @SuppressWarnings("unchecked")
   void addValue(final V value, @NotNull final AsyncResultCollection<R> results) throws Exception {
-    results.addValues((Iterable<R>) mMapper.apply(value)).set();
+    results.addValues(mMapper.apply(value)).set();
   }
 
   @Override
-  void addValues(@Nullable final Iterable<V> values,
+  void addValues(@Nullable final Iterable<? extends V> values,
       @NotNull final AsyncResultCollection<R> results) throws Exception {
     if (values == null) {
       return;

@@ -144,6 +144,20 @@ public class TestAsyncStatement {
   }
 
   @Test
+  public void consumeFailure() {
+    final AsyncStatement<String> statement = new Async().failure(new Exception("test"));
+    statement.consume();
+    assertThat(statement.isDone()).isTrue();
+  }
+
+  @Test
+  public void consumeValue() {
+    final AsyncStatement<String> statement = new Async().value("test");
+    statement.consume();
+    assertThat(statement.isDone()).isTrue();
+  }
+
+  @Test
   public void creation() {
     final AsyncStatement<String> statement =
         new Async().statement(new Observer<AsyncResult<String>>() {
@@ -1350,6 +1364,21 @@ public class TestAsyncStatement {
     @SuppressWarnings("unchecked") final AsyncStatement<String> deserialized =
         (AsyncStatement<String>) objectInputStream.readObject();
     assertThat(deserialized.getValue()).isEqualTo("TEST");
+  }
+
+  @Test
+  public void serializePartial() throws IOException, ClassNotFoundException {
+    final AsyncStatement<String> statement = new Async().value("test");
+    statement.then(new ToUpper());
+    final ByteArrayOutputStream byteOutputStream = new ByteArrayOutputStream();
+    final ObjectOutputStream objectOutputStream = new ObjectOutputStream(byteOutputStream);
+    objectOutputStream.writeObject(statement);
+    final ByteArrayInputStream byteInputStream =
+        new ByteArrayInputStream(byteOutputStream.toByteArray());
+    final ObjectInputStream objectInputStream = new ObjectInputStream(byteInputStream);
+    @SuppressWarnings("unchecked") final AsyncStatement<String> deserialized =
+        (AsyncStatement<String>) objectInputStream.readObject();
+    assertThat(deserialized.getValue()).isEqualTo("test");
   }
 
   @Test
