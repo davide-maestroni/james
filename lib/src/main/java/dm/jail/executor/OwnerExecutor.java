@@ -21,4 +21,6 @@ import java.util.concurrent.Executor;
 /**
  * Created by davide-maestroni on 02/07/2018.
  */
-public interface OwnerExecutor extends Executor, ThreadOwner {}
+public interface OwnerExecutor extends Executor, ThreadOwner {
+  
+}

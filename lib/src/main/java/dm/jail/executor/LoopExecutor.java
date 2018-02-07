@@ -31,7 +31,7 @@ import dm.jail.config.BuildConfig;
  * <p>
  * Created by davide-maestroni on 09/18/2014.
  */
-class LoopExecutor extends SyncExecutor implements OwnerExecutor, Serializable {
+class LoopExecutor implements OwnerExecutor, Serializable {
 
   private static final LoopExecutor sInstance = new LoopExecutor();
 
@@ -50,6 +50,10 @@ class LoopExecutor extends SyncExecutor implements OwnerExecutor, Serializable {
 
   public void execute(@NotNull final Runnable command) {
     LocalExecutor.run(command);
+  }
+
+  public boolean isOwnedThread() {
+    return false;
   }
 
   @NotNull

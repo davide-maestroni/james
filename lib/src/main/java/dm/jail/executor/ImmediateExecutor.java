@@ -35,7 +35,7 @@ import dm.jail.config.BuildConfig;
  * <p>
  * Created by davide-maestroni on 05/13/2016.
  */
-class ImmediateExecutor extends SyncExecutor implements OwnerExecutor, Serializable {
+class ImmediateExecutor implements OwnerExecutor, Serializable {
 
   private static final ImmediateExecutor sInstance = new ImmediateExecutor();
 
@@ -54,6 +54,10 @@ class ImmediateExecutor extends SyncExecutor implements OwnerExecutor, Serializa
 
   public void execute(@NotNull final Runnable command) {
     command.run();
+  }
+
+  public boolean isOwnedThread() {
+    return false;
   }
 
   @NotNull
