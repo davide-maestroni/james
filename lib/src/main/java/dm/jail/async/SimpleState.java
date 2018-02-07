@@ -55,7 +55,7 @@ public abstract class SimpleState<V> implements AsyncState<V>, Serializable {
     return (SimpleState<V>) SettledState.sInstance;
   }
 
-  public abstract void addTo(@NotNull AsyncResultCollection<? super V> results);
+  public abstract void addTo(@NotNull AsyncResults<? super V> results);
 
   private static class FailureState<V> extends SimpleState<V> {
 
@@ -67,7 +67,7 @@ public abstract class SimpleState<V> implements AsyncState<V>, Serializable {
       mFailure = ConstantConditions.notNull("failure", failure);
     }
 
-    public void addTo(@NotNull final AsyncResultCollection<? super V> results) {
+    public void addTo(@NotNull final AsyncResults<? super V> results) {
       results.addFailure(mFailure);
     }
 
@@ -112,7 +112,7 @@ public abstract class SimpleState<V> implements AsyncState<V>, Serializable {
       return sInstance;
     }
 
-    public void addTo(@NotNull final AsyncResultCollection<? super V> results) {
+    public void addTo(@NotNull final AsyncResults<? super V> results) {
       throw new UnsupportedOperationException();
     }
 
@@ -157,7 +157,7 @@ public abstract class SimpleState<V> implements AsyncState<V>, Serializable {
       return sInstance;
     }
 
-    public void addTo(@NotNull final AsyncResultCollection<? super V> results) {
+    public void addTo(@NotNull final AsyncResults<? super V> results) {
       throw new UnsupportedOperationException();
     }
 
@@ -201,7 +201,7 @@ public abstract class SimpleState<V> implements AsyncState<V>, Serializable {
       mValue = value;
     }
 
-    public void addTo(@NotNull final AsyncResultCollection<? super V> results) {
+    public void addTo(@NotNull final AsyncResults<? super V> results) {
       results.addValue(mValue);
     }
 

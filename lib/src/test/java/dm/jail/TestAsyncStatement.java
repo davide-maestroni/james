@@ -50,8 +50,8 @@ import dm.jail.log.LogPrinters;
 import dm.jail.log.Logger;
 import dm.jail.util.ConstantConditions;
 
-import static dm.jail.executor.ScheduledExecutors.backgroundExecutor;
-import static dm.jail.executor.ScheduledExecutors.withDelay;
+import static dm.jail.executor.ExecutorPool.backgroundExecutor;
+import static dm.jail.executor.ExecutorPool.withDelay;
 import static java.util.concurrent.TimeUnit.SECONDS;
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -198,7 +198,7 @@ public class TestAsyncStatement {
   @Test
   public void doneOn() {
     final AsyncStatement<String> statement =
-        new Async().on(withDelay(backgroundExecutor(), 100, TimeUnit.MILLISECONDS)).value("test");
+        new Async().on(withDelay(100, TimeUnit.MILLISECONDS, backgroundExecutor())).value("test");
     statement.waitDone();
     assertThat(statement.isDone()).isTrue();
   }
@@ -394,7 +394,7 @@ public class TestAsyncStatement {
 
               public AsyncStatement<Integer> apply(final Throwable input) {
                 return new Async().value(input.getMessage().length())
-                                  .on(withDelay(backgroundExecutor(), 100, TimeUnit.MILLISECONDS));
+                                  .on(withDelay(100, TimeUnit.MILLISECONDS, backgroundExecutor()));
               }
             });
     assertThat(statement.getValue()).isEqualTo(4);
@@ -408,7 +408,7 @@ public class TestAsyncStatement {
 
               public AsyncStatement<Integer> apply(final Throwable input) {
                 return new Async().value(input.getMessage().length())
-                                  .on(withDelay(backgroundExecutor(), 100, TimeUnit.MILLISECONDS));
+                                  .on(withDelay(100, TimeUnit.MILLISECONDS, backgroundExecutor()));
               }
             }, IllegalStateException.class);
     assertThat(statement.getValue()).isEqualTo(4);
@@ -422,7 +422,7 @@ public class TestAsyncStatement {
 
               public AsyncStatement<Integer> apply(final Throwable input) {
                 return new Async().value(input.getMessage().length())
-                                  .on(withDelay(backgroundExecutor(), 100, TimeUnit.MILLISECONDS));
+                                  .on(withDelay(100, TimeUnit.MILLISECONDS, backgroundExecutor()));
               }
             }, IOException.class);
     assertThat(ConstantConditions.notNull(statement.getFailure()).getCause()).isExactlyInstanceOf(
@@ -512,7 +512,7 @@ public class TestAsyncStatement {
   public void evaluate() {
     final Random random = new Random();
     final AsyncStatement<Float> statement =
-        new Async().on(withDelay(backgroundExecutor(), 100, TimeUnit.MILLISECONDS))
+        new Async().on(withDelay(100, TimeUnit.MILLISECONDS, backgroundExecutor()))
                    .statement(new Observer<AsyncResult<Float>>() {
 
                      public void accept(final AsyncResult<Float> result) {
@@ -576,14 +576,14 @@ public class TestAsyncStatement {
   @Test
   public void evaluating() {
     final AsyncStatement<String> statement =
-        new Async().value("test").on(withDelay(backgroundExecutor(), 1, TimeUnit.SECONDS));
+        new Async().value("test").on(withDelay(1, TimeUnit.SECONDS, backgroundExecutor()));
     assertThat(statement.isEvaluating()).isTrue();
   }
 
   @Test
   public void evaluatingBackground() {
     final AsyncStatement<String> statement =
-        new Async().value("test").on(withDelay(backgroundExecutor(), 1, TimeUnit.SECONDS));
+        new Async().value("test").on(withDelay(1, TimeUnit.SECONDS, backgroundExecutor()));
     assertThat(statement.isEvaluating()).isTrue();
   }
 
@@ -592,7 +592,7 @@ public class TestAsyncStatement {
     final AsyncStatement<String> statement = //
         new Async().unevaluated()
                    .value("test")
-                   .on(withDelay(backgroundExecutor(), 1, SECONDS))
+                   .on(withDelay(1, SECONDS, backgroundExecutor()))
                    .then(new Mapper<String, String>() {
 
                      public String apply(final String input) {
@@ -606,14 +606,14 @@ public class TestAsyncStatement {
   @Test(expected = IllegalStateException.class)
   public void evaluatingFailureException() {
     final AsyncStatement<String> statement = new Async().<String>failure(new Exception()).on(
-        withDelay(backgroundExecutor(), 1, TimeUnit.SECONDS));
+        withDelay(1, TimeUnit.SECONDS, backgroundExecutor()));
     ConstantConditions.notNull(statement.failure());
   }
 
   @Test
   public void evaluatingOn() {
     final AsyncStatement<String> statement =
-        new Async().on(withDelay(backgroundExecutor(), 1, TimeUnit.SECONDS)).value("test");
+        new Async().on(withDelay(1, TimeUnit.SECONDS, backgroundExecutor())).value("test");
     assertThat(statement.isEvaluating()).isTrue();
   }
 
@@ -622,7 +622,7 @@ public class TestAsyncStatement {
     final AsyncStatement<String> statement = //
         new Async().unevaluated()
                    .value("test")
-                   .on(withDelay(backgroundExecutor(), 1, SECONDS))
+                   .on(withDelay(1, SECONDS, backgroundExecutor()))
                    .then(new Mapper<String, String>() {
 
                      public String apply(final String input) {
@@ -635,7 +635,7 @@ public class TestAsyncStatement {
   @Test(expected = IllegalStateException.class)
   public void evaluatingValueException() {
     final AsyncStatement<String> statement =
-        new Async().value("test").on(withDelay(backgroundExecutor(), 1, TimeUnit.SECONDS));
+        new Async().value("test").on(withDelay(1, TimeUnit.SECONDS, backgroundExecutor()));
     statement.value();
   }
 
@@ -723,7 +723,7 @@ public class TestAsyncStatement {
   @Test
   public void forkCancel() {
     final AsyncStatement<String> statement = createStatementFork(
-        new Async().on(withDelay(backgroundExecutor(), 1, TimeUnit.SECONDS)).value("test"));
+        new Async().on(withDelay(1, TimeUnit.SECONDS, backgroundExecutor())).value("test"));
     assertThat(statement.isFinal()).isTrue();
     assertThat(statement.isDone()).isFalse();
     assertThat(statement.cancel(true)).isTrue();
@@ -755,7 +755,7 @@ public class TestAsyncStatement {
   @Test
   public void forkCancelForked() {
     final AsyncStatement<String> statement = createStatementFork(
-        new Async().on(withDelay(backgroundExecutor(), 1, TimeUnit.SECONDS)).value("test"));
+        new Async().on(withDelay(1, TimeUnit.SECONDS, backgroundExecutor())).value("test"));
     final AsyncStatement<String> forked = statement.then(new Mapper<String, String>() {
 
       public String apply(final String input) {
@@ -1058,14 +1058,14 @@ public class TestAsyncStatement {
   @Test
   public void get() throws ExecutionException, InterruptedException {
     final AsyncStatement<String> statement =
-        new Async().on(withDelay(backgroundExecutor(), 100, TimeUnit.MILLISECONDS)).value("test");
+        new Async().on(withDelay(100, TimeUnit.MILLISECONDS, backgroundExecutor())).value("test");
     assertThat(statement.get()).isEqualTo("test");
   }
 
   @Test(expected = CancellationException.class)
   public void getCancelled() throws ExecutionException, InterruptedException {
     final AsyncStatement<String> statement =
-        new Async().on(withDelay(backgroundExecutor(), 100, TimeUnit.MILLISECONDS)).value("test");
+        new Async().on(withDelay(100, TimeUnit.MILLISECONDS, backgroundExecutor())).value("test");
     assertThat(statement.cancel(true)).isTrue();
     statement.get();
   }
@@ -1074,7 +1074,7 @@ public class TestAsyncStatement {
   public void getCancelledWithTimeout() throws ExecutionException, InterruptedException,
       TimeoutException {
     final AsyncStatement<String> statement =
-        new Async().on(withDelay(backgroundExecutor(), 100, TimeUnit.MILLISECONDS)).value("test");
+        new Async().on(withDelay(100, TimeUnit.MILLISECONDS, backgroundExecutor())).value("test");
     assertThat(statement.cancel(true)).isTrue();
     statement.get(10, TimeUnit.MILLISECONDS);
   }
@@ -1082,7 +1082,7 @@ public class TestAsyncStatement {
   @Test(expected = ExecutionException.class)
   public void getFailure() throws ExecutionException, InterruptedException {
     final AsyncStatement<String> statement =
-        new Async().on(withDelay(backgroundExecutor(), 100, TimeUnit.MILLISECONDS))
+        new Async().on(withDelay(100, TimeUnit.MILLISECONDS, backgroundExecutor()))
                    .failure(new IllegalArgumentException());
     statement.get();
   }
@@ -1108,7 +1108,7 @@ public class TestAsyncStatement {
   public void getFailureTimeout() throws ExecutionException, InterruptedException,
       TimeoutException {
     final AsyncStatement<String> statement =
-        new Async().on(withDelay(backgroundExecutor(), 1, TimeUnit.SECONDS)).value("test");
+        new Async().on(withDelay(1, TimeUnit.SECONDS, backgroundExecutor())).value("test");
     assertThat(statement.getFailure(10, TimeUnit.MILLISECONDS));
   }
 
@@ -1116,7 +1116,7 @@ public class TestAsyncStatement {
   public void getFailureWithTimeout() throws ExecutionException, InterruptedException,
       TimeoutException {
     final AsyncStatement<String> statement =
-        new Async().on(withDelay(backgroundExecutor(), 100, TimeUnit.MILLISECONDS))
+        new Async().on(withDelay(100, TimeUnit.MILLISECONDS, backgroundExecutor()))
                    .failure(new IllegalArgumentException());
     statement.get(1, TimeUnit.SECONDS);
   }
@@ -1124,7 +1124,7 @@ public class TestAsyncStatement {
   @Test(expected = TimeoutException.class)
   public void getTimeout() throws ExecutionException, InterruptedException, TimeoutException {
     final AsyncStatement<String> statement =
-        new Async().on(withDelay(backgroundExecutor(), 1, TimeUnit.SECONDS)).value("test");
+        new Async().on(withDelay(1, TimeUnit.SECONDS, backgroundExecutor())).value("test");
     statement.get(10, TimeUnit.MILLISECONDS);
   }
 
@@ -1148,14 +1148,14 @@ public class TestAsyncStatement {
   @Test(expected = RuntimeTimeoutException.class)
   public void getValueTimeout() {
     final AsyncStatement<Object> statement =
-        new Async().value(null).on(withDelay(backgroundExecutor(), 1, TimeUnit.SECONDS));
+        new Async().value(null).on(withDelay(1, TimeUnit.SECONDS, backgroundExecutor()));
     statement.getValue(0, TimeUnit.MILLISECONDS);
   }
 
   @Test
   public void getWithTimeout() throws ExecutionException, InterruptedException, TimeoutException {
     final AsyncStatement<String> statement =
-        new Async().on(withDelay(backgroundExecutor(), 100, TimeUnit.MILLISECONDS)).value("test");
+        new Async().on(withDelay(100, TimeUnit.MILLISECONDS, backgroundExecutor())).value("test");
     assertThat(statement.get(1, TimeUnit.SECONDS)).isEqualTo("test");
   }
 
@@ -1535,7 +1535,7 @@ public class TestAsyncStatement {
   @Test
   public void stateCancelled() {
     final AsyncStatement<String> statement =
-        new Async().on(withDelay(backgroundExecutor(), 1, TimeUnit.SECONDS)).value("test");
+        new Async().on(withDelay(1, TimeUnit.SECONDS, backgroundExecutor())).value("test");
     statement.cancel(true);
     statement.waitDone();
     assertThat(statement.isCancelled()).isTrue();
@@ -1548,7 +1548,7 @@ public class TestAsyncStatement {
   @Test
   public void stateEvaluating() {
     final AsyncStatement<String> statement =
-        new Async().on(withDelay(backgroundExecutor(), 1, TimeUnit.SECONDS)).value("test");
+        new Async().on(withDelay(1, TimeUnit.SECONDS, backgroundExecutor())).value("test");
     assertThat(statement.isCancelled()).isFalse();
     assertThat(statement.isDone()).isFalse();
     assertThat(statement.isEvaluating()).isTrue();
@@ -1664,7 +1664,7 @@ public class TestAsyncStatement {
 
           public AsyncStatement<Integer> apply(final String input) {
             return new Async().value(input.length())
-                              .on(withDelay(backgroundExecutor(), 100, TimeUnit.MILLISECONDS));
+                              .on(withDelay(100, TimeUnit.MILLISECONDS, backgroundExecutor()));
           }
         });
     assertThat(statement.getValue()).isEqualTo(4);
@@ -1963,7 +1963,7 @@ public class TestAsyncStatement {
 
           public AsyncStatement<Integer> apply(final String input) {
             return new Async().value(input.length())
-                              .on(withDelay(backgroundExecutor(), 100, TimeUnit.MILLISECONDS));
+                              .on(withDelay(100, TimeUnit.MILLISECONDS, backgroundExecutor()));
           }
         });
     assertThat(statement.getValue()).isEqualTo(4);
@@ -1982,7 +1982,7 @@ public class TestAsyncStatement {
 
           public AsyncStatement<Integer> apply(final String input) {
             return new Async().value(input.length())
-                              .on(withDelay(backgroundExecutor(), 100, TimeUnit.MILLISECONDS));
+                              .on(withDelay(100, TimeUnit.MILLISECONDS, backgroundExecutor()));
           }
         });
     assertThat(statement.getFailure()).isNotNull();
@@ -2005,7 +2005,7 @@ public class TestAsyncStatement {
 
           public AsyncStatement<Integer> apply(final String input) {
             return new Async().value(input.length())
-                              .on(withDelay(backgroundExecutor(), 100, TimeUnit.MILLISECONDS));
+                              .on(withDelay(100, TimeUnit.MILLISECONDS, backgroundExecutor()));
           }
         });
     assertThat(statement.getFailure()).isNotNull();
@@ -2221,14 +2221,14 @@ public class TestAsyncStatement {
   @Test
   public void waitDoneOn() {
     final AsyncStatement<String> statement =
-        new Async().on(withDelay(backgroundExecutor(), 100, TimeUnit.MILLISECONDS)).value("test");
+        new Async().on(withDelay(100, TimeUnit.MILLISECONDS, backgroundExecutor())).value("test");
     assertThat(statement.waitDone(1, TimeUnit.SECONDS)).isTrue();
   }
 
   @Test
   public void waitDoneTimeout() {
     final AsyncStatement<Object> statement =
-        new Async().value(null).on(withDelay(backgroundExecutor(), 1, TimeUnit.SECONDS));
+        new Async().value(null).on(withDelay(1, TimeUnit.SECONDS, backgroundExecutor()));
     assertThat(statement.waitDone(1, TimeUnit.MILLISECONDS)).isFalse();
   }
 

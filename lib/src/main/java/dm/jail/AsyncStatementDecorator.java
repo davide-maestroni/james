@@ -21,6 +21,7 @@ import org.jetbrains.annotations.Nullable;
 
 import java.io.Closeable;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.Executor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
@@ -30,7 +31,6 @@ import dm.jail.async.AsyncStatement;
 import dm.jail.async.FailureException;
 import dm.jail.async.Mapper;
 import dm.jail.async.Observer;
-import dm.jail.executor.ScheduledExecutor;
 import dm.jail.util.ConstantConditions;
 
 /**
@@ -61,6 +61,10 @@ abstract class AsyncStatementDecorator<V> implements AsyncStatement<V> {
     return null;
   }
 
+  public void consume() {
+    mStatement.consume();
+  }
+
   @NotNull
   public AsyncStatement<V> elseCatch(@NotNull final Mapper<? super Throwable, ? extends V> mapper,
       @Nullable final Class<?>[] exceptionTypes) {
@@ -83,6 +87,11 @@ abstract class AsyncStatementDecorator<V> implements AsyncStatement<V> {
   @NotNull
   public AsyncStatement<V> evaluate() {
     return newInstance(mStatement.evaluate());
+  }
+
+  @NotNull
+  public AsyncStatement<V> evaluated() {
+    return newInstance(mStatement.evaluated());
   }
 
   @NotNull
@@ -124,7 +133,7 @@ abstract class AsyncStatementDecorator<V> implements AsyncStatement<V> {
   }
 
   @NotNull
-  public AsyncStatement<V> on(@NotNull final ScheduledExecutor executor) {
+  public AsyncStatement<V> on(@NotNull final Executor executor) {
     return newInstance(mStatement.on(executor));
   }
 

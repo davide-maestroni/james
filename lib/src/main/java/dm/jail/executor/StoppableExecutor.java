@@ -14,29 +14,20 @@
  * limitations under the License.
  */
 
-package dm.jail;
-
-import org.jetbrains.annotations.NotNull;
-
-import dm.jail.async.AsyncResults;
+package dm.jail.executor;
 
 /**
- * Created by davide-maestroni on 01/14/2018.
+ * Created by davide-maestroni on 02/07/2018.
  */
-class AsyncStatementLoopHandler<V, R> {
+public interface StoppableExecutor extends OwnerExecutor {
 
-  void failure(@NotNull final Throwable failure, @NotNull final AsyncResults<R> results) throws
-      Exception {
-    results.addFailure(failure).set();
-  }
-
-  @NotNull
-  AsyncStatementLoopHandler<V, R> renew() {
-    return this;
-  }
-
-  @SuppressWarnings("unchecked")
-  void value(final V value, @NotNull final AsyncResults<R> results) throws Exception {
-    results.addValue((R) value).set();
-  }
+  /**
+   * Stops the executor.
+   * <br>
+   * The method is meant to signal that the executor is no more needed. In fact, as a consequence of
+   * the call, pending commands might get discarded and the executor itself may become unusable.
+   * <br>
+   * The specific implementation can leverage the method to eventually free allocated resources.
+   */
+  void stop();
 }

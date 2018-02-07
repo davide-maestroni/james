@@ -25,7 +25,7 @@ import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.Arrays;
 
-import dm.jail.async.AsyncResultCollection;
+import dm.jail.async.AsyncResults;
 import dm.jail.async.Mapper;
 import dm.jail.config.BuildConfig;
 import dm.jail.util.ConstantConditions;
@@ -55,8 +55,8 @@ class ElseLoopLoopHandler<V> extends AsyncLoopHandler<V, V> implements Serializa
 
   @Override
   @SuppressWarnings("unchecked")
-  void addFailure(@NotNull final Throwable failure,
-      @NotNull final AsyncResultCollection<V> results) throws Exception {
+  void addFailure(@NotNull final Throwable failure, @NotNull final AsyncResults<V> results) throws
+      Exception {
     for (final Class<?> type : mTypes) {
       if (type.isInstance(failure)) {
         results.addValues((Iterable<V>) mMapper.apply(failure)).set();
@@ -69,7 +69,7 @@ class ElseLoopLoopHandler<V> extends AsyncLoopHandler<V, V> implements Serializa
 
   @Override
   void addFailures(@Nullable final Iterable<? extends Throwable> failures,
-      @NotNull final AsyncResultCollection<V> results) throws Exception {
+      @NotNull final AsyncResults<V> results) throws Exception {
     if (failures == null) {
       return;
     }

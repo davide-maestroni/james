@@ -24,14 +24,14 @@ import java.util.Collections;
 import java.util.concurrent.TimeUnit;
 
 import dm.jail.async.AsyncResult;
-import dm.jail.async.AsyncResultCollection;
+import dm.jail.async.AsyncResults;
 import dm.jail.async.AsyncState;
 import dm.jail.async.AsyncStatement;
 import dm.jail.async.AsyncStatement.Forker;
 import dm.jail.async.Mapper;
 import dm.jail.async.Observer;
 import dm.jail.async.SimpleState;
-import dm.jail.executor.ScheduledExecutors;
+import dm.jail.executor.ExecutorPool;
 import dm.jail.log.LogLevel;
 import dm.jail.log.LogPrinters;
 
@@ -122,9 +122,9 @@ public class TestAsync {
 
   @Test
   public void bbb() {
-    assertThat(new Async().loop(new Observer<AsyncResultCollection<Object>>() {
+    assertThat(new Async().loop(new Observer<AsyncResults<Object>>() {
 
-      public void accept(final AsyncResultCollection<Object> results) {
+      public void accept(final AsyncResults<Object> results) {
         results.addFailures(Collections.<Throwable>singletonList(null)).set();
       }
     }).isFailed()).isTrue();
@@ -154,7 +154,7 @@ public class TestAsync {
     final Async async = new Async();
     assertThat(async.log(LogLevel.SILENT)).isNotSameAs(async);
     assertThat(async.log(LogPrinters.nullPrinter())).isNotSameAs(async);
-    assertThat(async.on(ScheduledExecutors.immediateExecutor())).isNotSameAs(async);
+    assertThat(async.on(ExecutorPool.immediateExecutor())).isNotSameAs(async);
   }
 
   @Test
@@ -202,12 +202,16 @@ public class TestAsync {
   @Test
   public void logLevelWarning() {
     final TestLogPrinter logPrinter = new TestLogPrinter();
-    new Async().log(logPrinter).log(LogLevel.WARNING).value(null).then(new Mapper<Object, Object>() {
+    new Async().log(logPrinter)
+               .log(LogLevel.WARNING)
+               .value(null)
+               .then(new Mapper<Object, Object>() {
 
-      public Object apply(final Object input) throws Exception {
-        throw new Exception();
-      }
-    }).cancel(true);
+                 public Object apply(final Object input) throws Exception {
+                   throw new Exception();
+                 }
+               })
+               .cancel(true);
     assertThat(logPrinter.isDbgCalled()).isFalse();
     assertThat(logPrinter.isWrnCalled()).isTrue();
     assertThat(logPrinter.isErrCalled()).isTrue();
@@ -216,7 +220,7 @@ public class TestAsync {
   @Test
   @SuppressWarnings("ConstantConditions")
   public void statementAsyncFailure() {
-    assertThat(new Async().on(ScheduledExecutors.backgroundExecutor())
+    assertThat(new Async().on(ExecutorPool.backgroundExecutor())
                           .statement(new Observer<AsyncResult<Integer>>() {
 
                             public void accept(final AsyncResult<Integer> result) {
@@ -229,7 +233,7 @@ public class TestAsync {
 
   @Test
   public void statementAsyncValue() {
-    assertThat(new Async().on(ScheduledExecutors.backgroundExecutor())
+    assertThat(new Async().on(ExecutorPool.backgroundExecutor())
                           .statement(new Observer<AsyncResult<Integer>>() {
 
                             public void accept(final AsyncResult<Integer> result) {
@@ -244,13 +248,15 @@ public class TestAsync {
   public void statementDelayedFailure() {
     final long startTime = System.currentTimeMillis();
     assertThat(new Async().on(
-        ScheduledExecutors.withDelay(ScheduledExecutors.backgroundExecutor(), 100,
-            TimeUnit.MILLISECONDS)).statement(new Observer<AsyncResult<Integer>>() {
+        ExecutorPool.withDelay(100, TimeUnit.MILLISECONDS, ExecutorPool.backgroundExecutor()))
+                          .statement(new Observer<AsyncResult<Integer>>() {
 
-      public void accept(final AsyncResult<Integer> result) {
-        result.fail(new IllegalAccessException());
-      }
-    }).getFailure().getCause()).isExactlyInstanceOf(IllegalAccessException.class);
+                            public void accept(final AsyncResult<Integer> result) {
+                              result.fail(new IllegalAccessException());
+                            }
+                          })
+                          .getFailure()
+                          .getCause()).isExactlyInstanceOf(IllegalAccessException.class);
     assertThat(System.currentTimeMillis() - startTime).isGreaterThanOrEqualTo(100);
   }
 
@@ -258,13 +264,14 @@ public class TestAsync {
   public void statementDelayedValue() {
     final long startTime = System.currentTimeMillis();
     assertThat(new Async().on(
-        ScheduledExecutors.withDelay(ScheduledExecutors.backgroundExecutor(), 100,
-            TimeUnit.MILLISECONDS)).statement(new Observer<AsyncResult<Integer>>() {
+        ExecutorPool.withDelay(100, TimeUnit.MILLISECONDS, ExecutorPool.backgroundExecutor()))
+                          .statement(new Observer<AsyncResult<Integer>>() {
 
-      public void accept(final AsyncResult<Integer> result) {
-        result.set(3);
-      }
-    }).getValue()).isEqualTo(3);
+                            public void accept(final AsyncResult<Integer> result) {
+                              result.set(3);
+                            }
+                          })
+                          .getValue()).isEqualTo(3);
     assertThat(System.currentTimeMillis() - startTime).isGreaterThanOrEqualTo(100);
   }
 

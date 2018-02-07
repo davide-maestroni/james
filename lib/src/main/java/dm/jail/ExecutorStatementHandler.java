@@ -23,14 +23,14 @@ import java.io.InvalidObjectException;
 import java.io.ObjectStreamException;
 import java.io.Serializable;
 import java.util.concurrent.CancellationException;
+import java.util.concurrent.Executor;
 
 import dm.jail.async.AsyncResult;
 import dm.jail.config.BuildConfig;
-import dm.jail.executor.ScheduledExecutor;
-import dm.jail.log.LogPrinter;
+import dm.jail.executor.ExecutorPool;
 import dm.jail.log.LogLevel;
+import dm.jail.log.LogPrinter;
 import dm.jail.log.Logger;
-import dm.jail.util.ConstantConditions;
 
 /**
  * Created by davide-maestroni on 02/01/2018.
@@ -39,13 +39,13 @@ class ExecutorStatementHandler<V> extends AsyncStatementHandler<V, V> implements
 
   private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
 
-  private final ScheduledExecutor mExecutor;
+  private final Executor mExecutor;
 
   private final Logger mLogger;
 
-  ExecutorStatementHandler(@NotNull final ScheduledExecutor executor,
-      @Nullable final LogPrinter printer, @Nullable final LogLevel level) {
-    mExecutor = ConstantConditions.notNull("executor", executor);
+  ExecutorStatementHandler(@NotNull final Executor executor, @Nullable final LogPrinter printer,
+      @Nullable final LogLevel level) {
+    mExecutor = ExecutorPool.register(executor);
     mLogger = Logger.newLogger(printer, level, this);
   }
 
@@ -92,14 +92,13 @@ class ExecutorStatementHandler<V> extends AsyncStatementHandler<V, V> implements
 
     private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
 
-    private final ScheduledExecutor mExecutor;
+    private final Executor mExecutor;
 
     private final LogLevel mLogLevel;
 
     private final LogPrinter mLogPrinter;
 
-    private HandlerProxy(final ScheduledExecutor executor, final LogPrinter printer,
-        final LogLevel level) {
+    private HandlerProxy(final Executor executor, final LogPrinter printer, final LogLevel level) {
       mExecutor = executor;
       mLogPrinter = printer;
       mLogLevel = level;

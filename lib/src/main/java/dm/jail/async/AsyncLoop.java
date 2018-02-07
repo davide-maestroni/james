@@ -23,9 +23,8 @@ import java.io.Closeable;
 import java.io.Serializable;
 import java.util.Iterator;
 import java.util.List;
+import java.util.concurrent.Executor;
 import java.util.concurrent.TimeUnit;
-
-import dm.jail.executor.ScheduledExecutor;
 
 /**
  * Created by davide-maestroni on 01/08/2018.
@@ -33,11 +32,10 @@ import dm.jail.executor.ScheduledExecutor;
 public interface AsyncLoop<V> extends AsyncStatement<Iterable<V>>, Serializable {
 
   @NotNull
-  <S> AsyncLoop<V> backoffOn(@NotNull ScheduledExecutor executor,
-      @NotNull Backoffer<S, V> backoffer);
+  <S> AsyncLoop<V> backoffOn(@NotNull Executor executor, @NotNull Backoffer<S, V> backoffer);
 
   @NotNull
-  <S> AsyncLoop<V> backoffOn(@NotNull ScheduledExecutor executor, @Nullable Provider<S> init,
+  <S> AsyncLoop<V> backoffOn(@NotNull Executor executor, @Nullable Provider<S> init,
       @Nullable YieldUpdater<S, ? super V, ? super PendingState> value,
       @Nullable YieldUpdater<S, ? super Throwable, ? super PendingState> failure,
       @Nullable YieldCompleter<S, ? super PendingState> done);
@@ -75,7 +73,7 @@ public interface AsyncLoop<V> extends AsyncStatement<Iterable<V>>, Serializable 
           AsyncResult<Iterable<V>>> statement);
 
   @NotNull
-  AsyncLoop<V> on(@NotNull ScheduledExecutor executor);
+  AsyncLoop<V> on(@NotNull Executor executor);
 
   @NotNull
   AsyncLoop<V> elseForEach(@NotNull Mapper<? super Throwable, V> mapper,
@@ -165,20 +163,20 @@ public interface AsyncLoop<V> extends AsyncStatement<Iterable<V>>, Serializable 
 
   @NotNull
   <S> AsyncLoop<V> forkLoop(
-      @NotNull Forker<S, ? super AsyncLoop<V>, ? super V, ? super AsyncResultCollection<V>> forker);
+      @NotNull Forker<S, ? super AsyncLoop<V>, ? super V, ? super AsyncResults<V>> forker);
 
   @NotNull
   <S> AsyncLoop<V> forkLoop(@Nullable Mapper<? super AsyncLoop<V>, S> init,
       @Nullable ForkUpdater<S, ? super AsyncLoop<V>, ? super V> value,
       @Nullable ForkUpdater<S, ? super AsyncLoop<V>, ? super Throwable> failure,
       @Nullable ForkCompleter<S, ? super AsyncLoop<V>> done,
-      @Nullable ForkUpdater<S, ? super AsyncLoop<V>, ? super AsyncResultCollection<V>> statement);
+      @Nullable ForkUpdater<S, ? super AsyncLoop<V>, ? super AsyncResults<V>> statement);
 
   @NotNull
-  AsyncLoop<V> onParallel(@NotNull ScheduledExecutor executor);
+  AsyncLoop<V> onParallel(@NotNull Executor executor);
 
   @NotNull
-  AsyncLoop<V> onParallelOrdered(@NotNull ScheduledExecutor executor);
+  AsyncLoop<V> onParallelOrdered(@NotNull Executor executor);
 
   @NotNull
   Generator<AsyncState<V>> stateGenerator();
@@ -186,7 +184,7 @@ public interface AsyncLoop<V> extends AsyncStatement<Iterable<V>>, Serializable 
   @NotNull
   Generator<AsyncState<V>> stateGenerator(long timeout, @NotNull TimeUnit timeUnit);
 
-  void to(@NotNull AsyncResultCollection<? super V> results);
+  void to(@NotNull AsyncResults<? super V> results);
 
   @NotNull
   Generator<V> valueGenerator();

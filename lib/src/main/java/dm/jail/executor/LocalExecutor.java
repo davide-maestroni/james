@@ -18,10 +18,9 @@ package dm.jail.executor;
 
 import org.jetbrains.annotations.NotNull;
 
-import java.util.concurrent.TimeUnit;
+import java.util.Iterator;
 
-import dm.jail.async.RuntimeInterruptedException;
-import dm.jail.util.TimeUnits;
+import dm.jail.util.DoubleQueue;
 
 /**
  * Class maintaining a queue of commands which is local to the calling thread.
@@ -35,35 +34,16 @@ class LocalExecutor {
 
   private static final int INITIAL_CAPACITY = 1 << 3;
 
-  private static final VoidCommand NO_OP = new VoidCommand();
-
   private static final LocalExecutorThreadLocal sExecutor = new LocalExecutorThreadLocal();
 
-  private long[] mCommandTimeNs;
-
-  private Runnable[] mCommands;
-
-  private TimeUnit[] mDelayUnits;
-
-  private long[] mDelays;
-
-  private int mFirst;
+  private final DoubleQueue<Runnable> mCommands = new DoubleQueue<Runnable>(INITIAL_CAPACITY);
 
   private boolean mIsRunning;
-
-  private int mLast;
-
-  private int mMask;
 
   /**
    * Constructor.
    */
   private LocalExecutor() {
-    mCommandTimeNs = new long[INITIAL_CAPACITY];
-    mCommands = new Runnable[INITIAL_CAPACITY];
-    mDelays = new long[INITIAL_CAPACITY];
-    mDelayUnits = new TimeUnit[INITIAL_CAPACITY];
-    mMask = INITIAL_CAPACITY - 1;
   }
 
   /**
@@ -78,48 +58,10 @@ class LocalExecutor {
   /**
    * Runs the specified command.
    *
-   * @param command  the command.
-   * @param delay    the command delay.
-   * @param timeUnit the delay time unit.
-   */
-  public static void run(@NotNull final Runnable command, final long delay,
-      @NotNull final TimeUnit timeUnit) {
-    sExecutor.get().addCommand(command, delay, timeUnit);
-  }
-
-  /**
-   * Runs the specified command.
-   *
    * @param command the command.
    */
   public static void run(@NotNull final Runnable command) {
     sExecutor.get().addCommand(command);
-  }
-
-  private static void resizeArray(@NotNull final long[] src, @NotNull final long[] dst,
-      final int first) {
-    final int remainder = src.length - first;
-    System.arraycopy(src, first, dst, 0, remainder);
-    System.arraycopy(src, 0, dst, remainder, first);
-  }
-
-  private static <T> void resizeArray(@NotNull final T[] src, @NotNull final T[] dst,
-      final int first) {
-    final int remainder = src.length - first;
-    System.arraycopy(src, first, dst, 0, remainder);
-    System.arraycopy(src, 0, dst, remainder, first);
-  }
-
-  private void add(@NotNull final Runnable command, final long delay,
-      @NotNull final TimeUnit timeUnit) {
-    final int last = mLast;
-    mCommandTimeNs[last] = System.nanoTime();
-    mCommands[last] = command;
-    mDelays[last] = delay;
-    mDelayUnits[last] = timeUnit;
-    if (mFirst == (mLast = (last + 1) & mMask)) {
-      doubleCapacity();
-    }
   }
 
   private void addCommand(@NotNull final Runnable command) {
@@ -134,135 +76,26 @@ class LocalExecutor {
       }
 
     } else {
-      add(command, 0, TimeUnit.MILLISECONDS);
+      mCommands.add(command);
     }
-  }
-
-  private void addCommand(@NotNull final Runnable command, final long delay,
-      @NotNull final TimeUnit timeUnit) {
-    if (delay == 0) {
-      addCommand(command);
-
-    } else {
-      add(command, delay, timeUnit);
-      if (!mIsRunning) {
-        run();
-      }
-    }
-  }
-
-  private void doubleCapacity() {
-    final int size = mCommands.length;
-    final int newSize = size << 1;
-    if (newSize < size) {
-      throw new OutOfMemoryError();
-    }
-
-    final int first = mFirst;
-    final long[] newCommandTimeNs = new long[newSize];
-    resizeArray(mCommandTimeNs, newCommandTimeNs, first);
-    final Runnable[] newCommands = new Runnable[newSize];
-    resizeArray(mCommands, newCommands, first);
-    final long[] newDelays = new long[newSize];
-    resizeArray(mDelays, newDelays, first);
-    final TimeUnit[] newDelayUnits = new TimeUnit[newSize];
-    resizeArray(mDelayUnits, newDelayUnits, first);
-    mCommandTimeNs = newCommandTimeNs;
-    mCommands = newCommands;
-    mDelays = newDelays;
-    mDelayUnits = newDelayUnits;
-    mFirst = 0;
-    mLast = size;
-    mMask = newSize - 1;
   }
 
   private void removeCommand(@NotNull final Runnable command) {
-    final Runnable[] commands = mCommands;
-    final int mask = mMask;
-    final int last = mLast;
-    int i = mFirst;
-    while (i != last) {
-      if (commands[i] == command) {
-        commands[i] = NO_OP;
-        mDelays[i] = 0;
-        mDelayUnits[i] = TimeUnit.NANOSECONDS;
+    final Iterator<Runnable> iterator = mCommands.iterator();
+    while (iterator.hasNext()) {
+      if (iterator.next() == command) {
+        iterator.remove();
       }
-
-      i = (i + 1) & mask;
     }
   }
 
   private void run() {
     mIsRunning = true;
+    final DoubleQueue<Runnable> commands = mCommands;
     try {
-      while (mFirst != mLast) {
-        final int mask = mMask;
-        final int i = mFirst;
-        final int last = mLast;
-        final long[] commandTimeNs = mCommandTimeNs;
-        final Runnable[] commands = mCommands;
-        final long[] delays = mDelays;
-        final TimeUnit[] delayUnits = mDelayUnits;
-        long timeNs = commandTimeNs[i];
-        Runnable command = commands[i];
-        long delay = delays[i];
-        TimeUnit delayUnit = delayUnits[i];
-        final long currentTimeNs = System.nanoTime();
-        long delayNs = timeNs - currentTimeNs + delayUnit.toNanos(delay);
-        if (delayNs > 0) {
-          long minDelay = delayNs;
-          int s = i;
-          int j = (i + 1) & mask;
-          while (j != last) {
-            final long nextDelayNs =
-                commandTimeNs[j] - currentTimeNs + delayUnits[j].toNanos(delays[j]);
-            if (nextDelayNs <= 0) {
-              s = j;
-              break;
-            }
-
-            if (nextDelayNs < minDelay) {
-              minDelay = nextDelayNs;
-              s = j;
-            }
-
-            j = (j + 1) & mask;
-          }
-
-          if (s != i) {
-            timeNs = commandTimeNs[s];
-            command = commands[s];
-            delay = delays[s];
-            delayUnit = delayUnits[s];
-            commandTimeNs[s] = commandTimeNs[i];
-            commands[s] = commands[i];
-            delays[s] = delays[i];
-            delayUnits[s] = delayUnits[i];
-          }
-
-          delayNs = timeNs - System.nanoTime() + delayUnit.toNanos(delay);
-        }
-
-        if (delayNs > 0) {
-          try {
-            TimeUnits.sleepAtLeast(delayNs, TimeUnit.NANOSECONDS);
-
-          } catch (final InterruptedException e) {
-            throw new RuntimeInterruptedException(e);
-          }
-        }
-
-        try {
-          command.run();
-
-        } finally {
-          // Note that the field values may have changed here
-          final int n = mFirst;
-          mCommands[n] = null;
-          mDelays[n] = 0;
-          mDelayUnits[n] = TimeUnit.NANOSECONDS;
-          mFirst = (n + 1) & mask;
-        }
+      while (!commands.isEmpty()) {
+        // TODO: 07/02/2018 catch?
+        commands.removeFirst().run();
       }
 
     } finally {
@@ -278,15 +111,6 @@ class LocalExecutor {
     @Override
     protected LocalExecutor initialValue() {
       return new LocalExecutor();
-    }
-  }
-
-  /**
-   * Void command implementation.
-   */
-  private static class VoidCommand implements Runnable {
-
-    public void run() {
     }
   }
 }

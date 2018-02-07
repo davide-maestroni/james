@@ -20,11 +20,8 @@ import org.jetbrains.annotations.NotNull;
 
 import java.io.ObjectStreamException;
 import java.io.Serializable;
-import java.util.concurrent.TimeUnit;
 
-import dm.jail.async.RuntimeInterruptedException;
 import dm.jail.config.BuildConfig;
-import dm.jail.util.TimeUnits;
 
 /**
  * Executor implementation just running the command in the same call to the {@code execute()}
@@ -38,7 +35,7 @@ import dm.jail.util.TimeUnits;
  * <p>
  * Created by davide-maestroni on 05/13/2016.
  */
-class ImmediateExecutor extends SyncExecutor implements Serializable {
+class ImmediateExecutor extends SyncExecutor implements OwnerExecutor, Serializable {
 
   private static final ImmediateExecutor sInstance = new ImmediateExecutor();
 
@@ -56,20 +53,6 @@ class ImmediateExecutor extends SyncExecutor implements Serializable {
   }
 
   public void execute(@NotNull final Runnable command) {
-    command.run();
-  }
-
-  public void execute(@NotNull final Runnable command, final long delay,
-      @NotNull final TimeUnit timeUnit) {
-    if (delay > 0) {
-      try {
-        TimeUnits.sleepAtLeast(delay, timeUnit);
-
-      } catch (final InterruptedException e) {
-        throw new RuntimeInterruptedException(e);
-      }
-    }
-
     command.run();
   }
 

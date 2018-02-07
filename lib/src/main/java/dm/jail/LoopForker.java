@@ -27,7 +27,7 @@ import java.util.List;
 import dm.jail.LoopForker.ForkerStack;
 import dm.jail.async.AsyncLoop;
 import dm.jail.async.AsyncResult;
-import dm.jail.async.AsyncResultCollection;
+import dm.jail.async.AsyncResults;
 import dm.jail.async.AsyncStatement;
 import dm.jail.async.AsyncStatement.Forker;
 import dm.jail.config.BuildConfig;
@@ -38,7 +38,7 @@ import dm.jail.util.SerializableProxy;
  * Created by davide-maestroni on 02/05/2018.
  */
 class LoopForker<S, V>
-    implements Forker<ForkerStack<S, V>, AsyncLoop<V>, V, AsyncResultCollection<V>>, Serializable {
+    implements Forker<ForkerStack<S, V>, AsyncLoop<V>, V, AsyncResults<V>>, Serializable {
 
   private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
 
@@ -82,8 +82,7 @@ class LoopForker<S, V>
   }
 
   public ForkerStack<S, V> statement(@NotNull final AsyncLoop<V> statement,
-      final ForkerStack<S, V> stack, @NotNull final AsyncResultCollection<V> result) throws
-      Exception {
+      final ForkerStack<S, V> stack, @NotNull final AsyncResults<V> result) throws Exception {
     return stack.withStack(
         mForker.statement(statement, stack.getStack(), new AsyncResult<Iterable<V>>() {
 

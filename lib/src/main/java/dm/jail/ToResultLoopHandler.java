@@ -23,7 +23,7 @@ import java.io.NotSerializableException;
 import java.io.ObjectStreamException;
 import java.io.Serializable;
 
-import dm.jail.async.AsyncResultCollection;
+import dm.jail.async.AsyncResults;
 import dm.jail.config.BuildConfig;
 import dm.jail.util.ConstantConditions;
 
@@ -34,38 +34,37 @@ class ToResultLoopHandler<V> extends AsyncLoopHandler<V, Void> implements Serial
 
   private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
 
-  private final AsyncResultCollection<V> mResults;
+  private final AsyncResults<V> mResults;
 
   @SuppressWarnings("unchecked")
-  ToResultLoopHandler(@NotNull final AsyncResultCollection<? super V> results) {
-    mResults = (AsyncResultCollection<V>) ConstantConditions.notNull("results", results);
+  ToResultLoopHandler(@NotNull final AsyncResults<? super V> results) {
+    mResults = (AsyncResults<V>) ConstantConditions.notNull("results", results);
   }
 
   @Override
-  void addFailure(@NotNull final Throwable failure,
-      @NotNull final AsyncResultCollection<Void> results) {
+  void addFailure(@NotNull final Throwable failure, @NotNull final AsyncResults<Void> results) {
     mResults.addFailure(failure);
   }
 
   @Override
   void addFailures(@Nullable final Iterable<? extends Throwable> failures,
-      @NotNull final AsyncResultCollection<Void> results) {
+      @NotNull final AsyncResults<Void> results) {
     mResults.addFailures(failures);
   }
 
   @Override
-  void addValue(final V value, @NotNull final AsyncResultCollection<Void> results) {
+  void addValue(final V value, @NotNull final AsyncResults<Void> results) {
     mResults.addValue(value);
   }
 
   @Override
   void addValues(@Nullable final Iterable<? extends V> values,
-      @NotNull final AsyncResultCollection<Void> results) {
+      @NotNull final AsyncResults<Void> results) {
     mResults.addValues(values);
   }
 
   @Override
-  void set(@NotNull final AsyncResultCollection<Void> results) {
+  void set(@NotNull final AsyncResults<Void> results) {
     mResults.set();
   }
 

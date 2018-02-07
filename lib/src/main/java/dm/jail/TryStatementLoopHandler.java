@@ -24,11 +24,11 @@ import java.io.InvalidObjectException;
 import java.io.ObjectStreamException;
 import java.io.Serializable;
 
-import dm.jail.async.AsyncResultCollection;
+import dm.jail.async.AsyncResults;
 import dm.jail.async.Mapper;
 import dm.jail.config.BuildConfig;
-import dm.jail.log.LogPrinter;
 import dm.jail.log.LogLevel;
+import dm.jail.log.LogPrinter;
 import dm.jail.log.Logger;
 import dm.jail.util.ConstantConditions;
 import dm.jail.util.SerializableProxy;
@@ -56,7 +56,7 @@ class TryStatementLoopHandler<V, R> extends AsyncStatementLoopHandler<V, R>
   }
 
   @Override
-  void value(final V value, @NotNull final AsyncResultCollection<R> results) throws Exception {
+  void value(final V value, @NotNull final AsyncResults<R> results) throws Exception {
     final Closeable closeable = mCloseable.apply(value);
     try {
       mHandler.value(value, results);

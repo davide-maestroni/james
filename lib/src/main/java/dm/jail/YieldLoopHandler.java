@@ -23,25 +23,25 @@ import java.io.InvalidObjectException;
 import java.io.ObjectStreamException;
 import java.io.Serializable;
 import java.util.concurrent.CancellationException;
+import java.util.concurrent.Executor;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import dm.jail.async.AsyncLoop;
 import dm.jail.async.AsyncLoop.YieldResults;
 import dm.jail.async.AsyncLoop.Yielder;
 import dm.jail.async.AsyncResult;
-import dm.jail.async.AsyncResultCollection;
+import dm.jail.async.AsyncResults;
 import dm.jail.async.AsyncStatement;
 import dm.jail.async.RuntimeInterruptedException;
 import dm.jail.config.BuildConfig;
-import dm.jail.executor.ScheduledExecutor;
 import dm.jail.log.LogLevel;
 import dm.jail.log.LogPrinter;
 import dm.jail.log.Logger;
 import dm.jail.util.ConstantConditions;
 import dm.jail.util.SerializableProxy;
 
-import static dm.jail.executor.ScheduledExecutors.immediateExecutor;
-import static dm.jail.executor.ScheduledExecutors.withThrottling;
+import static dm.jail.executor.ExecutorPool.immediateExecutor;
+import static dm.jail.executor.ExecutorPool.withThrottling;
 
 /**
  * Created by davide-maestroni on 02/05/2018.
@@ -50,7 +50,7 @@ class YieldLoopHandler<S, V, R> extends AsyncLoopHandler<V, R> implements Serial
 
   private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
 
-  private final ScheduledExecutor mExecutor;
+  private final Executor mExecutor;
 
   private final Logger mLogger;
 
@@ -67,13 +67,12 @@ class YieldLoopHandler<S, V, R> extends AsyncLoopHandler<V, R> implements Serial
   YieldLoopHandler(@NotNull final Yielder<S, ? super V, R> yielder,
       @Nullable final LogPrinter printer, @Nullable final LogLevel level) {
     mYielder = ConstantConditions.notNull("yielder", yielder);
-    mExecutor = withThrottling(immediateExecutor(), 1);
+    mExecutor = withThrottling(1, immediateExecutor());
     mLogger = Logger.newLogger(printer, level, this);
   }
 
   @Override
-  void addFailure(@NotNull final Throwable failure,
-      @NotNull final AsyncResultCollection<R> results) {
+  void addFailure(@NotNull final Throwable failure, @NotNull final AsyncResults<R> results) {
     mExecutor.execute(new YielderRunnable(results) {
 
       @Override
@@ -85,7 +84,7 @@ class YieldLoopHandler<S, V, R> extends AsyncLoopHandler<V, R> implements Serial
 
   @Override
   void addFailures(@Nullable final Iterable<? extends Throwable> failures,
-      @NotNull final AsyncResultCollection<R> results) {
+      @NotNull final AsyncResults<R> results) {
     if (failures == null) {
       return;
     }
@@ -103,7 +102,7 @@ class YieldLoopHandler<S, V, R> extends AsyncLoopHandler<V, R> implements Serial
   }
 
   @Override
-  void addValue(final V value, @NotNull final AsyncResultCollection<R> results) {
+  void addValue(final V value, @NotNull final AsyncResults<R> results) {
     mExecutor.execute(new YielderRunnable(results) {
 
       @Override
@@ -115,7 +114,7 @@ class YieldLoopHandler<S, V, R> extends AsyncLoopHandler<V, R> implements Serial
 
   @Override
   void addValues(@Nullable final Iterable<? extends V> values,
-      @NotNull final AsyncResultCollection<R> results) {
+      @NotNull final AsyncResults<R> results) {
     if (values == null) {
       return;
     }
@@ -140,7 +139,7 @@ class YieldLoopHandler<S, V, R> extends AsyncLoopHandler<V, R> implements Serial
   }
 
   @Override
-  void set(@NotNull final AsyncResultCollection<R> results) {
+  void set(@NotNull final AsyncResults<R> results) {
     mExecutor.execute(new YielderRunnable(results) {
 
       @Override
@@ -156,8 +155,7 @@ class YieldLoopHandler<S, V, R> extends AsyncLoopHandler<V, R> implements Serial
     });
   }
 
-  private void failSafe(@NotNull final AsyncResultCollection<R> results,
-      @NotNull final Throwable failure) {
+  private void failSafe(@NotNull final AsyncResults<R> results, @NotNull final Throwable failure) {
     mYielderResults.withResults(results).set();
     try {
       results.addFailure(failure).set();
@@ -200,7 +198,7 @@ class YieldLoopHandler<S, V, R> extends AsyncLoopHandler<V, R> implements Serial
 
     private final AtomicBoolean mIsSet = new AtomicBoolean();
 
-    private AsyncResultCollection<V> mResults;
+    private AsyncResults<V> mResults;
 
     @NotNull
     public YieldResults<V> yieldFailure(@NotNull final Throwable failure) {
@@ -237,29 +235,29 @@ class YieldLoopHandler<S, V, R> extends AsyncLoopHandler<V, R> implements Serial
     public YieldResults<V> yieldLoop(@NotNull final AsyncStatement<? extends Iterable<V>> loop) {
       checkSet();
       if (loop instanceof AsyncLoop) {
-        ((AsyncLoop<V>) loop).to(new AsyncResultCollection<V>() {
+        ((AsyncLoop<V>) loop).to(new AsyncResults<V>() {
 
           @NotNull
-          public AsyncResultCollection<V> addFailure(@NotNull final Throwable failure) {
+          public AsyncResults<V> addFailure(@NotNull final Throwable failure) {
             mResults.addFailure(failure);
             return this;
           }
 
           @NotNull
-          public AsyncResultCollection<V> addFailures(
+          public AsyncResults<V> addFailures(
               @Nullable final Iterable<? extends Throwable> failures) {
             mResults.addFailures(failures);
             return this;
           }
 
           @NotNull
-          public AsyncResultCollection<V> addValue(final V value) {
+          public AsyncResults<V> addValue(final V value) {
             mResults.addValue(value);
             return this;
           }
 
           @NotNull
-          public AsyncResultCollection<V> addValues(@Nullable final Iterable<? extends V> values) {
+          public AsyncResults<V> addValues(@Nullable final Iterable<? extends V> values) {
             mResults.addValues(values);
             return this;
           }
@@ -309,7 +307,7 @@ class YieldLoopHandler<S, V, R> extends AsyncLoopHandler<V, R> implements Serial
     }
 
     @NotNull
-    private YielderResults<V> withResults(@NotNull final AsyncResultCollection<V> results) {
+    private YielderResults<V> withResults(@NotNull final AsyncResults<V> results) {
       mResults = results;
       return this;
     }
@@ -317,14 +315,14 @@ class YieldLoopHandler<S, V, R> extends AsyncLoopHandler<V, R> implements Serial
 
   private abstract class YielderRunnable implements Runnable {
 
-    private final AsyncResultCollection<R> mResults;
+    private final AsyncResults<R> mResults;
 
-    private YielderRunnable(@NotNull final AsyncResultCollection<R> results) {
+    private YielderRunnable(@NotNull final AsyncResults<R> results) {
       mResults = results;
     }
 
     public void run() {
-      final AsyncResultCollection<R> results = mResults;
+      final AsyncResults<R> results = mResults;
       try {
         if (mIsFailed) {
           results.set();

@@ -99,17 +99,17 @@ class ThrottlingExecutor extends ScheduledExecutorDecorator implements Serializa
   }
 
   @Override
-  public void execute(@NotNull final Runnable command, final long delay,
+  public void execute(@NotNull final Runnable runnable, final long delay,
       @NotNull final TimeUnit timeUnit) {
     final ThrottlingCommand throttlingCommand;
     synchronized (mMutex) {
       final DoubleQueue<PendingCommand> queue = mQueue;
       if ((mRunningCount + queue.size()) >= mMaxRunning) {
-        queue.add(new PendingCommand(command, delay, timeUnit));
+        queue.add(new PendingCommand(runnable, delay, timeUnit));
         return;
       }
 
-      throttlingCommand = getThrottlingCommand(command);
+      throttlingCommand = getThrottlingCommand(runnable);
     }
 
     super.execute(throttlingCommand, delay, timeUnit);
@@ -193,10 +193,14 @@ class ThrottlingExecutor extends ScheduledExecutorDecorator implements Serializa
       }
 
       final long delay = mDelay;
-      ThrottlingExecutor.super.execute(throttlingCommand, (delay == 0) ? 0
-              : Math.max(mTimeUnit.toMillis(delay) + mStartTimeMillis - System.currentTimeMillis
-                  (), 0),
-          TimeUnit.MILLISECONDS);
+      final long currentDelay = (delay == 0) ? 0
+          : Math.max(mTimeUnit.toMillis(delay) + mStartTimeMillis - System.currentTimeMillis(), 0);
+      if (currentDelay == 0) {
+        ThrottlingExecutor.super.execute(throttlingCommand);
+
+      } else {
+        ThrottlingExecutor.super.execute(throttlingCommand, currentDelay, TimeUnit.MILLISECONDS);
+      }
     }
   }
 

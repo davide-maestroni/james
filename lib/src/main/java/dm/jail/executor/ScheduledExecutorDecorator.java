@@ -27,7 +27,7 @@ import dm.jail.util.ConstantConditions;
  * <p>
  * Created by davide-maestroni on 09/22/2014.
  */
-public class ScheduledExecutorDecorator implements ScheduledExecutor {
+class ScheduledExecutorDecorator implements ScheduledExecutor, ExecutorDecorator {
 
   private final ScheduledExecutor mExecutor;
 
@@ -44,20 +44,21 @@ public class ScheduledExecutorDecorator implements ScheduledExecutor {
     mExecutor.execute(command);
   }
 
-  public void execute(@NotNull final Runnable command, final long delay,
+  public void execute(@NotNull final Runnable runnable, final long delay,
       @NotNull final TimeUnit timeUnit) {
-    mExecutor.execute(command, delay, timeUnit);
+    mExecutor.execute(runnable, delay, timeUnit);
   }
 
-  public boolean isExecutionThread() {
-    return mExecutor.isExecutionThread();
-  }
-
-  public void stop() {
-    mExecutor.stop();
+  @NotNull
+  public OwnerExecutor getDecorated() {
+    return mExecutor;
   }
 
   public boolean isOwnedThread() {
     return mExecutor.isOwnedThread();
+  }
+
+  public void stop() {
+    mExecutor.stop();
   }
 }

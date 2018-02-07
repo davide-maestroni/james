@@ -21,10 +21,9 @@ import org.jetbrains.annotations.Nullable;
 
 import java.io.Closeable;
 import java.io.Serializable;
+import java.util.concurrent.Executor;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
-
-import dm.jail.executor.ScheduledExecutor;
 
 /**
  * Created by davide-maestroni on 01/08/2018.
@@ -76,7 +75,7 @@ public interface AsyncStatement<V> extends AsyncState<V>, Future<V>, Serializabl
   boolean isFinal();
 
   @NotNull
-  AsyncStatement<V> on(@NotNull ScheduledExecutor executor);
+  AsyncStatement<V> on(@NotNull Executor executor);
 
   @NotNull
   <R> AsyncStatement<R> then(@NotNull Mapper<? super V, R> mapper);

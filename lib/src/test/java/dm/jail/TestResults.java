@@ -21,26 +21,25 @@ import org.jetbrains.annotations.Nullable;
 
 import java.util.ArrayList;
 
-import dm.jail.async.AsyncResultCollection;
+import dm.jail.async.AsyncResults;
 import dm.jail.async.AsyncState;
 import dm.jail.async.SimpleState;
 
 /**
  * Created by davide-maestroni on 01/30/2018.
  */
-class TestResultCollection<V> implements AsyncResultCollection<V> {
+class TestResults<V> implements AsyncResults<V> {
 
   private ArrayList<AsyncState<V>> mStates = new ArrayList<AsyncState<V>>();
 
   @NotNull
-  public AsyncResultCollection<V> addFailure(@NotNull final Throwable failure) {
+  public AsyncResults<V> addFailure(@NotNull final Throwable failure) {
     mStates.add(SimpleState.<V>ofFailure(failure));
     return this;
   }
 
   @NotNull
-  public AsyncResultCollection<V> addFailures(
-      @Nullable final Iterable<? extends Throwable> failures) {
+  public AsyncResults<V> addFailures(@Nullable final Iterable<? extends Throwable> failures) {
     if (failures != null) {
       for (final Throwable failure : failures) {
         mStates.add(SimpleState.<V>ofFailure(failure));
@@ -51,13 +50,13 @@ class TestResultCollection<V> implements AsyncResultCollection<V> {
   }
 
   @NotNull
-  public AsyncResultCollection<V> addValue(final V value) {
+  public AsyncResults<V> addValue(final V value) {
     mStates.add(SimpleState.ofValue(value));
     return this;
   }
 
   @NotNull
-  public AsyncResultCollection<V> addValues(@Nullable final Iterable<? extends V> values) {
+  public AsyncResults<V> addValues(@Nullable final Iterable<? extends V> values) {
     if (values != null) {
       for (final V value : values) {
         mStates.add(SimpleState.ofValue(value));

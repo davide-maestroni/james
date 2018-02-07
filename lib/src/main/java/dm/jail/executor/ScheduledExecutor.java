@@ -18,10 +18,7 @@ package dm.jail.executor;
 
 import org.jetbrains.annotations.NotNull;
 
-import java.util.concurrent.Executor;
 import java.util.concurrent.TimeUnit;
-
-import dm.jail.util.Threads.ThreadOwner;
 
 /**
  * The executor class defines an object responsible for executing routine invocations inside
@@ -43,45 +40,23 @@ import dm.jail.util.Threads.ThreadOwner;
  * The implementing class can optionally support the cancellation of commands not yet run
  * (waiting, for example, in a consuming queue).
  * <p>
- * The class {@link ScheduledExecutors ScheduledExecutor} provides a few
+ * The class {@link ExecutorPool ScheduledExecutor} provides a few
  * implementations employing concurrent Java classes.
  * <p>
  * Created by davide-maestroni on 09/07/2014.
  */
-public interface ScheduledExecutor extends Executor, ThreadOwner {
+public interface ScheduledExecutor extends StoppableExecutor {
 
   /**
    * Executes the specified command (that is, it calls the {@link Runnable#run()} method inside
    * the executor thread) after the specified delay.
    *
-   * @param command  the command.
+   * @param runnable the command.
    * @param delay    the command delay.
    * @param timeUnit the delay time unit.
    * @throws java.util.concurrent.RejectedExecutionException it the executor is currently unable to
    *                                                         fulfill the command (for instance,
    *                                                         after being stopped).
    */
-  void execute(@NotNull Runnable command, long delay, @NotNull TimeUnit timeUnit);
-
-  /**
-   * Checks if the calling thread may be employed to run commands.
-   * <p>
-   * The implementation of this method is not strictly mandatory, even if, the classes always
-   * returning false effectively prevent the correct detection of possible deadlocks.
-   * <br>
-   * A synchronous executor implementation will always return true.
-   *
-   * @return whether the calling thread is employed by the executor.
-   */
-  boolean isExecutionThread();
-
-  /**
-   * Stops the executor.
-   * <br>
-   * The method is meant to signal that the executor is no more needed. In fact, as a consequence of
-   * the call, pending commands might get discarded and the executor itself may become unusable.
-   * <br>
-   * The specific implementation can leverage the method to eventually free allocated resources.
-   */
-  void stop();
+  void execute(@NotNull Runnable runnable, long delay, @NotNull TimeUnit timeUnit);
 }

@@ -25,7 +25,7 @@ import java.io.Serializable;
 import java.util.Iterator;
 
 import dm.jail.async.Action;
-import dm.jail.async.AsyncResultCollection;
+import dm.jail.async.AsyncResults;
 import dm.jail.config.BuildConfig;
 import dm.jail.util.ConstantConditions;
 import dm.jail.util.Iterables;
@@ -45,8 +45,8 @@ class DoneLoopHandler<V> extends AsyncLoopHandler<V, V> implements Serializable 
   }
 
   @Override
-  void addFailure(@NotNull final Throwable failure,
-      @NotNull final AsyncResultCollection<V> results) throws Exception {
+  void addFailure(@NotNull final Throwable failure, @NotNull final AsyncResults<V> results) throws
+      Exception {
     mAction.perform();
     super.addFailure(failure, results);
   }
@@ -54,7 +54,7 @@ class DoneLoopHandler<V> extends AsyncLoopHandler<V, V> implements Serializable 
   @Override
   @SuppressWarnings("WhileLoopReplaceableByForEach")
   void addFailures(@Nullable final Iterable<? extends Throwable> failures,
-      @NotNull final AsyncResultCollection<V> results) throws Exception {
+      @NotNull final AsyncResults<V> results) throws Exception {
     if (failures == null) {
       return;
     }
@@ -75,7 +75,7 @@ class DoneLoopHandler<V> extends AsyncLoopHandler<V, V> implements Serializable 
   }
 
   @Override
-  void addValue(final V value, @NotNull final AsyncResultCollection<V> results) throws Exception {
+  void addValue(final V value, @NotNull final AsyncResults<V> results) throws Exception {
     mAction.perform();
     super.addValue(value, results);
   }
@@ -83,7 +83,7 @@ class DoneLoopHandler<V> extends AsyncLoopHandler<V, V> implements Serializable 
   @Override
   @SuppressWarnings("WhileLoopReplaceableByForEach")
   void addValues(@Nullable final Iterable<? extends V> values,
-      @NotNull final AsyncResultCollection<V> results) throws Exception {
+      @NotNull final AsyncResults<V> results) throws Exception {
     if (values == null) {
       return;
     }

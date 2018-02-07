@@ -14,29 +14,27 @@
  * limitations under the License.
  */
 
-package dm.jail;
+package dm.jail.async;
 
 import org.jetbrains.annotations.NotNull;
-
-import dm.jail.async.AsyncResults;
+import org.jetbrains.annotations.Nullable;
 
 /**
- * Created by davide-maestroni on 01/14/2018.
+ * Created by davide-maestroni on 01/08/2018.
  */
-class AsyncStatementLoopHandler<V, R> {
-
-  void failure(@NotNull final Throwable failure, @NotNull final AsyncResults<R> results) throws
-      Exception {
-    results.addFailure(failure).set();
-  }
+public interface AsyncResults<V> {
 
   @NotNull
-  AsyncStatementLoopHandler<V, R> renew() {
-    return this;
-  }
+  AsyncResults<V> addFailure(@NotNull Throwable failure);
 
-  @SuppressWarnings("unchecked")
-  void value(final V value, @NotNull final AsyncResults<R> results) throws Exception {
-    results.addValue((R) value).set();
-  }
+  @NotNull
+  AsyncResults<V> addFailures(@Nullable Iterable<? extends Throwable> failures);
+
+  @NotNull
+  AsyncResults<V> addValue(V value);
+
+  @NotNull
+  AsyncResults<V> addValues(@Nullable Iterable<? extends V> values);
+
+  void set();
 }

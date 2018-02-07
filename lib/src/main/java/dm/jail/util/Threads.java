@@ -25,11 +25,6 @@ import java.lang.Thread.State;
  */
 public class Threads {
 
-  private static final Object mMutex = new Object();
-
-  private static WeakIdentityHashMap<ThreadOwner, Void> mOwners =
-      new WeakIdentityHashMap<ThreadOwner, Void>();
-
   private Threads() {
   }
 
@@ -41,30 +36,5 @@ public class Threads {
     }
 
     return false;
-  }
-
-  public static boolean isOwnedThread() {
-    for (final ThreadOwner owner : mOwners.keySet()) {
-      if ((owner != null) && owner.isOwnedThread()) {
-        return true;
-      }
-    }
-
-    return false;
-  }
-
-  public static void register(@NotNull final ThreadOwner owner) {
-    ConstantConditions.notNull("owner", owner);
-    synchronized (mMutex) {
-      final WeakIdentityHashMap<ThreadOwner, Void> owners =
-          new WeakIdentityHashMap<ThreadOwner, Void>(mOwners);
-      owners.put(owner, null);
-      mOwners = owners;
-    }
-  }
-
-  public interface ThreadOwner {
-
-    boolean isOwnedThread();
   }
 }

@@ -16,25 +16,10 @@
 
 package dm.jail.async;
 
-import org.jetbrains.annotations.NotNull;
-import org.jetbrains.annotations.Nullable;
-
 /**
- * Created by davide-maestroni on 01/08/2018.
+ * Created by davide-maestroni on 02/07/2018.
  */
-public interface AsyncResultCollection<V> {
+public interface Completer<S, T> {
 
-  @NotNull
-  AsyncResultCollection<V> addFailure(@NotNull Throwable failure);
-
-  @NotNull
-  AsyncResultCollection<V> addFailures(@Nullable Iterable<? extends Throwable> failures);
-
-  @NotNull
-  AsyncResultCollection<V> addValue(V value);
-
-  @NotNull
-  AsyncResultCollection<V> addValues(@Nullable Iterable<? extends V> values);
-
-  void set();
+  S complete(S stack, T state) throws Exception;
 }

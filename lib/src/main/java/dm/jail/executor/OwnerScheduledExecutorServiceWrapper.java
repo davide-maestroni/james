@@ -21,23 +21,25 @@ import org.jetbrains.annotations.NotNull;
 import java.io.InvalidObjectException;
 import java.io.ObjectStreamException;
 import java.io.Serializable;
-import java.util.WeakHashMap;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 
 import dm.jail.config.BuildConfig;
 import dm.jail.util.ConstantConditions;
-import dm.jail.util.Threads;
+import dm.jail.util.WeakIdentityHashMap;
 
 /**
  * Class implementing an executor employing an executor service.
  * <p>
  * Created by davide-maestroni on 10/14/2014.
  */
-class ServiceExecutor extends AsyncExecutor implements Serializable {
+class OwnerScheduledExecutorServiceWrapper
+    implements OwnerExecutor, ScheduledExecutor, Serializable {
 
-  private static final WeakHashMap<ScheduledExecutorService, Boolean> mOwners =
-      new WeakHashMap<ScheduledExecutorService, Boolean>();
+  private static final WeakIdentityHashMap<ScheduledExecutorService,
+      OwnerScheduledExecutorServiceWrapper>
+      sOwners =
+      new WeakIdentityHashMap<ScheduledExecutorService, OwnerScheduledExecutorServiceWrapper>();
 
   private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
 
@@ -50,7 +52,7 @@ class ServiceExecutor extends AsyncExecutor implements Serializable {
    *
    * @param service the executor service.
    */
-  private ServiceExecutor(@NotNull final ScheduledExecutorService service) {
+  private OwnerScheduledExecutorServiceWrapper(@NotNull final ScheduledExecutorService service) {
     mService = ConstantConditions.notNull("service", service);
   }
 
@@ -61,15 +63,17 @@ class ServiceExecutor extends AsyncExecutor implements Serializable {
    * @return the executor.
    */
   @NotNull
-  static ServiceExecutor of(@NotNull final ScheduledExecutorService service) {
-    final ServiceExecutor executor = new ServiceExecutor(service);
-    synchronized (mOwners) {
-      if (!Boolean.TRUE.equals(mOwners.put(service, Boolean.TRUE))) {
-        Threads.register(executor);
+  static OwnerScheduledExecutorServiceWrapper of(@NotNull final ScheduledExecutorService service) {
+    OwnerScheduledExecutorServiceWrapper ownerExecutor;
+    synchronized (sOwners) {
+      ownerExecutor = sOwners.get(service);
+      if (ownerExecutor == null) {
+        ownerExecutor = new OwnerScheduledExecutorServiceWrapper(service);
+        sOwners.put(service, ownerExecutor);
       }
     }
 
-    return executor;
+    return ownerExecutor;
   }
 
   /**
@@ -81,24 +85,26 @@ class ServiceExecutor extends AsyncExecutor implements Serializable {
    * @return the executor.
    */
   @NotNull
-  static ServiceExecutor ofStoppable(@NotNull final ScheduledExecutorService service) {
-    final StoppableServiceExecutor executor = new StoppableServiceExecutor(service);
-    synchronized (mOwners) {
-      if (!Boolean.TRUE.equals(mOwners.put(service, Boolean.TRUE))) {
-        Threads.register(executor);
-      }
-    }
-
-    return executor;
+  static OwnerScheduledExecutorServiceWrapper ofUnstoppable(
+      @NotNull final ScheduledExecutorService service) {
+    return new UnstoppableScheduledServiceExecutor(service);
   }
 
-  public void execute(@NotNull final Runnable command, final long delay,
+  public void execute(@NotNull final Runnable runnable, final long delay,
       @NotNull final TimeUnit timeUnit) {
-    mService.schedule(new RunnableWrapper(command), delay, timeUnit);
+    mService.schedule(new RunnableWrapper(runnable), delay, timeUnit);
+  }
+
+  public void execute(@NotNull final Runnable runnable) {
+    mService.execute(new RunnableWrapper(runnable));
   }
 
   public boolean isOwnedThread() {
     return Boolean.TRUE.equals(mIsManaged.get());
+  }
+
+  public void stop() {
+    mService.shutdown();
   }
 
   @NotNull
@@ -119,7 +125,7 @@ class ServiceExecutor extends AsyncExecutor implements Serializable {
     @NotNull
     Object readResolve() throws ObjectStreamException {
       try {
-        return new ServiceExecutor(mService);
+        return of(mService);
 
       } catch (final Throwable t) {
         throw new InvalidObjectException(t.getMessage());
@@ -131,7 +137,8 @@ class ServiceExecutor extends AsyncExecutor implements Serializable {
    * Implementation of a scheduled executor shutting down the backing service as soon as the
    * executor is stopped.
    */
-  private static class StoppableServiceExecutor extends ServiceExecutor {
+  private static class UnstoppableScheduledServiceExecutor
+      extends OwnerScheduledExecutorServiceWrapper {
 
     private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
 
@@ -142,14 +149,39 @@ class ServiceExecutor extends AsyncExecutor implements Serializable {
      *
      * @param service the executor service.
      */
-    private StoppableServiceExecutor(final ScheduledExecutorService service) {
+    private UnstoppableScheduledServiceExecutor(final ScheduledExecutorService service) {
       super(service);
       mService = service;
     }
 
     @Override
     public void stop() {
-      mService.shutdown();
+    }
+
+    @NotNull
+    private Object writeReplace() throws ObjectStreamException {
+      return new ExecutorProxy(mService);
+    }
+
+    private static class ExecutorProxy implements Serializable {
+
+      private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
+
+      private final ScheduledExecutorService mService;
+
+      private ExecutorProxy(@NotNull final ScheduledExecutorService service) {
+        mService = service;
+      }
+
+      @NotNull
+      Object readResolve() throws ObjectStreamException {
+        try {
+          return new UnstoppableScheduledServiceExecutor(mService);
+
+        } catch (final Throwable t) {
+          throw new InvalidObjectException(t.getMessage());
+        }
+      }
     }
   }
 

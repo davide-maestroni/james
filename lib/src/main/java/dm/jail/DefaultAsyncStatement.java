@@ -28,6 +28,7 @@ import java.util.List;
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.Executor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
@@ -40,14 +41,12 @@ import dm.jail.async.Observer;
 import dm.jail.async.RuntimeInterruptedException;
 import dm.jail.async.RuntimeTimeoutException;
 import dm.jail.config.BuildConfig;
-import dm.jail.executor.ScheduledExecutor;
-import dm.jail.executor.ScheduledExecutors;
-import dm.jail.log.LogPrinter;
+import dm.jail.executor.ExecutorPool;
 import dm.jail.log.LogLevel;
+import dm.jail.log.LogPrinter;
 import dm.jail.log.Logger;
 import dm.jail.util.ConstantConditions;
 import dm.jail.util.SerializableProxy;
-import dm.jail.util.Threads;
 import dm.jail.util.TimeUnits;
 import dm.jail.util.TimeUnits.Condition;
 
@@ -67,7 +66,7 @@ class DefaultAsyncStatement<V> implements AsyncStatement<V>, Serializable {
 
   private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
 
-  private final ScheduledExecutor mExecutor;
+  private final Executor mExecutor;
 
   private final CopyOnWriteArrayList<AsyncStatement<?>> mForked =
       new CopyOnWriteArrayList<AsyncStatement<?>>();
@@ -91,14 +90,15 @@ class DefaultAsyncStatement<V> implements AsyncStatement<V>, Serializable {
   private StatementState mState = StatementState.Evaluating;
 
   DefaultAsyncStatement(@NotNull final Observer<? super AsyncResult<V>> observer,
-      final boolean isEvaluated, @Nullable final LogPrinter printer, @Nullable final LogLevel level) {
+      final boolean isEvaluated, @Nullable final LogPrinter printer,
+      @Nullable final LogLevel level) {
     this(ConstantConditions.notNull("observer", observer), isEvaluated,
-        ScheduledExecutors.immediateExecutor(), printer, level);
+        ExecutorPool.immediateExecutor(), printer, level);
   }
 
   @SuppressWarnings("unchecked")
   private DefaultAsyncStatement(@NotNull final Observer<? super AsyncResult<V>> observer,
-      final boolean isEvaluated, @NotNull final ScheduledExecutor executor,
+      final boolean isEvaluated, @NotNull final Executor executor,
       @Nullable final LogPrinter printer, @Nullable final LogLevel level) {
     // forking
     mObserver = (Observer<AsyncResult<?>>) observer;
@@ -122,7 +122,7 @@ class DefaultAsyncStatement<V> implements AsyncStatement<V>, Serializable {
 
   @SuppressWarnings("unchecked")
   private DefaultAsyncStatement(@NotNull final Observer<AsyncResult<?>> observer,
-      final boolean isEvaluated, @NotNull final ScheduledExecutor executor,
+      final boolean isEvaluated, @NotNull final Executor executor,
       @Nullable final LogPrinter printer, @Nullable final LogLevel level,
       @NotNull final ChainHead<?> head, @NotNull final StatementChain<?, V> tail) {
     // serialization
@@ -151,9 +151,9 @@ class DefaultAsyncStatement<V> implements AsyncStatement<V>, Serializable {
 
   @SuppressWarnings("unchecked")
   private DefaultAsyncStatement(@NotNull final Observer<AsyncResult<?>> observer,
-      final boolean isEvaluated, @NotNull final ScheduledExecutor executor,
-      @NotNull final Logger logger, @NotNull final ChainHead<?> head,
-      @NotNull final StatementChain<?, ?> tail, @NotNull final StatementChain<?, V> chain) {
+      final boolean isEvaluated, @NotNull final Executor executor, @NotNull final Logger logger,
+      @NotNull final ChainHead<?> head, @NotNull final StatementChain<?, ?> tail,
+      @NotNull final StatementChain<?, V> chain) {
     // chaining
     mObserver = observer;
     mExecutor = executor;
@@ -169,9 +169,8 @@ class DefaultAsyncStatement<V> implements AsyncStatement<V>, Serializable {
 
   @SuppressWarnings("unchecked")
   private DefaultAsyncStatement(@NotNull final Observer<AsyncResult<?>> observer,
-      final boolean isEvaluated, @NotNull final ScheduledExecutor executor,
-      @NotNull final Logger logger, @NotNull final ChainHead<?> head,
-      @NotNull final StatementChain<?, V> tail) {
+      final boolean isEvaluated, @NotNull final Executor executor, @NotNull final Logger logger,
+      @NotNull final ChainHead<?> head, @NotNull final StatementChain<?, V> tail) {
     // copy
     mObserver = observer;
     mExecutor = executor;
@@ -411,7 +410,7 @@ class DefaultAsyncStatement<V> implements AsyncStatement<V>, Serializable {
   }
 
   @NotNull
-  public AsyncStatement<V> on(@NotNull final ScheduledExecutor executor) {
+  public AsyncStatement<V> on(@NotNull final Executor executor) {
     final Logger logger = mLogger;
     return chain(new ChainHandler<V, V>(
             new ExecutorStatementHandler<V>(executor, logger.getLogPrinter(), logger.getLogLevel
@@ -569,8 +568,7 @@ class DefaultAsyncStatement<V> implements AsyncStatement<V>, Serializable {
   @NotNull
   @SuppressWarnings("unchecked")
   private <R> AsyncStatement<R> chain(@NotNull final StatementChain<V, R> chain,
-      @NotNull final ScheduledExecutor chainExecutor,
-      @NotNull final ScheduledExecutor newExecutor) {
+      @NotNull final Executor chainExecutor, @NotNull final Executor newExecutor) {
     final ChainHead<?> head = mHead;
     final Logger logger = mLogger;
     final Runnable chaining;
@@ -632,7 +630,7 @@ class DefaultAsyncStatement<V> implements AsyncStatement<V>, Serializable {
     }
 
     final Logger logger = mLogger;
-    if (logger.willPrint(LogLevel.WARNING) && Threads.isOwnedThread()) {
+    if (logger.willPrint(LogLevel.WARNING) && ExecutorPool.isOwnedThread()) {
       logger.wrn("ATTENTION: possible deadlock detected! Try to avoid waiting on managed threads");
     }
   }
@@ -971,7 +969,7 @@ class DefaultAsyncStatement<V> implements AsyncStatement<V>, Serializable {
 
     private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
 
-    private final ScheduledExecutor mExecutor;
+    private final Executor mExecutor;
 
     private final Forker<S, AsyncStatement<V>, V, AsyncResult<V>> mForker;
 
@@ -990,7 +988,7 @@ class DefaultAsyncStatement<V> implements AsyncStatement<V>, Serializable {
       mForker =
           (Forker<S, AsyncStatement<V>, V, AsyncResult<V>>) ConstantConditions.notNull("forker",
               forker);
-      mExecutor = ScheduledExecutors.withThrottling(ScheduledExecutors.immediateExecutor(), 1);
+      mExecutor = ExecutorPool.withThrottling(1, ExecutorPool.immediateExecutor());
       mStatement = statement;
     }
 
@@ -1280,7 +1278,7 @@ class DefaultAsyncStatement<V> implements AsyncStatement<V>, Serializable {
     private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
 
     private StatementProxy(final Observer<AsyncResult<?>> observer, final boolean isEvaluated,
-        final ScheduledExecutor executor, final LogPrinter printer, final LogLevel level,
+        final Executor executor, final LogPrinter printer, final LogLevel level,
         final List<StatementChain<?, ?>> chains) {
       super(proxy(observer), isEvaluated, executor, printer, level, chains);
     }
@@ -1298,8 +1296,8 @@ class DefaultAsyncStatement<V> implements AsyncStatement<V>, Serializable {
         }
 
         return new DefaultAsyncStatement<Object>((Observer<AsyncResult<?>>) args[0],
-            (Boolean) args[1], (ScheduledExecutor) args[2], (LogPrinter) args[3], (LogLevel) args[4],
-            head, (StatementChain<?, Object>) tail);
+            (Boolean) args[1], (Executor) args[2], (LogPrinter) args[3], (LogLevel) args[4], head,
+            (StatementChain<?, Object>) tail);
 
       } catch (final Throwable t) {
         throw new InvalidObjectException(t.getMessage());

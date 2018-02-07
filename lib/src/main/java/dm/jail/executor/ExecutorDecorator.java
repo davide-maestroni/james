@@ -18,25 +18,11 @@ package dm.jail.executor;
 
 import org.jetbrains.annotations.NotNull;
 
-import java.util.concurrent.TimeUnit;
-
 /**
- * Base abstract implementation of an asynchronous executor.
- * <br>
- * For an asynchronous executor the execution threads are the same as the managed ones.
- * <p>
- * Created by davide-maestroni on 06/06/2016.
+ * Created by davide-maestroni on 02/07/2018.
  */
-public abstract class AsyncExecutor implements ScheduledExecutor {
+interface ExecutorDecorator {
 
-  public void execute(@NotNull final Runnable command) {
-    execute(command, 0, TimeUnit.MILLISECONDS);
-  }
-
-  public boolean isExecutionThread() {
-    return isOwnedThread();
-  }
-
-  public void stop() {
-  }
+  @NotNull
+  OwnerExecutor getDecorated();
 }

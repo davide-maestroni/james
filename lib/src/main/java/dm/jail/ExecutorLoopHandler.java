@@ -23,14 +23,14 @@ import java.io.InvalidObjectException;
 import java.io.ObjectStreamException;
 import java.io.Serializable;
 import java.util.concurrent.CancellationException;
+import java.util.concurrent.Executor;
 
-import dm.jail.async.AsyncResultCollection;
+import dm.jail.async.AsyncResults;
 import dm.jail.config.BuildConfig;
-import dm.jail.executor.ScheduledExecutor;
+import dm.jail.executor.ExecutorPool;
 import dm.jail.log.LogLevel;
 import dm.jail.log.LogPrinter;
 import dm.jail.log.Logger;
-import dm.jail.util.ConstantConditions;
 
 /**
  * Created by davide-maestroni on 02/01/2018.
@@ -39,19 +39,18 @@ class ExecutorLoopHandler<V> extends AsyncLoopHandler<V, V> implements Serializa
 
   private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
 
-  private final ScheduledExecutor mExecutor;
+  private final Executor mExecutor;
 
   private final Logger mLogger;
 
-  ExecutorLoopHandler(@NotNull final ScheduledExecutor executor, @Nullable final LogPrinter printer,
+  ExecutorLoopHandler(@NotNull final Executor executor, @Nullable final LogPrinter printer,
       @Nullable final LogLevel level) {
-    mExecutor = ConstantConditions.notNull("executor", executor);
+    mExecutor = ExecutorPool.register(executor);
     mLogger = Logger.newLogger(printer, level, this);
   }
 
   @Override
-  void addFailure(@NotNull final Throwable failure,
-      @NotNull final AsyncResultCollection<V> results) {
+  void addFailure(@NotNull final Throwable failure, @NotNull final AsyncResults<V> results) {
     if (failure instanceof CancellationException) {
       try {
         results.addFailure(failure).set();
@@ -64,7 +63,7 @@ class ExecutorLoopHandler<V> extends AsyncLoopHandler<V, V> implements Serializa
       mExecutor.execute(new HandlerRunnable(results) {
 
         @Override
-        protected void innerRun(@NotNull final AsyncResultCollection<V> results) {
+        protected void innerRun(@NotNull final AsyncResults<V> results) {
           results.addFailure(failure).set();
         }
       });
@@ -73,22 +72,22 @@ class ExecutorLoopHandler<V> extends AsyncLoopHandler<V, V> implements Serializa
 
   @Override
   void addFailures(@Nullable final Iterable<? extends Throwable> failures,
-      @NotNull final AsyncResultCollection<V> results) {
+      @NotNull final AsyncResults<V> results) {
     mExecutor.execute(new HandlerRunnable(results) {
 
       @Override
-      protected void innerRun(@NotNull final AsyncResultCollection<V> results) {
+      protected void innerRun(@NotNull final AsyncResults<V> results) {
         results.addFailures(failures).set();
       }
     });
   }
 
   @Override
-  void addValue(final V value, @NotNull final AsyncResultCollection<V> results) {
+  void addValue(final V value, @NotNull final AsyncResults<V> results) {
     mExecutor.execute(new HandlerRunnable(results) {
 
       @Override
-      protected void innerRun(@NotNull final AsyncResultCollection<V> results) {
+      protected void innerRun(@NotNull final AsyncResults<V> results) {
         results.addValue(value).set();
       }
     });
@@ -96,11 +95,11 @@ class ExecutorLoopHandler<V> extends AsyncLoopHandler<V, V> implements Serializa
 
   @Override
   void addValues(@Nullable final Iterable<? extends V> values,
-      @NotNull final AsyncResultCollection<V> results) {
+      @NotNull final AsyncResults<V> results) {
     mExecutor.execute(new HandlerRunnable(results) {
 
       @Override
-      protected void innerRun(@NotNull final AsyncResultCollection<V> results) {
+      protected void innerRun(@NotNull final AsyncResults<V> results) {
         results.addValues(values).set();
       }
     });
@@ -116,14 +115,13 @@ class ExecutorLoopHandler<V> extends AsyncLoopHandler<V, V> implements Serializa
 
     private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
 
-    private final ScheduledExecutor mExecutor;
+    private final Executor mExecutor;
 
     private final LogLevel mLogLevel;
 
     private final LogPrinter mLogPrinter;
 
-    private HandlerProxy(final ScheduledExecutor executor, final LogPrinter printer,
-        final LogLevel level) {
+    private HandlerProxy(final Executor executor, final LogPrinter printer, final LogLevel level) {
       mExecutor = executor;
       mLogPrinter = printer;
       mLogLevel = level;
@@ -142,9 +140,9 @@ class ExecutorLoopHandler<V> extends AsyncLoopHandler<V, V> implements Serializa
 
   private abstract class HandlerRunnable implements Runnable {
 
-    private final AsyncResultCollection<V> mResults;
+    private final AsyncResults<V> mResults;
 
-    private HandlerRunnable(@NotNull final AsyncResultCollection<V> results) {
+    private HandlerRunnable(@NotNull final AsyncResults<V> results) {
       mResults = results;
     }
 
@@ -157,6 +155,6 @@ class ExecutorLoopHandler<V> extends AsyncLoopHandler<V, V> implements Serializa
       }
     }
 
-    protected abstract void innerRun(@NotNull AsyncResultCollection<V> results);
+    protected abstract void innerRun(@NotNull AsyncResults<V> results);
   }
 }

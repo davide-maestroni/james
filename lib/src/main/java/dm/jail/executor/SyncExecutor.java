@@ -16,6 +16,8 @@
 
 package dm.jail.executor;
 
+import java.util.concurrent.Executor;
+
 /**
  * Base abstract implementation of a synchronous executor.
  * <br>
@@ -23,14 +25,7 @@ package dm.jail.executor;
  * <p>
  * Created by davide-maestroni on 06/06/2016.
  */
-public abstract class SyncExecutor implements ScheduledExecutor {
-
-  public boolean isExecutionThread() {
-    return true;
-  }
-
-  public void stop() {
-  }
+abstract class SyncExecutor implements Executor {
 
   public boolean isOwnedThread() {
     return false;

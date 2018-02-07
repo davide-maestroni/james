@@ -20,6 +20,7 @@ import org.jetbrains.annotations.NotNull;
 
 import java.io.ObjectStreamException;
 import java.io.Serializable;
+import java.util.concurrent.Executor;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
@@ -28,6 +29,7 @@ import java.util.concurrent.TimeUnit;
 
 import dm.jail.config.BuildConfig;
 import dm.jail.util.ConstantConditions;
+import dm.jail.util.WeakIdentityHashMap;
 
 /**
  * Utility class for creating and sharing executor instances.
@@ -35,7 +37,7 @@ import dm.jail.util.ConstantConditions;
  * Created by davide-maestroni on 09/09/2014.
  */
 @SuppressWarnings("WeakerAccess")
-public class ScheduledExecutors {
+public class ExecutorPool {
 
   private static final Object sMutex = new Object();
 
@@ -45,10 +47,13 @@ public class ScheduledExecutors {
 
   private static ScheduledExecutor sForegroundExecutor;
 
+  private static WeakIdentityHashMap<ThreadOwner, Void> sOwners =
+      new WeakIdentityHashMap<ThreadOwner, Void>();
+
   /**
    * Avoid explicit instantiation.
    */
-  protected ScheduledExecutors() {
+  protected ExecutorPool() {
     ConstantConditions.avoid();
   }
 
@@ -103,8 +108,18 @@ public class ScheduledExecutors {
    * @return the executor instance.
    */
   @NotNull
-  public static ScheduledExecutor immediateExecutor() {
+  public static Executor immediateExecutor() {
     return ImmediateExecutor.instance();
+  }
+
+  public static boolean isOwnedThread() {
+    for (final ThreadOwner owner : sOwners.keySet()) {
+      if ((owner != null) && owner.isOwnedThread()) {
+        return true;
+      }
+    }
+
+    return false;
   }
 
   /**
@@ -117,7 +132,7 @@ public class ScheduledExecutors {
    * @return the executor instance.
    */
   @NotNull
-  public static ScheduledExecutor loopExecutor() {
+  public static Executor loopExecutor() {
     return LoopExecutor.instance();
   }
 
@@ -143,7 +158,7 @@ public class ScheduledExecutors {
   @NotNull
   public static ScheduledExecutor newDynamicPoolExecutor(final int corePoolSize,
       final int maximumPoolSize, final long keepAliveTime, @NotNull final TimeUnit keepAliveUnit) {
-    return newStoppableServiceExecutor(
+    return OwnerScheduledExecutorServiceWrapper.of(
         new DynamicScheduledThreadPoolExecutorService(corePoolSize, maximumPoolSize, keepAliveTime,
             keepAliveUnit));
   }
@@ -172,7 +187,7 @@ public class ScheduledExecutors {
   public static ScheduledExecutor newDynamicPoolExecutor(final int corePoolSize,
       final int maximumPoolSize, final long keepAliveTime, @NotNull final TimeUnit keepAliveUnit,
       @NotNull final ThreadFactory threadFactory) {
-    return newStoppableServiceExecutor(
+    return OwnerScheduledExecutorServiceWrapper.of(
         new DynamicScheduledThreadPoolExecutorService(corePoolSize, maximumPoolSize, keepAliveTime,
             keepAliveUnit, threadFactory));
   }
@@ -199,60 +214,19 @@ public class ScheduledExecutors {
     return new PoolExecutor(poolSize);
   }
 
-  /**
-   * Returns an executor employing the specified executor service.
-   * <p>
-   * Be aware that the created executor will not fully comply with the interface contract. Java
-   * executor services do not in fact publish the used threads, so that knowing in advance whether
-   * a thread belongs to the managed pool is not feasible. This issue actually exposes routines
-   * employing the executor to possible deadlocks, in case the specified service is not exclusively
-   * accessed by the executor itself.
-   * <br>
-   * Be then careful when employing executors returned by this method.
-   *
-   * @param service the executor service.
-   * @return the executor instance.
-   */
   @NotNull
-  public static ScheduledExecutor newServiceExecutor(
-      @NotNull final ScheduledExecutorService service) {
-    return ServiceExecutor.of(service);
-  }
-
-  /**
-   * Returns an executor employing the specified executor service.
-   * <p>
-   * Be aware that the created executor will not fully comply with the interface contract. Java
-   * executor services do not in fact publish the used threads, so that knowing in advance whether
-   * a thread belongs to the managed pool is not feasible. This issue actually exposes routines
-   * employing the executor to possible deadlocks, in case the specified service is not exclusively
-   * accessed by the executor itself.
-   * <br>
-   * Be then careful when employing executors returned by this method.
-   *
-   * @param service the executor service.
-   * @return the executor instance.
-   */
-  @NotNull
-  public static ScheduledExecutor newServiceExecutor(@NotNull final ExecutorService service) {
-    return newServiceExecutor(new ScheduledThreadPoolExecutorService(service));
+  public static ScheduledExecutor register(@NotNull final ScheduledExecutor executor) {
+    return registerOwner(ConstantConditions.notNull("executor", executor));
   }
 
   @NotNull
-  public static ScheduledExecutor newStoppableServiceExecutor(
-      @NotNull final ScheduledExecutorService service) {
-    return ServiceExecutor.ofStoppable(service);
+  public static Executor register(@NotNull final Executor executor) {
+    return registerOwner(managed(executor));
   }
 
   @NotNull
-  public static ScheduledExecutor newStoppableServiceExecutor(
-      @NotNull final ExecutorService service) {
-    return newStoppableServiceExecutor(new ScheduledThreadPoolExecutorService(service));
-  }
-
-  @NotNull
-  public static ScheduledExecutor withDelay(@NotNull final ScheduledExecutor executor,
-      final long delay, @NotNull final TimeUnit timeUnit) {
+  public static ScheduledExecutor withDelay(final long delay, @NotNull final TimeUnit timeUnit,
+      @NotNull final ScheduledExecutor executor) {
     if (ConstantConditions.notNegative("delay", delay) == 0) {
       return executor;
     }
@@ -286,14 +260,19 @@ public class ScheduledExecutors {
    * in different threads than the calling one, thus causing the results to be not immediately
    * available.
    *
-   * @param executor the wrapped executor instance.
    * @param priority the commands priority.
+   * @param executor the wrapped executor instance.
    * @return the executor instance.
    */
   @NotNull
-  public static ScheduledExecutor withPriority(@NotNull final ScheduledExecutor executor,
-      final int priority) {
+  public static ScheduledExecutor withPriority(final int priority,
+      @NotNull final ScheduledExecutor executor) {
     return PriorityExecutor.of(executor, priority);
+  }
+
+  @NotNull
+  public static Executor withPriority(final int priority, @NotNull final Executor executor) {
+    return PriorityExecutor.of(new ScheduledExecutorWrapper(managed(executor)), priority);
   }
 
   /**
@@ -304,24 +283,132 @@ public class ScheduledExecutors {
    * in different threads than the calling one, thus causing the results to be not immediately
    * available.
    *
-   * @param executor      the wrapped instance.
    * @param maxExecutions the maximum number of running executions.
+   * @param executor      the wrapped instance.
    * @return the executor instance.
    * @throws IllegalArgumentException if the specified max number is less than 1.
    */
   @NotNull
-  public static ScheduledExecutor withThrottling(@NotNull final ScheduledExecutor executor,
-      final int maxExecutions) {
+  public static ScheduledExecutor withThrottling(final int maxExecutions,
+      @NotNull final ScheduledExecutor executor) {
     return ThrottlingExecutor.of(executor, maxExecutions);
+  }
+
+  @NotNull
+  public static Executor withThrottling(final int maxExecutions, @NotNull final Executor executor) {
+    return ThrottlingExecutor.of(new ScheduledExecutorWrapper(managed(executor)), maxExecutions);
+  }
+
+  @NotNull
+  private static OwnerExecutor managed(@NotNull final Executor executor) {
+    final OwnerExecutor managedExecutor;
+    if (executor instanceof OwnerExecutor) {
+      managedExecutor = (OwnerExecutor) executor;
+
+    } else if (executor instanceof ThreadOwner) {
+      managedExecutor = ThreadOwnerExecutor.of(executor);
+
+    } else if (executor instanceof ScheduledExecutorService) {
+      managedExecutor =
+          OwnerScheduledExecutorServiceWrapper.of((ScheduledExecutorService) executor);
+
+    } else if (executor instanceof ExecutorService) {
+      managedExecutor = OwnerExecutorServiceWrapper.of(((ExecutorService) executor));
+
+    } else {
+      managedExecutor = OwnerExecutorWrapper.of(executor);
+    }
+
+    return managedExecutor;
   }
 
   @NotNull
   private static ScheduledExecutor optimizedExecutor(final int threadPriority) {
     final int processors = Runtime.getRuntime().availableProcessors();
-    return newServiceExecutor(
+    return OwnerScheduledExecutorServiceWrapper.ofUnstoppable(
         new DynamicScheduledThreadPoolExecutorService(Math.max(2, processors >> 1),
             Math.max(2, (processors << 1) - 1), 10L, TimeUnit.SECONDS,
             new ExecutorThreadFactory(threadPriority)));
+  }
+
+  @NotNull
+  private static <T extends OwnerExecutor> T registerOwner(@NotNull final T owner) {
+    OwnerExecutor decorated = owner;
+    while (decorated instanceof ExecutorDecorator) {
+      decorated = ((ExecutorDecorator) decorated).getDecorated();
+    }
+
+    synchronized (sMutex) {
+      if (!sOwners.containsKey(owner)) {
+        final WeakIdentityHashMap<ThreadOwner, Void> owners =
+            new WeakIdentityHashMap<ThreadOwner, Void>(sOwners);
+        owners.put(decorated, null);
+        sOwners = owners;
+      }
+    }
+
+    return owner;
+  }
+
+  static class ThreadOwnerExecutor implements OwnerExecutor, Serializable {
+
+    private static final WeakIdentityHashMap<Executor, ThreadOwnerExecutor> sOwners =
+        new WeakIdentityHashMap<Executor, ThreadOwnerExecutor>();
+
+    private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
+
+    private final Executor mExecutor;
+
+    private final ThreadOwner mThreadOwner;
+
+    @SuppressWarnings("unchecked")
+    ThreadOwnerExecutor(@NotNull final Executor executor) {
+      mExecutor = ConstantConditions.notNull("executor", executor);
+      mThreadOwner = (ThreadOwner) executor;
+    }
+
+    @NotNull
+    public static ThreadOwnerExecutor of(@NotNull final Executor executor) {
+      ThreadOwnerExecutor ownerExecutor;
+      synchronized (sOwners) {
+        ownerExecutor = sOwners.get(executor);
+        if (ownerExecutor == null) {
+          ownerExecutor = new ThreadOwnerExecutor(executor);
+          sOwners.put(executor, ownerExecutor);
+        }
+      }
+
+      return ownerExecutor;
+    }
+
+    public void execute(@NotNull final Runnable runnable) {
+      mExecutor.execute(runnable);
+    }
+
+    public boolean isOwnedThread() {
+      return mThreadOwner.isOwnedThread();
+    }
+
+    @NotNull
+    private Object writeReplace() throws ObjectStreamException {
+      return new ExecutorProxy(mExecutor);
+    }
+
+    private static class ExecutorProxy implements Serializable {
+
+      private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
+
+      private final Executor mExecutor;
+
+      private ExecutorProxy(final Executor executor) {
+        mExecutor = executor;
+      }
+
+      @NotNull
+      Object readResolve() throws ObjectStreamException {
+        return ThreadOwnerExecutor.of(mExecutor);
+      }
+    }
   }
 
   private static class BackgroundExecutor extends ScheduledExecutorDecorator
@@ -436,13 +523,14 @@ public class ScheduledExecutors {
     private final int mPoolSize;
 
     private PoolExecutor() {
-      super(newStoppableServiceExecutor(
-          Executors.newScheduledThreadPool((Runtime.getRuntime().availableProcessors() << 1) - 1)));
-      mPoolSize = Integer.MIN_VALUE;
+      this(Integer.MIN_VALUE);
     }
 
     private PoolExecutor(final int poolSize) {
-      super(newStoppableServiceExecutor(Executors.newScheduledThreadPool(poolSize)));
+      super(OwnerScheduledExecutorServiceWrapper.of(
+          (poolSize == Integer.MIN_VALUE) ? Executors.newScheduledThreadPool(
+              (Runtime.getRuntime().availableProcessors() << 1) - 1)
+              : Executors.newScheduledThreadPool(poolSize)));
       mPoolSize = poolSize;
     }
 
@@ -463,8 +551,7 @@ public class ScheduledExecutors {
 
       @NotNull
       Object readResolve() throws ObjectStreamException {
-        return (mPoolSize == Integer.MIN_VALUE) ? new ScheduledExecutors.PoolExecutor()
-            : new ScheduledExecutors.PoolExecutor(mPoolSize);
+        return new ExecutorPool.PoolExecutor(mPoolSize);
       }
     }
   }

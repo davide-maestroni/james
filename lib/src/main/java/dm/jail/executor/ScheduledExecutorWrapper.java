@@ -18,42 +18,43 @@ package dm.jail.executor;
 
 import org.jetbrains.annotations.NotNull;
 
-import java.io.ObjectStreamException;
 import java.io.Serializable;
+import java.util.concurrent.TimeUnit;
 
 import dm.jail.config.BuildConfig;
+import dm.jail.util.ConstantConditions;
 
 /**
- * Class implementing a synchronous loop executor.
- * <p>
- * The executor maintains an internal buffer of commands that are consumed only when the last one
- * completes, thus avoiding overflowing the call stack because of nested calls to other routines.
- * <p>
- * Created by davide-maestroni on 09/18/2014.
+ * Created by davide-maestroni on 02/07/2018.
  */
-class LoopExecutor extends SyncExecutor implements OwnerExecutor, Serializable {
-
-  private static final LoopExecutor sInstance = new LoopExecutor();
+class ScheduledExecutorWrapper implements ScheduledExecutor, ExecutorDecorator, Serializable {
 
   private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
 
-  /**
-   * Avoid explicit instantiation.
-   */
-  private LoopExecutor() {
+  private final OwnerExecutor mExecutor;
+
+  ScheduledExecutorWrapper(@NotNull final OwnerExecutor executor) {
+    mExecutor = ConstantConditions.notNull("executor", executor);
+  }
+
+  public void execute(@NotNull final Runnable runnable, final long delay,
+      @NotNull final TimeUnit timeUnit) {
+    ConstantConditions.unsupported();
+  }
+
+  public void execute(@NotNull final Runnable runnable) {
+    mExecutor.execute(runnable);
   }
 
   @NotNull
-  static LoopExecutor instance() {
-    return sInstance;
+  public OwnerExecutor getDecorated() {
+    return mExecutor;
   }
 
-  public void execute(@NotNull final Runnable command) {
-    LocalExecutor.run(command);
+  public boolean isOwnedThread() {
+    return mExecutor.isOwnedThread();
   }
 
-  @NotNull
-  Object readResolve() throws ObjectStreamException {
-    return sInstance;
+  public void stop() {
   }
 }

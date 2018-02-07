@@ -23,7 +23,7 @@ import java.io.InvalidObjectException;
 import java.io.ObjectStreamException;
 import java.io.Serializable;
 
-import dm.jail.async.AsyncResultCollection;
+import dm.jail.async.AsyncResults;
 import dm.jail.async.Observer;
 import dm.jail.config.BuildConfig;
 import dm.jail.util.ConstantConditions;
@@ -44,7 +44,7 @@ class ThenDoLoopHandler<V, R> extends AsyncLoopHandler<V, R> implements Serializ
   }
 
   @Override
-  void addValue(final V value, @NotNull final AsyncResultCollection<R> results) throws Exception {
+  void addValue(final V value, @NotNull final AsyncResults<R> results) throws Exception {
     mObserver.accept(value);
     super.addValue(value, results);
   }
@@ -52,7 +52,7 @@ class ThenDoLoopHandler<V, R> extends AsyncLoopHandler<V, R> implements Serializ
   @Override
   @SuppressWarnings("unchecked")
   void addValues(@Nullable final Iterable<? extends V> values,
-      @NotNull final AsyncResultCollection<R> results) throws Exception {
+      @NotNull final AsyncResults<R> results) throws Exception {
     if (values == null) {
       return;
     }

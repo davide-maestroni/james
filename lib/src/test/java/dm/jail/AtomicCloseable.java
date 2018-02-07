@@ -27,11 +27,11 @@ class AtomicCloseable implements Closeable {
 
   private final AtomicBoolean mIsCalled = new AtomicBoolean();
 
-  boolean isCalled() {
-    return mIsCalled.get();
-  }
-
   public void close() throws IOException {
     mIsCalled.set(true);
+  }
+
+  boolean isCalled() {
+    return mIsCalled.get();
   }
 }

@@ -24,7 +24,7 @@ import java.io.ObjectStreamException;
 import java.io.Serializable;
 
 import dm.jail.async.AsyncLoop;
-import dm.jail.async.AsyncResultCollection;
+import dm.jail.async.AsyncResults;
 import dm.jail.async.AsyncStatement.ForkCompleter;
 import dm.jail.async.AsyncStatement.ForkUpdater;
 import dm.jail.async.AsyncStatement.Forker;
@@ -36,7 +36,7 @@ import dm.jail.util.SerializableProxy;
  * Created by davide-maestroni on 01/19/2018.
  */
 class ComposedLoopForker<S, V>
-    implements Forker<S, AsyncLoop<V>, V, AsyncResultCollection<V>>, Serializable {
+    implements Forker<S, AsyncLoop<V>, V, AsyncResults<V>>, Serializable {
 
   private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
 
@@ -46,8 +46,7 @@ class ComposedLoopForker<S, V>
 
   private final Mapper<? super AsyncLoop<V>, S> mInit;
 
-  private final ForkUpdater<S, ? super AsyncLoop<V>, ? super AsyncResultCollection<? extends V>>
-      mLoop;
+  private final ForkUpdater<S, ? super AsyncLoop<V>, ? super AsyncResults<? extends V>> mLoop;
 
   private final ForkUpdater<S, ? super AsyncLoop<V>, ? super V> mValue;
 
@@ -56,7 +55,7 @@ class ComposedLoopForker<S, V>
       @Nullable final ForkUpdater<S, ? super AsyncLoop<V>, ? super V> value,
       @Nullable final ForkUpdater<S, ? super AsyncLoop<V>, ? super Throwable> failure,
       @Nullable final ForkCompleter<S, ? super AsyncLoop<V>> done,
-      @Nullable final ForkUpdater<S, ? super AsyncLoop<V>, ? super AsyncResultCollection<V>> loop) {
+      @Nullable final ForkUpdater<S, ? super AsyncLoop<V>, ? super AsyncResults<V>> loop) {
     mInit = (Mapper<? super AsyncLoop<V>, S>) ((init != null) ? init : DefaultInit.sInstance);
     mValue = (ForkUpdater<S, ? super AsyncLoop<V>, ? super V>) ((value != null) ? value
         : DefaultUpdateValue.sInstance);
@@ -65,8 +64,9 @@ class ComposedLoopForker<S, V>
             : DefaultUpdateValue.sInstance);
     mDone = (ForkCompleter<S, ? super AsyncLoop<V>>) ((done != null) ? done
         : DefaultComplete.sInstance);
-    mLoop = (ForkUpdater<S, ? super AsyncLoop<V>, ? super AsyncResultCollection<? extends V>>) (
-        (loop != null) ? loop : DefaultUpdateResult.sInstance);
+    mLoop =
+        (ForkUpdater<S, ? super AsyncLoop<V>, ? super AsyncResults<? extends V>>) ((loop != null)
+            ? loop : DefaultUpdateResult.sInstance);
   }
 
   public S done(@NotNull final AsyncLoop<V> loop, final S stack) throws Exception {
@@ -83,7 +83,7 @@ class ComposedLoopForker<S, V>
   }
 
   public S statement(@NotNull final AsyncLoop<V> loop, final S stack,
-      @NotNull final AsyncResultCollection<V> result) throws Exception {
+      @NotNull final AsyncResults<V> result) throws Exception {
     return mLoop.update(loop, stack, result);
   }
 
@@ -104,8 +104,7 @@ class ComposedLoopForker<S, V>
         final ForkUpdater<S, ? super AsyncLoop<V>, ? super V> value,
         final ForkUpdater<S, ? super AsyncLoop<V>, ? super Throwable> failure,
         final ForkCompleter<S, ? super AsyncLoop<V>> done,
-        final ForkUpdater<S, ? super AsyncLoop<V>, ? super AsyncResultCollection<? extends V>>
-            loop) {
+        final ForkUpdater<S, ? super AsyncLoop<V>, ? super AsyncResults<? extends V>> loop) {
       super(proxy(init), proxy(value), proxy(failure), proxy(done), proxy(loop));
     }
 
@@ -118,8 +117,7 @@ class ComposedLoopForker<S, V>
             (ForkUpdater<S, ? super AsyncLoop<V>, ? super V>) args[1],
             (ForkUpdater<S, ? super AsyncLoop<V>, ? super Throwable>) args[2],
             (ForkCompleter<S, ? super AsyncLoop<V>>) args[3],
-            (ForkUpdater<S, ? super AsyncLoop<V>, ? super AsyncResultCollection<? extends V>>)
-                args[4]);
+            (ForkUpdater<S, ? super AsyncLoop<V>, ? super AsyncResults<? extends V>>) args[4]);
 
       } catch (final Throwable t) {
         throw new InvalidObjectException(t.getMessage());
@@ -161,15 +159,14 @@ class ComposedLoopForker<S, V>
   }
 
   private static class DefaultUpdateResult<S, V>
-      implements ForkUpdater<S, AsyncLoop<V>, AsyncResultCollection<V>>, Serializable {
+      implements ForkUpdater<S, AsyncLoop<V>, AsyncResults<V>>, Serializable {
 
     private static final DefaultUpdateResult<?, ?> sInstance =
         new DefaultUpdateResult<Object, Object>();
 
     private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
 
-    public S update(@NotNull final AsyncLoop<V> loop, final S stack,
-        final AsyncResultCollection<V> result) {
+    public S update(@NotNull final AsyncLoop<V> loop, final S stack, final AsyncResults<V> result) {
       result.addFailure(new UnsupportedOperationException()).set();
       return stack;
     }

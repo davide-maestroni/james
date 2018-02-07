@@ -14,29 +14,11 @@
  * limitations under the License.
  */
 
-package dm.jail;
+package dm.jail.executor;
 
-import org.jetbrains.annotations.NotNull;
-
-import dm.jail.async.AsyncResults;
+import java.util.concurrent.Executor;
 
 /**
- * Created by davide-maestroni on 01/14/2018.
+ * Created by davide-maestroni on 02/07/2018.
  */
-class AsyncStatementLoopHandler<V, R> {
-
-  void failure(@NotNull final Throwable failure, @NotNull final AsyncResults<R> results) throws
-      Exception {
-    results.addFailure(failure).set();
-  }
-
-  @NotNull
-  AsyncStatementLoopHandler<V, R> renew() {
-    return this;
-  }
-
-  @SuppressWarnings("unchecked")
-  void value(final V value, @NotNull final AsyncResults<R> results) throws Exception {
-    results.addValue((R) value).set();
-  }
-}
+public interface OwnerExecutor extends Executor, ThreadOwner {}

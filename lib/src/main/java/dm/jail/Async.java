@@ -23,16 +23,16 @@ import java.io.InvalidObjectException;
 import java.io.ObjectStreamException;
 import java.io.Serializable;
 import java.util.List;
+import java.util.concurrent.Executor;
 
 import dm.jail.async.AsyncLoop;
 import dm.jail.async.AsyncResult;
-import dm.jail.async.AsyncResultCollection;
+import dm.jail.async.AsyncResults;
 import dm.jail.async.AsyncStatement;
 import dm.jail.async.Mapper;
 import dm.jail.async.Observer;
 import dm.jail.async.RuntimeInterruptedException;
 import dm.jail.config.BuildConfig;
-import dm.jail.executor.ScheduledExecutor;
 import dm.jail.log.LogLevel;
 import dm.jail.log.LogPrinter;
 import dm.jail.util.ConstantConditions;
@@ -45,7 +45,7 @@ import dm.jail.util.Threads;
  */
 public class Async {
 
-  private final ScheduledExecutor mExecutor;
+  private final Executor mExecutor;
 
   private final boolean mIsUnevaluated;
 
@@ -57,7 +57,7 @@ public class Async {
     this(false, null, null, null);
   }
 
-  private Async(final boolean isUnevaluated, @Nullable final ScheduledExecutor executor,
+  private Async(final boolean isUnevaluated, @Nullable final Executor executor,
       @Nullable final LogPrinter printer, @Nullable final LogLevel level) {
     mIsUnevaluated = isUnevaluated;
     mExecutor = executor;
@@ -96,18 +96,18 @@ public class Async {
   }
 
   @NotNull
-  public <V> AsyncLoop<V> loop(@NotNull final Observer<AsyncResultCollection<V>> observer) {
+  public <V> AsyncLoop<V> loop(@NotNull final Observer<AsyncResults<V>> observer) {
     final boolean isUnevaluated = mIsUnevaluated;
-    final Observer<AsyncResultCollection<V>> loopObserver = loopObserver(observer);
+    final Observer<AsyncResults<V>> loopObserver = loopObserver(observer);
     return new DefaultAsyncLoop<V>(
-        (isUnevaluated) ? new UnevaluatedObserver<V, AsyncResultCollection<V>>(loopObserver)
-            : loopObserver, !isUnevaluated, mLogPrinter, mLogLevel);
+        (isUnevaluated) ? new UnevaluatedObserver<V, AsyncResults<V>>(loopObserver) : loopObserver,
+        !isUnevaluated, mLogPrinter, mLogLevel);
   }
 
   @NotNull
   public <S, V, R> AsyncLoop<R> loopOf(
-      @NotNull final Combiner<S, ? super AsyncLoop<V>, ? super V, ? super AsyncResultCollection<?
-          extends R>> combiner,
+      @NotNull final Combiner<S, ? super AsyncLoop<V>, ? super V, ? super AsyncResults<? extends
+          R>> combiner,
       @NotNull final Iterable<? extends AsyncLoop<? extends V>> loops) {
     return null;
   }
@@ -115,13 +115,13 @@ public class Async {
   @NotNull
   public <S, V, R> AsyncLoop<R> loopOf(@Nullable final Mapper<? super List<AsyncLoop<V>>, S> init,
       @Nullable final CombinationUpdater<S, ? super AsyncLoop<V>, ? super V, ? super
-          AsyncResultCollection<? extends R>> value,
+          AsyncResults<? extends R>> value,
       @Nullable final CombinationUpdater<S, ? super AsyncLoop<V>, ? super Throwable, ? super
-          AsyncResultCollection<? extends R>> failure,
-      @Nullable final CombinationCompleter<S, ? super AsyncLoop<V>, ? super
-          AsyncResultCollection<? extends R>> done,
-      @Nullable final CombinationSettler<S, ? super AsyncLoop<V>, ? super AsyncResultCollection<?
-          extends R>> settle,
+          AsyncResults<? extends R>> failure,
+      @Nullable final CombinationCompleter<S, ? super AsyncLoop<V>, ? super AsyncResults<?
+          extends R>> done,
+      @Nullable final CombinationSettler<S, ? super AsyncLoop<V>, ? super AsyncResults<? extends
+          R>> settle,
       @NotNull final Iterable<? extends AsyncLoop<? extends V>> loops) {
     return null;
   }
@@ -132,7 +132,7 @@ public class Async {
   }
 
   @NotNull
-  public Async on(@Nullable final ScheduledExecutor executor) {
+  public Async on(@Nullable final Executor executor) {
     return new Async(mIsUnevaluated, executor, mLogPrinter, mLogLevel);
   }
 
@@ -184,9 +184,9 @@ public class Async {
   }
 
   @NotNull
-  private <V> Observer<AsyncResultCollection<V>> loopObserver(
-      @NotNull final Observer<AsyncResultCollection<V>> observer) {
-    final ScheduledExecutor executor = mExecutor;
+  private <V> Observer<AsyncResults<V>> loopObserver(
+      @NotNull final Observer<AsyncResults<V>> observer) {
+    final Executor executor = mExecutor;
     if (executor != null) {
       return new LoopExecutorObserver<V>(observer, executor);
     }
@@ -197,7 +197,7 @@ public class Async {
   @NotNull
   private <V> Observer<AsyncResult<V>> statementObserver(
       @NotNull final Observer<AsyncResult<V>> observer) {
-    final ScheduledExecutor executor = mExecutor;
+    final Executor executor = mExecutor;
     if (executor != null) {
       return new StatementExecutorObserver<V>(observer, executor);
     }
@@ -251,8 +251,7 @@ public class Async {
     }
   }
 
-  private static class FailuresObserver<V>
-      implements Observer<AsyncResultCollection<V>>, Serializable {
+  private static class FailuresObserver<V> implements Observer<AsyncResults<V>>, Serializable {
 
     private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
 
@@ -266,26 +265,26 @@ public class Async {
       mFailures = failures;
     }
 
-    public void accept(final AsyncResultCollection<V> results) {
+    public void accept(final AsyncResults<V> results) {
       results.addFailures(mFailures).set();
     }
   }
 
   private static class LoopExecutorObserver<V>
-      implements InterruptibleObserver<AsyncResultCollection<V>>, Serializable {
+      implements InterruptibleObserver<AsyncResults<V>>, Serializable {
 
     private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
 
-    private final ScheduledExecutor mExecutor;
+    private final Executor mExecutor;
 
     private final Object mMutex = new Object();
 
-    private final Observer<AsyncResultCollection<V>> mObserver;
+    private final Observer<AsyncResults<V>> mObserver;
 
     private Thread mThread;
 
-    private LoopExecutorObserver(@NotNull final Observer<AsyncResultCollection<V>> observer,
-        @NotNull final ScheduledExecutor executor) {
+    private LoopExecutorObserver(@NotNull final Observer<AsyncResults<V>> observer,
+        @NotNull final Executor executor) {
       mObserver = ConstantConditions.notNull("observer", observer);
       mExecutor = executor;
     }
@@ -308,8 +307,7 @@ public class Async {
 
       private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
 
-      private ObserverProxy(final Observer<AsyncResultCollection<V>> observer,
-          final ScheduledExecutor executor) {
+      private ObserverProxy(final Observer<AsyncResults<V>> observer, final Executor executor) {
         super(proxy(observer), executor);
       }
 
@@ -318,8 +316,8 @@ public class Async {
       Object readResolve() throws ObjectStreamException {
         try {
           final Object[] args = deserializeArgs();
-          return new LoopExecutorObserver<V>((Observer<AsyncResultCollection<V>>) args[0],
-              (ScheduledExecutor) args[1]);
+          return new LoopExecutorObserver<V>((Observer<AsyncResults<V>>) args[0],
+              (Executor) args[1]);
 
         } catch (final Throwable t) {
           throw new InvalidObjectException(t.getMessage());
@@ -327,7 +325,7 @@ public class Async {
       }
     }
 
-    public void accept(final AsyncResultCollection<V> results) {
+    public void accept(final AsyncResults<V> results) {
       mExecutor.execute(new Runnable() {
 
         public void run() {
@@ -355,8 +353,7 @@ public class Async {
     }
   }
 
-  private static class LoopObserver<V>
-      implements RenewableObserver<AsyncResultCollection<V>>, Serializable {
+  private static class LoopObserver<V> implements RenewableObserver<AsyncResults<V>>, Serializable {
 
     private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
 
@@ -367,11 +364,11 @@ public class Async {
     }
 
     @NotNull
-    public Observer<AsyncResultCollection<V>> renew() {
+    public Observer<AsyncResults<V>> renew() {
       return new LoopObserver<V>(mStatement.evaluate());
     }
 
-    public void accept(final AsyncResultCollection<V> results) {
+    public void accept(final AsyncResults<V> results) {
       mStatement.then(new Mapper<Iterable<V>, Void>() {
 
         public Void apply(final Iterable<V> values) {
@@ -389,7 +386,7 @@ public class Async {
   }
 
   private static class SingleLoopObserver<V>
-      implements RenewableObserver<AsyncResultCollection<V>>, Serializable {
+      implements RenewableObserver<AsyncResults<V>>, Serializable {
 
     private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
 
@@ -400,11 +397,11 @@ public class Async {
     }
 
     @NotNull
-    public Observer<AsyncResultCollection<V>> renew() {
+    public Observer<AsyncResults<V>> renew() {
       return new SingleLoopObserver<V>(mStatement.evaluate());
     }
 
-    public void accept(final AsyncResultCollection<V> results) {
+    public void accept(final AsyncResults<V> results) {
       mStatement.then(new Mapper<V, Void>() {
 
         public Void apply(final V value) {
@@ -426,7 +423,7 @@ public class Async {
 
     private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
 
-    private final ScheduledExecutor mExecutor;
+    private final Executor mExecutor;
 
     private final Object mMutex = new Object();
 
@@ -435,7 +432,7 @@ public class Async {
     private Thread mThread;
 
     private StatementExecutorObserver(@NotNull final Observer<AsyncResult<V>> observer,
-        @NotNull final ScheduledExecutor executor) {
+        @NotNull final Executor executor) {
       mObserver = ConstantConditions.notNull("observer", observer);
       mExecutor = executor;
     }
@@ -449,8 +446,7 @@ public class Async {
 
       private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
 
-      private ObserverProxy(final Observer<AsyncResult<V>> observer,
-          final ScheduledExecutor executor) {
+      private ObserverProxy(final Observer<AsyncResult<V>> observer, final Executor executor) {
         super(proxy(observer), executor);
       }
 
@@ -460,7 +456,7 @@ public class Async {
         try {
           final Object[] args = deserializeArgs();
           return new StatementExecutorObserver<V>((Observer<AsyncResult<V>>) args[0],
-              (ScheduledExecutor) args[1]);
+              (Executor) args[1]);
 
         } catch (final Throwable t) {
           throw new InvalidObjectException(t.getMessage());
@@ -565,8 +561,7 @@ public class Async {
     }
   }
 
-  private static class ValuesObserver<V>
-      implements Observer<AsyncResultCollection<V>>, Serializable {
+  private static class ValuesObserver<V> implements Observer<AsyncResults<V>>, Serializable {
 
     private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
 
@@ -576,7 +571,7 @@ public class Async {
       mValues = values;
     }
 
-    public void accept(final AsyncResultCollection<V> results) {
+    public void accept(final AsyncResults<V> results) {
       results.addValues(mValues).set();
     }
   }
