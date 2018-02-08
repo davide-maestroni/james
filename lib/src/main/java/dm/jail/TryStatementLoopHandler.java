@@ -24,7 +24,7 @@ import java.io.InvalidObjectException;
 import java.io.ObjectStreamException;
 import java.io.Serializable;
 
-import dm.jail.async.AsyncResults;
+import dm.jail.async.AsyncEvaluations;
 import dm.jail.async.Mapper;
 import dm.jail.config.BuildConfig;
 import dm.jail.log.LogLevel;
@@ -52,14 +52,14 @@ class TryStatementLoopHandler<V, R> extends AsyncStatementLoopHandler<V, R>
       @Nullable final LogLevel level) {
     mCloseable = ConstantConditions.notNull("closeable", closeable);
     mHandler = ConstantConditions.notNull("handler", handler);
-    mLogger = Logger.newLogger(printer, level, this);
+    mLogger = Logger.newLogger(this, printer, level);
   }
 
   @Override
-  void value(final V value, @NotNull final AsyncResults<R> results) throws Exception {
+  void value(final V value, @NotNull final AsyncEvaluations<R> evaluations) throws Exception {
     final Closeable closeable = mCloseable.apply(value);
     try {
-      mHandler.value(value, results);
+      mHandler.value(value, evaluations);
 
     } finally {
       Asyncs.close(closeable, mLogger);

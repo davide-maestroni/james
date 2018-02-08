@@ -18,14 +18,14 @@ package dm.jail;
 
 import org.jetbrains.annotations.NotNull;
 
-import dm.jail.async.AsyncResult;
+import dm.jail.async.AsyncEvaluation;
 import dm.jail.async.AsyncState;
 import dm.jail.async.SimpleState;
 
 /**
  * Created by davide-maestroni on 01/30/2018.
  */
-class TestResult<V> implements AsyncResult<V> {
+class TestEvaluation<V> implements AsyncEvaluation<V> {
 
   private AsyncState<V> mState;
 

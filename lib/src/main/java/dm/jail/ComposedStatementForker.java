@@ -23,12 +23,12 @@ import java.io.InvalidObjectException;
 import java.io.ObjectStreamException;
 import java.io.Serializable;
 
-import dm.jail.async.AsyncResult;
+import dm.jail.async.AsyncEvaluation;
 import dm.jail.async.AsyncStatement;
-import dm.jail.async.AsyncStatement.ForkCompleter;
-import dm.jail.async.AsyncStatement.ForkUpdater;
 import dm.jail.async.AsyncStatement.Forker;
+import dm.jail.async.Completer;
 import dm.jail.async.Mapper;
+import dm.jail.async.Updater;
 import dm.jail.config.BuildConfig;
 import dm.jail.util.SerializableProxy;
 
@@ -36,60 +36,60 @@ import dm.jail.util.SerializableProxy;
  * Created by davide-maestroni on 01/19/2018.
  */
 class ComposedStatementForker<S, V>
-    implements Forker<S, AsyncStatement<V>, V, AsyncResult<V>>, Serializable {
+    implements Forker<S, AsyncStatement<V>, V, AsyncEvaluation<V>>, Serializable {
 
   private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
 
-  private final ForkCompleter<S, ? super AsyncStatement<V>> mDone;
+  private final Completer<S, ? super AsyncStatement<V>> mDone;
 
-  private final ForkUpdater<S, ? super AsyncStatement<V>, ? super Throwable> mFailure;
+  private final Updater<S, ? super Throwable, ? super AsyncStatement<V>> mFailure;
 
   private final Mapper<? super AsyncStatement<V>, S> mInit;
 
-  private final ForkUpdater<S, ? super AsyncStatement<V>, ? super AsyncResult<? extends V>>
+  private final Updater<S, ? super AsyncEvaluation<? extends V>, ? super AsyncStatement<V>>
       mStatement;
 
-  private final ForkUpdater<S, ? super AsyncStatement<V>, ? super V> mValue;
+  private final Updater<S, ? super V, ? super AsyncStatement<V>> mValue;
 
   @SuppressWarnings("unchecked")
   ComposedStatementForker(@Nullable final Mapper<? super AsyncStatement<V>, S> init,
-      @Nullable final ForkUpdater<S, ? super AsyncStatement<V>, ? super V> value,
-      @Nullable final ForkUpdater<S, ? super AsyncStatement<V>, ? super Throwable> failure,
-      @Nullable final ForkCompleter<S, ? super AsyncStatement<V>> done,
-      @Nullable final ForkUpdater<S, ? super AsyncStatement<V>, ? super AsyncResult<V>> statement) {
+      @Nullable final Updater<S, ? super V, ? super AsyncStatement<V>> value,
+      @Nullable final Updater<S, ? super Throwable, ? super AsyncStatement<V>> failure,
+      @Nullable final Completer<S, ? super AsyncStatement<V>> done,
+      @Nullable final Updater<S, ? super AsyncEvaluation<V>, ? super AsyncStatement<V>> statement) {
     mInit = (Mapper<? super AsyncStatement<V>, S>) ((init != null) ? init : DefaultInit.sInstance);
-    mValue = (ForkUpdater<S, ? super AsyncStatement<V>, ? super V>) ((value != null) ? value
-        : DefaultUpdateValue.sInstance);
+    mValue = (Updater<S, ? super V, ? super AsyncStatement<V>>) ((value != null) ? value
+        : DefaultUpdater.sInstance);
     mFailure =
-        (ForkUpdater<S, ? super AsyncStatement<V>, ? super Throwable>) ((failure != null) ? failure
-            : DefaultUpdateValue.sInstance);
-    mDone = (ForkCompleter<S, ? super AsyncStatement<V>>) ((done != null) ? done
-        : DefaultComplete.sInstance);
-    mStatement = (ForkUpdater<S, ? super AsyncStatement<V>, ? super AsyncResult<? extends V>>) (
-        (statement != null) ? statement : DefaultUpdateResult.sInstance);
+        (Updater<S, ? super Throwable, ? super AsyncStatement<V>>) ((failure != null) ? failure
+            : DefaultUpdater.sInstance);
+    mDone = (Completer<S, ? super AsyncStatement<V>>) ((done != null) ? done
+        : DefaultCompleter.sInstance);
+    mStatement = (Updater<S, ? super AsyncEvaluation<? extends V>, ? super AsyncStatement<V>>) (
+        (statement != null) ? statement : DefaultEvaluationUpdater.sInstance);
   }
 
-  public S done(@NotNull final AsyncStatement<V> statement, final S stack) throws Exception {
-    return mDone.complete(statement, stack);
+  public S done(final S stack, @NotNull final AsyncStatement<V> statement) throws Exception {
+    return mDone.complete(stack, statement);
   }
 
-  public S failure(@NotNull final AsyncStatement<V> statement, final S stack,
-      @NotNull final Throwable failure) throws Exception {
-    return mFailure.update(statement, stack, failure);
+  public S evaluation(final S stack, @NotNull final AsyncEvaluation<V> evaluation,
+      @NotNull final AsyncStatement<V> statement) throws Exception {
+    return mStatement.update(stack, evaluation, statement);
+  }
+
+  public S failure(final S stack, @NotNull final Throwable failure,
+      @NotNull final AsyncStatement<V> statement) throws Exception {
+    return mFailure.update(stack, failure, statement);
   }
 
   public S init(@NotNull final AsyncStatement<V> statement) throws Exception {
     return mInit.apply(statement);
   }
 
-  public S statement(@NotNull final AsyncStatement<V> statement, final S stack,
-      @NotNull final AsyncResult<V> result) throws Exception {
-    return mStatement.update(statement, stack, result);
-  }
-
-  public S value(@NotNull final AsyncStatement<V> statement, final S stack, final V value) throws
+  public S value(final S stack, final V value, @NotNull final AsyncStatement<V> statement) throws
       Exception {
-    return mValue.update(statement, stack, value);
+    return mValue.update(stack, value, statement);
   }
 
   @NotNull
@@ -97,14 +97,34 @@ class ComposedStatementForker<S, V>
     return new ForkerProxy<S, V>(mInit, mValue, mFailure, mDone, mStatement);
   }
 
-  private static class DefaultComplete<S, V>
-      implements ForkCompleter<S, AsyncStatement<V>>, Serializable {
+  private static class DefaultCompleter<S, V>
+      implements Completer<S, AsyncStatement<V>>, Serializable {
 
-    private static final DefaultComplete<?, ?> sInstance = new DefaultComplete<Object, Object>();
+    private static final DefaultCompleter<?, ?> sInstance = new DefaultCompleter<Object, Object>();
 
     private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
 
-    public S complete(@NotNull final AsyncStatement<V> statement, final S stack) {
+    public S complete(final S stack, @NotNull final AsyncStatement<V> statement) {
+      return stack;
+    }
+
+    @NotNull
+    Object readResolve() throws ObjectStreamException {
+      return sInstance;
+    }
+  }
+
+  private static class DefaultEvaluationUpdater<S, V>
+      implements Updater<S, AsyncEvaluation<V>, AsyncStatement<V>>, Serializable {
+
+    private static final DefaultEvaluationUpdater<?, ?> sInstance =
+        new DefaultEvaluationUpdater<Object, Object>();
+
+    private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
+
+    public S update(final S stack, final AsyncEvaluation<V> evaluation,
+        @NotNull final AsyncStatement<V> statement) {
+      evaluation.fail(new UnsupportedOperationException());
       return stack;
     }
 
@@ -130,31 +150,11 @@ class ComposedStatementForker<S, V>
     }
   }
 
-  private static class DefaultUpdateResult<S, V>
-      implements ForkUpdater<S, AsyncStatement<V>, AsyncResult<V>>, Serializable {
+  private static class DefaultUpdater<S, V, I>
+      implements Updater<S, I, AsyncStatement<V>>, Serializable {
 
-    private static final DefaultUpdateResult<?, ?> sInstance =
-        new DefaultUpdateResult<Object, Object>();
-
-    private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
-
-    public S update(@NotNull final AsyncStatement<V> statement, final S stack,
-        final AsyncResult<V> result) {
-      result.fail(new UnsupportedOperationException());
-      return stack;
-    }
-
-    @NotNull
-    Object readResolve() throws ObjectStreamException {
-      return sInstance;
-    }
-  }
-
-  private static class DefaultUpdateValue<S, V, I>
-      implements ForkUpdater<S, AsyncStatement<V>, I>, Serializable {
-
-    private static final DefaultUpdateValue<?, ?, ?> sInstance =
-        new DefaultUpdateValue<Object, Object, Object>();
+    private static final DefaultUpdater<?, ?, ?> sInstance =
+        new DefaultUpdater<Object, Object, Object>();
 
     private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
 
@@ -163,7 +163,7 @@ class ComposedStatementForker<S, V>
       return sInstance;
     }
 
-    public S update(@NotNull final AsyncStatement<V> statement, final S stack, final I input) {
+    public S update(final S stack, final I input, @NotNull final AsyncStatement<V> statement) {
       return stack;
     }
   }
@@ -173,10 +173,10 @@ class ComposedStatementForker<S, V>
     private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
 
     private ForkerProxy(final Mapper<? super AsyncStatement<V>, S> init,
-        final ForkUpdater<S, ? super AsyncStatement<V>, ? super V> value,
-        final ForkUpdater<S, ? super AsyncStatement<V>, ? super Throwable> failure,
-        final ForkCompleter<S, ? super AsyncStatement<V>> done,
-        final ForkUpdater<S, ? super AsyncStatement<V>, ? super AsyncResult<? extends V>>
+        final Updater<S, ? super V, ? super AsyncStatement<V>> value,
+        final Updater<S, ? super Throwable, ? super AsyncStatement<V>> failure,
+        final Completer<S, ? super AsyncStatement<V>> done,
+        final Updater<S, ? super AsyncEvaluation<? extends V>, ? super AsyncStatement<V>>
             statement) {
       super(proxy(init), proxy(value), proxy(failure), proxy(done), proxy(statement));
     }
@@ -187,10 +187,10 @@ class ComposedStatementForker<S, V>
       try {
         final Object[] args = deserializeArgs();
         return new ComposedStatementForker<S, V>((Mapper<? super AsyncStatement<V>, S>) args[0],
-            (ForkUpdater<S, ? super AsyncStatement<V>, ? super V>) args[1],
-            (ForkUpdater<S, ? super AsyncStatement<V>, ? super Throwable>) args[2],
-            (ForkCompleter<S, ? super AsyncStatement<V>>) args[3],
-            (ForkUpdater<S, ? super AsyncStatement<V>, ? super AsyncResult<? extends V>>) args[4]);
+            (Updater<S, ? super V, ? super AsyncStatement<V>>) args[1],
+            (Updater<S, ? super Throwable, ? super AsyncStatement<V>>) args[2],
+            (Completer<S, ? super AsyncStatement<V>>) args[3],
+            (Updater<S, ? super AsyncEvaluation<? extends V>, ? super AsyncStatement<V>>) args[4]);
 
       } catch (final Throwable t) {
         throw new InvalidObjectException(t.getMessage());

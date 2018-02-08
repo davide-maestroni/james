@@ -24,7 +24,7 @@ import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.Arrays;
 
-import dm.jail.async.AsyncLoop.YieldResults;
+import dm.jail.async.AsyncLoop.YieldOutputs;
 import dm.jail.async.Mapper;
 import dm.jail.config.BuildConfig;
 import dm.jail.util.ConstantConditions;
@@ -52,15 +52,15 @@ class ElseCatchYielder<V> extends CollectionYielder<V> implements Serializable {
 
   @Override
   public ArrayList<V> failure(final ArrayList<V> stack, @NotNull final Throwable failure,
-      @NotNull final YieldResults<V> results) throws Exception {
+      @NotNull final YieldOutputs<V> outputs) throws Exception {
     for (final Class<?> type : mTypes) {
       if (type.isInstance(failure)) {
-        results.yieldValues(mMapper.apply(failure));
+        outputs.yieldValues(mMapper.apply(failure));
         return null;
       }
     }
 
-    return super.failure(stack, failure, results);
+    return super.failure(stack, failure, outputs);
   }
 
   @NotNull

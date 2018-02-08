@@ -20,6 +20,7 @@ import org.jetbrains.annotations.NotNull;
 
 import java.util.Iterator;
 
+import dm.jail.log.Logger;
 import dm.jail.util.DoubleQueue;
 
 /**
@@ -38,12 +39,15 @@ class LocalExecutor {
 
   private final DoubleQueue<Runnable> mCommands = new DoubleQueue<Runnable>(INITIAL_CAPACITY);
 
+  private final Logger mLogger;
+
   private boolean mIsRunning;
 
   /**
    * Constructor.
    */
   private LocalExecutor() {
+    mLogger = Logger.newLogger(this);
   }
 
   /**
@@ -68,7 +72,13 @@ class LocalExecutor {
     if (!mIsRunning) {
       mIsRunning = true;
       try {
-        command.run();
+        try {
+          command.run();
+
+        } catch (final Throwable t) {
+          mLogger.wrn(t, "Suppressed exception");
+        }
+
         run();
 
       } finally {
@@ -94,8 +104,12 @@ class LocalExecutor {
     final DoubleQueue<Runnable> commands = mCommands;
     try {
       while (!commands.isEmpty()) {
-        // TODO: 07/02/2018 catch?
-        commands.removeFirst().run();
+        try {
+          commands.removeFirst().run();
+
+        } catch (final Throwable t) {
+          mLogger.wrn(t, "Suppressed exception");
+        }
       }
 
     } finally {

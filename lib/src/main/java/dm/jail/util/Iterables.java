@@ -66,6 +66,10 @@ public class Iterables {
   }
 
   public static boolean contains(@NotNull final Iterable<?> iterable, final Object element) {
+    if (iterable instanceof Collection) {
+      return ((Collection<?>) iterable).contains(element);
+    }
+
     if (element != null) {
       for (final Object object : iterable) {
         if ((object == element) || element.equals(object)) {
@@ -82,6 +86,33 @@ public class Iterables {
     }
 
     return false;
+  }
+
+  public static boolean containsAll(@NotNull final Iterable<?> iterable,
+      @NotNull final Collection<?> collection) {
+    if (iterable instanceof Collection) {
+      return ((Collection<?>) iterable).containsAll(collection);
+    }
+
+    final ArrayList<Object> objects = new ArrayList<Object>(collection);
+    for (final Object object : iterable) {
+      boolean found = false;
+      final Iterator<Object> iterator = objects.iterator();
+      while (iterator.hasNext()) {
+        final Object next = iterator.next();
+        if ((object == next) || ((next != null) && next.equals(object))) {
+          iterator.remove();
+          found = true;
+          break;
+        }
+      }
+
+      if (!found) {
+        return false;
+      }
+    }
+
+    return true;
   }
 
   public static <T> T first(@NotNull final Iterable<T> iterable) {
@@ -101,6 +132,93 @@ public class Iterables {
     }
 
     return iterator.next();
+  }
+
+  public static boolean isEmpty(@NotNull final Iterable<?> iterable) {
+    return (iterable instanceof Collection) ? ((Collection<?>) iterable).isEmpty()
+        : !iterable.iterator().hasNext();
+  }
+
+  public static boolean remove(@NotNull final Iterable<?> iterable, final Object element) {
+    if (iterable instanceof Collection) {
+      return ((Collection<?>) iterable).remove(element);
+    }
+
+    if (element != null) {
+      final Iterator<?> iterator = iterable.iterator();
+      while (iterator.hasNext()) {
+        final Object object = iterator.next();
+        if ((object == element) || element.equals(object)) {
+          iterator.remove();
+          return true;
+        }
+      }
+
+    } else {
+      final Iterator<?> iterator = iterable.iterator();
+      while (iterator.hasNext()) {
+        final Object object = iterator.next();
+        if (object == null) {
+          iterator.remove();
+          return true;
+        }
+      }
+    }
+
+    return false;
+  }
+
+  @SuppressWarnings("unchecked")
+  public static boolean removeAll(@NotNull final Iterable<?> iterable,
+      @NotNull final Collection<?> collection) {
+    if (iterable instanceof Collection) {
+      return ((Collection<Object>) iterable).removeAll(collection);
+    }
+
+    boolean found = false;
+    for (final Object element : collection) {
+      if (element != null) {
+        final Iterator<?> iterator = iterable.iterator();
+        while (iterator.hasNext()) {
+          final Object object = iterator.next();
+          if ((object == element) || element.equals(object)) {
+            iterator.remove();
+            found = true;
+          }
+        }
+
+      } else {
+        final Iterator<?> iterator = iterable.iterator();
+        while (iterator.hasNext()) {
+          final Object object = iterator.next();
+          if (object == null) {
+            iterator.remove();
+            found = true;
+          }
+        }
+      }
+    }
+
+    return found;
+  }
+
+  public static boolean retainAll(@NotNull final Iterable<?> iterable,
+      @NotNull final Collection<?> collection) {
+    if (iterable instanceof Collection) {
+      return ((Collection<?>) iterable).retainAll(collection);
+    }
+
+    ConstantConditions.notNull("collection", collection);
+    boolean isModified = false;
+    final Iterator<?> iterator = iterable.iterator();
+    while (iterator.hasNext()) {
+      if (!collection.contains(iterator.next())) {
+        iterator.remove();
+        isModified = true;
+      }
+    }
+
+    return isModified;
   }
 
   public static int size(@NotNull final Iterable<?> iterable) {
@@ -179,6 +297,20 @@ public class Iterables {
 
   @NotNull
   public static String toString(@NotNull final Iterable<?> iterable) {
-    return asList(iterable).toString();
+    final Iterator<?> iterator = iterable.iterator();
+    if (iterator.hasNext()) {
+      final StringBuilder builder = new StringBuilder();
+      builder.append('[');
+      while (true) {
+        builder.append(String.valueOf(iterator.next()));
+        if (!iterator.hasNext()) {
+          return builder.append(']').toString();
+        }
+
+        builder.append(',').append(' ');
+      }
+    }
+
+    return "[]";
   }
 }

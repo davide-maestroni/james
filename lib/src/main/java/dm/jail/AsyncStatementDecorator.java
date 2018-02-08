@@ -26,11 +26,13 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
 import dm.jail.async.Action;
-import dm.jail.async.AsyncResult;
+import dm.jail.async.AsyncEvaluation;
 import dm.jail.async.AsyncStatement;
+import dm.jail.async.Completer;
 import dm.jail.async.FailureException;
 import dm.jail.async.Mapper;
 import dm.jail.async.Observer;
+import dm.jail.async.Updater;
 import dm.jail.util.ConstantConditions;
 
 /**
@@ -96,17 +98,17 @@ abstract class AsyncStatementDecorator<V> implements AsyncStatement<V> {
 
   @NotNull
   public <S> AsyncStatement<V> fork(
-      @NotNull final Forker<S, ? super AsyncStatement<V>, ? super V, ? super AsyncResult<V>>
+      @NotNull final Forker<S, ? super AsyncStatement<V>, ? super V, ? super AsyncEvaluation<V>>
           forker) {
     return newInstance(mStatement.fork(forker));
   }
 
   @NotNull
   public <S> AsyncStatement<V> fork(@Nullable final Mapper<? super AsyncStatement<V>, S> init,
-      @Nullable final ForkUpdater<S, ? super AsyncStatement<V>, ? super V> value,
-      @Nullable final ForkUpdater<S, ? super AsyncStatement<V>, ? super Throwable> failure,
-      @Nullable final ForkCompleter<S, ? super AsyncStatement<V>> done,
-      @Nullable final ForkUpdater<S, ? super AsyncStatement<V>, ? super AsyncResult<V>> statement) {
+      @Nullable final Updater<S, ? super V, ? super AsyncStatement<V>> value,
+      @Nullable final Updater<S, ? super Throwable, ? super AsyncStatement<V>> failure,
+      @Nullable final Completer<S, ? super AsyncStatement<V>> done,
+      @Nullable final Updater<S, ? super AsyncEvaluation<V>, ? super AsyncStatement<V>> statement) {
     return newInstance(mStatement.fork(init, value, failure, done, statement));
   }
 
@@ -208,8 +210,8 @@ abstract class AsyncStatementDecorator<V> implements AsyncStatement<V> {
     return mStatement.isSet();
   }
 
-  public void to(@NotNull final AsyncResult<? super V> result) {
-    mStatement.to(result);
+  public void to(@NotNull final AsyncEvaluation<? super V> evaluation) {
+    mStatement.to(evaluation);
   }
 
   public V value() {

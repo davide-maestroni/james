@@ -18,16 +18,16 @@ package dm.jail;
 
 import org.jetbrains.annotations.NotNull;
 
-import dm.jail.async.AsyncResults;
+import dm.jail.async.AsyncEvaluations;
 
 /**
  * Created by davide-maestroni on 01/14/2018.
  */
 class AsyncStatementLoopHandler<V, R> {
 
-  void failure(@NotNull final Throwable failure, @NotNull final AsyncResults<R> results) throws
-      Exception {
-    results.addFailure(failure).set();
+  void failure(@NotNull final Throwable failure,
+      @NotNull final AsyncEvaluations<R> evaluations) throws Exception {
+    evaluations.addFailure(failure).set();
   }
 
   @NotNull
@@ -36,7 +36,7 @@ class AsyncStatementLoopHandler<V, R> {
   }
 
   @SuppressWarnings("unchecked")
-  void value(final V value, @NotNull final AsyncResults<R> results) throws Exception {
-    results.addValue((R) value).set();
+  void value(final V value, @NotNull final AsyncEvaluations<R> evaluations) throws Exception {
+    evaluations.addValue((R) value).set();
   }
 }

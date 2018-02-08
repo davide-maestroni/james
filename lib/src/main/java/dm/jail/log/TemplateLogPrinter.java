@@ -20,12 +20,9 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 import java.io.Serializable;
-import java.text.SimpleDateFormat;
-import java.util.Date;
 import java.util.List;
-import java.util.Locale;
 
-import dm.jail.config.BuildConfig;
+import dm.jail.util.ConstantConditions;
 
 /**
  * Abstract implementation of a log.
@@ -42,29 +39,10 @@ import dm.jail.config.BuildConfig;
 @SuppressWarnings("WeakerAccess")
 public abstract class TemplateLogPrinter implements LogPrinter, Serializable {
 
-  private static final Locale DEFAULT_LOCALE = Locale.ENGLISH;
+  private final LogFormatter mFormatter;
 
-  private static final String FORMAT_DATE = "MM/dd HH:mm:ss.SSS z";
-
-  private static final String FORMAT_EXCEPTION = " caused by:%n%s";
-
-  private static final String FORMAT_LOG = "%s\t%s\t%s\t%s<%s>";
-
-  private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
-
-  private static ThreadLocal<SimpleDateFormat> sDateFormatter =
-      new ThreadLocal<SimpleDateFormat>() {
-
-        @Override
-        protected SimpleDateFormat initialValue() {
-          return new SimpleDateFormat(FORMAT_DATE, Locale.getDefault());
-        }
-      };
-
-  private static String format(@NotNull final LogLevel level, @NotNull final List<Object> contexts,
-      @Nullable final String message) {
-    return String.format(DEFAULT_LOCALE, FORMAT_LOG, sDateFormatter.get().format(new Date()),
-        Thread.currentThread().getName(), contexts.toString(), level, message);
+  public TemplateLogPrinter(@NotNull final LogFormatter formatter) {
+    mFormatter = ConstantConditions.notNull("formatter", formatter);
   }
 
   public void dbg(@NotNull final List<Object> contexts, @Nullable final String message,
@@ -92,13 +70,7 @@ public abstract class TemplateLogPrinter implements LogPrinter, Serializable {
    */
   protected void log(@NotNull final LogLevel level, @NotNull final List<Object> contexts,
       @Nullable final String message, @Nullable final Throwable throwable) {
-    String formatted = format(level, contexts, message);
-    if (throwable != null) {
-      formatted +=
-          String.format(DEFAULT_LOCALE, FORMAT_EXCEPTION, LogPrinters.printStackTrace(throwable));
-    }
-
-    log(formatted);
+    print(mFormatter.format(level, contexts, message, throwable));
   }
 
   /**
@@ -106,6 +78,6 @@ public abstract class TemplateLogPrinter implements LogPrinter, Serializable {
    *
    * @param message the message.
    */
-  protected void log(@NotNull final String message) {
+  protected void print(@NotNull final String message) {
   }
 }

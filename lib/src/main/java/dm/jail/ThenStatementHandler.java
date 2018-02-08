@@ -22,7 +22,7 @@ import java.io.InvalidObjectException;
 import java.io.ObjectStreamException;
 import java.io.Serializable;
 
-import dm.jail.async.AsyncResult;
+import dm.jail.async.AsyncEvaluation;
 import dm.jail.async.Mapper;
 import dm.jail.config.BuildConfig;
 import dm.jail.util.ConstantConditions;
@@ -42,8 +42,8 @@ class ThenStatementHandler<V, R> extends AsyncStatementHandler<V, R> implements 
   }
 
   @Override
-  void value(final V value, @NotNull final AsyncResult<R> result) throws Exception {
-    result.set(mMapper.apply(value));
+  void value(final V value, @NotNull final AsyncEvaluation<R> evaluation) throws Exception {
+    evaluation.set(mMapper.apply(value));
   }
 
   @NotNull

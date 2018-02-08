@@ -24,8 +24,8 @@ import java.io.ObjectStreamException;
 import java.io.Serializable;
 import java.util.Arrays;
 
+import dm.jail.async.AsyncEvaluations;
 import dm.jail.async.AsyncLoop;
-import dm.jail.async.AsyncResults;
 import dm.jail.async.Mapper;
 import dm.jail.config.BuildConfig;
 import dm.jail.util.ConstantConditions;
@@ -54,16 +54,16 @@ class ElseLoopIfStatementHandler<V> extends AsyncStatementLoopHandler<V, V>
   }
 
   @Override
-  void failure(@NotNull final Throwable failure, @NotNull final AsyncResults<V> results) throws
-      Exception {
+  void failure(@NotNull final Throwable failure,
+      @NotNull final AsyncEvaluations<V> evaluations) throws Exception {
     for (final Class<?> type : mTypes) {
       if (type.isInstance(failure)) {
-        mMapper.apply(failure).to(results);
+        mMapper.apply(failure).to(evaluations);
         return;
       }
     }
 
-    super.failure(failure, results);
+    super.failure(failure, evaluations);
   }
 
   @NotNull

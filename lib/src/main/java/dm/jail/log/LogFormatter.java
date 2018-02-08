@@ -14,13 +14,19 @@
  * limitations under the License.
  */
 
-package dm.jail.executor;
+package dm.jail.log;
 
-import java.util.concurrent.Executor;
+import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
+
+import java.util.List;
 
 /**
- * Created by davide-maestroni on 02/07/2018.
+ * Created by davide-maestroni on 02/08/2018.
  */
-public interface OwnerExecutor extends Executor, ThreadOwner {
+public interface LogFormatter {
 
+  @NotNull
+  String format(@NotNull LogLevel level, @NotNull List<Object> contexts, @Nullable String message,
+      @Nullable Throwable throwable);
 }

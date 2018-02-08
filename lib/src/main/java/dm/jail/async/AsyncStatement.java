@@ -53,14 +53,14 @@ public interface AsyncStatement<V> extends AsyncState<V>, Future<V>, Serializabl
 
   @NotNull
   <S> AsyncStatement<V> fork(
-      @NotNull Forker<S, ? super AsyncStatement<V>, ? super V, ? super AsyncResult<V>> forker);
+      @NotNull Forker<S, ? super AsyncStatement<V>, ? super V, ? super AsyncEvaluation<V>> forker);
 
   @NotNull
   <S> AsyncStatement<V> fork(@Nullable Mapper<? super AsyncStatement<V>, S> init,
-      @Nullable ForkUpdater<S, ? super AsyncStatement<V>, ? super V> value,
-      @Nullable ForkUpdater<S, ? super AsyncStatement<V>, ? super Throwable> failure,
-      @Nullable ForkCompleter<S, ? super AsyncStatement<V>> done,
-      @Nullable ForkUpdater<S, ? super AsyncStatement<V>, ? super AsyncResult<V>> statement);
+      @Nullable Updater<S, ? super V, ? super AsyncStatement<V>> value,
+      @Nullable Updater<S, ? super Throwable, ? super AsyncStatement<V>> failure,
+      @Nullable Completer<S, ? super AsyncStatement<V>> done,
+      @Nullable Updater<S, ? super AsyncEvaluation<V>, ? super AsyncStatement<V>> statement);
 
   @Nullable
   FailureException getFailure();
@@ -105,26 +105,16 @@ public interface AsyncStatement<V> extends AsyncState<V>, Future<V>, Serializabl
   @NotNull
   AsyncStatement<V> whenDone(@NotNull Action action);
 
-  interface ForkCompleter<S, A> {
-
-    S complete(@NotNull A statement, S stack) throws Exception;
-  }
-
-  interface ForkUpdater<S, A, T> {
-
-    S update(@NotNull A statement, S stack, T input) throws Exception;
-  }
-
   interface Forker<S, A, V, R> {
 
-    S done(@NotNull A statement, S stack) throws Exception;
+    S done(S stack, @NotNull A statement) throws Exception;
 
-    S failure(@NotNull A statement, S stack, @NotNull Throwable failure) throws Exception;
+    S evaluation(S stack, @NotNull R evaluation, @NotNull A statement) throws Exception;
+
+    S failure(S stack, @NotNull Throwable failure, @NotNull A statement) throws Exception;
 
     S init(@NotNull A statement) throws Exception;
 
-    S statement(@NotNull A statement, S stack, @NotNull R result) throws Exception;
-
-    S value(@NotNull A statement, S stack, V value) throws Exception;
+    S value(S stack, V value, @NotNull A statement) throws Exception;
   }
 }

@@ -19,32 +19,32 @@ package dm.jail;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
-import dm.jail.async.AsyncResults;
+import dm.jail.async.AsyncEvaluations;
 
 /**
  * Created by davide-maestroni on 02/01/2018.
  */
 class AsyncLoopHandler<V, R> {
 
-  void addFailure(@NotNull final Throwable failure, @NotNull final AsyncResults<R> results) throws
-      Exception {
-    results.addFailure(failure).set();
+  void addFailure(@NotNull final Throwable failure,
+      @NotNull final AsyncEvaluations<R> evaluations) throws Exception {
+    evaluations.addFailure(failure).set();
   }
 
   void addFailures(@Nullable final Iterable<? extends Throwable> failures,
-      @NotNull final AsyncResults<R> results) throws Exception {
-    results.addFailures(failures).set();
+      @NotNull final AsyncEvaluations<R> evaluations) throws Exception {
+    evaluations.addFailures(failures).set();
   }
 
   @SuppressWarnings("unchecked")
-  void addValue(final V value, @NotNull final AsyncResults<R> results) throws Exception {
-    results.addValue((R) value).set();
+  void addValue(final V value, @NotNull final AsyncEvaluations<R> evaluations) throws Exception {
+    evaluations.addValue((R) value).set();
   }
 
   @SuppressWarnings("unchecked")
   void addValues(@Nullable final Iterable<? extends V> values,
-      @NotNull final AsyncResults<R> results) throws Exception {
-    results.addValues((Iterable<R>) values).set();
+      @NotNull final AsyncEvaluations<R> evaluations) throws Exception {
+    evaluations.addValues((Iterable<R>) values).set();
   }
 
   @NotNull
@@ -52,7 +52,7 @@ class AsyncLoopHandler<V, R> {
     return this;
   }
 
-  void set(@NotNull final AsyncResults<R> results) throws Exception {
-    results.set();
+  void set(@NotNull final AsyncEvaluations<R> evaluations) throws Exception {
+    evaluations.set();
   }
 }

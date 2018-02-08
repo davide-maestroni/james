@@ -24,7 +24,7 @@ import java.io.ObjectStreamException;
 import java.io.Serializable;
 import java.util.ArrayList;
 
-import dm.jail.async.AsyncResults;
+import dm.jail.async.AsyncEvaluations;
 import dm.jail.async.Mapper;
 import dm.jail.config.BuildConfig;
 import dm.jail.util.ConstantConditions;
@@ -44,13 +44,13 @@ class ThenLoopHandler<V, R> extends AsyncLoopHandler<V, R> implements Serializab
   }
 
   @Override
-  void addValue(final V value, @NotNull final AsyncResults<R> results) throws Exception {
-    results.addValue(mMapper.apply(value)).set();
+  void addValue(final V value, @NotNull final AsyncEvaluations<R> evaluations) throws Exception {
+    evaluations.addValue(mMapper.apply(value)).set();
   }
 
   @Override
   void addValues(@Nullable final Iterable<? extends V> values,
-      @NotNull final AsyncResults<R> results) throws Exception {
+      @NotNull final AsyncEvaluations<R> evaluations) throws Exception {
     if (values == null) {
       return;
     }
@@ -63,7 +63,7 @@ class ThenLoopHandler<V, R> extends AsyncLoopHandler<V, R> implements Serializab
       }
 
     } finally {
-      results.addValues(outputs).set();
+      evaluations.addValues(outputs).set();
     }
   }
 

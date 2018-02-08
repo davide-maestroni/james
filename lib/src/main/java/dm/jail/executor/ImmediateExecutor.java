@@ -22,6 +22,7 @@ import java.io.ObjectStreamException;
 import java.io.Serializable;
 
 import dm.jail.config.BuildConfig;
+import dm.jail.log.Logger;
 
 /**
  * Executor implementation just running the command in the same call to the {@code execute()}
@@ -41,10 +42,13 @@ class ImmediateExecutor implements OwnerExecutor, Serializable {
 
   private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
 
+  private transient final Logger mLogger;
+
   /**
    * Avoid explicit instantiation.
    */
   private ImmediateExecutor() {
+    mLogger = Logger.newLogger(this);
   }
 
   @NotNull
@@ -53,7 +57,12 @@ class ImmediateExecutor implements OwnerExecutor, Serializable {
   }
 
   public void execute(@NotNull final Runnable command) {
-    command.run();
+    try {
+      command.run();
+
+    } catch (final Throwable t) {
+      mLogger.wrn(t, "Suppressed exception");
+    }
   }
 
   public boolean isOwnedThread() {

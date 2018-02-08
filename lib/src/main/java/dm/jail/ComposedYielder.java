@@ -23,12 +23,12 @@ import java.io.InvalidObjectException;
 import java.io.ObjectStreamException;
 import java.io.Serializable;
 
-import dm.jail.async.AsyncLoop.YieldCompleter;
-import dm.jail.async.AsyncLoop.YieldResults;
-import dm.jail.async.AsyncLoop.YieldUpdater;
+import dm.jail.async.AsyncLoop.YieldOutputs;
 import dm.jail.async.AsyncLoop.Yielder;
+import dm.jail.async.Completer;
 import dm.jail.async.Mapper;
 import dm.jail.async.Provider;
+import dm.jail.async.Updater;
 import dm.jail.config.BuildConfig;
 import dm.jail.util.SerializableProxy;
 
@@ -39,40 +39,39 @@ class ComposedYielder<S, V, R> implements Yielder<S, V, R>, Serializable {
 
   private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
 
-  private final YieldCompleter<S, ? super YieldResults<R>> mDone;
+  private final Completer<S, ? super YieldOutputs<R>> mDone;
 
-  private final YieldUpdater<S, ? super Throwable, ? super YieldResults<R>> mFailure;
+  private final Updater<S, ? super Throwable, ? super YieldOutputs<R>> mFailure;
 
   private final Provider<S> mInit;
 
   private final Mapper<S, ? extends Boolean> mLoop;
 
-  private final YieldUpdater<S, ? super V, ? super YieldResults<R>> mValue;
+  private final Updater<S, ? super V, ? super YieldOutputs<R>> mValue;
 
   @SuppressWarnings("unchecked")
   ComposedYielder(@Nullable final Provider<S> init,
       @Nullable final Mapper<S, ? extends Boolean> loop,
-      @Nullable final YieldUpdater<S, ? super V, ? super YieldResults<R>> value,
-      @Nullable final YieldUpdater<S, ? super Throwable, ? super YieldResults<R>> failure,
-      @Nullable final YieldCompleter<S, ? super YieldResults<R>> done) {
+      @Nullable final Updater<S, ? super V, ? super YieldOutputs<R>> value,
+      @Nullable final Updater<S, ? super Throwable, ? super YieldOutputs<R>> failure,
+      @Nullable final Completer<S, ? super YieldOutputs<R>> done) {
     mInit = (Provider<S>) ((init != null) ? init : DefaultInit.sInstance);
     mLoop = (Mapper<S, ? extends Boolean>) ((loop != null) ? loop : DefaultLoop.sInstance);
-    mValue = (YieldUpdater<S, ? super V, ? super YieldResults<R>>) ((value != null) ? value
+    mValue = (Updater<S, ? super V, ? super YieldOutputs<R>>) ((value != null) ? value
         : DefaultUpdateValue.sInstance);
-    mFailure =
-        (YieldUpdater<S, ? super Throwable, ? super YieldResults<R>>) ((failure != null) ? failure
-            : DefaultUpdateValue.sInstance);
-    mDone = (YieldCompleter<S, ? super YieldResults<R>>) ((done != null) ? done
-        : DefaultComplete.sInstance);
+    mFailure = (Updater<S, ? super Throwable, ? super YieldOutputs<R>>) ((failure != null) ? failure
+        : DefaultUpdateValue.sInstance);
+    mDone =
+        (Completer<S, ? super YieldOutputs<R>>) ((done != null) ? done : DefaultComplete.sInstance);
   }
 
-  public void done(final S stack, @NotNull final YieldResults<R> results) throws Exception {
-    mDone.complete(stack, results);
+  public void done(final S stack, @NotNull final YieldOutputs<R> outputs) throws Exception {
+    mDone.complete(stack, outputs);
   }
 
   public S failure(final S stack, @NotNull final Throwable failure,
-      @NotNull final YieldResults<R> results) throws Exception {
-    return mFailure.update(stack, failure, results);
+      @NotNull final YieldOutputs<R> outputs) throws Exception {
+    return mFailure.update(stack, failure, outputs);
   }
 
   public S init() throws Exception {
@@ -83,9 +82,9 @@ class ComposedYielder<S, V, R> implements Yielder<S, V, R>, Serializable {
     return mLoop.apply(stack);
   }
 
-  public S value(final S stack, final V value, @NotNull final YieldResults<R> results) throws
+  public S value(final S stack, final V value, @NotNull final YieldOutputs<R> outputs) throws
       Exception {
-    return mValue.update(stack, value, results);
+    return mValue.update(stack, value, outputs);
   }
 
   @NotNull
@@ -94,13 +93,14 @@ class ComposedYielder<S, V, R> implements Yielder<S, V, R>, Serializable {
   }
 
   private static class DefaultComplete<S, V>
-      implements YieldCompleter<S, YieldResults<V>>, Serializable {
+      implements Completer<S, YieldOutputs<V>>, Serializable {
 
     private static final DefaultComplete<?, ?> sInstance = new DefaultComplete<Object, Object>();
 
     private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
 
-    public void complete(final S stack, @NotNull final YieldResults<V> state) {
+    public S complete(final S stack, @NotNull final YieldOutputs<V> state) {
+      return null;
     }
 
     @NotNull
@@ -142,14 +142,14 @@ class ComposedYielder<S, V, R> implements Yielder<S, V, R>, Serializable {
   }
 
   private static class DefaultUpdateValue<S, V, I>
-      implements YieldUpdater<S, I, YieldResults<V>>, Serializable {
+      implements Updater<S, I, YieldOutputs<V>>, Serializable {
 
     private static final DefaultUpdateValue<?, ?, ?> sInstance =
         new DefaultUpdateValue<Object, Object, Object>();
 
     private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
 
-    public S update(final S stack, final I value, @NotNull final YieldResults<V> results) {
+    public S update(final S stack, final I value, @NotNull final YieldOutputs<V> outputs) {
       return stack;
     }
 
@@ -164,9 +164,9 @@ class ComposedYielder<S, V, R> implements Yielder<S, V, R>, Serializable {
     private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
 
     private YielderProxy(final Provider<S> init, final Mapper<S, ? extends Boolean> loop,
-        final YieldUpdater<S, ? super V, ? super YieldResults<R>> value,
-        final YieldUpdater<S, ? super Throwable, ? super YieldResults<R>> failure,
-        final YieldCompleter<S, ? super YieldResults<R>> done) {
+        final Updater<S, ? super V, ? super YieldOutputs<R>> value,
+        final Updater<S, ? super Throwable, ? super YieldOutputs<R>> failure,
+        final Completer<S, ? super YieldOutputs<R>> done) {
       super(proxy(init), proxy(loop), proxy(value), proxy(failure), proxy(done));
     }
 
@@ -177,9 +177,9 @@ class ComposedYielder<S, V, R> implements Yielder<S, V, R>, Serializable {
         final Object[] args = deserializeArgs();
         return new ComposedYielder<S, V, R>((Provider<S>) args[0],
             (Mapper<S, ? extends Boolean>) args[1],
-            (YieldUpdater<S, ? super V, ? super YieldResults<R>>) args[2],
-            (YieldUpdater<S, ? super Throwable, ? super YieldResults<R>>) args[3],
-            (YieldCompleter<S, ? super YieldResults<R>>) args[4]);
+            (Updater<S, ? super V, ? super YieldOutputs<R>>) args[2],
+            (Updater<S, ? super Throwable, ? super YieldOutputs<R>>) args[3],
+            (Completer<S, ? super YieldOutputs<R>>) args[4]);
 
       } catch (final Throwable t) {
         throw new InvalidObjectException(t.getMessage());

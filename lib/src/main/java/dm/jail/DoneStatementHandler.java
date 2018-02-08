@@ -23,7 +23,7 @@ import java.io.ObjectStreamException;
 import java.io.Serializable;
 
 import dm.jail.async.Action;
-import dm.jail.async.AsyncResult;
+import dm.jail.async.AsyncEvaluation;
 import dm.jail.config.BuildConfig;
 import dm.jail.util.ConstantConditions;
 import dm.jail.util.SerializableProxy;
@@ -42,16 +42,16 @@ class DoneStatementHandler<V> extends AsyncStatementHandler<V, V> implements Ser
   }
 
   @Override
-  void failure(@NotNull final Throwable failure, @NotNull final AsyncResult<V> result) throws
-      Exception {
+  void failure(@NotNull final Throwable failure,
+      @NotNull final AsyncEvaluation<V> evaluation) throws Exception {
     mAction.perform();
-    super.failure(failure, result);
+    super.failure(failure, evaluation);
   }
 
   @Override
-  void value(final V value, @NotNull final AsyncResult<V> result) throws Exception {
+  void value(final V value, @NotNull final AsyncEvaluation<V> evaluation) throws Exception {
     mAction.perform();
-    super.value(value, result);
+    super.value(value, evaluation);
   }
 
   @NotNull

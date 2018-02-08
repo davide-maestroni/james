@@ -24,6 +24,7 @@ import java.io.InvalidObjectException;
 import java.io.ObjectStreamException;
 import java.io.Serializable;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.List;
 import java.util.NoSuchElementException;
 import java.util.concurrent.CancellationException;
@@ -32,15 +33,15 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
-import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 
 import dm.jail.async.Action;
+import dm.jail.async.AsyncEvaluation;
+import dm.jail.async.AsyncEvaluations;
 import dm.jail.async.AsyncLoop;
-import dm.jail.async.AsyncResult;
-import dm.jail.async.AsyncResults;
 import dm.jail.async.AsyncState;
 import dm.jail.async.AsyncStatement;
+import dm.jail.async.Completer;
 import dm.jail.async.FailureException;
 import dm.jail.async.Mapper;
 import dm.jail.async.Observer;
@@ -48,6 +49,7 @@ import dm.jail.async.Provider;
 import dm.jail.async.RuntimeInterruptedException;
 import dm.jail.async.RuntimeTimeoutException;
 import dm.jail.async.SimpleState;
+import dm.jail.async.Updater;
 import dm.jail.config.BuildConfig;
 import dm.jail.executor.ExecutorPool;
 import dm.jail.log.LogLevel;
@@ -65,26 +67,26 @@ import dm.jail.util.TimeUnits.Condition;
  */
 class DefaultAsyncLoop<V> implements AsyncLoop<V>, Serializable {
 
-  private static final AsyncResults<?> VOID_RESULTS = new AsyncResults<Object>() {
+  private static final AsyncEvaluations<?> VOID_EVALUATIONS = new AsyncEvaluations<Object>() {
 
     @NotNull
-    public AsyncResults<Object> addFailure(@NotNull final Throwable failure) {
+    public AsyncEvaluations<Object> addFailure(@NotNull final Throwable failure) {
       return this;
     }
 
     @NotNull
-    public AsyncResults<Object> addFailures(
+    public AsyncEvaluations<Object> addFailures(
         @Nullable final Iterable<? extends Throwable> failures) {
       return this;
     }
 
     @NotNull
-    public AsyncResults<Object> addValue(final Object value) {
+    public AsyncEvaluations<Object> addValue(final Object value) {
       return this;
     }
 
     @NotNull
-    public AsyncResults<Object> addValues(@Nullable final Iterable<? extends Object> values) {
+    public AsyncEvaluations<Object> addValues(@Nullable final Iterable<? extends Object> values) {
       return this;
     }
 
@@ -109,7 +111,7 @@ class DefaultAsyncLoop<V> implements AsyncLoop<V>, Serializable {
 
   private final Object mMutex;
 
-  private final Observer<AsyncResults<?>> mObserver;
+  private final Observer<AsyncEvaluations<?>> mObserver;
 
   private final LoopChain<?, V> mTail;
 
@@ -117,7 +119,7 @@ class DefaultAsyncLoop<V> implements AsyncLoop<V>, Serializable {
 
   private StatementState mState = StatementState.Evaluating;
 
-  DefaultAsyncLoop(@NotNull final Observer<? super AsyncResults<V>> observer,
+  DefaultAsyncLoop(@NotNull final Observer<? super AsyncEvaluations<V>> observer,
       final boolean isEvaluated, @Nullable final LogPrinter printer,
       @Nullable final LogLevel level) {
     this(ConstantConditions.notNull("observer", observer), isEvaluated,
@@ -125,15 +127,15 @@ class DefaultAsyncLoop<V> implements AsyncLoop<V>, Serializable {
   }
 
   @SuppressWarnings("unchecked")
-  private DefaultAsyncLoop(@NotNull final Observer<? super AsyncResults<V>> observer,
+  private DefaultAsyncLoop(@NotNull final Observer<? super AsyncEvaluations<V>> observer,
       final boolean isEvaluated, @NotNull final Executor executor,
       @Nullable final LogPrinter printer, @Nullable final LogLevel level) {
     // forking
-    mObserver = (Observer<AsyncResults<?>>) observer;
+    mObserver = (Observer<AsyncEvaluations<?>>) observer;
     mExecutor = executor;
     mIsEvaluated = isEvaluated;
     mIsFork = (observer instanceof ForkObserver);
-    mLogger = Logger.newLogger(printer, level, this);
+    mLogger = Logger.newLogger(this, printer, level);
     final ChainHead<V> head = new ChainHead<V>();
     head.setLogger(mLogger);
     head.setNext(new ChainTail(head));
@@ -149,7 +151,7 @@ class DefaultAsyncLoop<V> implements AsyncLoop<V>, Serializable {
   }
 
   @SuppressWarnings("unchecked")
-  private DefaultAsyncLoop(@NotNull final Observer<AsyncResults<?>> observer,
+  private DefaultAsyncLoop(@NotNull final Observer<AsyncEvaluations<?>> observer,
       final boolean isEvaluated, @NotNull final Executor executor,
       @Nullable final LogPrinter printer, @Nullable final LogLevel level,
       @NotNull final ChainHead<?> head, @NotNull final LoopChain<?, V> tail) {
@@ -158,7 +160,7 @@ class DefaultAsyncLoop<V> implements AsyncLoop<V>, Serializable {
     mExecutor = executor;
     mIsEvaluated = isEvaluated;
     mIsFork = (observer instanceof ForkObserver);
-    mLogger = Logger.newLogger(printer, level, this);
+    mLogger = Logger.newLogger(this, printer, level);
     mMutex = head.getMutex();
     mHead = head;
     mTail = tail;
@@ -178,7 +180,7 @@ class DefaultAsyncLoop<V> implements AsyncLoop<V>, Serializable {
   }
 
   @SuppressWarnings("unchecked")
-  private DefaultAsyncLoop(@NotNull final Observer<AsyncResults<?>> observer,
+  private DefaultAsyncLoop(@NotNull final Observer<AsyncEvaluations<?>> observer,
       final boolean isEvaluated, @NotNull final Executor executor, @NotNull final Logger logger,
       @NotNull final ChainHead<?> head, @NotNull final LoopChain<?, V> tail,
       final boolean observe) {
@@ -265,9 +267,9 @@ class DefaultAsyncLoop<V> implements AsyncLoop<V>, Serializable {
   @NotNull
   public <S> AsyncLoop<V> backoffOn(@NotNull final Executor executor,
       @Nullable final Provider<S> init,
-      @Nullable final YieldUpdater<S, ? super V, ? super PendingState> value,
-      @Nullable final YieldUpdater<S, ? super Throwable, ? super PendingState> failure,
-      @Nullable final YieldCompleter<S, ? super PendingState> done) {
+      @Nullable final Updater<S, ? super V, ? super PendingState> value,
+      @Nullable final Updater<S, ? super Throwable, ? super PendingState> failure,
+      @Nullable final Completer<S, ? super PendingState> done) {
     // TODO: 05/02/2018 implement
     return null;
   }
@@ -322,19 +324,18 @@ class DefaultAsyncLoop<V> implements AsyncLoop<V>, Serializable {
   @NotNull
   public <S> AsyncLoop<V> fork(
       @NotNull final Forker<S, ? super AsyncStatement<Iterable<V>>, ? super Iterable<V>, ? super
-          AsyncResult<Iterable<V>>> forker) {
+          AsyncEvaluation<Iterable<V>>> forker) {
+
     return forkLoop(new LoopForker<S, V>(forker));
   }
 
   @NotNull
   public <S> AsyncLoop<V> fork(@Nullable final Mapper<? super AsyncStatement<Iterable<V>>, S> init,
-      @Nullable final ForkUpdater<S, ? super AsyncStatement<Iterable<V>>, ? super Iterable<V>>
-          value,
-      @Nullable final ForkUpdater<S, ? super AsyncStatement<Iterable<V>>, ? super Throwable>
-          failure,
-      @Nullable final ForkCompleter<S, ? super AsyncStatement<Iterable<V>>> done,
-      @Nullable final ForkUpdater<S, ? super AsyncStatement<Iterable<V>>, ? super
-          AsyncResult<Iterable<V>>> statement) {
+      @Nullable final Updater<S, ? super Iterable<V>, ? super AsyncStatement<Iterable<V>>> value,
+      @Nullable final Updater<S, ? super Throwable, ? super AsyncStatement<Iterable<V>>> failure,
+      @Nullable final Completer<S, ? super AsyncStatement<Iterable<V>>> done,
+      @Nullable final Updater<S, ? super AsyncEvaluation<Iterable<V>>, ? super
+          AsyncStatement<Iterable<V>>> statement) {
     return fork(new ComposedStatementForker<S, Iterable<V>>(init, value, failure, done, statement));
   }
 
@@ -510,7 +511,8 @@ class DefaultAsyncLoop<V> implements AsyncLoop<V>, Serializable {
 
   @NotNull
   public <S> AsyncLoop<V> forkLoop(
-      @NotNull final Forker<S, ? super AsyncLoop<V>, ? super V, ? super AsyncResults<V>> forker) {
+      @NotNull final Forker<S, ? super AsyncLoop<V>, ? super V, ? super AsyncEvaluations<V>>
+          forker) {
     final Logger logger = mLogger;
     return new DefaultAsyncLoop<V>(new ForkObserver<S, V>(this, forker), mIsEvaluated, mExecutor,
         logger.getLogPrinter(), logger.getLogLevel());
@@ -518,11 +520,88 @@ class DefaultAsyncLoop<V> implements AsyncLoop<V>, Serializable {
 
   @NotNull
   public <S> AsyncLoop<V> forkLoop(@Nullable final Mapper<? super AsyncLoop<V>, S> init,
-      @Nullable final ForkUpdater<S, ? super AsyncLoop<V>, ? super V> value,
-      @Nullable final ForkUpdater<S, ? super AsyncLoop<V>, ? super Throwable> failure,
-      @Nullable final ForkCompleter<S, ? super AsyncLoop<V>> done,
-      @Nullable final ForkUpdater<S, ? super AsyncLoop<V>, ? super AsyncResults<V>> statement) {
+      @Nullable final Updater<S, ? super V, ? super AsyncLoop<V>> value,
+      @Nullable final Updater<S, ? super Throwable, ? super AsyncLoop<V>> failure,
+      @Nullable final Completer<S, ? super AsyncLoop<V>> done,
+      @Nullable final Updater<S, ? super AsyncEvaluations<V>, ? super AsyncLoop<V>> statement) {
     return forkLoop(new ComposedLoopForker<S, V>(init, value, failure, done, statement));
+  }
+
+  @NotNull
+  public List<AsyncState<V>> getStates(final int maxCount) {
+    return getStates(maxCount, -1, TimeUnit.MILLISECONDS);
+  }
+
+  @NotNull
+  public List<AsyncState<V>> getStates(final int maxCount, final long timeout,
+      @NotNull final TimeUnit timeUnit) {
+    checkSupported();
+    deadLockWarning(timeout);
+    final ChainHead<?> head = mHead;
+    final ArrayList<AsyncState<V>> outputs = new ArrayList<AsyncState<V>>();
+    synchronized (mMutex) {
+      try {
+        if (TimeUnits.waitUntil(mMutex, new Condition() {
+
+          public boolean isTrue() {
+            checkFinal();
+            return ((head.getStates().size() >= maxCount) || head.getState().isDone());
+          }
+        }, timeout, timeUnit)) {
+          @SuppressWarnings("unchecked") final DoubleQueue<SimpleState<V>> states =
+              ((ChainHead<V>) head).getStates();
+          while (!states.isEmpty() && (outputs.size() < maxCount)) {
+            outputs.add(states.removeFirst());
+          }
+        }
+
+      } catch (final InterruptedException e) {
+        throw new RuntimeInterruptedException(e);
+      }
+    }
+
+    return outputs;
+  }
+
+  @NotNull
+  public List<V> getValues(final int maxCount) {
+    return getValues(maxCount, -1, TimeUnit.MILLISECONDS);
+  }
+
+  @NotNull
+  public List<V> getValues(final int maxCount, final long timeout,
+      @NotNull final TimeUnit timeUnit) {
+    checkSupported();
+    deadLockWarning(timeout);
+    final ChainHead<?> head = mHead;
+    final ArrayList<V> outputs = new ArrayList<V>();
+    synchronized (mMutex) {
+      try {
+        if (TimeUnits.waitUntil(mMutex, new Condition() {
+
+          public boolean isTrue() {
+            checkFinal();
+            return ((head.getStates().size() >= maxCount) || head.getState().isDone());
+          }
+        }, timeout, timeUnit)) {
+          @SuppressWarnings("unchecked") final DoubleQueue<SimpleState<V>> states =
+              ((ChainHead<V>) head).getStates();
+          while (!states.isEmpty() && (outputs.size() < maxCount)) {
+            final SimpleState<V> state = states.removeFirst();
+            if (state.isFailed()) {
+              throw FailureException.wrap(state.failure());
+            }
+
+            outputs.add(state.value());
+          }
+        }
+
+      } catch (final InterruptedException e) {
+        throw new RuntimeInterruptedException(e);
+      }
+    }
+
+    return outputs;
   }
 
   @NotNull
@@ -542,29 +621,29 @@ class DefaultAsyncLoop<V> implements AsyncLoop<V>, Serializable {
   }
 
   @NotNull
-  public Generator<AsyncState<V>> stateGenerator() {
+  public AsyncGenerator<AsyncState<V>> stateGenerator() {
     return stateGenerator(-1, TimeUnit.MILLISECONDS);
   }
 
   @NotNull
-  public Generator<AsyncState<V>> stateGenerator(final long timeout,
+  public AsyncGenerator<AsyncState<V>> stateGenerator(final long timeout,
       @NotNull final TimeUnit timeUnit) {
     checkSupported();
     return new StateGenerator<V>(this, timeout, timeUnit);
   }
 
-  public void to(@NotNull final AsyncResults<? super V> results) {
+  public void to(@NotNull final AsyncEvaluations<? super V> evaluations) {
     checkEvaluated();
-    chain(new ToResultLoopHandler<V>(results));
+    chain(new ToEvaluationLoopHandler<V>(evaluations));
   }
 
   @NotNull
-  public Generator<V> valueGenerator() {
+  public AsyncGenerator<V> valueGenerator() {
     return valueGenerator(-1, TimeUnit.MILLISECONDS);
   }
 
   @NotNull
-  public Generator<V> valueGenerator(final long timeout, @NotNull final TimeUnit timeUnit) {
+  public AsyncGenerator<V> valueGenerator(final long timeout, @NotNull final TimeUnit timeUnit) {
     checkSupported();
     return new ValueGenerator<V>(this, timeout, timeUnit);
   }
@@ -579,9 +658,9 @@ class DefaultAsyncLoop<V> implements AsyncLoop<V>, Serializable {
   @NotNull
   public <R, S> AsyncLoop<R> yield(@Nullable final Provider<S> init,
       @Nullable final Mapper<S, ? extends Boolean> loop,
-      @Nullable final YieldUpdater<S, ? super V, ? super YieldResults<R>> value,
-      @Nullable final YieldUpdater<S, ? super Throwable, ? super YieldResults<R>> failure,
-      @Nullable final YieldCompleter<S, ? super YieldResults<R>> done) {
+      @Nullable final Updater<S, ? super V, ? super YieldOutputs<R>> value,
+      @Nullable final Updater<S, ? super Throwable, ? super YieldOutputs<R>> failure,
+      @Nullable final Completer<S, ? super YieldOutputs<R>> done) {
     return yield(new ComposedYielder<S, V, R>(init, loop, value, failure, done));
   }
 
@@ -595,14 +674,14 @@ class DefaultAsyncLoop<V> implements AsyncLoop<V>, Serializable {
   @NotNull
   public <R, S> AsyncLoop<R> yieldOrdered(@Nullable final Provider<S> init,
       @Nullable final Mapper<S, ? extends Boolean> loop,
-      @Nullable final YieldUpdater<S, ? super V, ? super YieldResults<R>> value,
-      @Nullable final YieldUpdater<S, ? super Throwable, ? super YieldResults<R>> failure,
-      @Nullable final YieldCompleter<S, ? super YieldResults<R>> done) {
+      @Nullable final Updater<S, ? super V, ? super YieldOutputs<R>> value,
+      @Nullable final Updater<S, ? super Throwable, ? super YieldOutputs<R>> failure,
+      @Nullable final Completer<S, ? super YieldOutputs<R>> done) {
     return yieldOrdered(new ComposedYielder<S, V, R>(init, loop, value, failure, done));
   }
 
   public boolean cancel(final boolean mayInterruptIfRunning) {
-    final Observer<? extends AsyncResults<?>> observer = mObserver;
+    final Observer<? extends AsyncEvaluations<?>> observer = mObserver;
     if (mIsFork) {
       if (((ForkObserver<?, ?>) observer).cancel(mayInterruptIfRunning)) {
         return true;
@@ -686,7 +765,7 @@ class DefaultAsyncLoop<V> implements AsyncLoop<V>, Serializable {
 
   @SuppressWarnings("unchecked")
   public void consume() {
-    to((AsyncResults<V>) VOID_RESULTS);
+    to((AsyncEvaluations<V>) VOID_EVALUATIONS);
   }
 
   @Nullable
@@ -862,21 +941,21 @@ class DefaultAsyncLoop<V> implements AsyncLoop<V>, Serializable {
     }
   }
 
-  public void to(@NotNull final AsyncResult<? super Iterable<V>> result) {
+  public void to(@NotNull final AsyncEvaluation<? super Iterable<V>> evaluation) {
     checkEvaluated();
     yield(new CollectionYielder<V>() {
 
       @Override
       public ArrayList<V> failure(final ArrayList<V> stack, @NotNull final Throwable failure,
-          @NotNull final YieldResults<V> results) throws Exception {
-        result.fail(failure);
+          @NotNull final YieldOutputs<V> outputs) throws Exception {
+        evaluation.fail(failure);
         return null;
       }
 
       @Override
       public ArrayList<V> value(final ArrayList<V> stack, final V value,
-          @NotNull final YieldResults<V> results) {
-        result.set(stack);
+          @NotNull final YieldOutputs<V> outputs) {
+        evaluation.set(stack);
         return stack;
       }
     });
@@ -915,7 +994,7 @@ class DefaultAsyncLoop<V> implements AsyncLoop<V>, Serializable {
     final Logger logger = mLogger;
     final ChainHead<?> head = mHead;
     final Runnable chaining;
-    final Observer<? extends AsyncResults<?>> observer = mObserver;
+    final Observer<? extends AsyncEvaluations<?>> observer = mObserver;
     if (mIsFork) {
       final AsyncLoop<R> forked =
           new DefaultAsyncLoop<V>(((ForkObserver<?, V>) observer).newObserver(), mIsEvaluated,
@@ -938,7 +1017,7 @@ class DefaultAsyncLoop<V> implements AsyncLoop<V>, Serializable {
     }
 
     final DefaultAsyncLoop<R> loop =
-        new DefaultAsyncLoop<R>((Observer<AsyncResults<?>>) observer, mIsEvaluated, newExecutor,
+        new DefaultAsyncLoop<R>((Observer<AsyncEvaluations<?>>) observer, mIsEvaluated, newExecutor,
             logger, head, chain, false);
     if (chaining != null) {
       chainExecutor.execute(chaining);
@@ -994,10 +1073,10 @@ class DefaultAsyncLoop<V> implements AsyncLoop<V>, Serializable {
   }
 
   @NotNull
-  private Observer<AsyncResults<?>> renewObserver() {
-    final Observer<AsyncResults<?>> observer = mObserver;
+  private Observer<AsyncEvaluations<?>> renewObserver() {
+    final Observer<AsyncEvaluations<?>> observer = mObserver;
     if (observer instanceof RenewableObserver) {
-      return ((RenewableObserver<AsyncResults<?>>) observer).renew();
+      return ((RenewableObserver<AsyncEvaluations<?>>) observer).renew();
     }
 
     return observer;
@@ -1033,7 +1112,7 @@ class DefaultAsyncLoop<V> implements AsyncLoop<V>, Serializable {
   }
 
   private static class ChainForkObserver<S, V>
-      implements RenewableObserver<AsyncResults<V>>, Serializable {
+      implements RenewableObserver<AsyncEvaluations<V>>, Serializable {
 
     private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
 
@@ -1043,8 +1122,8 @@ class DefaultAsyncLoop<V> implements AsyncLoop<V>, Serializable {
       mObserver = observer;
     }
 
-    public void accept(final AsyncResults<V> result) {
-      mObserver.chain(result);
+    public void accept(final AsyncEvaluations<V> evaluation) {
+      mObserver.chain(evaluation);
     }
 
     @NotNull
@@ -1260,11 +1339,11 @@ class DefaultAsyncLoop<V> implements AsyncLoop<V>, Serializable {
 
     private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
 
+    private final ChainEvaluations mEvaluations = new ChainEvaluations();
+
     private final AsyncLoopHandler<V, R> mHandler;
 
     private final AtomicLong mPendingCount = new AtomicLong(1);
-
-    private final ChainResults mResults = new ChainResults();
 
     private ChainLoopHandler(@Nullable final AsyncLoopHandler<V, R> handler) {
       mHandler = ConstantConditions.notNull("handler", handler);
@@ -1309,36 +1388,37 @@ class DefaultAsyncLoop<V> implements AsyncLoop<V>, Serializable {
       }
     }
 
-    private class ChainResults implements AsyncResults<R> {
+    private class ChainEvaluations implements AsyncEvaluations<R> {
 
       private volatile LoopChain<R, ?> mNext;
 
       @NotNull
-      ChainResults withNext(final LoopChain<R, ?> next) {
+      ChainEvaluations withNext(final LoopChain<R, ?> next) {
         mNext = next;
         return this;
       }
 
       @NotNull
-      public AsyncResults<R> addFailure(@NotNull final Throwable failure) {
+      public AsyncEvaluations<R> addFailure(@NotNull final Throwable failure) {
         mNext.addFailure(failure);
         return this;
       }
 
       @NotNull
-      public AsyncResults<R> addFailures(@Nullable final Iterable<? extends Throwable> failures) {
+      public AsyncEvaluations<R> addFailures(
+          @Nullable final Iterable<? extends Throwable> failures) {
         mNext.addFailures(failures);
         return this;
       }
 
       @NotNull
-      public AsyncResults<R> addValue(final R value) {
+      public AsyncEvaluations<R> addValue(final R value) {
         mNext.addValue(value);
         return this;
       }
 
       @NotNull
-      public AsyncResults<R> addValues(@Nullable final Iterable<? extends R> values) {
+      public AsyncEvaluations<R> addValues(@Nullable final Iterable<? extends R> values) {
         mNext.addValues(values);
         return this;
       }
@@ -1352,7 +1432,7 @@ class DefaultAsyncLoop<V> implements AsyncLoop<V>, Serializable {
     void addFailure(final LoopChain<R, ?> next, @NotNull final Throwable failure) {
       mPendingCount.incrementAndGet();
       try {
-        mHandler.addFailure(failure, mResults.withNext(next));
+        mHandler.addFailure(failure, mEvaluations.withNext(next));
 
       } catch (final CancellationException e) {
         getLogger().wrn(e, "Loop has been cancelled");
@@ -1368,7 +1448,7 @@ class DefaultAsyncLoop<V> implements AsyncLoop<V>, Serializable {
     void addValue(final LoopChain<R, ?> next, final V value) {
       mPendingCount.incrementAndGet();
       try {
-        mHandler.addValue(value, mResults.withNext(next));
+        mHandler.addValue(value, mEvaluations.withNext(next));
 
       } catch (final CancellationException e) {
         getLogger().wrn(e, "Loop has been cancelled");
@@ -1384,7 +1464,7 @@ class DefaultAsyncLoop<V> implements AsyncLoop<V>, Serializable {
     void addValues(final LoopChain<R, ?> next, @NotNull final Iterable<? extends V> values) {
       mPendingCount.incrementAndGet();
       try {
-        mHandler.addValues(values, mResults.withNext(next));
+        mHandler.addValues(values, mEvaluations.withNext(next));
 
       } catch (final CancellationException e) {
         getLogger().wrn(e, "Loop has been cancelled");
@@ -1407,7 +1487,7 @@ class DefaultAsyncLoop<V> implements AsyncLoop<V>, Serializable {
         @NotNull final Iterable<? extends Throwable> failures) {
       mPendingCount.incrementAndGet();
       try {
-        mHandler.addFailures(failures, mResults.withNext(next));
+        mHandler.addFailures(failures, mEvaluations.withNext(next));
 
       } catch (final CancellationException e) {
         getLogger().wrn(e, "Loop has been cancelled");
@@ -1422,7 +1502,7 @@ class DefaultAsyncLoop<V> implements AsyncLoop<V>, Serializable {
     @Override
     void set(final LoopChain<R, ?> next) {
       try {
-        mHandler.set(mResults.withNext(next));
+        mHandler.set(mEvaluations.withNext(next));
 
       } catch (final CancellationException e) {
         getLogger().wrn(e, "Loop has been cancelled");
@@ -1499,20 +1579,20 @@ class DefaultAsyncLoop<V> implements AsyncLoop<V>, Serializable {
       }
     }
 
-    private class ChainResults implements AsyncResults<R> {
+    private class ChainEvaluations implements AsyncEvaluations<R> {
 
       private final LoopChain<R, ?> mNext;
 
       private final NestedQueue<SimpleState<R>> mQueue;
 
-      private ChainResults(@NotNull final NestedQueue<SimpleState<R>> queue,
+      private ChainEvaluations(@NotNull final NestedQueue<SimpleState<R>> queue,
           final LoopChain<R, ?> next) {
         mQueue = queue;
         mNext = next;
       }
 
       @NotNull
-      public AsyncResults<R> addFailure(@NotNull final Throwable failure) {
+      public AsyncEvaluations<R> addFailure(@NotNull final Throwable failure) {
         synchronized (mMutex) {
           mQueue.add(SimpleState.<R>ofFailure(failure));
         }
@@ -1522,7 +1602,8 @@ class DefaultAsyncLoop<V> implements AsyncLoop<V>, Serializable {
       }
 
       @NotNull
-      public AsyncResults<R> addFailures(@Nullable final Iterable<? extends Throwable> failures) {
+      public AsyncEvaluations<R> addFailures(
+          @Nullable final Iterable<? extends Throwable> failures) {
         if (failures != null) {
           synchronized (mMutex) {
             final NestedQueue<SimpleState<R>> queue = mQueue;
@@ -1538,7 +1619,7 @@ class DefaultAsyncLoop<V> implements AsyncLoop<V>, Serializable {
       }
 
       @NotNull
-      public AsyncResults<R> addValue(final R value) {
+      public AsyncEvaluations<R> addValue(final R value) {
         synchronized (mMutex) {
           mQueue.add(SimpleState.ofValue(value));
         }
@@ -1548,7 +1629,7 @@ class DefaultAsyncLoop<V> implements AsyncLoop<V>, Serializable {
       }
 
       @NotNull
-      public AsyncResults<R> addValues(@Nullable final Iterable<? extends R> values) {
+      public AsyncEvaluations<R> addValues(@Nullable final Iterable<? extends R> values) {
         if (values != null) {
           synchronized (mMutex) {
             final NestedQueue<SimpleState<R>> queue = mQueue;
@@ -1578,7 +1659,7 @@ class DefaultAsyncLoop<V> implements AsyncLoop<V>, Serializable {
     void addFailure(final LoopChain<R, ?> next, @NotNull final Throwable failure) {
       mPendingCount.incrementAndGet();
       try {
-        mHandler.addFailure(failure, new ChainResults(mQueue.addNested(), next));
+        mHandler.addFailure(failure, new ChainEvaluations(mQueue.addNested(), next));
 
       } catch (final CancellationException e) {
         getLogger().wrn(e, "Loop has been cancelled");
@@ -1594,7 +1675,7 @@ class DefaultAsyncLoop<V> implements AsyncLoop<V>, Serializable {
     void addValue(final LoopChain<R, ?> next, final V value) {
       mPendingCount.incrementAndGet();
       try {
-        mHandler.addValue(value, new ChainResults(mQueue.addNested(), next));
+        mHandler.addValue(value, new ChainEvaluations(mQueue.addNested(), next));
 
       } catch (final CancellationException e) {
         getLogger().wrn(e, "Loop has been cancelled");
@@ -1610,7 +1691,7 @@ class DefaultAsyncLoop<V> implements AsyncLoop<V>, Serializable {
     void addValues(final LoopChain<R, ?> next, @NotNull final Iterable<? extends V> values) {
       mPendingCount.incrementAndGet();
       try {
-        mHandler.addValues(values, new ChainResults(mQueue.addNested(), next));
+        mHandler.addValues(values, new ChainEvaluations(mQueue.addNested(), next));
 
       } catch (final CancellationException e) {
         getLogger().wrn(e, "Loop has been cancelled");
@@ -1633,7 +1714,7 @@ class DefaultAsyncLoop<V> implements AsyncLoop<V>, Serializable {
         @NotNull final Iterable<? extends Throwable> failures) {
       mPendingCount.incrementAndGet();
       try {
-        mHandler.addFailures(failures, new ChainResults(mQueue.addNested(), next));
+        mHandler.addFailures(failures, new ChainEvaluations(mQueue.addNested(), next));
 
       } catch (final CancellationException e) {
         getLogger().wrn(e, "Loop has been cancelled");
@@ -1648,7 +1729,7 @@ class DefaultAsyncLoop<V> implements AsyncLoop<V>, Serializable {
     @Override
     void set(final LoopChain<R, ?> next) {
       try {
-        mHandler.set(new ChainResults(mQueue.addNested(), next));
+        mHandler.set(new ChainEvaluations(mQueue.addNested(), next));
 
       } catch (final CancellationException e) {
         getLogger().wrn(e, "Loop has been cancelled");
@@ -1665,11 +1746,11 @@ class DefaultAsyncLoop<V> implements AsyncLoop<V>, Serializable {
 
     private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
 
+    private final ChainEvaluation mEvaluation = new ChainEvaluation();
+
     private final AsyncStatementHandler<V, R> mHandler;
 
     private final AtomicLong mPendingCount = new AtomicLong(1);
-
-    private final ChainResult mResult = new ChainResult();
 
     private ChainStatementHandler(@Nullable final AsyncStatementHandler<V, R> handler) {
       mHandler = ConstantConditions.notNull("handler", handler);
@@ -1714,7 +1795,7 @@ class DefaultAsyncLoop<V> implements AsyncLoop<V>, Serializable {
       }
     }
 
-    private class ChainResult implements AsyncResult<R> {
+    private class ChainEvaluation implements AsyncEvaluation<R> {
 
       private volatile LoopChain<R, ?> mNext;
 
@@ -1725,7 +1806,7 @@ class DefaultAsyncLoop<V> implements AsyncLoop<V>, Serializable {
       }
 
       @NotNull
-      ChainResult withNext(final LoopChain<R, ?> next) {
+      ChainEvaluation withNext(final LoopChain<R, ?> next) {
         mNext = next;
         return this;
       }
@@ -1741,7 +1822,7 @@ class DefaultAsyncLoop<V> implements AsyncLoop<V>, Serializable {
     void addFailure(final LoopChain<R, ?> next, @NotNull final Throwable failure) {
       mPendingCount.incrementAndGet();
       try {
-        mHandler.failure(failure, mResult.withNext(next));
+        mHandler.failure(failure, mEvaluation.withNext(next));
 
       } catch (final CancellationException e) {
         getLogger().wrn(e, "Loop has been cancelled");
@@ -1757,7 +1838,7 @@ class DefaultAsyncLoop<V> implements AsyncLoop<V>, Serializable {
     void addValue(final LoopChain<R, ?> next, final V value) {
       mPendingCount.incrementAndGet();
       try {
-        mHandler.value(value, mResult.withNext(next));
+        mHandler.value(value, mEvaluation.withNext(next));
 
       } catch (final CancellationException e) {
         getLogger().wrn(e, "Loop has been cancelled");
@@ -1772,10 +1853,10 @@ class DefaultAsyncLoop<V> implements AsyncLoop<V>, Serializable {
     @Override
     void addValues(final LoopChain<R, ?> next, @NotNull final Iterable<? extends V> values) {
       mPendingCount.addAndGet(Iterables.size(values));
-      final ChainResult result = mResult.withNext(next);
+      final ChainEvaluation evaluation = mEvaluation.withNext(next);
       for (final V value : values) {
         try {
-          mHandler.value(value, result);
+          mHandler.value(value, evaluation);
 
         } catch (final CancellationException e) {
           getLogger().wrn(e, "Loop has been cancelled");
@@ -1800,10 +1881,10 @@ class DefaultAsyncLoop<V> implements AsyncLoop<V>, Serializable {
     void addFailures(final LoopChain<R, ?> next,
         @NotNull final Iterable<? extends Throwable> failures) {
       mPendingCount.addAndGet(Iterables.size(failures));
-      final ChainResult result = mResult.withNext(next);
+      final ChainEvaluation evaluation = mEvaluation.withNext(next);
       for (final Throwable failure : failures) {
         try {
-          mHandler.failure(failure, result);
+          mHandler.failure(failure, evaluation);
 
         } catch (final CancellationException e) {
           getLogger().wrn(e, "Loop has been cancelled");
@@ -1897,13 +1978,13 @@ class DefaultAsyncLoop<V> implements AsyncLoop<V>, Serializable {
       }
     }
 
-    private class ChainResult implements AsyncResult<R> {
+    private class ChainEvaluation implements AsyncEvaluation<R> {
 
       private final LoopChain<R, ?> mNext;
 
       private final NestedQueue<SimpleState<R>> mQueue;
 
-      private ChainResult(@NotNull final NestedQueue<SimpleState<R>> queue,
+      private ChainEvaluation(@NotNull final NestedQueue<SimpleState<R>> queue,
           final LoopChain<R, ?> next) {
         mQueue = queue;
         mNext = next;
@@ -1934,7 +2015,7 @@ class DefaultAsyncLoop<V> implements AsyncLoop<V>, Serializable {
     void addFailure(final LoopChain<R, ?> next, @NotNull final Throwable failure) {
       mPendingCount.incrementAndGet();
       try {
-        mHandler.failure(failure, new ChainResult(mQueue.addNested(), next));
+        mHandler.failure(failure, new ChainEvaluation(mQueue.addNested(), next));
 
       } catch (final CancellationException e) {
         getLogger().wrn(e, "Loop has been cancelled");
@@ -1950,7 +2031,7 @@ class DefaultAsyncLoop<V> implements AsyncLoop<V>, Serializable {
     void addValue(final LoopChain<R, ?> next, final V value) {
       mPendingCount.incrementAndGet();
       try {
-        mHandler.value(value, new ChainResult(mQueue.addNested(), next));
+        mHandler.value(value, new ChainEvaluation(mQueue.addNested(), next));
 
       } catch (final CancellationException e) {
         getLogger().wrn(e, "Loop has been cancelled");
@@ -1967,7 +2048,7 @@ class DefaultAsyncLoop<V> implements AsyncLoop<V>, Serializable {
       mPendingCount.addAndGet(Iterables.size(values));
       for (final V value : values) {
         try {
-          mHandler.value(value, new ChainResult(mQueue.addNested(), next));
+          mHandler.value(value, new ChainEvaluation(mQueue.addNested(), next));
 
         } catch (final CancellationException e) {
           getLogger().wrn(e, "Loop has been cancelled");
@@ -1994,7 +2075,7 @@ class DefaultAsyncLoop<V> implements AsyncLoop<V>, Serializable {
       mPendingCount.addAndGet(Iterables.size(failures));
       for (final Throwable failure : failures) {
         try {
-          mHandler.failure(failure, new ChainResult(mQueue.addNested(), next));
+          mHandler.failure(failure, new ChainEvaluation(mQueue.addNested(), next));
 
         } catch (final CancellationException e) {
           getLogger().wrn(e, "Loop has been cancelled");
@@ -2021,11 +2102,11 @@ class DefaultAsyncLoop<V> implements AsyncLoop<V>, Serializable {
 
     private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
 
+    private final ChainEvaluations mEvaluation = new ChainEvaluations();
+
     private final AsyncStatementLoopHandler<V, R> mHandler;
 
     private final AtomicLong mPendingCount = new AtomicLong(1);
-
-    private final ChainResults mResult = new ChainResults();
 
     private ChainStatementLoopHandler(@Nullable final AsyncStatementLoopHandler<V, R> handler) {
       mHandler = ConstantConditions.notNull("handler", handler);
@@ -2070,36 +2151,37 @@ class DefaultAsyncLoop<V> implements AsyncLoop<V>, Serializable {
       }
     }
 
-    private class ChainResults implements AsyncResults<R> {
+    private class ChainEvaluations implements AsyncEvaluations<R> {
 
       private volatile LoopChain<R, ?> mNext;
 
       @NotNull
-      ChainResults withNext(final LoopChain<R, ?> next) {
+      ChainEvaluations withNext(final LoopChain<R, ?> next) {
         mNext = next;
         return this;
       }
 
       @NotNull
-      public AsyncResults<R> addFailure(@NotNull final Throwable failure) {
+      public AsyncEvaluations<R> addFailure(@NotNull final Throwable failure) {
         mNext.addFailure(failure);
         return this;
       }
 
       @NotNull
-      public AsyncResults<R> addFailures(@Nullable final Iterable<? extends Throwable> failures) {
+      public AsyncEvaluations<R> addFailures(
+          @Nullable final Iterable<? extends Throwable> failures) {
         mNext.addFailures(failures);
         return this;
       }
 
       @NotNull
-      public AsyncResults<R> addValue(final R value) {
+      public AsyncEvaluations<R> addValue(final R value) {
         mNext.addValue(value);
         return this;
       }
 
       @NotNull
-      public AsyncResults<R> addValues(@Nullable final Iterable<? extends R> values) {
+      public AsyncEvaluations<R> addValues(@Nullable final Iterable<? extends R> values) {
         mNext.addValues(values);
         return this;
       }
@@ -2113,7 +2195,7 @@ class DefaultAsyncLoop<V> implements AsyncLoop<V>, Serializable {
     void addFailure(final LoopChain<R, ?> next, @NotNull final Throwable failure) {
       mPendingCount.incrementAndGet();
       try {
-        mHandler.failure(failure, mResult.withNext(next));
+        mHandler.failure(failure, mEvaluation.withNext(next));
 
       } catch (final CancellationException e) {
         getLogger().wrn(e, "Loop has been cancelled");
@@ -2129,7 +2211,7 @@ class DefaultAsyncLoop<V> implements AsyncLoop<V>, Serializable {
     void addValue(final LoopChain<R, ?> next, final V value) {
       mPendingCount.incrementAndGet();
       try {
-        mHandler.value(value, mResult.withNext(next));
+        mHandler.value(value, mEvaluation.withNext(next));
 
       } catch (final CancellationException e) {
         getLogger().wrn(e, "Loop has been cancelled");
@@ -2144,10 +2226,10 @@ class DefaultAsyncLoop<V> implements AsyncLoop<V>, Serializable {
     @Override
     void addValues(final LoopChain<R, ?> next, @NotNull final Iterable<? extends V> values) {
       mPendingCount.addAndGet(Iterables.size(values));
-      final ChainResults result = mResult.withNext(next);
+      final ChainEvaluations evaluation = mEvaluation.withNext(next);
       for (final V value : values) {
         try {
-          mHandler.value(value, result);
+          mHandler.value(value, evaluation);
 
         } catch (final CancellationException e) {
           getLogger().wrn(e, "Loop has been cancelled");
@@ -2172,10 +2254,10 @@ class DefaultAsyncLoop<V> implements AsyncLoop<V>, Serializable {
     void addFailures(final LoopChain<R, ?> next,
         @NotNull final Iterable<? extends Throwable> failures) {
       mPendingCount.addAndGet(Iterables.size(failures));
-      final ChainResults result = mResult.withNext(next);
+      final ChainEvaluations evaluation = mEvaluation.withNext(next);
       for (final Throwable failure : failures) {
         try {
-          mHandler.failure(failure, result);
+          mHandler.failure(failure, evaluation);
 
         } catch (final CancellationException e) {
           getLogger().wrn(e, "Loop has been cancelled");
@@ -2261,20 +2343,20 @@ class DefaultAsyncLoop<V> implements AsyncLoop<V>, Serializable {
       }
     }
 
-    private class ChainResults implements AsyncResults<R> {
+    private class ChainEvaluations implements AsyncEvaluations<R> {
 
       private final LoopChain<R, ?> mNext;
 
       private final NestedQueue<SimpleState<R>> mQueue;
 
-      private ChainResults(@NotNull final NestedQueue<SimpleState<R>> queue,
+      private ChainEvaluations(@NotNull final NestedQueue<SimpleState<R>> queue,
           final LoopChain<R, ?> next) {
         mQueue = queue;
         mNext = next;
       }
 
       @NotNull
-      public AsyncResults<R> addFailure(@NotNull final Throwable failure) {
+      public AsyncEvaluations<R> addFailure(@NotNull final Throwable failure) {
         synchronized (mMutex) {
           mQueue.add(SimpleState.<R>ofFailure(failure));
         }
@@ -2284,7 +2366,8 @@ class DefaultAsyncLoop<V> implements AsyncLoop<V>, Serializable {
       }
 
       @NotNull
-      public AsyncResults<R> addFailures(@Nullable final Iterable<? extends Throwable> failures) {
+      public AsyncEvaluations<R> addFailures(
+          @Nullable final Iterable<? extends Throwable> failures) {
         if (failures != null) {
           synchronized (mMutex) {
             final NestedQueue<SimpleState<R>> queue = mQueue;
@@ -2300,7 +2383,7 @@ class DefaultAsyncLoop<V> implements AsyncLoop<V>, Serializable {
       }
 
       @NotNull
-      public AsyncResults<R> addValue(final R value) {
+      public AsyncEvaluations<R> addValue(final R value) {
         synchronized (mMutex) {
           mQueue.add(SimpleState.ofValue(value));
         }
@@ -2310,7 +2393,7 @@ class DefaultAsyncLoop<V> implements AsyncLoop<V>, Serializable {
       }
 
       @NotNull
-      public AsyncResults<R> addValues(@Nullable final Iterable<? extends R> values) {
+      public AsyncEvaluations<R> addValues(@Nullable final Iterable<? extends R> values) {
         if (values != null) {
           synchronized (mMutex) {
             final NestedQueue<SimpleState<R>> queue = mQueue;
@@ -2340,7 +2423,7 @@ class DefaultAsyncLoop<V> implements AsyncLoop<V>, Serializable {
     void addFailure(final LoopChain<R, ?> next, @NotNull final Throwable failure) {
       mPendingCount.incrementAndGet();
       try {
-        mHandler.failure(failure, new ChainResults(mQueue.addNested(), next));
+        mHandler.failure(failure, new ChainEvaluations(mQueue.addNested(), next));
 
       } catch (final CancellationException e) {
         getLogger().wrn(e, "Loop has been cancelled");
@@ -2356,7 +2439,7 @@ class DefaultAsyncLoop<V> implements AsyncLoop<V>, Serializable {
     void addValue(final LoopChain<R, ?> next, final V value) {
       mPendingCount.incrementAndGet();
       try {
-        mHandler.value(value, new ChainResults(mQueue.addNested(), next));
+        mHandler.value(value, new ChainEvaluations(mQueue.addNested(), next));
 
       } catch (final CancellationException e) {
         getLogger().wrn(e, "Loop has been cancelled");
@@ -2373,7 +2456,7 @@ class DefaultAsyncLoop<V> implements AsyncLoop<V>, Serializable {
       mPendingCount.addAndGet(Iterables.size(values));
       for (final V value : values) {
         try {
-          mHandler.value(value, new ChainResults(mQueue.addNested(), next));
+          mHandler.value(value, new ChainEvaluations(mQueue.addNested(), next));
 
         } catch (final CancellationException e) {
           getLogger().wrn(e, "Loop has been cancelled");
@@ -2400,7 +2483,7 @@ class DefaultAsyncLoop<V> implements AsyncLoop<V>, Serializable {
       mPendingCount.addAndGet(Iterables.size(failures));
       for (final Throwable failure : failures) {
         try {
-          mHandler.failure(failure, new ChainResults(mQueue.addNested(), next));
+          mHandler.failure(failure, new ChainEvaluations(mQueue.addNested(), next));
 
         } catch (final CancellationException e) {
           getLogger().wrn(e, "Loop has been cancelled");
@@ -2422,15 +2505,15 @@ class DefaultAsyncLoop<V> implements AsyncLoop<V>, Serializable {
   }
 
   private static class ForkObserver<S, V>
-      implements RenewableObserver<AsyncResults<V>>, Serializable {
+      implements RenewableObserver<AsyncEvaluations<V>>, Serializable {
 
     private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
 
+    private final List<AsyncEvaluations<V>> mEvaluations = new ArrayList<AsyncEvaluations<V>>();
+
     private final Executor mExecutor;
 
-    private final Forker<S, AsyncLoop<V>, V, AsyncResults<V>> mForker;
-
-    private final List<AsyncResults<V>> mResults = new ArrayList<AsyncResults<V>>();
+    private final Forker<S, AsyncLoop<V>, V, AsyncEvaluations<V>> mForker;
 
     private Throwable mFailure;
 
@@ -2440,9 +2523,11 @@ class DefaultAsyncLoop<V> implements AsyncLoop<V>, Serializable {
 
     @SuppressWarnings("unchecked")
     private ForkObserver(@NotNull final AsyncLoop<V> loop,
-        @NotNull final Forker<S, ? super AsyncLoop<V>, ? super V, ? super AsyncResults<V>> forker) {
-      mForker = (Forker<S, AsyncLoop<V>, V, AsyncResults<V>>) ConstantConditions.notNull("forker",
-          forker);
+        @NotNull final Forker<S, ? super AsyncLoop<V>, ? super V, ? super AsyncEvaluations<V>>
+            forker) {
+      mForker =
+          (Forker<S, AsyncLoop<V>, V, AsyncEvaluations<V>>) ConstantConditions.notNull("forker",
+              forker);
       mExecutor = ExecutorPool.withThrottling(1, ExecutorPool.immediateExecutor());
       mLoop = loop;
     }
@@ -2451,41 +2536,41 @@ class DefaultAsyncLoop<V> implements AsyncLoop<V>, Serializable {
       return mLoop.cancel(mayInterruptIfRunning);
     }
 
-    void chain(final AsyncResults<V> results) {
+    void chain(final AsyncEvaluations<V> evaluations) {
       mExecutor.execute(new Runnable() {
 
         public void run() {
           final Throwable failure = mFailure;
           if (failure != null) {
-            results.addFailure(failure).set();
+            evaluations.addFailure(failure).set();
             return;
           }
 
-          mResults.add(results);
+          mEvaluations.add(evaluations);
           try {
-            mStack = mForker.statement(mLoop, mStack, results);
+            mStack = mForker.evaluation(mStack, evaluations, mLoop);
 
           } catch (final Throwable t) {
             final Throwable throwable = RuntimeInterruptedException.wrapIfInterrupt(t);
             mFailure = throwable;
-            clearResults(throwable);
+            clearEvaluations(throwable);
           }
         }
       });
     }
 
     @NotNull
-    Observer<AsyncResults<V>> newObserver() {
+    Observer<AsyncEvaluations<V>> newObserver() {
       return new ChainForkObserver<S, V>(this);
     }
 
-    private void clearResults(@NotNull final Throwable failure) {
-      final List<AsyncResults<V>> results = mResults;
-      for (final AsyncResults<V> result : results) {
-        result.addFailure(failure).set();
+    private void clearEvaluations(@NotNull final Throwable failure) {
+      final List<AsyncEvaluations<V>> evaluations = mEvaluations;
+      for (final AsyncEvaluations<V> evaluation : evaluations) {
+        evaluation.addFailure(failure).set();
       }
 
-      results.clear();
+      evaluations.clear();
     }
 
     @NotNull
@@ -2498,7 +2583,7 @@ class DefaultAsyncLoop<V> implements AsyncLoop<V>, Serializable {
       private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
 
       private ObserverProxy(final AsyncLoop<V> loop,
-          final Forker<S, ? super AsyncLoop<V>, ? super V, ? super AsyncResults<V>> forker) {
+          final Forker<S, ? super AsyncLoop<V>, ? super V, ? super AsyncEvaluations<V>> forker) {
         super(loop, proxy(forker));
       }
 
@@ -2508,7 +2593,7 @@ class DefaultAsyncLoop<V> implements AsyncLoop<V>, Serializable {
         try {
           final Object[] args = deserializeArgs();
           return new ForkObserver<S, V>((AsyncLoop<V>) args[0],
-              (Forker<S, ? super AsyncLoop<V>, ? super V, ? super AsyncResults<V>>) args[1]);
+              (Forker<S, ? super AsyncLoop<V>, ? super V, ? super AsyncEvaluations<V>>) args[1]);
 
         } catch (final Throwable t) {
           throw new InvalidObjectException(t.getMessage());
@@ -2516,7 +2601,7 @@ class DefaultAsyncLoop<V> implements AsyncLoop<V>, Serializable {
       }
     }
 
-    public void accept(final AsyncResults<V> results) {
+    public void accept(final AsyncEvaluations<V> evaluations) {
       mExecutor.execute(new Runnable() {
 
         public void run() {
@@ -2531,17 +2616,17 @@ class DefaultAsyncLoop<V> implements AsyncLoop<V>, Serializable {
                   public void run() {
                     final Throwable failure = mFailure;
                     if (failure != null) {
-                      clearResults(failure);
+                      clearEvaluations(failure);
                       return;
                     }
 
                     try {
-                      mStack = mForker.value(mLoop, mStack, value);
+                      mStack = mForker.value(mStack, value, mLoop);
 
                     } catch (final Throwable t) {
                       final Throwable throwable = RuntimeInterruptedException.wrapIfInterrupt(t);
                       mFailure = throwable;
-                      clearResults(throwable);
+                      clearEvaluations(throwable);
                     }
                   }
                 });
@@ -2555,17 +2640,17 @@ class DefaultAsyncLoop<V> implements AsyncLoop<V>, Serializable {
                   public void run() {
                     final Throwable failure = mFailure;
                     if (failure != null) {
-                      clearResults(failure);
+                      clearEvaluations(failure);
                       return;
                     }
 
                     try {
-                      mStack = mForker.failure(mLoop, mStack, throwable);
+                      mStack = mForker.failure(mStack, throwable, mLoop);
 
                     } catch (final Throwable t) {
                       final Throwable throwable = RuntimeInterruptedException.wrapIfInterrupt(t);
                       mFailure = throwable;
-                      clearResults(throwable);
+                      clearEvaluations(throwable);
                     }
                   }
                 });
@@ -2579,17 +2664,17 @@ class DefaultAsyncLoop<V> implements AsyncLoop<V>, Serializable {
                   public void run() {
                     final Throwable failure = mFailure;
                     if (failure != null) {
-                      clearResults(failure);
+                      clearEvaluations(failure);
                       return;
                     }
 
                     try {
-                      mStack = mForker.done(mLoop, mStack);
+                      mStack = mForker.done(mStack, mLoop);
 
                     } catch (final Throwable t) {
                       final Throwable throwable = RuntimeInterruptedException.wrapIfInterrupt(t);
                       mFailure = throwable;
-                      clearResults(throwable);
+                      clearEvaluations(throwable);
                     }
                   }
                 });
@@ -2609,7 +2694,7 @@ class DefaultAsyncLoop<V> implements AsyncLoop<V>, Serializable {
     }
   }
 
-  private static abstract class LoopChain<V, R> implements AsyncResults<V> {
+  private static abstract class LoopChain<V, R> implements AsyncEvaluations<V> {
 
     private static final Runnable NO_OP = new Runnable() {
 
@@ -2685,7 +2770,7 @@ class DefaultAsyncLoop<V> implements AsyncLoop<V>, Serializable {
     }
 
     void setLogger(@NotNull final Logger logger) {
-      mLogger = logger.subContextLogger(this);
+      mLogger = logger.newChildLogger(this, logger.getLogPrinter(), logger.getLogLevel());
     }
 
     boolean isTail() {
@@ -2892,7 +2977,7 @@ class DefaultAsyncLoop<V> implements AsyncLoop<V>, Serializable {
     }
 
     @NotNull
-    public final AsyncResults<V> addFailure(@NotNull final Throwable failure) {
+    public final AsyncEvaluations<V> addFailure(@NotNull final Throwable failure) {
       ConstantConditions.notNull("failure", failure);
       final Runnable command;
       synchronized (mMutex) {
@@ -2908,7 +2993,7 @@ class DefaultAsyncLoop<V> implements AsyncLoop<V>, Serializable {
     }
 
     @NotNull
-    public AsyncResults<V> addFailures(@Nullable final Iterable<? extends Throwable> failures) {
+    public AsyncEvaluations<V> addFailures(@Nullable final Iterable<? extends Throwable> failures) {
       final Runnable command;
       synchronized (mMutex) {
         command = mInnerState.add();
@@ -2929,7 +3014,7 @@ class DefaultAsyncLoop<V> implements AsyncLoop<V>, Serializable {
     }
 
     @NotNull
-    public final AsyncResults<V> addValue(final V value) {
+    public final AsyncEvaluations<V> addValue(final V value) {
       final Runnable command;
       synchronized (mMutex) {
         command = mInnerState.add();
@@ -2944,7 +3029,7 @@ class DefaultAsyncLoop<V> implements AsyncLoop<V>, Serializable {
     }
 
     @NotNull
-    public final AsyncResults<V> addValues(@Nullable final Iterable<? extends V> values) {
+    public final AsyncEvaluations<V> addValues(@Nullable final Iterable<? extends V> values) {
       final Runnable command;
       synchronized (mMutex) {
         command = mInnerState.add();
@@ -2977,7 +3062,7 @@ class DefaultAsyncLoop<V> implements AsyncLoop<V>, Serializable {
 
     private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
 
-    private LoopProxy(final Observer<AsyncResults<?>> observer, final boolean isEvaluated,
+    private LoopProxy(final Observer<AsyncEvaluations<?>> observer, final boolean isEvaluated,
         final Executor executor, final LogPrinter printer, final LogLevel level,
         final List<LoopChain<?, ?>> chains) {
       super(proxy(observer), isEvaluated, executor, printer, level, chains);
@@ -2995,8 +3080,8 @@ class DefaultAsyncLoop<V> implements AsyncLoop<V>, Serializable {
           tail = chain;
         }
 
-        return new DefaultAsyncLoop<Object>((Observer<AsyncResults<?>>) args[0], (Boolean) args[1],
-            (Executor) args[2], (LogPrinter) args[3], (LogLevel) args[4], head,
+        return new DefaultAsyncLoop<Object>((Observer<AsyncEvaluations<?>>) args[0],
+            (Boolean) args[1], (Executor) args[2], (LogPrinter) args[3], (LogLevel) args[4], head,
             (LoopChain<?, Object>) tail);
 
       } catch (final Throwable t) {
@@ -3005,9 +3090,7 @@ class DefaultAsyncLoop<V> implements AsyncLoop<V>, Serializable {
     }
   }
 
-  private static class StateGenerator<V> implements Generator<AsyncState<V>> {
-
-    private final AtomicBoolean mIsFirst = new AtomicBoolean(false);
+  private static class StateGenerator<V> implements AsyncGenerator<AsyncState<V>> {
 
     private final DefaultAsyncLoop<V> mLoop;
 
@@ -3023,13 +3106,12 @@ class DefaultAsyncLoop<V> implements AsyncLoop<V>, Serializable {
     }
 
     @NotNull
-    public GeneratorIterator<AsyncState<V>> iterator() {
-      return new StateIterator<V>(mIsFirst.getAndSet(false) ? mLoop : mLoop.evaluate(), mTimeout,
-          mTimeUnit);
+    public AsyncIterator<AsyncState<V>> iterator() {
+      return new StateIterator<V>(mLoop.evaluate(), mTimeout, mTimeUnit);
     }
   }
 
-  private static class StateIterator<V> implements GeneratorIterator<AsyncState<V>> {
+  private static class StateIterator<V> implements AsyncIterator<AsyncState<V>> {
 
     private final DefaultAsyncLoop<V> mLoop;
 
@@ -3085,36 +3167,9 @@ class DefaultAsyncLoop<V> implements AsyncLoop<V>, Serializable {
 
     @NotNull
     public List<AsyncState<V>> next(final int maxCount) {
-      final DefaultAsyncLoop<V> loop = mLoop;
-      final ChainHead<?> head = loop.mHead;
-      final long timeout = remainingTime();
-      loop.deadLockWarning(timeout);
-      synchronized (loop.mMutex) {
-        try {
-          if (TimeUnits.waitUntil(loop.mMutex, new Condition() {
-
-            public boolean isTrue() {
-              loop.checkFinal();
-              return ((head.getStates().size() >= maxCount) || head.getState().isDone());
-            }
-          }, timeout, mTimeUnit)) {
-            @SuppressWarnings("unchecked") final DoubleQueue<SimpleState<V>> states =
-                ((ChainHead<V>) head).getStates();
-            final ArrayList<AsyncState<V>> outputs =
-                new ArrayList<AsyncState<V>>(Math.min(maxCount, states.size()));
-            while (!states.isEmpty() && (outputs.size() < maxCount)) {
-              outputs.add(states.removeFirst());
-            }
-
-            return outputs;
-          }
-
-        } catch (final InterruptedException e) {
-          throw new RuntimeInterruptedException(e);
-        }
-      }
-
-      throw timeoutException();
+      final ArrayList<AsyncState<V>> outputs = new ArrayList<AsyncState<V>>();
+      readNext(outputs, maxCount);
+      return outputs;
     }
 
     private long remainingTime() {
@@ -3136,6 +3191,55 @@ class DefaultAsyncLoop<V> implements AsyncLoop<V>, Serializable {
       return new RuntimeTimeoutException(
           "timeout while iterating promise resolutions [" + mOriginalTimeout + " "
               + mOriginalTimeUnit + "]");
+    }
+
+    public int readNext(@NotNull final Collection<? super AsyncState<V>> collection,
+        final int maxCount) {
+      return readNext(collection, maxCount, -1, TimeUnit.MILLISECONDS);
+    }
+
+    @NotNull
+    public List<AsyncState<V>> next(final int maxCount, final long timeout,
+        @NotNull final TimeUnit timeUnit) {
+      final ArrayList<AsyncState<V>> outputs = new ArrayList<AsyncState<V>>();
+      readNext(outputs, maxCount, timeout, timeUnit);
+      return outputs;
+    }
+
+    public int readNext(@NotNull final Collection<? super AsyncState<V>> collection,
+        final int maxCount, final long timeout, @NotNull final TimeUnit timeUnit) {
+      final DefaultAsyncLoop<V> loop = mLoop;
+      final ChainHead<?> head = loop.mHead;
+      final TimeUnit waitTimeUnit = mTimeUnit;
+      final long waitTimeout = Math.min(remainingTime(),
+          (timeout >= 0) ? waitTimeUnit.convert(timeout, timeUnit) : Long.MAX_VALUE);
+      loop.deadLockWarning(waitTimeout);
+      synchronized (loop.mMutex) {
+        try {
+          if (TimeUnits.waitUntil(loop.mMutex, new Condition() {
+
+            public boolean isTrue() {
+              loop.checkFinal();
+              return ((head.getStates().size() >= maxCount) || head.getState().isDone());
+            }
+          }, waitTimeout, waitTimeUnit)) {
+            int count = 0;
+            @SuppressWarnings("unchecked") final DoubleQueue<SimpleState<V>> states =
+                ((ChainHead<V>) head).getStates();
+            while (!states.isEmpty() && (count < maxCount)) {
+              collection.add(states.removeFirst());
+              ++count;
+            }
+
+            return count;
+          }
+
+        } catch (final InterruptedException e) {
+          throw new RuntimeInterruptedException(e);
+        }
+      }
+
+      throw timeoutException();
     }
 
     public AsyncState<V> next() {
@@ -3174,9 +3278,7 @@ class DefaultAsyncLoop<V> implements AsyncLoop<V>, Serializable {
     }
   }
 
-  private static class ValueGenerator<V> implements Generator<V> {
-
-    private final AtomicBoolean mIsFirst = new AtomicBoolean(false);
+  private static class ValueGenerator<V> implements AsyncGenerator<V> {
 
     private final DefaultAsyncLoop<V> mLoop;
 
@@ -3192,13 +3294,12 @@ class DefaultAsyncLoop<V> implements AsyncLoop<V>, Serializable {
     }
 
     @NotNull
-    public GeneratorIterator<V> iterator() {
-      return new ValueIterator<V>(mIsFirst.getAndSet(false) ? mLoop : mLoop.evaluate(), mTimeout,
-          mTimeUnit);
+    public AsyncIterator<V> iterator() {
+      return new ValueIterator<V>(mLoop.evaluate(), mTimeout, mTimeUnit);
     }
   }
 
-  private static class ValueIterator<V> implements GeneratorIterator<V> {
+  private static class ValueIterator<V> implements AsyncIterator<V> {
 
     private final DefaultAsyncLoop<V> mLoop;
 
@@ -3324,10 +3425,30 @@ class DefaultAsyncLoop<V> implements AsyncLoop<V>, Serializable {
 
     @NotNull
     public List<V> next(final int maxCount) {
+      final ArrayList<V> outputs = new ArrayList<V>();
+      readNext(outputs, maxCount);
+      return outputs;
+    }
+
+    public int readNext(@NotNull final Collection<? super V> collection, final int maxCount) {
+      return readNext(collection, maxCount, -1, TimeUnit.MILLISECONDS);
+    }
+
+    @NotNull
+    public List<V> next(final int maxCount, final long timeout, @NotNull final TimeUnit timeUnit) {
+      final ArrayList<V> outputs = new ArrayList<V>();
+      readNext(outputs, maxCount, timeout, timeUnit);
+      return outputs;
+    }
+
+    public int readNext(@NotNull final Collection<? super V> collection, final int maxCount,
+        final long timeout, @NotNull final TimeUnit timeUnit) {
       final DefaultAsyncLoop<V> loop = mLoop;
       final ChainHead<?> head = loop.mHead;
-      final long timeout = remainingTime();
-      loop.deadLockWarning(timeout);
+      final TimeUnit waitTimeUnit = mTimeUnit;
+      final long waitTimeout = Math.min(remainingTime(),
+          (timeout >= 0) ? waitTimeUnit.convert(timeout, timeUnit) : Long.MAX_VALUE);
+      loop.deadLockWarning(waitTimeout);
       synchronized (loop.mMutex) {
         try {
           if (TimeUnits.waitUntil(loop.mMutex, new Condition() {
@@ -3336,20 +3457,21 @@ class DefaultAsyncLoop<V> implements AsyncLoop<V>, Serializable {
               loop.checkFinal();
               return ((head.getStates().size() >= maxCount) || head.getState().isDone());
             }
-          }, timeout, mTimeUnit)) {
+          }, waitTimeout, waitTimeUnit)) {
+            int count = 0;
             @SuppressWarnings("unchecked") final DoubleQueue<SimpleState<V>> states =
                 ((ChainHead<V>) head).getStates();
-            final ArrayList<V> outputs = new ArrayList<V>(Math.min(maxCount, states.size()));
-            while (!states.isEmpty() && (outputs.size() < maxCount)) {
+            while (!states.isEmpty() && (count < maxCount)) {
               final SimpleState<V> state = states.removeFirst();
               if (state.isFailed()) {
                 throw FailureException.wrap(state.failure());
               }
 
-              outputs.add(state.value());
+              collection.add(state.value());
+              ++count;
             }
 
-            return outputs;
+            return count;
           }
 
         } catch (final InterruptedException e) {

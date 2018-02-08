@@ -22,7 +22,6 @@ import java.io.ObjectStreamException;
 import java.io.Serializable;
 import java.util.concurrent.Executor;
 import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
@@ -136,6 +135,17 @@ public class ExecutorPool {
     return LoopExecutor.instance();
   }
 
+  @NotNull
+  public static StoppableExecutor newCachedPoolExecutor() {
+    return new PoolExecutor();
+  }
+
+  @NotNull
+  public static StoppableExecutor newCachedPoolExecutor(
+      @NotNull final ThreadFactory threadFactory) {
+    return new PoolExecutor(threadFactory);
+  }
+
   /**
    * Returns an executor employing a dynamic pool of threads.
    * <br>
@@ -192,31 +202,50 @@ public class ExecutorPool {
             keepAliveUnit, threadFactory));
   }
 
+  @NotNull
+  public static StoppableExecutor newFixedPoolExecutor(final int corePoolSize) {
+    return new PoolExecutor(corePoolSize);
+  }
+
+  @NotNull
+  public static StoppableExecutor newFixedPoolExecutor(final int poolSize,
+      @NotNull final ThreadFactory threadFactory) {
+    return new PoolExecutor(poolSize, threadFactory);
+  }
+
   /**
    * Returns an executor employing an optimum number of threads.
    *
    * @return the executor instance.
    */
   @NotNull
-  public static ScheduledExecutor newPoolExecutor() {
-    return new PoolExecutor();
+  public static ScheduledExecutor newScheduledPoolExecutor() {
+    return new ScheduledPoolExecutor();
   }
 
   /**
    * Returns an executor employing the specified number of threads.
    *
-   * @param poolSize the thread pool size.
+   * @param corePoolSize the thread pool size.
    * @return the executor instance.
    * @throws IllegalArgumentException if the pool size is less than 1.
    */
   @NotNull
-  public static ScheduledExecutor newPoolExecutor(final int poolSize) {
-    return new PoolExecutor(poolSize);
+  public static ScheduledExecutor newScheduledPoolExecutor(final int corePoolSize) {
+    return new ScheduledPoolExecutor(corePoolSize);
   }
 
-  // TODO: 07/02/2018 newPoolExecutor(int, ThreadFactory)
-  // TODO: 07/02/2018 StoppableExecutor newCachedPool()
-  // TODO: 07/02/2018 StoppableExecutor newFixedPool()
+  @NotNull
+  public static ScheduledExecutor newScheduledPoolExecutor(final int poolSize,
+      @NotNull final ThreadFactory threadFactory) {
+    return new ScheduledPoolExecutor(poolSize, threadFactory);
+  }
+
+  @NotNull
+  public static ScheduledExecutor newScheduledPoolExecutor(
+      @NotNull final ThreadFactory threadFactory) {
+    return new ScheduledPoolExecutor(threadFactory);
+  }
 
   @NotNull
   public static ScheduledExecutor register(@NotNull final ScheduledExecutor executor) {
@@ -224,7 +253,7 @@ public class ExecutorPool {
   }
 
   @NotNull
-  public static Executor register(@NotNull final Executor executor) {
+  public static OwnerExecutor register(@NotNull final Executor executor) {
     return registerOwner(owner(executor));
   }
 
@@ -309,7 +338,7 @@ public class ExecutorPool {
     return OwnerScheduledExecutorServiceWrapper.ofUnstoppable(
         new DynamicScheduledThreadPoolExecutorService(Math.max(2, processors >> 1),
             Math.max(2, (processors << 1) - 1), 10L, TimeUnit.SECONDS,
-            new ExecutorThreadFactory(threadPriority)));
+            new PriorityThreadFactory(threadPriority)));
   }
 
   @NotNull
@@ -470,28 +499,6 @@ public class ExecutorPool {
     }
   }
 
-  private static class ExecutorThreadFactory implements ThreadFactory, Serializable {
-
-    private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
-
-    private final int mPriority;
-
-    private ExecutorThreadFactory(final int priority) {
-      if ((priority < Thread.MIN_PRIORITY) || (priority > Thread.MAX_PRIORITY)) {
-        throw new IllegalArgumentException();
-      }
-
-      mPriority = priority;
-    }
-
-    public Thread newThread(@NotNull final Runnable runnable) {
-      final Thread thread = new Thread(runnable);
-      thread.setName("jail-" + thread.getName());
-      thread.setPriority(mPriority);
-      return thread;
-    }
-  }
-
   private static class ForegroundExecutor extends ScheduledExecutorDecorator
       implements Serializable {
 
@@ -520,43 +527,25 @@ public class ExecutorPool {
     }
   }
 
-  private static class PoolExecutor extends ScheduledExecutorDecorator implements Serializable {
+  private static class PriorityThreadFactory implements ThreadFactory, Serializable {
 
     private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
 
-    private final int mPoolSize;
+    private final int mPriority;
 
-    private PoolExecutor() {
-      this(Integer.MIN_VALUE);
-    }
-
-    private PoolExecutor(final int poolSize) {
-      super(OwnerScheduledExecutorServiceWrapper.of(
-          (poolSize == Integer.MIN_VALUE) ? Executors.newScheduledThreadPool(
-              (Runtime.getRuntime().availableProcessors() << 1) - 1)
-              : Executors.newScheduledThreadPool(poolSize)));
-      mPoolSize = poolSize;
-    }
-
-    @NotNull
-    private Object writeReplace() throws ObjectStreamException {
-      return new ExecutorProxy(mPoolSize);
-    }
-
-    private static class ExecutorProxy implements Serializable {
-
-      private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
-
-      private final int mPoolSize;
-
-      private ExecutorProxy(final int poolSize) {
-        mPoolSize = poolSize;
+    private PriorityThreadFactory(final int priority) {
+      if ((priority < Thread.MIN_PRIORITY) || (priority > Thread.MAX_PRIORITY)) {
+        throw new IllegalArgumentException();
       }
 
-      @NotNull
-      Object readResolve() throws ObjectStreamException {
-        return new ExecutorPool.PoolExecutor(mPoolSize);
-      }
+      mPriority = priority;
+    }
+
+    public Thread newThread(@NotNull final Runnable runnable) {
+      final Thread thread = new Thread(runnable);
+      thread.setName("jail-" + thread.getName());
+      thread.setPriority(mPriority);
+      return thread;
     }
   }
 }

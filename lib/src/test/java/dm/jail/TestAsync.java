@@ -21,10 +21,14 @@ import org.junit.Test;
 
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.concurrent.Callable;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 
-import dm.jail.async.AsyncResult;
-import dm.jail.async.AsyncResults;
+import dm.jail.async.AsyncEvaluation;
+import dm.jail.async.AsyncEvaluations;
 import dm.jail.async.AsyncState;
 import dm.jail.async.AsyncStatement;
 import dm.jail.async.AsyncStatement.Forker;
@@ -46,9 +50,9 @@ public class TestAsync {
 
     class ForkStack<V> {
 
-      AsyncStatement<String> forked;
+      ArrayList<AsyncEvaluation<V>> evaluations = new ArrayList<AsyncEvaluation<V>>();
 
-      ArrayList<AsyncResult<V>> results = new ArrayList<AsyncResult<V>>();
+      AsyncStatement<String> forked;
 
       AsyncState<V> state;
 
@@ -58,22 +62,22 @@ public class TestAsync {
     new Async().value("hello")
                .fork(
                    new Forker<ForkStack<String>, AsyncStatement<String>, String,
-                       AsyncResult<String>>() {
+                       AsyncEvaluation<String>>() {
 
-                     public ForkStack<String> done(@NotNull final AsyncStatement<String> statement,
-                         final ForkStack<String> stack) {
+                     public ForkStack<String> done(final ForkStack<String> stack,
+                         @NotNull final AsyncStatement<String> statement) {
                        return stack;
                      }
 
-                     public ForkStack<String> failure(
-                         @NotNull final AsyncStatement<String> statement,
-                         final ForkStack<String> stack, @NotNull final Throwable failure) {
+                     public ForkStack<String> failure(final ForkStack<String> stack,
+                         @NotNull final Throwable failure,
+                         @NotNull final AsyncStatement<String> statement) {
                        stack.state = SimpleState.ofFailure(failure);
-                       for (final AsyncResult<String> result : stack.results) {
-                         result.fail(failure);
+                       for (final AsyncEvaluation<String> evaluation : stack.evaluations) {
+                         evaluation.fail(failure);
                        }
 
-                       stack.results.clear();
+                       stack.evaluations.clear();
                        return stack;
                      }
 
@@ -82,39 +86,39 @@ public class TestAsync {
                        return new ForkStack<String>();
                      }
 
-                     public ForkStack<String> statement(
-                         @NotNull final AsyncStatement<String> statement,
-                         final ForkStack<String> stack, @NotNull final AsyncResult<String> result) {
+                     public ForkStack<String> evaluation(final ForkStack<String> stack,
+                         @NotNull final AsyncEvaluation<String> evaluation,
+                         @NotNull final AsyncStatement<String> statement) {
                        final AsyncState<String> state = stack.state;
                        if (state == null) {
-                         stack.results.add(result);
+                         stack.evaluations.add(evaluation);
 
                        } else if (state.isFailed()) {
-                         result.fail(state.failure());
+                         evaluation.fail(state.failure());
 
                        } else if (System.currentTimeMillis() - stack.timestamp <= 10000) {
-                         result.set(state.value());
+                         evaluation.set(state.value());
 
                        } else {
                          if (stack.forked == null) {
                            stack.forked = statement.evaluate().fork(this);
                          }
 
-                         stack.forked.to(result);
+                         stack.forked.to(evaluation);
                        }
 
                        return stack;
                      }
 
-                     public ForkStack<String> value(@NotNull final AsyncStatement<String> statement,
-                         final ForkStack<String> stack, final String value) {
+                     public ForkStack<String> value(final ForkStack<String> stack,
+                         final String value, @NotNull final AsyncStatement<String> statement) {
                        stack.timestamp = System.currentTimeMillis();
                        stack.state = SimpleState.ofValue(value);
-                       for (final AsyncResult<String> result : stack.results) {
-                         result.set(value);
+                       for (final AsyncEvaluation<String> evaluation : stack.evaluations) {
+                         evaluation.set(value);
                        }
 
-                       stack.results.clear();
+                       stack.evaluations.clear();
                        return stack;
                      }
                    });
@@ -122,12 +126,32 @@ public class TestAsync {
 
   @Test
   public void bbb() {
-    assertThat(new Async().loop(new Observer<AsyncResults<Object>>() {
+    // TODO: 08/02/2018 move to loop tests
+    assertThat(new Async().loop(new Observer<AsyncEvaluations<Object>>() {
 
-      public void accept(final AsyncResults<Object> results) {
-        results.addFailures(Collections.<Throwable>singletonList(null)).set();
+      public void accept(final AsyncEvaluations<Object> evaluations) {
+        evaluations.addFailures(Collections.<Throwable>singletonList(null)).set();
       }
     }).isFailed()).isTrue();
+  }
+
+  @Test
+  public void ccc() throws InterruptedException, ExecutionException {
+    final ExecutorService service = Executors.newSingleThreadExecutor();
+    service.execute(new Runnable() {
+
+      public void run() {
+        Thread.currentThread().interrupt();
+        throw new RuntimeException();
+      }
+    });
+    Thread.sleep(1000);
+    assertThat(service.submit(new Callable<String>() {
+
+      public String call() throws Exception {
+        return "test";
+      }
+    }).get()).isEqualTo("test");
   }
 
   @Test
@@ -221,10 +245,10 @@ public class TestAsync {
   @SuppressWarnings("ConstantConditions")
   public void statementAsyncFailure() {
     assertThat(new Async().on(ExecutorPool.backgroundExecutor())
-                          .statement(new Observer<AsyncResult<Integer>>() {
+                          .statement(new Observer<AsyncEvaluation<Integer>>() {
 
-                            public void accept(final AsyncResult<Integer> result) {
-                              result.fail(new IllegalAccessException());
+                            public void accept(final AsyncEvaluation<Integer> evaluation) {
+                              evaluation.fail(new IllegalAccessException());
                             }
                           })
                           .getFailure()
@@ -234,10 +258,10 @@ public class TestAsync {
   @Test
   public void statementAsyncValue() {
     assertThat(new Async().on(ExecutorPool.backgroundExecutor())
-                          .statement(new Observer<AsyncResult<Integer>>() {
+                          .statement(new Observer<AsyncEvaluation<Integer>>() {
 
-                            public void accept(final AsyncResult<Integer> result) {
-                              result.set(3);
+                            public void accept(final AsyncEvaluation<Integer> evaluation) {
+                              evaluation.set(3);
                             }
                           })
                           .getValue()).isEqualTo(3);
@@ -249,10 +273,10 @@ public class TestAsync {
     final long startTime = System.currentTimeMillis();
     assertThat(new Async().on(
         ExecutorPool.withDelay(100, TimeUnit.MILLISECONDS, ExecutorPool.backgroundExecutor()))
-                          .statement(new Observer<AsyncResult<Integer>>() {
+                          .statement(new Observer<AsyncEvaluation<Integer>>() {
 
-                            public void accept(final AsyncResult<Integer> result) {
-                              result.fail(new IllegalAccessException());
+                            public void accept(final AsyncEvaluation<Integer> evaluation) {
+                              evaluation.fail(new IllegalAccessException());
                             }
                           })
                           .getFailure()
@@ -265,10 +289,10 @@ public class TestAsync {
     final long startTime = System.currentTimeMillis();
     assertThat(new Async().on(
         ExecutorPool.withDelay(100, TimeUnit.MILLISECONDS, ExecutorPool.backgroundExecutor()))
-                          .statement(new Observer<AsyncResult<Integer>>() {
+                          .statement(new Observer<AsyncEvaluation<Integer>>() {
 
-                            public void accept(final AsyncResult<Integer> result) {
-                              result.set(3);
+                            public void accept(final AsyncEvaluation<Integer> evaluation) {
+                              evaluation.set(3);
                             }
                           })
                           .getValue()).isEqualTo(3);
@@ -278,10 +302,10 @@ public class TestAsync {
   @Test
   @SuppressWarnings("ConstantConditions")
   public void statementFailure() {
-    assertThat(new Async().statement(new Observer<AsyncResult<Integer>>() {
+    assertThat(new Async().statement(new Observer<AsyncEvaluation<Integer>>() {
 
-      public void accept(final AsyncResult<Integer> result) {
-        result.fail(new IllegalAccessException());
+      public void accept(final AsyncEvaluation<Integer> evaluation) {
+        evaluation.fail(new IllegalAccessException());
       }
     }).getFailure().getCause()).isExactlyInstanceOf(IllegalAccessException.class);
   }
@@ -294,10 +318,10 @@ public class TestAsync {
 
   @Test
   public void statementValue() {
-    assertThat(new Async().statement(new Observer<AsyncResult<Integer>>() {
+    assertThat(new Async().statement(new Observer<AsyncEvaluation<Integer>>() {
 
-      public void accept(final AsyncResult<Integer> result) {
-        result.set(3);
+      public void accept(final AsyncEvaluation<Integer> evaluation) {
+        evaluation.set(3);
       }
     }).getValue()).isEqualTo(3);
   }

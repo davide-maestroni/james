@@ -25,7 +25,7 @@ import java.io.Serializable;
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.Executor;
 
-import dm.jail.async.AsyncResults;
+import dm.jail.async.AsyncEvaluations;
 import dm.jail.config.BuildConfig;
 import dm.jail.executor.ExecutorPool;
 import dm.jail.log.LogLevel;
@@ -46,25 +46,26 @@ class ExecutorLoopHandler<V> extends AsyncLoopHandler<V, V> implements Serializa
   ExecutorLoopHandler(@NotNull final Executor executor, @Nullable final LogPrinter printer,
       @Nullable final LogLevel level) {
     mExecutor = ExecutorPool.register(executor);
-    mLogger = Logger.newLogger(printer, level, this);
+    mLogger = Logger.newLogger(this, printer, level);
   }
 
   @Override
-  void addFailure(@NotNull final Throwable failure, @NotNull final AsyncResults<V> results) {
+  void addFailure(@NotNull final Throwable failure,
+      @NotNull final AsyncEvaluations<V> evaluations) {
     if (failure instanceof CancellationException) {
       try {
-        results.addFailure(failure).set();
+        evaluations.addFailure(failure).set();
 
       } catch (final Throwable t) {
         mLogger.dbg(t, "Suppressed failure");
       }
 
     } else {
-      mExecutor.execute(new HandlerRunnable(results) {
+      mExecutor.execute(new HandlerRunnable(evaluations) {
 
         @Override
-        protected void innerRun(@NotNull final AsyncResults<V> results) {
-          results.addFailure(failure).set();
+        protected void innerRun(@NotNull final AsyncEvaluations<V> evaluations) {
+          evaluations.addFailure(failure).set();
         }
       });
     }
@@ -72,35 +73,35 @@ class ExecutorLoopHandler<V> extends AsyncLoopHandler<V, V> implements Serializa
 
   @Override
   void addFailures(@Nullable final Iterable<? extends Throwable> failures,
-      @NotNull final AsyncResults<V> results) {
-    mExecutor.execute(new HandlerRunnable(results) {
+      @NotNull final AsyncEvaluations<V> evaluations) {
+    mExecutor.execute(new HandlerRunnable(evaluations) {
 
       @Override
-      protected void innerRun(@NotNull final AsyncResults<V> results) {
-        results.addFailures(failures).set();
+      protected void innerRun(@NotNull final AsyncEvaluations<V> evaluations) {
+        evaluations.addFailures(failures).set();
       }
     });
   }
 
   @Override
-  void addValue(final V value, @NotNull final AsyncResults<V> results) {
-    mExecutor.execute(new HandlerRunnable(results) {
+  void addValue(final V value, @NotNull final AsyncEvaluations<V> evaluations) {
+    mExecutor.execute(new HandlerRunnable(evaluations) {
 
       @Override
-      protected void innerRun(@NotNull final AsyncResults<V> results) {
-        results.addValue(value).set();
+      protected void innerRun(@NotNull final AsyncEvaluations<V> evaluations) {
+        evaluations.addValue(value).set();
       }
     });
   }
 
   @Override
   void addValues(@Nullable final Iterable<? extends V> values,
-      @NotNull final AsyncResults<V> results) {
-    mExecutor.execute(new HandlerRunnable(results) {
+      @NotNull final AsyncEvaluations<V> evaluations) {
+    mExecutor.execute(new HandlerRunnable(evaluations) {
 
       @Override
-      protected void innerRun(@NotNull final AsyncResults<V> results) {
-        results.addValues(values).set();
+      protected void innerRun(@NotNull final AsyncEvaluations<V> evaluations) {
+        evaluations.addValues(values).set();
       }
     });
   }
@@ -140,21 +141,21 @@ class ExecutorLoopHandler<V> extends AsyncLoopHandler<V, V> implements Serializa
 
   private abstract class HandlerRunnable implements Runnable {
 
-    private final AsyncResults<V> mResults;
+    private final AsyncEvaluations<V> mEvaluations;
 
-    private HandlerRunnable(@NotNull final AsyncResults<V> results) {
-      mResults = results;
+    private HandlerRunnable(@NotNull final AsyncEvaluations<V> evaluations) {
+      mEvaluations = evaluations;
     }
 
     public void run() {
       try {
-        innerRun(mResults);
+        innerRun(mEvaluations);
 
       } catch (final Throwable t) {
         mLogger.dbg(t, "Suppressed failure");
       }
     }
 
-    protected abstract void innerRun(@NotNull AsyncResults<V> results);
+    protected abstract void innerRun(@NotNull AsyncEvaluations<V> evaluations);
   }
 }

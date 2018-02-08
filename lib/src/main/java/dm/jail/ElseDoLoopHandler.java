@@ -24,7 +24,7 @@ import java.io.ObjectStreamException;
 import java.io.Serializable;
 import java.util.Arrays;
 
-import dm.jail.async.AsyncResults;
+import dm.jail.async.AsyncEvaluations;
 import dm.jail.async.Observer;
 import dm.jail.config.BuildConfig;
 import dm.jail.util.ConstantConditions;
@@ -52,8 +52,8 @@ class ElseDoLoopHandler<V> extends AsyncLoopHandler<V, V> implements Serializabl
   }
 
   @Override
-  void addFailure(@NotNull final Throwable failure, @NotNull final AsyncResults<V> results) throws
-      Exception {
+  void addFailure(@NotNull final Throwable failure,
+      @NotNull final AsyncEvaluations<V> evaluations) throws Exception {
     for (final Class<?> type : mTypes) {
       if (type.isInstance(failure)) {
         mObserver.accept(failure);
@@ -61,12 +61,12 @@ class ElseDoLoopHandler<V> extends AsyncLoopHandler<V, V> implements Serializabl
       }
     }
 
-    super.addFailure(failure, results);
+    super.addFailure(failure, evaluations);
   }
 
   @Override
   void addFailures(@Nullable final Iterable<? extends Throwable> failures,
-      @NotNull final AsyncResults<V> results) throws Exception {
+      @NotNull final AsyncEvaluations<V> evaluations) throws Exception {
     if (failures == null) {
       return;
     }
@@ -86,7 +86,7 @@ class ElseDoLoopHandler<V> extends AsyncLoopHandler<V, V> implements Serializabl
       }
 
     } finally {
-      results.addFailures(Iterables.asList(failures).subList(0, index)).set();
+      evaluations.addFailures(Iterables.asList(failures).subList(0, index)).set();
     }
   }
 

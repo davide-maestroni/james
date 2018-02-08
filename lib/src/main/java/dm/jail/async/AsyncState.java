@@ -36,7 +36,7 @@ public interface AsyncState<V> extends Serializable {
 
   boolean isSet();
 
-  void to(@NotNull AsyncResult<? super V> result);
+  void to(@NotNull AsyncEvaluation<? super V> evaluation);
 
   V value();
 }

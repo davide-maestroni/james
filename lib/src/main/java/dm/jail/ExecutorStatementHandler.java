@@ -25,7 +25,7 @@ import java.io.Serializable;
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.Executor;
 
-import dm.jail.async.AsyncResult;
+import dm.jail.async.AsyncEvaluation;
 import dm.jail.config.BuildConfig;
 import dm.jail.executor.ExecutorPool;
 import dm.jail.log.LogLevel;
@@ -46,38 +46,38 @@ class ExecutorStatementHandler<V> extends AsyncStatementHandler<V, V> implements
   ExecutorStatementHandler(@NotNull final Executor executor, @Nullable final LogPrinter printer,
       @Nullable final LogLevel level) {
     mExecutor = ExecutorPool.register(executor);
-    mLogger = Logger.newLogger(printer, level, this);
+    mLogger = Logger.newLogger(this, printer, level);
   }
 
   @Override
-  void failure(@NotNull final Throwable failure, @NotNull final AsyncResult<V> result) throws
-      Exception {
+  void failure(@NotNull final Throwable failure,
+      @NotNull final AsyncEvaluation<V> evaluation) throws Exception {
     if (failure instanceof CancellationException) {
       try {
-        result.fail(failure);
+        evaluation.fail(failure);
 
       } catch (final Throwable t) {
         mLogger.dbg(t, "Suppressed failure");
       }
 
     } else {
-      mExecutor.execute(new HandlerRunnable(result) {
+      mExecutor.execute(new HandlerRunnable(evaluation) {
 
         @Override
-        protected void innerRun(@NotNull final AsyncResult<V> result) {
-          result.fail(failure);
+        protected void innerRun(@NotNull final AsyncEvaluation<V> evaluation) {
+          evaluation.fail(failure);
         }
       });
     }
   }
 
   @Override
-  void value(final V value, @NotNull final AsyncResult<V> result) throws Exception {
-    mExecutor.execute(new HandlerRunnable(result) {
+  void value(final V value, @NotNull final AsyncEvaluation<V> evaluation) throws Exception {
+    mExecutor.execute(new HandlerRunnable(evaluation) {
 
       @Override
-      protected void innerRun(@NotNull final AsyncResult<V> result) {
-        result.set(value);
+      protected void innerRun(@NotNull final AsyncEvaluation<V> evaluation) {
+        evaluation.set(value);
       }
     });
   }
@@ -117,21 +117,21 @@ class ExecutorStatementHandler<V> extends AsyncStatementHandler<V, V> implements
 
   private abstract class HandlerRunnable implements Runnable {
 
-    private final AsyncResult<V> mResult;
+    private final AsyncEvaluation<V> mEvaluation;
 
-    private HandlerRunnable(@NotNull final AsyncResult<V> result) {
-      mResult = result;
+    private HandlerRunnable(@NotNull final AsyncEvaluation<V> evaluation) {
+      mEvaluation = evaluation;
     }
 
     public void run() {
       try {
-        innerRun(mResult);
+        innerRun(mEvaluation);
 
       } catch (final Throwable t) {
         mLogger.dbg(t, "Suppressed failure");
       }
     }
 
-    protected abstract void innerRun(@NotNull AsyncResult<V> result);
+    protected abstract void innerRun(@NotNull AsyncEvaluation<V> evaluation);
   }
 }

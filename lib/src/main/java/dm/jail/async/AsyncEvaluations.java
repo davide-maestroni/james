@@ -22,19 +22,19 @@ import org.jetbrains.annotations.Nullable;
 /**
  * Created by davide-maestroni on 01/08/2018.
  */
-public interface AsyncResults<V> {
+public interface AsyncEvaluations<V> {
 
   @NotNull
-  AsyncResults<V> addFailure(@NotNull Throwable failure);
+  AsyncEvaluations<V> addFailure(@NotNull Throwable failure);
 
   @NotNull
-  AsyncResults<V> addFailures(@Nullable Iterable<? extends Throwable> failures);
+  AsyncEvaluations<V> addFailures(@Nullable Iterable<? extends Throwable> failures);
 
   @NotNull
-  AsyncResults<V> addValue(V value);
+  AsyncEvaluations<V> addValue(V value);
 
   @NotNull
-  AsyncResults<V> addValues(@Nullable Iterable<? extends V> values);
+  AsyncEvaluations<V> addValues(@Nullable Iterable<? extends V> values);
 
   void set();
 }

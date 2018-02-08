@@ -23,49 +23,50 @@ import java.io.NotSerializableException;
 import java.io.ObjectStreamException;
 import java.io.Serializable;
 
-import dm.jail.async.AsyncResults;
+import dm.jail.async.AsyncEvaluations;
 import dm.jail.config.BuildConfig;
 import dm.jail.util.ConstantConditions;
 
 /**
  * Created by davide-maestroni on 02/05/2018.
  */
-class ToResultLoopHandler<V> extends AsyncLoopHandler<V, Void> implements Serializable {
+class ToEvaluationLoopHandler<V> extends AsyncLoopHandler<V, Void> implements Serializable {
 
   private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
 
-  private final AsyncResults<V> mResults;
+  private final AsyncEvaluations<V> mEvaluations;
 
   @SuppressWarnings("unchecked")
-  ToResultLoopHandler(@NotNull final AsyncResults<? super V> results) {
-    mResults = (AsyncResults<V>) ConstantConditions.notNull("results", results);
+  ToEvaluationLoopHandler(@NotNull final AsyncEvaluations<? super V> evaluations) {
+    mEvaluations = (AsyncEvaluations<V>) ConstantConditions.notNull("evaluations", evaluations);
   }
 
   @Override
-  void addFailure(@NotNull final Throwable failure, @NotNull final AsyncResults<Void> results) {
-    mResults.addFailure(failure);
+  void addFailure(@NotNull final Throwable failure,
+      @NotNull final AsyncEvaluations<Void> evaluations) {
+    mEvaluations.addFailure(failure);
   }
 
   @Override
   void addFailures(@Nullable final Iterable<? extends Throwable> failures,
-      @NotNull final AsyncResults<Void> results) {
-    mResults.addFailures(failures);
+      @NotNull final AsyncEvaluations<Void> evaluations) {
+    mEvaluations.addFailures(failures);
   }
 
   @Override
-  void addValue(final V value, @NotNull final AsyncResults<Void> results) {
-    mResults.addValue(value);
+  void addValue(final V value, @NotNull final AsyncEvaluations<Void> evaluations) {
+    mEvaluations.addValue(value);
   }
 
   @Override
   void addValues(@Nullable final Iterable<? extends V> values,
-      @NotNull final AsyncResults<Void> results) {
-    mResults.addValues(values);
+      @NotNull final AsyncEvaluations<Void> evaluations) {
+    mEvaluations.addValues(values);
   }
 
   @Override
-  void set(@NotNull final AsyncResults<Void> results) {
-    mResults.set();
+  void set(@NotNull final AsyncEvaluations<Void> evaluations) {
+    mEvaluations.set();
   }
 
   @NotNull

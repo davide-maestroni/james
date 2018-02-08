@@ -23,7 +23,7 @@ import java.io.ObjectStreamException;
 import java.io.Serializable;
 import java.util.Arrays;
 
-import dm.jail.async.AsyncResult;
+import dm.jail.async.AsyncEvaluation;
 import dm.jail.async.Mapper;
 import dm.jail.config.BuildConfig;
 import dm.jail.util.ConstantConditions;
@@ -50,16 +50,16 @@ class ElseCatchStatementHandler<V> extends AsyncStatementHandler<V, V> implement
   }
 
   @Override
-  void failure(@NotNull final Throwable failure, @NotNull final AsyncResult<V> result) throws
-      Exception {
+  void failure(@NotNull final Throwable failure,
+      @NotNull final AsyncEvaluation<V> evaluation) throws Exception {
     for (final Class<?> type : mTypes) {
       if (type.isInstance(failure)) {
-        result.set(mMapper.apply(failure));
+        evaluation.set(mMapper.apply(failure));
         return;
       }
     }
 
-    super.failure(failure, result);
+    super.failure(failure, evaluation);
   }
 
   @NotNull

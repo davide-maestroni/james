@@ -20,7 +20,7 @@ import org.jetbrains.annotations.NotNull;
 
 import java.util.ArrayList;
 
-import dm.jail.async.AsyncLoop.YieldResults;
+import dm.jail.async.AsyncLoop.YieldOutputs;
 import dm.jail.async.AsyncLoop.Yielder;
 
 /**
@@ -28,16 +28,16 @@ import dm.jail.async.AsyncLoop.Yielder;
  */
 class CollectionYielder<V> implements Yielder<ArrayList<V>, V, V> {
 
-  public void done(final ArrayList<V> stack, @NotNull final YieldResults<V> results) throws
+  public void done(final ArrayList<V> stack, @NotNull final YieldOutputs<V> outputs) throws
       Exception {
     if (stack != null) {
-      results.yieldValues(stack);
+      outputs.yieldValues(stack);
     }
   }
 
   public ArrayList<V> failure(final ArrayList<V> stack, @NotNull final Throwable failure,
-      @NotNull final YieldResults<V> results) throws Exception {
-    results.yieldFailure(failure);
+      @NotNull final YieldOutputs<V> outputs) throws Exception {
+    outputs.yieldFailure(failure);
     return null;
   }
 
@@ -50,7 +50,7 @@ class CollectionYielder<V> implements Yielder<ArrayList<V>, V, V> {
   }
 
   public ArrayList<V> value(final ArrayList<V> stack, final V value,
-      @NotNull final YieldResults<V> results) throws Exception {
+      @NotNull final YieldOutputs<V> outputs) throws Exception {
     stack.add(value);
     return stack;
   }

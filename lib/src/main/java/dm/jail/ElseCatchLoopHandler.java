@@ -25,7 +25,7 @@ import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.Arrays;
 
-import dm.jail.async.AsyncResults;
+import dm.jail.async.AsyncEvaluations;
 import dm.jail.async.Mapper;
 import dm.jail.config.BuildConfig;
 import dm.jail.util.ConstantConditions;
@@ -52,21 +52,21 @@ class ElseCatchLoopHandler<V> extends AsyncLoopHandler<V, V> implements Serializ
   }
 
   @Override
-  void addFailure(@NotNull final Throwable failure, @NotNull final AsyncResults<V> results) throws
-      Exception {
+  void addFailure(@NotNull final Throwable failure,
+      @NotNull final AsyncEvaluations<V> evaluations) throws Exception {
     for (final Class<?> type : mTypes) {
       if (type.isInstance(failure)) {
-        results.addValue(mMapper.apply(failure)).set();
+        evaluations.addValue(mMapper.apply(failure)).set();
         return;
       }
     }
 
-    super.addFailure(failure, results);
+    super.addFailure(failure, evaluations);
   }
 
   @Override
   void addFailures(@Nullable final Iterable<? extends Throwable> failures,
-      @NotNull final AsyncResults<V> results) throws Exception {
+      @NotNull final AsyncEvaluations<V> evaluations) throws Exception {
     if (failures == null) {
       return;
     }
@@ -87,18 +87,18 @@ class ElseCatchLoopHandler<V> extends AsyncLoopHandler<V, V> implements Serializ
 
         if (!found) {
           if (outputs.isEmpty()) {
-            results.addFailure(failure);
+            evaluations.addFailure(failure);
 
           } else {
             final ArrayList<V> values = new ArrayList<V>(outputs);
             outputs.clear();
-            results.addValues(values).addFailure(failure);
+            evaluations.addValues(values).addFailure(failure);
           }
         }
       }
 
     } finally {
-      results.addValues(outputs).set();
+      evaluations.addValues(outputs).set();
     }
   }
 

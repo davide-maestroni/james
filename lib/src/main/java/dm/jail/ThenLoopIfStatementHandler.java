@@ -22,8 +22,8 @@ import java.io.InvalidObjectException;
 import java.io.ObjectStreamException;
 import java.io.Serializable;
 
+import dm.jail.async.AsyncEvaluations;
 import dm.jail.async.AsyncLoop;
-import dm.jail.async.AsyncResults;
 import dm.jail.async.Mapper;
 import dm.jail.config.BuildConfig;
 import dm.jail.util.ConstantConditions;
@@ -44,8 +44,8 @@ class ThenLoopIfStatementHandler<V, R> extends AsyncStatementLoopHandler<V, R>
   }
 
   @Override
-  void value(final V value, @NotNull final AsyncResults<R> results) throws Exception {
-    mMapper.apply(value).to(results);
+  void value(final V value, @NotNull final AsyncEvaluations<R> evaluations) throws Exception {
+    mMapper.apply(value).to(evaluations);
   }
 
   @NotNull

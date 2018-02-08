@@ -25,7 +25,7 @@ import java.io.Serializable;
 import java.util.Iterator;
 
 import dm.jail.async.Action;
-import dm.jail.async.AsyncResults;
+import dm.jail.async.AsyncEvaluations;
 import dm.jail.config.BuildConfig;
 import dm.jail.util.ConstantConditions;
 import dm.jail.util.Iterables;
@@ -45,16 +45,16 @@ class DoneLoopHandler<V> extends AsyncLoopHandler<V, V> implements Serializable 
   }
 
   @Override
-  void addFailure(@NotNull final Throwable failure, @NotNull final AsyncResults<V> results) throws
-      Exception {
+  void addFailure(@NotNull final Throwable failure,
+      @NotNull final AsyncEvaluations<V> evaluations) throws Exception {
     mAction.perform();
-    super.addFailure(failure, results);
+    super.addFailure(failure, evaluations);
   }
 
   @Override
   @SuppressWarnings("WhileLoopReplaceableByForEach")
   void addFailures(@Nullable final Iterable<? extends Throwable> failures,
-      @NotNull final AsyncResults<V> results) throws Exception {
+      @NotNull final AsyncEvaluations<V> evaluations) throws Exception {
     if (failures == null) {
       return;
     }
@@ -70,20 +70,20 @@ class DoneLoopHandler<V> extends AsyncLoopHandler<V, V> implements Serializable 
       }
 
     } finally {
-      results.addFailures(Iterables.asList(failures).subList(0, index)).set();
+      evaluations.addFailures(Iterables.asList(failures).subList(0, index)).set();
     }
   }
 
   @Override
-  void addValue(final V value, @NotNull final AsyncResults<V> results) throws Exception {
+  void addValue(final V value, @NotNull final AsyncEvaluations<V> evaluations) throws Exception {
     mAction.perform();
-    super.addValue(value, results);
+    super.addValue(value, evaluations);
   }
 
   @Override
   @SuppressWarnings("WhileLoopReplaceableByForEach")
   void addValues(@Nullable final Iterable<? extends V> values,
-      @NotNull final AsyncResults<V> results) throws Exception {
+      @NotNull final AsyncEvaluations<V> evaluations) throws Exception {
     if (values == null) {
       return;
     }
@@ -99,7 +99,7 @@ class DoneLoopHandler<V> extends AsyncLoopHandler<V, V> implements Serializable 
       }
 
     } finally {
-      results.addValues(Iterables.asList(values).subList(0, index)).set();
+      evaluations.addValues(Iterables.asList(values).subList(0, index)).set();
     }
   }
 

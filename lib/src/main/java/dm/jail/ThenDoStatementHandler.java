@@ -22,7 +22,7 @@ import java.io.InvalidObjectException;
 import java.io.ObjectStreamException;
 import java.io.Serializable;
 
-import dm.jail.async.AsyncResult;
+import dm.jail.async.AsyncEvaluation;
 import dm.jail.async.Observer;
 import dm.jail.config.BuildConfig;
 import dm.jail.util.ConstantConditions;
@@ -42,9 +42,9 @@ class ThenDoStatementHandler<V, R> extends AsyncStatementHandler<V, R> implement
   }
 
   @Override
-  void value(final V value, @NotNull final AsyncResult<R> result) throws Exception {
+  void value(final V value, @NotNull final AsyncEvaluation<R> evaluation) throws Exception {
     mObserver.accept(value);
-    super.value(value, result);
+    super.value(value, evaluation);
   }
 
   @NotNull

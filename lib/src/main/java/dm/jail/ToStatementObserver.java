@@ -20,8 +20,8 @@ import org.jetbrains.annotations.NotNull;
 
 import java.io.Serializable;
 
+import dm.jail.async.AsyncEvaluation;
 import dm.jail.async.AsyncLoop;
-import dm.jail.async.AsyncResult;
 import dm.jail.async.Observer;
 import dm.jail.config.BuildConfig;
 import dm.jail.util.ConstantConditions;
@@ -29,7 +29,8 @@ import dm.jail.util.ConstantConditions;
 /**
  * Created by davide-maestroni on 02/02/2018.
  */
-class ToStatementObserver<V> implements RenewableObserver<AsyncResult<Iterable<V>>>, Serializable {
+class ToStatementObserver<V>
+    implements RenewableObserver<AsyncEvaluation<Iterable<V>>>, Serializable {
 
   private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
 
@@ -39,12 +40,12 @@ class ToStatementObserver<V> implements RenewableObserver<AsyncResult<Iterable<V
     mLoop = ConstantConditions.notNull("loop", loop);
   }
 
-  public void accept(final AsyncResult<Iterable<V>> result) {
-    mLoop.to(result);
+  public void accept(final AsyncEvaluation<Iterable<V>> evaluation) {
+    mLoop.to(evaluation);
   }
 
   @NotNull
-  public Observer<AsyncResult<Iterable<V>>> renew() {
+  public Observer<AsyncEvaluation<Iterable<V>>> renew() {
     return new ToStatementObserver<V>(mLoop.evaluate());
   }
 }

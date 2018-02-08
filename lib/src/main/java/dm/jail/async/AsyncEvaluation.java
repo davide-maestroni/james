@@ -21,7 +21,7 @@ import org.jetbrains.annotations.NotNull;
 /**
  * Created by davide-maestroni on 01/08/2018.
  */
-public interface AsyncResult<V> {
+public interface AsyncEvaluation<V> {
 
   void fail(@NotNull Throwable failure);
 

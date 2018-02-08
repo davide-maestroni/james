@@ -25,7 +25,7 @@ import java.io.ObjectStreamException;
 import java.io.Serializable;
 
 import dm.jail.async.Action;
-import dm.jail.async.AsyncResult;
+import dm.jail.async.AsyncEvaluation;
 import dm.jail.async.AsyncStatement;
 import dm.jail.async.Mapper;
 import dm.jail.config.BuildConfig;
@@ -53,17 +53,17 @@ class TryIfStatementHandler<V, R> extends AsyncStatementHandler<V, R> implements
       @Nullable final LogPrinter printer, @Nullable final LogLevel level) {
     mCloseable = ConstantConditions.notNull("closeable", closeable);
     mMapper = ConstantConditions.notNull("mapper", mapper);
-    mLogger = Logger.newLogger(printer, level, this);
+    mLogger = Logger.newLogger(this, printer, level);
   }
 
   @Override
-  void value(final V value, @NotNull final AsyncResult<R> result) throws Exception {
+  void value(final V value, @NotNull final AsyncEvaluation<R> evaluation) throws Exception {
     mMapper.apply(value).whenDone(new Action() {
 
       public void perform() throws Exception {
         Asyncs.close(mCloseable.apply(value), mLogger);
       }
-    }).to(result);
+    }).to(evaluation);
   }
 
   @NotNull
