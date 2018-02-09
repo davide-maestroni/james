@@ -257,21 +257,228 @@ class DefaultAsyncLoop<V> implements AsyncLoop<V>, Serializable {
     }
   }
 
-  @NotNull
-  public <S> AsyncLoop<V> backoffOn(@NotNull final Executor executor,
-      @NotNull final Backoffer<S, V> backoffer) {
-    // TODO: 05/02/2018 implement
-    return null;
+  public boolean cancel(final boolean mayInterruptIfRunning) {
+    final Observer<? extends AsyncEvaluations<?>> observer = mObserver;
+    if (mIsFork) {
+      if (((ForkObserver<?, ?>) observer).cancel(mayInterruptIfRunning)) {
+        return true;
+      }
+
+      boolean isCancelled = false;
+      for (final AsyncLoop<?> forked : mForked) {
+        if (forked.cancel(mayInterruptIfRunning)) {
+          isCancelled = true;
+        }
+      }
+
+      return isCancelled;
+    }
+
+    LoopChain<?, ?> chain = mHead;
+    final CancellationException exception = new CancellationException();
+    if (mayInterruptIfRunning && (observer instanceof InterruptibleObserver)) {
+      if (chain.cancel(exception)) {
+        ((InterruptibleObserver<?>) observer).interrupt();
+        return true;
+      }
+
+      chain = chain.mNext;
+    }
+
+    while (!chain.isTail()) {
+      if (chain.cancel(exception)) {
+        return true;
+      }
+
+      chain = chain.mNext;
+    }
+
+    return false;
+  }
+
+  public boolean isDone() {
+    synchronized (mMutex) {
+      return mHead.getState().isDone();
+    }
+  }
+
+  public Iterable<V> get() throws InterruptedException, ExecutionException {
+    try {
+      return getValue();
+
+    } catch (final RuntimeInterruptedException e) {
+      throw e.toInterruptedException();
+
+    } catch (final FailureException e) {
+      final Throwable cause = e.getCause();
+      if (cause instanceof CancellationException) {
+        throw (CancellationException) cause;
+      }
+
+      throw new ExecutionException(e);
+    }
+  }
+
+  public Iterable<V> get(final long timeout, @NotNull final TimeUnit timeUnit) throws
+      InterruptedException, ExecutionException, TimeoutException {
+    try {
+      return getValue(timeout, timeUnit);
+
+    } catch (final RuntimeInterruptedException e) {
+      throw e.toInterruptedException();
+
+    } catch (final RuntimeTimeoutException e) {
+      throw e.toTimeoutException();
+
+    } catch (final FailureException e) {
+      final Throwable cause = e.getCause();
+      if (cause instanceof CancellationException) {
+        throw (CancellationException) cause;
+      }
+
+      throw new ExecutionException(e);
+    }
+  }
+
+  @SuppressWarnings("unchecked")
+  public void consume() {
+    to((AsyncEvaluations<V>) VOID_EVALUATIONS);
+  }
+
+  @Nullable
+  public FailureException getFailure() {
+    return getFailure(-1, TimeUnit.MILLISECONDS);
+  }
+
+  @Nullable
+  public FailureException getFailure(final long timeout, @NotNull final TimeUnit timeUnit) {
+    checkSupported();
+    deadLockWarning(timeout);
+    final ChainHead<?> head = mHead;
+    synchronized (mMutex) {
+      try {
+        if (TimeUnits.waitUntil(mMutex, new Condition() {
+
+          public boolean isTrue() {
+            checkFinal();
+            return head.getState().isDone();
+          }
+        }, timeout, timeUnit)) {
+          return head.getFailure();
+        }
+
+      } catch (final InterruptedException e) {
+        throw new RuntimeInterruptedException(e);
+      }
+    }
+
+    throw new RuntimeTimeoutException(
+        "timeout while waiting for statement failure [" + timeout + " " + timeUnit + "]");
+  }
+
+  public Iterable<V> getValue() {
+    return getValue(-1, TimeUnit.MILLISECONDS);
+  }
+
+  @SuppressWarnings("unchecked")
+  public Iterable<V> getValue(final long timeout, @NotNull final TimeUnit timeUnit) {
+    checkSupported();
+    deadLockWarning(timeout);
+    final ChainHead<?> head = mHead;
+    synchronized (mMutex) {
+      try {
+        if (TimeUnits.waitUntil(mMutex, new Condition() {
+
+          public boolean isTrue() {
+            checkFinal();
+            return head.getState().isDone();
+          }
+        }, timeout, timeUnit)) {
+          return (Iterable<V>) head.getValues();
+        }
+
+      } catch (final InterruptedException e) {
+        throw new RuntimeInterruptedException(e);
+      }
+    }
+
+    throw new RuntimeTimeoutException(
+        "timeout while waiting for statement value [" + timeout + " " + timeUnit + "]");
+  }
+
+  public boolean isFinal() {
+    synchronized (mMutex) {
+      return (mChain == null);
+    }
   }
 
   @NotNull
-  public <S> AsyncLoop<V> backoffOn(@NotNull final Executor executor,
-      @Nullable final Provider<S> init,
-      @Nullable final Updater<S, ? super V, ? super PendingState> value,
-      @Nullable final Updater<S, ? super Throwable, ? super PendingState> failure,
-      @Nullable final Completer<S, ? super PendingState> done) {
-    // TODO: 05/02/2018 implement
-    return null;
+  public <R> AsyncStatement<R> then(@NotNull final Mapper<? super Iterable<V>, R> mapper) {
+    return toStatement().then(mapper);
+  }
+
+  @NotNull
+  public AsyncStatement<Iterable<V>> thenDo(@NotNull final Observer<? super Iterable<V>> observer) {
+    return toStatement().thenDo(observer);
+  }
+
+  @NotNull
+  public <R> AsyncStatement<R> thenIf(
+      @NotNull final Mapper<? super Iterable<V>, ? extends AsyncStatement<R>> mapper) {
+    return toStatement().thenIf(mapper);
+  }
+
+  @NotNull
+  public <R> AsyncStatement<R> thenTry(
+      @NotNull final Mapper<? super Iterable<V>, ? extends Closeable> closeable,
+      @NotNull final Mapper<? super Iterable<V>, R> mapper) {
+    return toStatement().thenTry(closeable, mapper);
+  }
+
+  @NotNull
+  public AsyncStatement<Iterable<V>> thenTryDo(
+      @NotNull final Mapper<? super Iterable<V>, ? extends Closeable> closeable,
+      @NotNull final Observer<? super Iterable<V>> observer) {
+    return toStatement().thenTryDo(closeable, observer);
+  }
+
+  @NotNull
+  public <R> AsyncStatement<R> thenTryIf(
+      @NotNull final Mapper<? super Iterable<V>, ? extends Closeable> closeable,
+      @NotNull final Mapper<? super Iterable<V>, ? extends AsyncStatement<R>> mapper) {
+    return toStatement().thenTryIf(closeable, mapper);
+  }
+
+  public void waitDone() {
+    waitDone(-1, TimeUnit.MILLISECONDS);
+  }
+
+  public boolean waitDone(final long timeout, @NotNull final TimeUnit timeUnit) {
+    checkSupported();
+    deadLockWarning(timeout);
+    @SuppressWarnings("UnnecessaryLocalVariable") final ChainHead<?> head = mHead;
+    synchronized (mMutex) {
+      try {
+        if (TimeUnits.waitUntil(mMutex, new Condition() {
+
+          public boolean isTrue() {
+            return head.getState().isDone();
+          }
+        }, timeout, timeUnit)) {
+          return true;
+        }
+
+      } catch (final InterruptedException e) {
+        throw new RuntimeInterruptedException(e);
+      }
+    }
+
+    return false;
+  }
+
+  @NotNull
+  public AsyncStatement<Iterable<V>> whenDone(@NotNull final Action action) {
+    return toStatement().whenDone(action);
   }
 
   @NotNull
@@ -605,11 +812,26 @@ class DefaultAsyncLoop<V> implements AsyncLoop<V>, Serializable {
   }
 
   @NotNull
+  public AsyncLoop<V> on(@NotNull final Executor executor, final int maxBatch) {
+    return yield(new BatchYielder<V>(maxBatch)).on(executor);
+  }
+
+  @NotNull
+  public AsyncLoop<V> onParallel(@NotNull final Executor executor, final int maxBatch) {
+    return yield(new BatchYielder<V>(maxBatch)).onParallel(executor);
+  }
+
+  @NotNull
   public AsyncLoop<V> onParallel(@NotNull final Executor executor) {
     final Logger logger = mLogger;
     return chain(new ChainLoopHandler<V, V>(
             new ExecutorLoopHandler<V>(executor, logger.getLogPrinter(), logger.getLogLevel())),
         mExecutor, executor);
+  }
+
+  @NotNull
+  public AsyncLoop<V> onParallelOrdered(@NotNull final Executor executor, final int maxBatch) {
+    return yield(new BatchYielder<V>(maxBatch)).onParallelOrdered(executor);
   }
 
   @NotNull
@@ -678,230 +900,6 @@ class DefaultAsyncLoop<V> implements AsyncLoop<V>, Serializable {
       @Nullable final Updater<S, ? super Throwable, ? super YieldOutputs<R>> failure,
       @Nullable final Completer<S, ? super YieldOutputs<R>> done) {
     return yieldOrdered(new ComposedYielder<S, V, R>(init, loop, value, failure, done));
-  }
-
-  public boolean cancel(final boolean mayInterruptIfRunning) {
-    final Observer<? extends AsyncEvaluations<?>> observer = mObserver;
-    if (mIsFork) {
-      if (((ForkObserver<?, ?>) observer).cancel(mayInterruptIfRunning)) {
-        return true;
-      }
-
-      boolean isCancelled = false;
-      for (final AsyncLoop<?> forked : mForked) {
-        if (forked.cancel(mayInterruptIfRunning)) {
-          isCancelled = true;
-        }
-      }
-
-      return isCancelled;
-    }
-
-    LoopChain<?, ?> chain = mHead;
-    final CancellationException exception = new CancellationException();
-    if (mayInterruptIfRunning && (observer instanceof InterruptibleObserver)) {
-      if (chain.cancel(exception)) {
-        ((InterruptibleObserver<?>) observer).interrupt();
-        return true;
-      }
-
-      chain = chain.mNext;
-    }
-
-    while (!chain.isTail()) {
-      if (chain.cancel(exception)) {
-        return true;
-      }
-
-      chain = chain.mNext;
-    }
-
-    return false;
-  }
-
-  public boolean isDone() {
-    synchronized (mMutex) {
-      return mHead.getState().isDone();
-    }
-  }
-
-  public Iterable<V> get() throws InterruptedException, ExecutionException {
-    try {
-      return getValue();
-
-    } catch (final RuntimeInterruptedException e) {
-      throw e.toInterruptedException();
-
-    } catch (final FailureException e) {
-      final Throwable cause = e.getCause();
-      if (cause instanceof CancellationException) {
-        throw (CancellationException) cause;
-      }
-
-      throw new ExecutionException(e);
-    }
-  }
-
-  public Iterable<V> get(final long timeout, @NotNull final TimeUnit timeUnit) throws
-      InterruptedException, ExecutionException, TimeoutException {
-    try {
-      return getValue(timeout, timeUnit);
-
-    } catch (final RuntimeInterruptedException e) {
-      throw e.toInterruptedException();
-
-    } catch (final RuntimeTimeoutException e) {
-      throw e.toTimeoutException();
-
-    } catch (final FailureException e) {
-      final Throwable cause = e.getCause();
-      if (cause instanceof CancellationException) {
-        throw (CancellationException) cause;
-      }
-
-      throw new ExecutionException(e);
-    }
-  }
-
-  @SuppressWarnings("unchecked")
-  public void consume() {
-    to((AsyncEvaluations<V>) VOID_EVALUATIONS);
-  }
-
-  @Nullable
-  public FailureException getFailure() {
-    return getFailure(-1, TimeUnit.MILLISECONDS);
-  }
-
-  @Nullable
-  public FailureException getFailure(final long timeout, @NotNull final TimeUnit timeUnit) {
-    checkSupported();
-    deadLockWarning(timeout);
-    final ChainHead<?> head = mHead;
-    synchronized (mMutex) {
-      try {
-        if (TimeUnits.waitUntil(mMutex, new Condition() {
-
-          public boolean isTrue() {
-            checkFinal();
-            return head.getState().isDone();
-          }
-        }, timeout, timeUnit)) {
-          return head.getFailure();
-        }
-
-      } catch (final InterruptedException e) {
-        throw new RuntimeInterruptedException(e);
-      }
-    }
-
-    throw new RuntimeTimeoutException(
-        "timeout while waiting for statement failure [" + timeout + " " + timeUnit + "]");
-  }
-
-  public Iterable<V> getValue() {
-    return getValue(-1, TimeUnit.MILLISECONDS);
-  }
-
-  @SuppressWarnings("unchecked")
-  public Iterable<V> getValue(final long timeout, @NotNull final TimeUnit timeUnit) {
-    checkSupported();
-    deadLockWarning(timeout);
-    final ChainHead<?> head = mHead;
-    synchronized (mMutex) {
-      try {
-        if (TimeUnits.waitUntil(mMutex, new Condition() {
-
-          public boolean isTrue() {
-            checkFinal();
-            return head.getState().isDone();
-          }
-        }, timeout, timeUnit)) {
-          return (Iterable<V>) head.getValues();
-        }
-
-      } catch (final InterruptedException e) {
-        throw new RuntimeInterruptedException(e);
-      }
-    }
-
-    throw new RuntimeTimeoutException(
-        "timeout while waiting for statement value [" + timeout + " " + timeUnit + "]");
-  }
-
-  public boolean isFinal() {
-    synchronized (mMutex) {
-      return (mChain == null);
-    }
-  }
-
-  @NotNull
-  public <R> AsyncStatement<R> then(@NotNull final Mapper<? super Iterable<V>, R> mapper) {
-    return toStatement().then(mapper);
-  }
-
-  @NotNull
-  public AsyncStatement<Iterable<V>> thenDo(@NotNull final Observer<? super Iterable<V>> observer) {
-    return toStatement().thenDo(observer);
-  }
-
-  @NotNull
-  public <R> AsyncStatement<R> thenIf(
-      @NotNull final Mapper<? super Iterable<V>, ? extends AsyncStatement<R>> mapper) {
-    return toStatement().thenIf(mapper);
-  }
-
-  @NotNull
-  public <R> AsyncStatement<R> thenTry(
-      @NotNull final Mapper<? super Iterable<V>, ? extends Closeable> closeable,
-      @NotNull final Mapper<? super Iterable<V>, R> mapper) {
-    return toStatement().thenTry(closeable, mapper);
-  }
-
-  @NotNull
-  public AsyncStatement<Iterable<V>> thenTryDo(
-      @NotNull final Mapper<? super Iterable<V>, ? extends Closeable> closeable,
-      @NotNull final Observer<? super Iterable<V>> observer) {
-    return toStatement().thenTryDo(closeable, observer);
-  }
-
-  @NotNull
-  public <R> AsyncStatement<R> thenTryIf(
-      @NotNull final Mapper<? super Iterable<V>, ? extends Closeable> closeable,
-      @NotNull final Mapper<? super Iterable<V>, ? extends AsyncStatement<R>> mapper) {
-    return toStatement().thenTryIf(closeable, mapper);
-  }
-
-  public void waitDone() {
-    waitDone(-1, TimeUnit.MILLISECONDS);
-  }
-
-  public boolean waitDone(final long timeout, @NotNull final TimeUnit timeUnit) {
-    checkSupported();
-    deadLockWarning(timeout);
-    @SuppressWarnings("UnnecessaryLocalVariable") final ChainHead<?> head = mHead;
-    synchronized (mMutex) {
-      try {
-        if (TimeUnits.waitUntil(mMutex, new Condition() {
-
-          public boolean isTrue() {
-            return head.getState().isDone();
-          }
-        }, timeout, timeUnit)) {
-          return true;
-        }
-
-      } catch (final InterruptedException e) {
-        throw new RuntimeInterruptedException(e);
-      }
-    }
-
-    return false;
-  }
-
-  @NotNull
-  public AsyncStatement<Iterable<V>> whenDone(@NotNull final Action action) {
-    return toStatement().whenDone(action);
   }
 
   @NotNull
@@ -1606,7 +1604,8 @@ class DefaultAsyncLoop<V> implements AsyncLoop<V>, Serializable {
           @Nullable final Iterable<? extends Throwable> failures) {
         if (failures != null) {
           synchronized (mMutex) {
-            final NestedQueue<SimpleState<R>> queue = mQueue;
+            @SuppressWarnings("UnnecessaryLocalVariable") final NestedQueue<SimpleState<R>> queue =
+                mQueue;
             for (final Throwable failure : failures) {
               queue.add(SimpleState.<R>ofFailure(failure));
             }
@@ -1632,7 +1631,8 @@ class DefaultAsyncLoop<V> implements AsyncLoop<V>, Serializable {
       public AsyncEvaluations<R> addValues(@Nullable final Iterable<? extends R> values) {
         if (values != null) {
           synchronized (mMutex) {
-            final NestedQueue<SimpleState<R>> queue = mQueue;
+            @SuppressWarnings("UnnecessaryLocalVariable") final NestedQueue<SimpleState<R>> queue =
+                mQueue;
             for (final R value : values) {
               queue.add(SimpleState.ofValue(value));
             }
@@ -2370,7 +2370,8 @@ class DefaultAsyncLoop<V> implements AsyncLoop<V>, Serializable {
           @Nullable final Iterable<? extends Throwable> failures) {
         if (failures != null) {
           synchronized (mMutex) {
-            final NestedQueue<SimpleState<R>> queue = mQueue;
+            @SuppressWarnings("UnnecessaryLocalVariable") final NestedQueue<SimpleState<R>> queue =
+                mQueue;
             for (final Throwable failure : failures) {
               queue.add(SimpleState.<R>ofFailure(failure));
             }
@@ -2396,7 +2397,8 @@ class DefaultAsyncLoop<V> implements AsyncLoop<V>, Serializable {
       public AsyncEvaluations<R> addValues(@Nullable final Iterable<? extends R> values) {
         if (values != null) {
           synchronized (mMutex) {
-            final NestedQueue<SimpleState<R>> queue = mQueue;
+            @SuppressWarnings("UnnecessaryLocalVariable") final NestedQueue<SimpleState<R>> queue =
+                mQueue;
             for (final R value : values) {
               queue.add(SimpleState.ofValue(value));
             }

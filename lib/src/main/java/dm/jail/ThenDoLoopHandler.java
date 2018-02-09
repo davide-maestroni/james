@@ -59,7 +59,7 @@ class ThenDoLoopHandler<V, R> extends AsyncLoopHandler<V, R> implements Serializ
 
     int index = 0;
     try {
-      final Observer<? super V> observer = mObserver;
+      @SuppressWarnings("UnnecessaryLocalVariable") final Observer<? super V> observer = mObserver;
       for (final V value : values) {
         observer.accept(value);
         ++index;

@@ -56,7 +56,8 @@ class ThenLoopHandler<V, R> extends AsyncLoopHandler<V, R> implements Serializab
     }
 
     final ArrayList<R> outputs = new ArrayList<R>();
-    final Mapper<? super V, ? extends R> mapper = mMapper;
+    @SuppressWarnings("UnnecessaryLocalVariable") final Mapper<? super V, ? extends R> mapper =
+        mMapper;
     try {
       for (final V value : values) {
         outputs.add(mapper.apply(value));

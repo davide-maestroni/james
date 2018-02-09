@@ -61,7 +61,7 @@ class DoneLoopHandler<V> extends AsyncLoopHandler<V, V> implements Serializable 
 
     int index = 0;
     try {
-      final Action action = mAction;
+      @SuppressWarnings("UnnecessaryLocalVariable") final Action action = mAction;
       final Iterator<? extends Throwable> iterator = failures.iterator();
       while (iterator.hasNext()) {
         iterator.next();
@@ -90,7 +90,7 @@ class DoneLoopHandler<V> extends AsyncLoopHandler<V, V> implements Serializable 
 
     int index = 0;
     try {
-      final Action action = mAction;
+      @SuppressWarnings("UnnecessaryLocalVariable") final Action action = mAction;
       final Iterator<? extends V> iterator = values.iterator();
       while (iterator.hasNext()) {
         iterator.next();

@@ -35,10 +35,7 @@ class BatchYielder<V> implements Yielder<ArrayList<V>, V, V>, Serializable {
 
   private final int mMaxBatch;
 
-  private final int mMinBatch;
-
-  BatchYielder(final int minBatch, final int maxBatch) {
-    mMinBatch = ConstantConditions.positive("minBatch", minBatch);
+  BatchYielder(final int maxBatch) {
     mMaxBatch = ConstantConditions.positive("maxBatch", maxBatch);
   }
 
@@ -63,7 +60,7 @@ class BatchYielder<V> implements Yielder<ArrayList<V>, V, V>, Serializable {
   public ArrayList<V> value(final ArrayList<V> stack, final V value,
       @NotNull final YieldOutputs<V> outputs) {
     stack.add(value);
-    if (stack.size() >= mMinBatch) {
+    if (stack.size() >= mMaxBatch) {
       flushValues(stack, outputs);
     }
 

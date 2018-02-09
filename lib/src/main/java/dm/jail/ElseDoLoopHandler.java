@@ -73,7 +73,8 @@ class ElseDoLoopHandler<V> extends AsyncLoopHandler<V, V> implements Serializabl
 
     int index = 0;
     try {
-      final Observer<? super Throwable> observer = mObserver;
+      @SuppressWarnings("UnnecessaryLocalVariable") final Observer<? super Throwable> observer =
+          mObserver;
       for (final Throwable failure : failures) {
         for (final Class<?> type : mTypes) {
           if (type.isInstance(failure)) {

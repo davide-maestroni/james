@@ -623,16 +623,6 @@ public class Logger {
   }
 
   /**
-   * Returns the list of contexts.
-   *
-   * @return the list of contexts.
-   */
-  @NotNull
-  public List<Object> getContextList() {
-    return mContextList;
-  }
-
-  /**
    * Returns the log level of this logger.
    *
    * @return the log level.

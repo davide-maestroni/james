@@ -1,1 +1,1 @@
-include ':lib', ':james-sample'
+include ':lib', ':ext', ':james-sample'

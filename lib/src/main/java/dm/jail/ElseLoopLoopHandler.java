@@ -59,7 +59,7 @@ class ElseLoopLoopHandler<V> extends AsyncLoopHandler<V, V> implements Serializa
       @NotNull final AsyncEvaluations<V> evaluations) throws Exception {
     for (final Class<?> type : mTypes) {
       if (type.isInstance(failure)) {
-        evaluations.addValues((Iterable<V>) mMapper.apply(failure)).set();
+        evaluations.addValues(mMapper.apply(failure)).set();
         return;
       }
     }
@@ -75,8 +75,10 @@ class ElseLoopLoopHandler<V> extends AsyncLoopHandler<V, V> implements Serializa
     }
 
     final ArrayList<V> outputs = new ArrayList<V>();
-    final Class<?>[] types = mTypes;
-    final Mapper<? super Throwable, ? extends Iterable<? extends V>> mapper = mMapper;
+    @SuppressWarnings("UnnecessaryLocalVariable") final Class<?>[] types = mTypes;
+    @SuppressWarnings(
+        "UnnecessaryLocalVariable") final Mapper<? super Throwable, ? extends Iterable<? extends V>>
+        mapper = mMapper;
     try {
       for (final Throwable failure : failures) {
         boolean found = false;

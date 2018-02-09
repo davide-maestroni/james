@@ -94,7 +94,8 @@ class YieldLoopHandler<S, V, R> extends AsyncLoopHandler<V, R> implements Serial
 
       @Override
       protected void innerRun(@NotNull final YielderOutputs<R> outputs) throws Exception {
-        final Yielder<S, ? super V, R> yielder = mYielder;
+        @SuppressWarnings("UnnecessaryLocalVariable") final Yielder<S, ? super V, R> yielder =
+            mYielder;
         for (final Throwable failure : failures) {
           mStack = yielder.failure(mStack, failure, outputs);
         }
@@ -124,7 +125,8 @@ class YieldLoopHandler<S, V, R> extends AsyncLoopHandler<V, R> implements Serial
 
       @Override
       protected void innerRun(@NotNull final YielderOutputs<R> outputs) throws Exception {
-        final Yielder<S, ? super V, R> yielder = mYielder;
+        @SuppressWarnings("UnnecessaryLocalVariable") final Yielder<S, ? super V, R> yielder =
+            mYielder;
         for (final V value : values) {
           mStack = yielder.value(mStack, value, outputs);
         }
@@ -299,7 +301,9 @@ class YieldLoopHandler<S, V, R> extends AsyncLoopHandler<V, R> implements Serial
     }
 
     private void set() {
-      mIsSet.set(true);
+      if (mIsSet.getAndSet(true)) {
+        checkSet();
+      }
     }
 
     @NotNull

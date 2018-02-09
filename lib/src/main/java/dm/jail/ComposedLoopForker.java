@@ -192,6 +192,5 @@ class ComposedLoopForker<S, V>
     public S update(final S stack, final I input, @NotNull final AsyncLoop<V> loop) {
       return stack;
     }
-
   }
 }

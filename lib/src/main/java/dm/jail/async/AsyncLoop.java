@@ -33,15 +33,6 @@ import java.util.concurrent.TimeUnit;
 public interface AsyncLoop<V> extends AsyncStatement<Iterable<V>>, Serializable {
 
   @NotNull
-  <S> AsyncLoop<V> backoffOn(@NotNull Executor executor, @NotNull Backoffer<S, V> backoffer);
-
-  @NotNull
-  <S> AsyncLoop<V> backoffOn(@NotNull Executor executor, @Nullable Provider<S> init,
-      @Nullable Updater<S, ? super V, ? super PendingState> value,
-      @Nullable Updater<S, ? super Throwable, ? super PendingState> failure,
-      @Nullable Completer<S, ? super PendingState> done);
-
-  @NotNull
   AsyncLoop<V> elseCatch(@NotNull Mapper<? super Throwable, ? extends Iterable<V>> mapper,
       @Nullable Class<?>[] exceptionTypes);
 
@@ -186,7 +177,16 @@ public interface AsyncLoop<V> extends AsyncStatement<Iterable<V>>, Serializable 
   List<V> getValues(int maxCount, long timeout, @NotNull TimeUnit timeUnit);
 
   @NotNull
+  AsyncLoop<V> on(@NotNull Executor executor, int maxBatch);
+
+  @NotNull
+  AsyncLoop<V> onParallel(@NotNull Executor executor, int maxBatch);
+
+  @NotNull
   AsyncLoop<V> onParallel(@NotNull Executor executor);
+
+  @NotNull
+  AsyncLoop<V> onParallelOrdered(@NotNull Executor executor, int maxBatch);
 
   @NotNull
   AsyncLoop<V> onParallelOrdered(@NotNull Executor executor);

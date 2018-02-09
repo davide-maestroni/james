@@ -72,8 +72,9 @@ class ElseCatchLoopHandler<V> extends AsyncLoopHandler<V, V> implements Serializ
     }
 
     final ArrayList<V> outputs = new ArrayList<V>();
-    final Class<?>[] types = mTypes;
-    final Mapper<? super Throwable, ? extends V> mapper = mMapper;
+    @SuppressWarnings("UnnecessaryLocalVariable") final Class<?>[] types = mTypes;
+    @SuppressWarnings("UnnecessaryLocalVariable") final Mapper<? super Throwable, ? extends V>
+        mapper = mMapper;
     try {
       for (final Throwable failure : failures) {
         boolean found = false;

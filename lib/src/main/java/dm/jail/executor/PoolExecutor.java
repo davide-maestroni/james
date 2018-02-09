@@ -34,32 +34,32 @@ class PoolExecutor implements StoppableExecutor, Serializable {
 
   private final OwnerExecutorServiceWrapper mExecutor;
 
-  private final int mPoolSize;
+  private final int mNumThreads;
 
   private final ThreadFactory mThreadFactory;
 
   PoolExecutor() {
     mExecutor = OwnerExecutorServiceWrapper.of(Executors.newCachedThreadPool());
-    mPoolSize = Integer.MIN_VALUE;
+    mNumThreads = Integer.MIN_VALUE;
     mThreadFactory = null;
   }
 
-  PoolExecutor(final int corePoolSize) {
-    mExecutor = OwnerExecutorServiceWrapper.of(Executors.newFixedThreadPool(corePoolSize));
-    mPoolSize = corePoolSize;
+  PoolExecutor(final int nThreads) {
+    mExecutor = OwnerExecutorServiceWrapper.of(Executors.newFixedThreadPool(nThreads));
+    mNumThreads = nThreads;
     mThreadFactory = null;
   }
 
   PoolExecutor(@NotNull final ThreadFactory threadFactory) {
     mExecutor = OwnerExecutorServiceWrapper.of(Executors.newCachedThreadPool(threadFactory));
-    mPoolSize = Integer.MIN_VALUE;
+    mNumThreads = Integer.MIN_VALUE;
     mThreadFactory = threadFactory;
   }
 
-  PoolExecutor(final int corePoolSize, @NotNull final ThreadFactory threadFactory) {
+  PoolExecutor(final int nThreads, @NotNull final ThreadFactory threadFactory) {
     mExecutor =
-        OwnerExecutorServiceWrapper.of(Executors.newFixedThreadPool(corePoolSize, threadFactory));
-    mPoolSize = corePoolSize;
+        OwnerExecutorServiceWrapper.of(Executors.newFixedThreadPool(nThreads, threadFactory));
+    mNumThreads = nThreads;
     mThreadFactory = threadFactory;
   }
 
@@ -77,27 +77,27 @@ class PoolExecutor implements StoppableExecutor, Serializable {
 
   @NotNull
   private Object writeReplace() throws ObjectStreamException {
-    return new ExecutorProxy(mPoolSize, mThreadFactory);
+    return new ExecutorProxy(mNumThreads, mThreadFactory);
   }
 
   private static class ExecutorProxy implements Serializable {
 
     private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
 
-    private final int mPoolSize;
+    private final int mNumThreads;
 
     private final ThreadFactory mThreadFactory;
 
-    private ExecutorProxy(final int poolSize, final ThreadFactory threadFactory) {
-      mPoolSize = poolSize;
+    private ExecutorProxy(final int nThreads, final ThreadFactory threadFactory) {
+      mNumThreads = nThreads;
       mThreadFactory = threadFactory;
     }
 
     @NotNull
     Object readResolve() throws ObjectStreamException {
-      final int poolSize = mPoolSize;
+      final int nThreads = mNumThreads;
       final ThreadFactory threadFactory = mThreadFactory;
-      if (poolSize == Integer.MIN_VALUE) {
+      if (nThreads == Integer.MIN_VALUE) {
         if (threadFactory == null) {
           return new PoolExecutor();
         }
@@ -105,10 +105,10 @@ class PoolExecutor implements StoppableExecutor, Serializable {
         return new PoolExecutor(threadFactory);
 
       } else if (threadFactory == null) {
-        return new PoolExecutor(poolSize);
+        return new PoolExecutor(nThreads);
       }
 
-      return new PoolExecutor(poolSize, threadFactory);
+      return new PoolExecutor(nThreads, threadFactory);
     }
   }
 }

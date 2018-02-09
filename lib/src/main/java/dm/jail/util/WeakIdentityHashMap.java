@@ -101,7 +101,8 @@ public class WeakIdentityHashMap<K, V> implements Map<K, V> {
    */
   @NotNull
   public WeakIdentityHashMap<K, V> prune() {
-    final HashMap<IdentityWeakReference, V> map = mMap;
+    @SuppressWarnings("UnnecessaryLocalVariable") final HashMap<IdentityWeakReference, V> map =
+        mMap;
     final ReferenceQueue<Object> queue = mQueue;
     IdentityWeakReference reference = (IdentityWeakReference) queue.poll();
     while (reference != null) {
@@ -144,8 +145,9 @@ public class WeakIdentityHashMap<K, V> implements Map<K, V> {
 
   public void putAll(@NotNull final Map<? extends K, ? extends V> map) {
     prune();
-    final ReferenceQueue<Object> queue = mQueue;
-    final HashMap<IdentityWeakReference, V> referenceMap = mMap;
+    @SuppressWarnings("UnnecessaryLocalVariable") final ReferenceQueue<Object> queue = mQueue;
+    @SuppressWarnings("UnnecessaryLocalVariable") final HashMap<IdentityWeakReference, V>
+        referenceMap = mMap;
     for (final Entry<? extends K, ? extends V> entry : map.entrySet()) {
       referenceMap.put(new IdentityWeakReference(entry.getKey(), queue), entry.getValue());
     }

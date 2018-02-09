@@ -203,14 +203,14 @@ public class ExecutorPool {
   }
 
   @NotNull
-  public static StoppableExecutor newFixedPoolExecutor(final int corePoolSize) {
-    return new PoolExecutor(corePoolSize);
+  public static StoppableExecutor newFixedPoolExecutor(final int nThreads) {
+    return new PoolExecutor(nThreads);
   }
 
   @NotNull
-  public static StoppableExecutor newFixedPoolExecutor(final int poolSize,
+  public static StoppableExecutor newFixedPoolExecutor(final int nThreads,
       @NotNull final ThreadFactory threadFactory) {
-    return new PoolExecutor(poolSize, threadFactory);
+    return new PoolExecutor(nThreads, threadFactory);
   }
 
   /**
@@ -333,12 +333,13 @@ public class ExecutorPool {
   }
 
   @NotNull
-  private static ScheduledExecutor optimizedExecutor(final int threadPriority) {
+  private static ScheduledExecutor optimizedExecutor(@NotNull final String threadName,
+      final int threadPriority) {
     final int processors = Runtime.getRuntime().availableProcessors();
     return OwnerScheduledExecutorServiceWrapper.ofUnstoppable(
         new DynamicScheduledThreadPoolExecutorService(Math.max(2, processors >> 1),
             Math.max(2, (processors << 1) - 1), 10L, TimeUnit.SECONDS,
-            new PriorityThreadFactory(threadPriority)));
+            new PriorityThreadFactory(threadName, threadPriority)));
   }
 
   @NotNull
@@ -453,7 +454,7 @@ public class ExecutorPool {
      * Constructor.
      */
     private BackgroundExecutor() {
-      super(optimizedExecutor(Thread.MIN_PRIORITY)); // TODO: 09/02/2018 thread name
+      super(optimizedExecutor("jale-background-thread", Thread.MIN_PRIORITY));
     }
 
     @NotNull
@@ -480,7 +481,7 @@ public class ExecutorPool {
      * Constructor.
      */
     private DefaultExecutor() {
-      super(optimizedExecutor(Thread.NORM_PRIORITY));
+      super(optimizedExecutor("jale-default-thread", Thread.NORM_PRIORITY));
     }
 
     @NotNull
@@ -508,7 +509,7 @@ public class ExecutorPool {
      * Constructor.
      */
     private ForegroundExecutor() {
-      super(optimizedExecutor(Thread.MAX_PRIORITY));
+      super(optimizedExecutor("jale-foreground-thread", Thread.MAX_PRIORITY));
     }
 
     @NotNull
@@ -531,19 +532,21 @@ public class ExecutorPool {
 
     private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
 
+    private final String mName;
+
     private final int mPriority;
 
-    private PriorityThreadFactory(final int priority) {
+    private PriorityThreadFactory(@NotNull final String name, final int priority) {
       if ((priority < Thread.MIN_PRIORITY) || (priority > Thread.MAX_PRIORITY)) {
         throw new IllegalArgumentException();
       }
 
+      mName = name;
       mPriority = priority;
     }
 
     public Thread newThread(@NotNull final Runnable runnable) {
-      final Thread thread = new Thread(runnable);
-      thread.setName("jail-" + thread.getName());
+      final Thread thread = new Thread(runnable, mName);
       thread.setPriority(mPriority);
       return thread;
     }

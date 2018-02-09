@@ -58,7 +58,9 @@ class ThenLoopLoopHandler<V, R> extends AsyncLoopHandler<V, R> implements Serial
     }
 
     final ArrayList<R> outputs = new ArrayList<R>();
-    final Mapper<? super V, ? extends Iterable<? extends R>> mapper = mMapper;
+    @SuppressWarnings(
+        "UnnecessaryLocalVariable") final Mapper<? super V, ? extends Iterable<? extends R>>
+        mapper = mMapper;
     try {
       for (final V value : values) {
         Iterables.addAll(mapper.apply(value), outputs);

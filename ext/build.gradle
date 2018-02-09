@@ -26,7 +26,7 @@ apply from: '../extra.gradle'
 
 group = project.getProperty('groupName')
 version = project.getProperty('releaseVersion')
-archivesBaseName = project.parent.name
+archivesBaseName = "${project.parent.name}-${project.name}"
 
 compileJava {
   def javaVersion = JavaVersion.VERSION_1_5
@@ -42,10 +42,18 @@ compileTestJava {
   targetCompatibility = javaVersion
 }
 
+ext {
+  libVersion = '0.0.1'
+}
+
 dependencies {
   compile 'com.intellij:annotations:12.0'
   testCompile 'junit:junit:4.12'
   testCompile 'org.assertj:assertj-core:2.4.1'
+}
+
+project.conditionalDependencies {
+  compile name: 'lib', version: libVersion
 }
 
 buildConfig {
@@ -70,8 +78,4 @@ jacoco {
 
 findbugs {
   toolVersion project.getProperty('findbugsVersion')
-}
-
-tasks.withType(FindBugs) {
-  excludeFilter = file('findbugs.xml')
 }
