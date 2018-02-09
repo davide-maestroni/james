@@ -1044,7 +1044,7 @@ class DefaultAsyncLoop<V> implements AsyncLoop<V>, Serializable {
 
   private void checkEvaluated() {
     if (!mIsEvaluated) {
-      throw new UnsupportedOperationException("the loop has not been evaluated");
+      ConstantConditions.unsupported("the loop has not been evaluated", "checkEvaluated");
     }
   }
 
@@ -1057,7 +1057,7 @@ class DefaultAsyncLoop<V> implements AsyncLoop<V>, Serializable {
   private void checkSupported() {
     checkEvaluated();
     if (mIsFork) {
-      throw new UnsupportedOperationException("the loop has been forked");
+      ConstantConditions.unsupported("the loop has been forked", "checkSupported");
     }
   }
 
@@ -3274,7 +3274,7 @@ class DefaultAsyncLoop<V> implements AsyncLoop<V>, Serializable {
     }
 
     public void remove() {
-      throw new UnsupportedOperationException("remove"); // TODO: 05/02/2018 message
+      ConstantConditions.unsupported();
     }
   }
 
@@ -3420,7 +3420,7 @@ class DefaultAsyncLoop<V> implements AsyncLoop<V>, Serializable {
     }
 
     public void remove() {
-      throw new UnsupportedOperationException("remove");
+      ConstantConditions.unsupported();
     }
 
     @NotNull

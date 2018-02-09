@@ -19,13 +19,20 @@ package dm.jail.log;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
+import java.io.Serializable;
 import java.util.Arrays;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.Set;
 
+import dm.jail.config.BuildConfig;
 import dm.jail.util.ConstantConditions;
 
 import static dm.jail.util.Reflections.asArgs;
@@ -53,10 +60,14 @@ public class Logger {
   private static final Object sMutex = new Object();
 
   private static LinkedHashMap<Class<?>, LogLevel> sLogLevels =
-      new LinkedHashMap<Class<?>, LogLevel>();
+      new LinkedHashMap<Class<?>, LogLevel>() {{
+        put(Object.class, DEFAULT_LOG_LEVEL);
+      }};
 
   private static LinkedHashMap<Class<?>, LogPrinter> sLogPrinters =
-      new LinkedHashMap<Class<?>, LogPrinter>();
+      new LinkedHashMap<Class<?>, LogPrinter>() {{
+        put(Object.class, DEFAULT_LOG_PRINTER);
+      }};
 
   private final List<Object> mContextList;
 
@@ -106,14 +117,27 @@ public class Logger {
   @NotNull
   public static LogLevel getDefaultLevel(@NotNull final Class<?> type) {
     synchronized (sMutex) {
-      return getBestMatch(type, sLogLevels);
+      final Set<LogLevel> levels = getBestMatches(type, sLogLevels);
+      LogLevel minLevel = LogLevel.SILENT;
+      for (final LogLevel level : levels) {
+        if (level.compareTo(minLevel) < 0) {
+          minLevel = level;
+        }
+      }
+
+      return minLevel;
     }
   }
 
   @NotNull
   public static LogPrinter getDefaultPrinter(@NotNull final Class<?> type) {
     synchronized (sMutex) {
-      return getBestMatch(type, sLogPrinters);
+      final Set<LogPrinter> matches = getBestMatches(type, sLogPrinters);
+      if (matches.size() == 1) {
+        return matches.iterator().next();
+      }
+
+      return new CompositeLogPrinter(matches);
     }
   }
 
@@ -192,26 +216,44 @@ public class Logger {
   }
 
   @NotNull
-  private static <T> T getBestMatch(@NotNull final Class<?> type,
+  private static <T> Set<T> getBestMatches(@NotNull final Class<?> type,
       @NotNull final Map<Class<?>, T> map) {
-    Class<?> bestCandidate = null;
-    T result = map.get(Object.class);
+    final T result = map.get(type);
+    if (result != null) {
+      return Collections.singleton(result);
+    }
+
+    final HashMap<Class<?>, T> candidates = new HashMap<Class<?>, T>();
     for (final Entry<Class<?>, T> entry : map.entrySet()) {
       final Class<?> key = entry.getKey();
-      if (key.equals(type)) {
-        return entry.getValue();
-      }
-
       if (key.isAssignableFrom(type)) {
-        if ((bestCandidate == null) || bestCandidate.isAssignableFrom(key) || !key.isAssignableFrom(
-            bestCandidate)) {
-          bestCandidate = key;
-          result = entry.getValue();
+        if (candidates.isEmpty()) {
+          candidates.put(key, entry.getValue());
+
+        } else {
+          boolean isCandidate = true;
+          for (final Class<?> candidate : candidates.keySet()) {
+            if (key.isAssignableFrom(candidate)) {
+              isCandidate = false;
+              break;
+            }
+          }
+
+          if (isCandidate) {
+            final Iterator<Class<?>> iterator = candidates.keySet().iterator();
+            while (iterator.hasNext()) {
+              if (iterator.next().isAssignableFrom(key)) {
+                iterator.remove();
+              }
+            }
+
+            candidates.put(key, entry.getValue());
+          }
         }
       }
     }
 
-    return result;
+    return new HashSet<T>(candidates.values());
   }
 
   /**
@@ -833,8 +875,35 @@ public class Logger {
     }
   }
 
-  static {
-    sLogLevels.put(Object.class, DEFAULT_LOG_LEVEL);
-    sLogPrinters.put(Object.class, DEFAULT_LOG_PRINTER);
+  private static class CompositeLogPrinter implements LogPrinter, Serializable {
+
+    private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
+
+    private final Set<LogPrinter> mPrinters;
+
+    private CompositeLogPrinter(@NotNull final Set<LogPrinter> printers) {
+      mPrinters = printers;
+    }
+
+    public void dbg(@NotNull final List<Object> contexts, @Nullable final String message,
+        @Nullable final Throwable throwable) {
+      for (final LogPrinter printer : mPrinters) {
+        printer.dbg(contexts, message, throwable);
+      }
+    }
+
+    public void err(@NotNull final List<Object> contexts, @Nullable final String message,
+        @Nullable final Throwable throwable) {
+      for (final LogPrinter printer : mPrinters) {
+        printer.err(contexts, message, throwable);
+      }
+    }
+
+    public void wrn(@NotNull final List<Object> contexts, @Nullable final String message,
+        @Nullable final Throwable throwable) {
+      for (final LogPrinter printer : mPrinters) {
+        printer.wrn(contexts, message, throwable);
+      }
+    }
   }
 }

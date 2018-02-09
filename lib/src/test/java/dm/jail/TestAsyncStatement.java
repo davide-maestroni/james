@@ -807,7 +807,7 @@ public class TestAsyncStatement {
       public String apply(final String input) {
         return input;
       }
-    }).failure()).isExactlyInstanceOf(UnsupportedOperationException.class);
+    }).failure()).isExactlyInstanceOf(IllegalStateException.class);
   }
 
   @Test
@@ -1351,7 +1351,7 @@ public class TestAsyncStatement {
       public String apply(final String input) {
         return input;
       }
-    }).failure()).isExactlyInstanceOf(UnsupportedOperationException.class);
+    }).failure()).isExactlyInstanceOf(IllegalStateException.class);
   }
 
   @Test

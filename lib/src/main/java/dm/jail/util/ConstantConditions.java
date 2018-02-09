@@ -17,6 +17,7 @@
 package dm.jail.util;
 
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 
 /**
  * Utility class for verifying constant conditions.
@@ -38,7 +39,7 @@ public class ConstantConditions {
    * @throws AssertionError if the method is called.
    */
   public static void avoid() {
-    throw new AssertionError("method " + buildMethodName() + " cannot be called");
+    throw new AssertionError("method is not callable");
   }
 
   /**
@@ -181,12 +182,49 @@ public class ConstantConditions {
    * @throws UnsupportedOperationException if the method is called.
    */
   public static <R> R unsupported() {
-    throw new UnsupportedOperationException("method " + buildMethodName() + " is not supported");
+    throw new UnsupportedOperationException(buildUnsupportedMethodName(null));
+  }
+
+  public static <R> R unsupported(final String message) {
+    throw new UnsupportedOperationException(
+        buildUnsupportedMethodName(null) + ((message != null) ? ": " + message : ""));
+  }
+
+  public static <R> R unsupported(final String message, @NotNull final String callerOfMethodName) {
+    throw new UnsupportedOperationException(
+        buildUnsupportedMethodName(notNull("callerOfMethodName", callerOfMethodName)) + (
+            (message != null) ? ": " + message : ""));
   }
 
   @NotNull
-  private static String buildMethodName() {
-    final StackTraceElement traceElement = Thread.currentThread().getStackTrace()[3];
-    return traceElement.getClassName() + "#" + traceElement.getMethodName();
+  private static String buildUnsupportedMethodName(@Nullable final String callerOfMethodName) {
+    final StackTraceElement[] stackTrace = Thread.currentThread().getStackTrace();
+    final int length = stackTrace.length;
+    for (int i = 0; i < length; ++i) {
+      final StackTraceElement traceElement = stackTrace[i];
+      if (ConstantConditions.class.getName().equals(traceElement.getClassName())
+          && "unsupported".equals(traceElement.getMethodName())) {
+        if (callerOfMethodName == null) {
+          if ((i + 1) < length) {
+            return stackTrace[i + 1].getMethodName();
+          }
+
+          return "";
+
+        } else {
+          for (int j = i + 1; j < length; ++j) {
+            if (callerOfMethodName.equals(stackTrace[j].getMethodName())) {
+              if ((j + 1) < length) {
+                return stackTrace[j + 1].getMethodName();
+              }
+
+              return "";
+            }
+          }
+        }
+      }
+    }
+
+    return "";
   }
 }

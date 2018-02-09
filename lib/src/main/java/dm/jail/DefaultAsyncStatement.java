@@ -609,7 +609,7 @@ class DefaultAsyncStatement<V> implements AsyncStatement<V>, Serializable {
 
   private void checkEvaluated() {
     if (!mIsEvaluated) {
-      throw new UnsupportedOperationException("the statement has not been evaluated");
+      ConstantConditions.unsupported("the statement has not been evaluated", "checkEvaluated");
     }
   }
 
@@ -622,7 +622,7 @@ class DefaultAsyncStatement<V> implements AsyncStatement<V>, Serializable {
   private void checkSupported() {
     checkEvaluated();
     if (mIsFork) {
-      throw new UnsupportedOperationException("the statement has been forked");
+      ConstantConditions.unsupported("the statement has been forked", "checkSupported");
     }
   }
 

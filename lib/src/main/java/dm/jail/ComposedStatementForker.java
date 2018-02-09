@@ -124,7 +124,7 @@ class ComposedStatementForker<S, V>
 
     public S update(final S stack, final AsyncEvaluation<V> evaluation,
         @NotNull final AsyncStatement<V> statement) {
-      evaluation.fail(new UnsupportedOperationException());
+      evaluation.fail(new IllegalStateException("the statement cannot be chained"));
       return stack;
     }
 

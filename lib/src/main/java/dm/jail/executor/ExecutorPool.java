@@ -453,7 +453,7 @@ public class ExecutorPool {
      * Constructor.
      */
     private BackgroundExecutor() {
-      super(optimizedExecutor(Thread.MIN_PRIORITY));
+      super(optimizedExecutor(Thread.MIN_PRIORITY)); // TODO: 09/02/2018 thread name
     }
 
     @NotNull

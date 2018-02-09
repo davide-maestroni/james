@@ -150,7 +150,7 @@ class ComposedLoopForker<S, V>
 
     public S update(final S stack, final AsyncEvaluations<V> evaluation,
         @NotNull final AsyncLoop<V> loop) {
-      evaluation.addFailure(new UnsupportedOperationException()).set();
+      evaluation.addFailure(new IllegalStateException("the loop cannot be chained")).set();
       return stack;
     }
 

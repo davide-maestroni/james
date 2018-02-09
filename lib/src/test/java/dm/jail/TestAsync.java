@@ -21,10 +21,6 @@ import org.junit.Test;
 
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.concurrent.Callable;
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 
 import dm.jail.async.AsyncEvaluation;
@@ -69,23 +65,6 @@ public class TestAsync {
                        return stack;
                      }
 
-                     public ForkStack<String> failure(final ForkStack<String> stack,
-                         @NotNull final Throwable failure,
-                         @NotNull final AsyncStatement<String> statement) {
-                       stack.state = SimpleState.ofFailure(failure);
-                       for (final AsyncEvaluation<String> evaluation : stack.evaluations) {
-                         evaluation.fail(failure);
-                       }
-
-                       stack.evaluations.clear();
-                       return stack;
-                     }
-
-                     public ForkStack<String> init(
-                         @NotNull final AsyncStatement<String> statement) {
-                       return new ForkStack<String>();
-                     }
-
                      public ForkStack<String> evaluation(final ForkStack<String> stack,
                          @NotNull final AsyncEvaluation<String> evaluation,
                          @NotNull final AsyncStatement<String> statement) {
@@ -108,6 +87,23 @@ public class TestAsync {
                        }
 
                        return stack;
+                     }
+
+                     public ForkStack<String> failure(final ForkStack<String> stack,
+                         @NotNull final Throwable failure,
+                         @NotNull final AsyncStatement<String> statement) {
+                       stack.state = SimpleState.ofFailure(failure);
+                       for (final AsyncEvaluation<String> evaluation : stack.evaluations) {
+                         evaluation.fail(failure);
+                       }
+
+                       stack.evaluations.clear();
+                       return stack;
+                     }
+
+                     public ForkStack<String> init(
+                         @NotNull final AsyncStatement<String> statement) {
+                       return new ForkStack<String>();
                      }
 
                      public ForkStack<String> value(final ForkStack<String> stack,
@@ -133,25 +129,6 @@ public class TestAsync {
         evaluations.addFailures(Collections.<Throwable>singletonList(null)).set();
       }
     }).isFailed()).isTrue();
-  }
-
-  @Test
-  public void ccc() throws InterruptedException, ExecutionException {
-    final ExecutorService service = Executors.newSingleThreadExecutor();
-    service.execute(new Runnable() {
-
-      public void run() {
-        Thread.currentThread().interrupt();
-        throw new RuntimeException();
-      }
-    });
-    Thread.sleep(1000);
-    assertThat(service.submit(new Callable<String>() {
-
-      public String call() throws Exception {
-        return "test";
-      }
-    }).get()).isEqualTo("test");
   }
 
   @Test

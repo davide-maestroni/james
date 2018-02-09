@@ -22,6 +22,7 @@ import java.io.PrintStream;
 import java.io.PrintWriter;
 import java.util.concurrent.CancellationException;
 
+import dm.jail.log.LogPrinters;
 import dm.jail.util.ConstantConditions;
 
 /**
@@ -64,7 +65,7 @@ public class FailureException extends RuntimeException {
 
   @NotNull
   @Override
-  public final synchronized Throwable getCause() {
+  public final Throwable getCause() {
     return super.getCause();
   }
 
@@ -101,30 +102,29 @@ public class FailureException extends RuntimeException {
     }
   }
 
-  @Override
-  public synchronized Throwable fillInStackTrace() {
-    final Throwable cause = super.getCause();
-    return (cause != null) ? cause.fillInStackTrace() : super.fillInStackTrace();
-  }
-
-  @Override
-  public StackTraceElement[] getStackTrace() {
-    final Throwable cause = super.getCause();
-    return (cause != null) ? cause.getStackTrace() : super.getStackTrace();
-  }
-
-  @Override
-  public void setStackTrace(final StackTraceElement[] stackTraceElements) {
-    final Throwable cause = super.getCause();
-    if (cause != null) {
-      cause.setStackTrace(stackTraceElements);
-
-    } else {
-      super.setStackTrace(stackTraceElements);
-    }
-  }
-
   public boolean isCancelled() {
     return (getCause() instanceof CancellationException);
+  }
+
+  public void printFullStackTrace(final PrintStream printStream) {
+    super.printStackTrace(printStream);
+  }
+
+  public void printFullStackTrace(final PrintWriter printWriter) {
+    super.printStackTrace(printWriter);
+  }
+
+  public void printFullStackTrace() {
+    super.printStackTrace();
+  }
+
+  @NotNull
+  public String printFullStackTraceToString() {
+    return LogPrinters.printStackTrace(this);
+  }
+
+  @NotNull
+  public String printStackTraceToString() {
+    return LogPrinters.printStackTrace(getCause());
   }
 }
