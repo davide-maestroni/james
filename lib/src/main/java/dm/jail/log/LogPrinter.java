@@ -16,10 +16,7 @@
 
 package dm.jail.log;
 
-import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
-
-import java.util.List;
 
 /**
  * Interface defining a log printer object responsible for formatting and writing the log messages.
@@ -47,30 +44,33 @@ import java.util.List;
  */
 public interface LogPrinter {
 
+  boolean canLogDbg();
+
+  boolean canLogErr();
+
+  boolean canLogWrn();
+
   /**
    * Logs a debug message.
    *
-   * @param contexts  the list of contexts.
    * @param message   the message.
    * @param throwable the optional throwable or null.
    */
-  void dbg(@NotNull List<Object> contexts, @Nullable String message, @Nullable Throwable throwable);
+  void dbg(@Nullable String message, @Nullable Throwable throwable);
 
   /**
    * Logs an error message.
    *
-   * @param contexts  the list of contexts.
    * @param message   the message.
    * @param throwable the optional throwable or null.
    */
-  void err(@NotNull List<Object> contexts, @Nullable String message, @Nullable Throwable throwable);
+  void err(@Nullable String message, @Nullable Throwable throwable);
 
   /**
    * Logs a warning message.
    *
-   * @param contexts  the list of contexts.
    * @param message   the message.
    * @param throwable the optional throwable or null.
    */
-  void wrn(@NotNull List<Object> contexts, @Nullable String message, @Nullable Throwable throwable);
+  void wrn(@Nullable String message, @Nullable Throwable throwable);
 }

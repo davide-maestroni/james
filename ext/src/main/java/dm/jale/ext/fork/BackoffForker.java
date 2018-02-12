@@ -66,10 +66,10 @@ class BackoffForker<S, V>
   }
 
   public ForkerEvaluations evaluation(final ForkerEvaluations stack,
-      @NotNull final AsyncEvaluations<V> evaluation, @NotNull final AsyncLoop<V> loop) throws
+      @NotNull final AsyncEvaluations<V> evaluations, @NotNull final AsyncLoop<V> loop) throws
       Exception {
-    if (!stack.setEvaluations(evaluation)) {
-      evaluation.addFailure(new IllegalStateException("the loop cannot be chained")).set();
+    if (!stack.setEvaluations(evaluations)) {
+      evaluations.addFailure(new IllegalStateException("the loop cannot be chained")).set();
     }
 
     return stack;

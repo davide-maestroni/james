@@ -22,14 +22,13 @@ import org.jetbrains.annotations.Nullable;
 import java.io.InvalidObjectException;
 import java.io.ObjectStreamException;
 import java.io.Serializable;
+import java.util.Locale;
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.Executor;
 
 import dm.jail.async.AsyncEvaluations;
 import dm.jail.config.BuildConfig;
 import dm.jail.executor.ExecutorPool;
-import dm.jail.log.LogLevel;
-import dm.jail.log.LogPrinter;
 import dm.jail.log.Logger;
 
 /**
@@ -43,10 +42,9 @@ class ExecutorLoopHandler<V> extends AsyncLoopHandler<V, V> implements Serializa
 
   private final Logger mLogger;
 
-  ExecutorLoopHandler(@NotNull final Executor executor, @Nullable final LogPrinter printer,
-      @Nullable final LogLevel level) {
+  ExecutorLoopHandler(@NotNull final Executor executor, @Nullable final String loggerName) {
     mExecutor = ExecutorPool.register(executor);
-    mLogger = Logger.newLogger(this, printer, level);
+    mLogger = Logger.newLogger(this, loggerName, Locale.ENGLISH);
   }
 
   @Override
@@ -57,7 +55,7 @@ class ExecutorLoopHandler<V> extends AsyncLoopHandler<V, V> implements Serializa
         evaluations.addFailure(failure).set();
 
       } catch (final Throwable t) {
-        mLogger.dbg(t, "Suppressed failure");
+        mLogger.err(t, "Suppressed failure");
       }
 
     } else {
@@ -108,8 +106,7 @@ class ExecutorLoopHandler<V> extends AsyncLoopHandler<V, V> implements Serializa
 
   @NotNull
   private Object writeReplace() throws ObjectStreamException {
-    final Logger logger = mLogger;
-    return new HandlerProxy<V>(mExecutor, logger.getLogPrinter(), logger.getLogLevel());
+    return new HandlerProxy<V>(mExecutor, mLogger.getName());
   }
 
   private static class HandlerProxy<V> implements Serializable {
@@ -118,20 +115,17 @@ class ExecutorLoopHandler<V> extends AsyncLoopHandler<V, V> implements Serializa
 
     private final Executor mExecutor;
 
-    private final LogLevel mLogLevel;
+    private final String mLoggerName;
 
-    private final LogPrinter mLogPrinter;
-
-    private HandlerProxy(final Executor executor, final LogPrinter printer, final LogLevel level) {
+    private HandlerProxy(final Executor executor, final String loggerName) {
       mExecutor = executor;
-      mLogPrinter = printer;
-      mLogLevel = level;
+      mLoggerName = loggerName;
     }
 
     @NotNull
     Object readResolve() throws ObjectStreamException {
       try {
-        return new ExecutorLoopHandler<V>(mExecutor, mLogPrinter, mLogLevel);
+        return new ExecutorLoopHandler<V>(mExecutor, mLoggerName);
 
       } catch (final Throwable t) {
         throw new InvalidObjectException(t.getMessage());
@@ -152,7 +146,7 @@ class ExecutorLoopHandler<V> extends AsyncLoopHandler<V, V> implements Serializa
         innerRun(mEvaluations);
 
       } catch (final Throwable t) {
-        mLogger.dbg(t, "Suppressed failure");
+        mLogger.err(t, "Suppressed failure");
       }
     }
 

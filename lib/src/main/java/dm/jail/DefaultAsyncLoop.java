@@ -26,6 +26,7 @@ import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
+import java.util.Locale;
 import java.util.NoSuchElementException;
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.CopyOnWriteArrayList;
@@ -52,8 +53,6 @@ import dm.jail.async.SimpleState;
 import dm.jail.async.Updater;
 import dm.jail.config.BuildConfig;
 import dm.jail.executor.ExecutorPool;
-import dm.jail.log.LogLevel;
-import dm.jail.log.LogPrinter;
 import dm.jail.log.Logger;
 import dm.jail.util.ConstantConditions;
 import dm.jail.util.DoubleQueue;
@@ -119,23 +118,37 @@ class DefaultAsyncLoop<V> implements AsyncLoop<V>, Serializable {
 
   private StatementState mState = StatementState.Evaluating;
 
+  @SuppressWarnings("unchecked")
   DefaultAsyncLoop(@NotNull final Observer<? super AsyncEvaluations<V>> observer,
-      final boolean isEvaluated, @Nullable final LogPrinter printer,
-      @Nullable final LogLevel level) {
-    this(ConstantConditions.notNull("observer", observer), isEvaluated,
-        ExecutorPool.immediateExecutor(), printer, level);
+      final boolean isEvaluated, @Nullable final String loggerName) {
+    mObserver = (Observer<AsyncEvaluations<?>>) observer;
+    mExecutor = ExecutorPool.immediateExecutor();
+    mIsEvaluated = isEvaluated;
+    mIsFork = (observer instanceof ForkObserver);
+    mLogger = Logger.newLogger(this, loggerName, Locale.ENGLISH);
+    final ChainHead<V> head = new ChainHead<V>();
+    head.setLogger(mLogger);
+    head.setNext(new ChainTail(head));
+    mMutex = head.getMutex();
+    mHead = head;
+    mTail = head;
+    try {
+      observer.accept(head);
+
+    } catch (final Throwable t) {
+      head.failSafe(RuntimeInterruptedException.wrapIfInterrupt(t));
+    }
   }
 
   @SuppressWarnings("unchecked")
   private DefaultAsyncLoop(@NotNull final Observer<? super AsyncEvaluations<V>> observer,
-      final boolean isEvaluated, @NotNull final Executor executor,
-      @Nullable final LogPrinter printer, @Nullable final LogLevel level) {
+      final boolean isEvaluated, @NotNull final Executor executor, @NotNull final Logger logger) {
     // forking
     mObserver = (Observer<AsyncEvaluations<?>>) observer;
     mExecutor = executor;
     mIsEvaluated = isEvaluated;
     mIsFork = (observer instanceof ForkObserver);
-    mLogger = Logger.newLogger(this, printer, level);
+    mLogger = logger;
     final ChainHead<V> head = new ChainHead<V>();
     head.setLogger(mLogger);
     head.setNext(new ChainTail(head));
@@ -153,14 +166,14 @@ class DefaultAsyncLoop<V> implements AsyncLoop<V>, Serializable {
   @SuppressWarnings("unchecked")
   private DefaultAsyncLoop(@NotNull final Observer<AsyncEvaluations<?>> observer,
       final boolean isEvaluated, @NotNull final Executor executor,
-      @Nullable final LogPrinter printer, @Nullable final LogLevel level,
-      @NotNull final ChainHead<?> head, @NotNull final LoopChain<?, V> tail) {
+      @Nullable final String loggerName, @NotNull final ChainHead<?> head,
+      @NotNull final LoopChain<?, V> tail) {
     // serialization
     mObserver = observer;
     mExecutor = executor;
     mIsEvaluated = isEvaluated;
     mIsFork = (observer instanceof ForkObserver);
-    mLogger = Logger.newLogger(this, printer, level);
+    mLogger = Logger.newLogger(this, loggerName, Locale.ENGLISH);
     mMutex = head.getMutex();
     mHead = head;
     mTail = tail;
@@ -532,7 +545,6 @@ class DefaultAsyncLoop<V> implements AsyncLoop<V>, Serializable {
   public <S> AsyncLoop<V> fork(
       @NotNull final Forker<S, ? super AsyncStatement<Iterable<V>>, ? super Iterable<V>, ? super
           AsyncEvaluation<Iterable<V>>> forker) {
-
     return forkLoop(new LoopForker<S, V>(forker));
   }
 
@@ -548,11 +560,10 @@ class DefaultAsyncLoop<V> implements AsyncLoop<V>, Serializable {
 
   @NotNull
   public AsyncLoop<V> on(@NotNull final Executor executor) {
-    final Logger logger = mLogger;
     final Executor throttledExecutor = ExecutorPool.withThrottling(1, executor);
     return chain(new ChainLoopHandler<V, V>(
-        new ExecutorLoopHandler<V>(throttledExecutor, logger.getLogPrinter(),
-            logger.getLogLevel())), mExecutor, throttledExecutor);
+            new ExecutorLoopHandler<V>(throttledExecutor, mLogger.getName())), mExecutor,
+        throttledExecutor);
   }
 
   @NotNull
@@ -654,75 +665,65 @@ class DefaultAsyncLoop<V> implements AsyncLoop<V>, Serializable {
   public <R> AsyncLoop<R> forEachOrderedTryIf(
       @NotNull final Mapper<? super V, ? extends Closeable> closeable,
       @NotNull final Mapper<? super V, ? extends AsyncStatement<R>> mapper) {
-    final Logger logger = mLogger;
-    return chainOrdered(new TryIfStatementHandler<V, R>(closeable, mapper, logger.getLogPrinter(),
-        logger.getLogLevel()));
+    return chainOrdered(new TryIfStatementHandler<V, R>(closeable, mapper, mLogger.getName()));
   }
 
   @NotNull
   public <R> AsyncLoop<R> forEachOrderedTryLoopIf(
       @NotNull final Mapper<? super V, ? extends Closeable> closeable,
       @NotNull final Mapper<? super V, ? extends AsyncLoop<R>> mapper) {
-    final Logger logger = mLogger;
     return chainOrdered(
         new TryStatementLoopHandler<V, R>(closeable, new ThenLoopIfStatementHandler<V, R>(mapper),
-            logger.getLogPrinter(), logger.getLogLevel()));
+            mLogger.getName()));
   }
 
   @NotNull
   public <R> AsyncLoop<R> forEachTry(
       @NotNull final Mapper<? super V, ? extends Closeable> closeable,
       @NotNull final Mapper<? super V, R> mapper) {
-    final Logger logger = mLogger;
     return chain(new TryStatementHandler<V, R>(closeable, new ThenStatementHandler<V, R>(mapper),
-        logger.getLogPrinter(), logger.getLogLevel()));
+        mLogger.getName()));
   }
 
   @NotNull
   public AsyncLoop<V> forEachTryDo(@NotNull final Mapper<? super V, ? extends Closeable> closeable,
       @NotNull final Observer<? super V> observer) {
-    final Logger logger = mLogger;
     return chain(
         new TryStatementHandler<V, V>(closeable, new ThenDoStatementHandler<V, V>(observer),
-            logger.getLogPrinter(), logger.getLogLevel()));
+            mLogger.getName()));
   }
 
   @NotNull
   public <R> AsyncLoop<R> forEachTryIf(
       @NotNull final Mapper<? super V, ? extends Closeable> closeable,
       @NotNull final Mapper<? super V, ? extends AsyncStatement<R>> mapper) {
-    final Logger logger = mLogger;
-    return chain(new TryIfStatementHandler<V, R>(closeable, mapper, logger.getLogPrinter(),
-        logger.getLogLevel()));
+    return chain(new TryIfStatementHandler<V, R>(closeable, mapper, mLogger.getName()));
   }
 
   @NotNull
   public <R> AsyncLoop<R> forEachTryLoop(
       @NotNull final Mapper<? super V, ? extends Closeable> closeable,
       @NotNull final Mapper<? super V, ? extends Iterable<R>> mapper) {
-    final Logger logger = mLogger;
     return chain(
         new TryStatementLoopHandler<V, R>(closeable, new ThenLoopStatementHandler<V, R>(mapper),
-            logger.getLogPrinter(), logger.getLogLevel()));
+            mLogger.getName()));
   }
 
   @NotNull
   public <R> AsyncLoop<R> forEachTryLoopIf(
       @NotNull final Mapper<? super V, ? extends Closeable> closeable,
       @NotNull final Mapper<? super V, ? extends AsyncLoop<R>> mapper) {
-    final Logger logger = mLogger;
     return chain(
         new TryStatementLoopHandler<V, R>(closeable, new ThenLoopIfStatementHandler<V, R>(mapper),
-            logger.getLogPrinter(), logger.getLogLevel()));
+            mLogger.getName()));
   }
 
   @NotNull
   public <S> AsyncLoop<V> forkLoop(
       @NotNull final Forker<S, ? super AsyncLoop<V>, ? super V, ? super AsyncEvaluations<V>>
           forker) {
-    final Logger logger = mLogger;
     return new DefaultAsyncLoop<V>(new ForkObserver<S, V>(this, forker), mIsEvaluated, mExecutor,
-        logger.getLogPrinter(), logger.getLogLevel());
+        mLogger);
   }
 
   @NotNull
@@ -823,9 +824,8 @@ class DefaultAsyncLoop<V> implements AsyncLoop<V>, Serializable {
 
   @NotNull
   public AsyncLoop<V> onParallel(@NotNull final Executor executor) {
-    final Logger logger = mLogger;
-    return chain(new ChainLoopHandler<V, V>(
-            new ExecutorLoopHandler<V>(executor, logger.getLogPrinter(), logger.getLogLevel())),
+    return chain(
+        new ChainLoopHandler<V, V>(new ExecutorLoopHandler<V>(executor, mLogger.getName())),
         mExecutor, executor);
   }
 
@@ -836,9 +836,8 @@ class DefaultAsyncLoop<V> implements AsyncLoop<V>, Serializable {
 
   @NotNull
   public AsyncLoop<V> onParallelOrdered(@NotNull final Executor executor) {
-    final Logger logger = mLogger;
-    return chain(new ChainLoopHandlerOrdered<V, V>(
-            new ExecutorLoopHandler<V>(executor, logger.getLogPrinter(), logger.getLogLevel())),
+    return chain(
+        new ChainLoopHandlerOrdered<V, V>(new ExecutorLoopHandler<V>(executor, mLogger.getName())),
         mExecutor, executor);
   }
 
@@ -872,9 +871,7 @@ class DefaultAsyncLoop<V> implements AsyncLoop<V>, Serializable {
 
   @NotNull
   public <R, S> AsyncLoop<R> yield(@NotNull final Yielder<S, ? super V, R> yielder) {
-    final Logger logger = mLogger;
-    return chain(
-        new YieldLoopHandler<S, V, R>(yielder, logger.getLogPrinter(), logger.getLogLevel()));
+    return chain(new YieldLoopHandler<S, V, R>(yielder, mLogger.getName()));
   }
 
   @NotNull
@@ -888,9 +885,7 @@ class DefaultAsyncLoop<V> implements AsyncLoop<V>, Serializable {
 
   @NotNull
   public <R, S> AsyncLoop<R> yieldOrdered(@NotNull final Yielder<S, ? super V, R> yielder) {
-    final Logger logger = mLogger;
-    return chainOrdered(
-        new YieldLoopHandler<S, V, R>(yielder, logger.getLogPrinter(), logger.getLogLevel()));
+    return chainOrdered(new YieldLoopHandler<S, V, R>(yielder, mLogger.getName()));
   }
 
   @NotNull
@@ -996,8 +991,7 @@ class DefaultAsyncLoop<V> implements AsyncLoop<V>, Serializable {
     if (mIsFork) {
       final AsyncLoop<R> forked =
           new DefaultAsyncLoop<V>(((ForkObserver<?, V>) observer).newObserver(), mIsEvaluated,
-              logger.getLogPrinter(), logger.getLogLevel()).chain(chain, chainExecutor,
-              newExecutor);
+              mExecutor, mLogger).chain(chain, chainExecutor, newExecutor);
       mForked.add(forked);
       return forked;
     }
@@ -1065,7 +1059,7 @@ class DefaultAsyncLoop<V> implements AsyncLoop<V>, Serializable {
     }
 
     final Logger logger = mLogger;
-    if (logger.willPrint(LogLevel.WARNING) && ExecutorPool.isOwnedThread()) {
+    if (logger.getPrinter().canLogWrn() && ExecutorPool.isOwnedThread()) {
       logger.wrn("ATTENTION: possible deadlock detected! Try to avoid waiting on managed threads");
     }
   }
@@ -1082,9 +1076,8 @@ class DefaultAsyncLoop<V> implements AsyncLoop<V>, Serializable {
 
   @NotNull
   private AsyncStatement<Iterable<V>> toStatement() {
-    final Logger logger = mLogger;
     return new DefaultAsyncStatement<Iterable<V>>(new ToStatementObserver<V>(this), mIsEvaluated,
-        logger.getLogPrinter(), logger.getLogLevel());
+        mLogger.getName());
   }
 
   @NotNull
@@ -1104,9 +1097,7 @@ class DefaultAsyncLoop<V> implements AsyncLoop<V>, Serializable {
       chains.add(chain);
     }
 
-    final Logger logger = mLogger;
-    return new LoopProxy(mObserver, mIsEvaluated, mExecutor, logger.getLogPrinter(),
-        logger.getLogLevel(), chains);
+    return new LoopProxy(mObserver, mIsEvaluated, mExecutor, mLogger.getName(), chains);
   }
 
   private static class ChainForkObserver<S, V>
@@ -2772,7 +2763,7 @@ class DefaultAsyncLoop<V> implements AsyncLoop<V>, Serializable {
     }
 
     void setLogger(@NotNull final Logger logger) {
-      mLogger = logger.newChildLogger(this, logger.getLogPrinter(), logger.getLogLevel());
+      mLogger = logger.newChildLogger(this);
     }
 
     boolean isTail() {
@@ -3065,9 +3056,8 @@ class DefaultAsyncLoop<V> implements AsyncLoop<V>, Serializable {
     private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
 
     private LoopProxy(final Observer<AsyncEvaluations<?>> observer, final boolean isEvaluated,
-        final Executor executor, final LogPrinter printer, final LogLevel level,
-        final List<LoopChain<?, ?>> chains) {
-      super(proxy(observer), isEvaluated, executor, printer, level, chains);
+        final Executor executor, final String loggerName, final List<LoopChain<?, ?>> chains) {
+      super(proxy(observer), isEvaluated, executor, loggerName, chains);
     }
 
     @NotNull
@@ -3083,7 +3073,7 @@ class DefaultAsyncLoop<V> implements AsyncLoop<V>, Serializable {
         }
 
         return new DefaultAsyncLoop<Object>((Observer<AsyncEvaluations<?>>) args[0],
-            (Boolean) args[1], (Executor) args[2], (LogPrinter) args[3], (LogLevel) args[4], head,
+            (Boolean) args[1], (Executor) args[2], (String) args[3], head,
             (LoopChain<?, Object>) tail);
 
       } catch (final Throwable t) {

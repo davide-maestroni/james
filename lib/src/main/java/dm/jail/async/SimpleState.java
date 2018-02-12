@@ -33,6 +33,14 @@ public abstract class SimpleState<V> implements AsyncState<V>, Serializable {
   private SimpleState() {
   }
 
+  // TODO: 12/02/2018 cancel(Throwable)?
+
+  @NotNull
+  @SuppressWarnings("unchecked")
+  public static <V> SimpleState<V> canceled() {
+    return (SimpleState<V>) CanceledState.sInstance;
+  }
+
   @NotNull
   public static <V> SimpleState<V> ofFailure(@NotNull final Throwable reason) {
     return new FailureState<V>(reason);
@@ -56,6 +64,51 @@ public abstract class SimpleState<V> implements AsyncState<V>, Serializable {
   }
 
   public abstract void addTo(@NotNull AsyncEvaluations<? super V> evaluations);
+
+  private static class CanceledState<V> extends SimpleState<V> {
+
+    private static final CanceledState<?> sInstance = new CanceledState<Object>();
+
+    private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
+
+    public void addTo(@NotNull final AsyncEvaluations<? super V> evaluations) {
+      evaluations.addFailure(new CancellationException());
+    }
+
+    @NotNull
+    public Throwable failure() {
+      throw new IllegalStateException();
+    }
+
+    @NotNull
+    Object readResolve() throws ObjectStreamException {
+      return sInstance;
+    }
+
+    public boolean isCancelled() {
+      return true;
+    }
+
+    public boolean isFailed() {
+      return false;
+    }
+
+    public boolean isEvaluating() {
+      return true;
+    }
+
+    public boolean isSet() {
+      return false;
+    }
+
+    public void to(@NotNull final AsyncEvaluation<? super V> evaluation) {
+      evaluation.fail(new CancellationException());
+    }
+
+    public V value() {
+      throw new IllegalStateException();
+    }
+  }
 
   private static class FailureState<V> extends SimpleState<V> {
 
@@ -158,7 +211,7 @@ public abstract class SimpleState<V> implements AsyncState<V>, Serializable {
     }
 
     public void addTo(@NotNull final AsyncEvaluations<? super V> evaluations) {
-      ConstantConditions.unsupported();
+      evaluations.set();
     }
 
     @NotNull

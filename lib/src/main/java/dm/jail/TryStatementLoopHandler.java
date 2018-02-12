@@ -23,12 +23,11 @@ import java.io.Closeable;
 import java.io.InvalidObjectException;
 import java.io.ObjectStreamException;
 import java.io.Serializable;
+import java.util.Locale;
 
 import dm.jail.async.AsyncEvaluations;
 import dm.jail.async.Mapper;
 import dm.jail.config.BuildConfig;
-import dm.jail.log.LogLevel;
-import dm.jail.log.LogPrinter;
 import dm.jail.log.Logger;
 import dm.jail.util.ConstantConditions;
 import dm.jail.util.SerializableProxy;
@@ -48,11 +47,10 @@ class TryStatementLoopHandler<V, R> extends AsyncStatementLoopHandler<V, R>
   private final Logger mLogger;
 
   TryStatementLoopHandler(@NotNull final Mapper<? super V, ? extends Closeable> closeable,
-      @NotNull final AsyncStatementLoopHandler<V, R> handler, @Nullable final LogPrinter printer,
-      @Nullable final LogLevel level) {
+      @NotNull final AsyncStatementLoopHandler<V, R> handler, @Nullable final String loggerName) {
     mCloseable = ConstantConditions.notNull("closeable", closeable);
     mHandler = ConstantConditions.notNull("handler", handler);
-    mLogger = Logger.newLogger(this, printer, level);
+    mLogger = Logger.newLogger(this, loggerName, Locale.ENGLISH);
   }
 
   @Override
@@ -68,9 +66,7 @@ class TryStatementLoopHandler<V, R> extends AsyncStatementLoopHandler<V, R>
 
   @NotNull
   private Object writeReplace() throws ObjectStreamException {
-    final Logger logger = mLogger;
-    return new HandlerProxy<V, R>(mCloseable, mHandler, logger.getLogPrinter(),
-        logger.getLogLevel());
+    return new HandlerProxy<V, R>(mCloseable, mHandler, mLogger.getName());
   }
 
   private static class HandlerProxy<V, R> extends SerializableProxy {
@@ -78,9 +74,8 @@ class TryStatementLoopHandler<V, R> extends AsyncStatementLoopHandler<V, R>
     private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
 
     private HandlerProxy(final Mapper<? super V, ? extends Closeable> closeable,
-        final AsyncStatementLoopHandler<V, R> handler, final LogPrinter printer,
-        final LogLevel level) {
-      super(proxy(closeable), handler, printer, level);
+        final AsyncStatementLoopHandler<V, R> handler, final String loggerName) {
+      super(proxy(closeable), handler, loggerName);
     }
 
     @NotNull
@@ -89,7 +84,7 @@ class TryStatementLoopHandler<V, R> extends AsyncStatementLoopHandler<V, R>
       try {
         final Object[] args = deserializeArgs();
         return new TryStatementLoopHandler<V, R>((Mapper<? super V, ? extends Closeable>) args[0],
-            (AsyncStatementLoopHandler<V, R>) args[1], (LogPrinter) args[2], (LogLevel) args[3]);
+            (AsyncStatementLoopHandler<V, R>) args[1], (String) args[2]);
 
       } catch (final Throwable t) {
         throw new InvalidObjectException(t.getMessage());

@@ -51,6 +51,10 @@ public interface AsyncStatement<V> extends AsyncState<V>, Future<V>, Serializabl
   @NotNull
   AsyncStatement<V> evaluated();
 
+  // TODO: 12/02/2018 cancel(Throwable, boolean)?
+  // TODO: 12/02/2018 tryFork?
+  // TODO: 12/02/2018 fork(on())?
+
   @NotNull
   <S> AsyncStatement<V> fork(
       @NotNull Forker<S, ? super AsyncStatement<V>, ? super V, ? super AsyncEvaluation<V>> forker);

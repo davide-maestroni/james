@@ -22,7 +22,7 @@ import java.io.PrintStream;
 import java.io.PrintWriter;
 import java.util.concurrent.CancellationException;
 
-import dm.jail.log.LogPrinters;
+import dm.jail.log.Logger;
 import dm.jail.util.ConstantConditions;
 
 /**
@@ -120,11 +120,11 @@ public class FailureException extends RuntimeException {
 
   @NotNull
   public String printFullStackTraceToString() {
-    return LogPrinters.printStackTrace(this);
+    return Logger.printStackTrace(this);
   }
 
   @NotNull
   public String printStackTraceToString() {
-    return LogPrinters.printStackTrace(getCause());
+    return Logger.printStackTrace(getCause());
   }
 }

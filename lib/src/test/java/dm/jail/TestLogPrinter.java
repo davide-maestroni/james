@@ -19,7 +19,6 @@ package dm.jail;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
-import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import dm.jail.log.LogPrinter;
@@ -33,20 +32,35 @@ class TestLogPrinter implements LogPrinter {
 
   private final AtomicBoolean mErrCalled = new AtomicBoolean();
 
+  private final Level mLevel;
+
   private final AtomicBoolean mWrnCalled = new AtomicBoolean();
 
-  public void dbg(@NotNull final List<Object> contexts, @Nullable final String message,
-      @Nullable final Throwable throwable) {
+  TestLogPrinter(@NotNull final Level level) {
+    mLevel = level;
+  }
+
+  public boolean canLogDbg() {
+    return mLevel.compareTo(Level.DBG) <= 0;
+  }
+
+  public boolean canLogErr() {
+    return mLevel.compareTo(Level.ERR) <= 0;
+  }
+
+  public boolean canLogWrn() {
+    return mLevel.compareTo(Level.WRN) <= 0;
+  }
+
+  public void dbg(@Nullable final String message, @Nullable final Throwable throwable) {
     mDbgCalled.set(true);
   }
 
-  public void err(@NotNull final List<Object> contexts, @Nullable final String message,
-      @Nullable final Throwable throwable) {
+  public void err(@Nullable final String message, @Nullable final Throwable throwable) {
     mErrCalled.set(true);
   }
 
-  public void wrn(@NotNull final List<Object> contexts, @Nullable final String message,
-      @Nullable final Throwable throwable) {
+  public void wrn(@Nullable final String message, @Nullable final Throwable throwable) {
     mWrnCalled.set(true);
   }
 
@@ -60,5 +74,9 @@ class TestLogPrinter implements LogPrinter {
 
   public boolean isWrnCalled() {
     return mWrnCalled.get();
+  }
+
+  enum Level {
+    DBG, WRN, ERR
   }
 }

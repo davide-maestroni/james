@@ -22,6 +22,7 @@ import org.jetbrains.annotations.Nullable;
 import java.io.InvalidObjectException;
 import java.io.ObjectStreamException;
 import java.io.Serializable;
+import java.util.Locale;
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.Executor;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -34,8 +35,6 @@ import dm.jail.async.AsyncLoop.Yielder;
 import dm.jail.async.AsyncStatement;
 import dm.jail.async.RuntimeInterruptedException;
 import dm.jail.config.BuildConfig;
-import dm.jail.log.LogLevel;
-import dm.jail.log.LogPrinter;
 import dm.jail.log.Logger;
 import dm.jail.util.ConstantConditions;
 import dm.jail.util.SerializableProxy;
@@ -65,10 +64,10 @@ class YieldLoopHandler<S, V, R> extends AsyncLoopHandler<V, R> implements Serial
   private S mStack;
 
   YieldLoopHandler(@NotNull final Yielder<S, ? super V, R> yielder,
-      @Nullable final LogPrinter printer, @Nullable final LogLevel level) {
+      @Nullable final String loggerName) {
     mYielder = ConstantConditions.notNull("yielder", yielder);
     mExecutor = withThrottling(1, immediateExecutor());
-    mLogger = Logger.newLogger(this, printer, level);
+    mLogger = Logger.newLogger(this, loggerName, Locale.ENGLISH);
   }
 
   @Override
@@ -137,8 +136,7 @@ class YieldLoopHandler<S, V, R> extends AsyncLoopHandler<V, R> implements Serial
   @NotNull
   @Override
   AsyncLoopHandler<V, R> renew() {
-    final Logger logger = mLogger;
-    return new YieldLoopHandler<S, V, R>(mYielder, logger.getLogPrinter(), logger.getLogLevel());
+    return new YieldLoopHandler<S, V, R>(mYielder, mLogger.getName());
   }
 
   @Override
@@ -165,17 +163,15 @@ class YieldLoopHandler<S, V, R> extends AsyncLoopHandler<V, R> implements Serial
 
   @NotNull
   private Object writeReplace() throws ObjectStreamException {
-    final Logger logger = mLogger;
-    return new HandlerProxy<S, V, R>(mYielder, logger.getLogPrinter(), logger.getLogLevel());
+    return new HandlerProxy<S, V, R>(mYielder, mLogger.getName());
   }
 
   private static class HandlerProxy<S, V, R> extends SerializableProxy {
 
     private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
 
-    private HandlerProxy(final Yielder<S, ? super V, R> yielder, final LogPrinter printer,
-        final LogLevel level) {
-      super(proxy(yielder), printer, level);
+    private HandlerProxy(final Yielder<S, ? super V, R> yielder, final String loggerName) {
+      super(proxy(yielder), loggerName);
     }
 
     @NotNull
@@ -183,8 +179,7 @@ class YieldLoopHandler<S, V, R> extends AsyncLoopHandler<V, R> implements Serial
     Object readResolve() throws ObjectStreamException {
       try {
         final Object[] args = deserializeArgs();
-        return new YieldLoopHandler<S, V, R>((Yielder<S, ? super V, R>) args[0],
-            (LogPrinter) args[1], (LogLevel) args[2]);
+        return new YieldLoopHandler<S, V, R>((Yielder<S, ? super V, R>) args[0], (String) args[1]);
 
       } catch (final Throwable t) {
         throw new InvalidObjectException(t.getMessage());

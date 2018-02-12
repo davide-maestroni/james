@@ -45,8 +45,6 @@ import dm.jail.async.Observer;
 import dm.jail.async.RuntimeTimeoutException;
 import dm.jail.async.SimpleState;
 import dm.jail.async.Updater;
-import dm.jail.log.LogPrinter;
-import dm.jail.log.LogPrinters;
 import dm.jail.log.Logger;
 import dm.jail.util.ConstantConditions;
 
@@ -1235,7 +1233,7 @@ public class TestAsyncStatement {
   public void serializeElseDo() throws IOException, ClassNotFoundException {
     final AsyncStatement<String> statement =
         new Async().<String>failure(new IllegalArgumentException("test")).elseDo(
-            new PrintMessage(LogPrinters.systemPrinter()));
+            new PrintMessage("test.logger"));
     final ByteArrayOutputStream byteOutputStream = new ByteArrayOutputStream();
     final ObjectOutputStream objectOutputStream = new ObjectOutputStream(byteOutputStream);
     objectOutputStream.writeObject(statement);
@@ -1401,7 +1399,7 @@ public class TestAsyncStatement {
   @Test
   public void serializeThenDo() throws IOException, ClassNotFoundException {
     final AsyncStatement<String> statement =
-        new Async().value("test").thenDo(new PrintString(LogPrinters.systemPrinter()));
+        new Async().value("test").thenDo(new PrintString("test.logger"));
     final ByteArrayOutputStream byteOutputStream = new ByteArrayOutputStream();
     final ObjectOutputStream objectOutputStream = new ObjectOutputStream(byteOutputStream);
     objectOutputStream.writeObject(statement);
@@ -2256,27 +2254,27 @@ public class TestAsyncStatement {
 
   private static class PrintMessage implements Observer<Throwable>, Serializable {
 
-    private final LogPrinter mLogPrinter;
+    private final String mLoggerName;
 
-    private PrintMessage(@NotNull final LogPrinter logPrinter) {
-      mLogPrinter = logPrinter;
+    private PrintMessage(@NotNull final String loggerName) {
+      mLoggerName = loggerName;
     }
 
     public void accept(final Throwable input) {
-      Logger.newLogger(this, mLogPrinter, null).err(input);
+      Logger.newLogger(this, mLoggerName).err(input);
     }
   }
 
   private static class PrintString implements Observer<String>, Serializable {
 
-    private final LogPrinter mLogPrinter;
+    private final String mLoggerName;
 
-    private PrintString(@NotNull final LogPrinter logPrinter) {
-      mLogPrinter = logPrinter;
+    private PrintString(@NotNull final String loggerName) {
+      mLoggerName = loggerName;
     }
 
     public void accept(final String input) {
-      Logger.newLogger(this, mLogPrinter, null).dbg(input);
+      Logger.newLogger(this, mLoggerName).dbg(input);
     }
   }
 

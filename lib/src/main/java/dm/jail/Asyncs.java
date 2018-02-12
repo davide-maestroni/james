@@ -45,15 +45,10 @@ class Asyncs {
   static void close(@Nullable final Closeable closeable, @NotNull final Logger logger) throws
       IOException {
     if (closeable == null) {
+      logger.wrn("Cannot close null closeable");
       return;
     }
 
-    try {
-      closeable.close();
-
-    } catch (final IOException e) {
-      logger.err(e, "Error while closing closeable: " + closeable);
-      throw e;
-    }
+    closeable.close();
   }
 }

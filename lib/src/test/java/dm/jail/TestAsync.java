@@ -21,8 +21,10 @@ import org.junit.Test;
 
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.List;
 import java.util.concurrent.TimeUnit;
 
+import dm.jail.TestLogPrinter.Level;
 import dm.jail.async.AsyncEvaluation;
 import dm.jail.async.AsyncEvaluations;
 import dm.jail.async.AsyncState;
@@ -32,8 +34,9 @@ import dm.jail.async.Mapper;
 import dm.jail.async.Observer;
 import dm.jail.async.SimpleState;
 import dm.jail.executor.ExecutorPool;
-import dm.jail.log.LogLevel;
-import dm.jail.log.LogPrinters;
+import dm.jail.log.LogConnector;
+import dm.jail.log.LogPrinter;
+import dm.jail.log.Logger;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -153,15 +156,23 @@ public class TestAsync {
   @Test
   public void immutable() {
     final Async async = new Async();
-    assertThat(async.log(LogLevel.SILENT)).isNotSameAs(async);
-    assertThat(async.log(LogPrinters.nullPrinter())).isNotSameAs(async);
+    assertThat(async.loggerName("test")).isNotSameAs(async);
+    assertThat(async.loggerName(null)).isNotSameAs(async);
     assertThat(async.on(ExecutorPool.immediateExecutor())).isNotSameAs(async);
   }
 
   @Test
   public void logLevelDebug() {
-    final TestLogPrinter logPrinter = new TestLogPrinter();
-    new Async().log(logPrinter).log(LogLevel.DEBUG).value(null).then(new Mapper<Object, Object>() {
+    final TestLogPrinter logPrinter = new TestLogPrinter(Level.DBG);
+    Logger.clearConnectors();
+    Logger.addConnector(new LogConnector() {
+
+      public LogPrinter getPrinter(@NotNull final String loggerName,
+          @NotNull final List<Object> contexts) {
+        return logPrinter;
+      }
+    });
+    new Async().value(null).then(new Mapper<Object, Object>() {
 
       public Object apply(final Object input) throws Exception {
         throw new Exception();
@@ -174,8 +185,16 @@ public class TestAsync {
 
   @Test
   public void logLevelError() {
-    final TestLogPrinter logPrinter = new TestLogPrinter();
-    new Async().log(logPrinter).log(LogLevel.ERROR).value(null).then(new Mapper<Object, Object>() {
+    final TestLogPrinter logPrinter = new TestLogPrinter(Level.ERR);
+    Logger.clearConnectors();
+    Logger.addConnector(new LogConnector() {
+
+      public LogPrinter getPrinter(@NotNull final String loggerName,
+          @NotNull final List<Object> contexts) {
+        return logPrinter;
+      }
+    });
+    new Async().value(null).then(new Mapper<Object, Object>() {
 
       public Object apply(final Object input) throws Exception {
         throw new Exception();
@@ -187,32 +206,22 @@ public class TestAsync {
   }
 
   @Test
-  public void logLevelSilent() {
-    final TestLogPrinter logPrinter = new TestLogPrinter();
-    new Async().log(logPrinter).log(LogLevel.SILENT).value(null).then(new Mapper<Object, Object>() {
+  public void logLevelWarning() {
+    final TestLogPrinter logPrinter = new TestLogPrinter(Level.WRN);
+    Logger.clearConnectors();
+    Logger.addConnector(new LogConnector() {
+
+      public LogPrinter getPrinter(@NotNull final String loggerName,
+          @NotNull final List<Object> contexts) {
+        return logPrinter;
+      }
+    });
+    new Async().value(null).then(new Mapper<Object, Object>() {
 
       public Object apply(final Object input) throws Exception {
         throw new Exception();
       }
     }).cancel(true);
-    assertThat(logPrinter.isDbgCalled()).isFalse();
-    assertThat(logPrinter.isWrnCalled()).isFalse();
-    assertThat(logPrinter.isErrCalled()).isFalse();
-  }
-
-  @Test
-  public void logLevelWarning() {
-    final TestLogPrinter logPrinter = new TestLogPrinter();
-    new Async().log(logPrinter)
-               .log(LogLevel.WARNING)
-               .value(null)
-               .then(new Mapper<Object, Object>() {
-
-                 public Object apply(final Object input) throws Exception {
-                   throw new Exception();
-                 }
-               })
-               .cancel(true);
     assertThat(logPrinter.isDbgCalled()).isFalse();
     assertThat(logPrinter.isWrnCalled()).isTrue();
     assertThat(logPrinter.isErrCalled()).isTrue();

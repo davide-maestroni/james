@@ -19,20 +19,14 @@ package dm.jail.log;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
-import java.io.Serializable;
+import java.io.PrintWriter;
+import java.io.StringWriter;
 import java.util.Arrays;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.HashSet;
 import java.util.Iterator;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
-import java.util.Map;
-import java.util.Map.Entry;
-import java.util.Set;
+import java.util.WeakHashMap;
 
-import dm.jail.config.BuildConfig;
 import dm.jail.util.ConstantConditions;
 
 import static dm.jail.util.Reflections.asArgs;
@@ -45,135 +39,78 @@ import static dm.jail.util.Reflections.asArgs;
 @SuppressWarnings("WeakerAccess")
 public class Logger {
 
-  private static final Locale DEFAULT_LOCALE = Locale.ENGLISH;
+  private static final Locale DEFAULT_LOCALE = Locale.getDefault();
 
-  private static final LogLevel DEFAULT_LOG_LEVEL = LogLevel.ERROR;
+  private static final LogConnector DEFAULT_LOG_CONNECTOR = new JavaLoggingConnector();
 
-  private static final LogPrinter DEFAULT_LOG_PRINTER = LogPrinters.systemPrinter();
+  private static final String NULL_IDENTITY_STRING = "null@" + Integer.toHexString(0);
 
-  private static final int LEVEL_DEBUG = LogLevel.DEBUG.ordinal();
-
-  private static final int LEVEL_ERROR = LogLevel.ERROR.ordinal();
-
-  private static final int LEVEL_WARNING = LogLevel.WARNING.ordinal();
+  private static final WeakHashMap<Logger, Void> sLoggers = new WeakHashMap<Logger, Void>();
 
   private static final Object sMutex = new Object();
 
-  private static LinkedHashMap<Class<?>, LogLevel> sLogLevels =
-      new LinkedHashMap<Class<?>, LogLevel>() {{
-        put(Object.class, DEFAULT_LOG_LEVEL);
-      }};
-
-  private static LinkedHashMap<Class<?>, LogPrinter> sLogPrinters =
-      new LinkedHashMap<Class<?>, LogPrinter>() {{
-        put(Object.class, DEFAULT_LOG_PRINTER);
-      }};
+  private static LogConnector sConnector = DEFAULT_LOG_CONNECTOR;
 
   private final List<Object> mContextList;
 
   private final Object[] mContexts;
 
-  private final int mLevel;
+  private final Locale mLocale;
 
-  private final LogLevel mLogLevel;
+  private final String mLoggerName;
 
-  private final LogPrinter mLogPrinter;
+  private volatile LogPrinter mPrinter;
 
   /**
    * Constructor.
    *
-   * @param contexts the array of contexts.
-   * @param printer  the printer instance.
-   * @param level    the log level.
+   * @param contexts   the array of contexts.
+   * @param loggerName the logger name.
+   * @param locale     the locale instance.
    */
-  private Logger(@NotNull final Object[] contexts, @NotNull final LogPrinter printer,
-      @NotNull final LogLevel level) {
+  private Logger(@NotNull final Object[] contexts, @NotNull final String loggerName,
+      @NotNull final Locale locale) {
     mContexts = contexts;
-    mLogPrinter = printer;
-    mLogLevel = level;
-    mLevel = level.ordinal();
+    mLoggerName = loggerName;
+    mLocale = locale;
     mContextList = Arrays.asList(contexts);
   }
 
-  /**
-   * Gets the default log level.
-   *
-   * @return the log level.
-   */
-  @NotNull
-  public static LogLevel getDefaultLevel() {
-    return sLogLevels.get(Object.class);
-  }
-
-  /**
-   * Sets the default log level.
-   *
-   * @param level the log level.
-   */
-  public static void setDefaultLevel(@NotNull final LogLevel level) {
-    setDefaultLevel(Object.class, level);
-  }
-
-  @NotNull
-  public static LogLevel getDefaultLevel(@NotNull final Class<?> type) {
+  public static void addConnector(@NotNull final LogConnector connector) {
+    ConstantConditions.notNull("connector", connector);
     synchronized (sMutex) {
-      final Set<LogLevel> levels = getBestMatches(type, sLogLevels);
-      LogLevel minLevel = LogLevel.SILENT;
-      for (final LogLevel level : levels) {
-        if (level.compareTo(minLevel) < 0) {
-          minLevel = level;
-        }
+      final LogConnector newConnector;
+      final LogConnector currentConnector = sConnector;
+      if (currentConnector == DEFAULT_LOG_CONNECTOR) {
+        newConnector = connector;
+
+      } else if (currentConnector instanceof MultiConnector) {
+        newConnector = new MultiConnector((MultiConnector) currentConnector, connector);
+
+      } else {
+        newConnector = new MultiConnector(currentConnector, connector);
       }
 
-      return minLevel;
+      sConnector = newConnector;
+      for (final Logger logger : sLoggers.keySet()) {
+        logger.setPrinter(newConnector);
+      }
+    }
+  }
+
+  public static void clearConnectors() {
+    synchronized (sMutex) {
+      sConnector = DEFAULT_LOG_CONNECTOR;
+      for (final Logger logger : sLoggers.keySet()) {
+        logger.setPrinter(DEFAULT_LOG_CONNECTOR);
+      }
     }
   }
 
   @NotNull
-  public static LogPrinter getDefaultPrinter(@NotNull final Class<?> type) {
-    synchronized (sMutex) {
-      final Set<LogPrinter> matches = getBestMatches(type, sLogPrinters);
-      if (matches.size() == 1) {
-        return matches.iterator().next();
-      }
-
-      return new CompositeLogPrinter(matches);
-    }
-  }
-
-  /**
-   * Gets the default log printer instance.
-   *
-   * @return the log instance.
-   */
-  @NotNull
-  public static LogPrinter getDefaultPrinter() {
-    return sLogPrinters.get(Object.class);
-  }
-
-  /**
-   * Sets the default log printer instance.
-   *
-   * @param printer the printer instance.
-   */
-  public static void setDefaultPrinter(@NotNull final LogPrinter printer) {
-    setDefaultPrinter(Object.class, printer);
-  }
-
-  /**
-   * Creates a new logger.
-   *
-   * @param context the context.
-   * @param printer the printer instance.
-   * @param level   the log level.
-   * @return the new logger.
-   */
-  @NotNull
-  public static Logger newLogger(@NotNull final Object context, @Nullable final LogPrinter printer,
-      @Nullable final LogLevel level) {
-    return new Logger(asArgs(ConstantConditions.notNull("context", context)),
-        (printer != null) ? printer : getDefaultPrinter(context.getClass()),
-        (level != null) ? level : getDefaultLevel(context.getClass()));
+  public static String identityToString(@Nullable final Object object) {
+    return (object != null) ? object.getClass().getName() + "@" + Integer.toHexString(
+        System.identityHashCode(object)) : NULL_IDENTITY_STRING;
   }
 
   @NotNull
@@ -182,78 +119,78 @@ public class Logger {
   }
 
   @NotNull
-  public static Logger newLogger(@NotNull final Object context,
-      @Nullable final LogPrinter printer) {
-    return newLogger(context, printer, null);
+  public static Logger newLogger(@NotNull final Object context, @Nullable final Locale locale) {
+    return newLogger(context, null, locale);
   }
 
   @NotNull
-  public static Logger newLogger(@NotNull final Object context, @Nullable final LogLevel level) {
-    return newLogger(context, null, level);
+  public static Logger newLogger(@NotNull final Object context, @Nullable final String loggerName) {
+    return newLogger(context, loggerName, null);
   }
 
-  public static void setDefaultLevel(@NotNull final Class<?> type, @NotNull final LogLevel level) {
-    ConstantConditions.notNull("level", level);
-    synchronized (sMutex) {
-      final LinkedHashMap<Class<?>, LogLevel> logLevels =
-          new LinkedHashMap<Class<?>, LogLevel>(sLogLevels);
-      if (logLevels.put(type, level) != null) {
-        sLogLevels = logLevels;
-      }
-    }
+  /**
+   * Creates a new logger.
+   *
+   * @param context    the context.
+   * @param loggerName the logger name.
+   * @param locale     the locale instance.
+   * @return the new logger.
+   */
+  @NotNull
+  public static Logger newLogger(@NotNull final Object context, @Nullable final String loggerName,
+      @Nullable final Locale locale) {
+    final Logger logger = new Logger(asArgs(ConstantConditions.notNull("context", context)),
+        (loggerName != null) ? loggerName : context.getClass().getName(),
+        (locale != null) ? locale : DEFAULT_LOCALE);
+    register(logger);
+    return logger;
   }
 
-  public static void setDefaultPrinter(@NotNull final Class<?> type,
-      @NotNull final LogPrinter printer) {
-    ConstantConditions.notNull("printer", printer);
-    synchronized (sMutex) {
-      final LinkedHashMap<Class<?>, LogPrinter> logPrinters =
-          new LinkedHashMap<Class<?>, LogPrinter>(sLogPrinters);
-      if (logPrinters.put(type, printer) != null) {
-        sLogPrinters = logPrinters;
-      }
-    }
+  /**
+   * Prints the stack trace of the specified throwable into a string.
+   *
+   * @param throwable the throwable instance.
+   * @return the printed stack trace.
+   */
+  @NotNull
+  public static String printStackTrace(@NotNull final Throwable throwable) {
+    final StringWriter writer = new StringWriter();
+    final PrintWriter printWriter = new PrintWriter(writer);
+    throwable.printStackTrace(printWriter);
+    printWriter.close();
+    return writer.toString();
   }
 
   @NotNull
-  private static <T> Set<T> getBestMatches(@NotNull final Class<?> type,
-      @NotNull final Map<Class<?>, T> map) {
-    final T result = map.get(type);
-    if (result != null) {
-      return Collections.singleton(result);
-    }
+  private static String contextToString(@NotNull final Object object) {
+    return object.getClass().getSimpleName() + "@" + Integer.toHexString(
+        System.identityHashCode(object));
+  }
 
-    final HashMap<Class<?>, T> candidates = new HashMap<Class<?>, T>();
-    for (final Entry<Class<?>, T> entry : map.entrySet()) {
-      final Class<?> key = entry.getKey();
-      if (key.isAssignableFrom(type)) {
-        if (candidates.isEmpty()) {
-          candidates.put(key, entry.getValue());
-
-        } else {
-          boolean isCandidate = true;
-          for (final Class<?> candidate : candidates.keySet()) {
-            if (key.isAssignableFrom(candidate)) {
-              isCandidate = false;
-              break;
-            }
-          }
-
-          if (isCandidate) {
-            final Iterator<Class<?>> iterator = candidates.keySet().iterator();
-            while (iterator.hasNext()) {
-              if (iterator.next().isAssignableFrom(key)) {
-                iterator.remove();
-              }
-            }
-
-            candidates.put(key, entry.getValue());
-          }
+  @NotNull
+  private static String printContexts(@NotNull final List<Object> contexts) {
+    final Iterator<Object> iterator = contexts.iterator();
+    if (iterator.hasNext()) {
+      final StringBuilder builder = new StringBuilder();
+      builder.append('[');
+      while (true) {
+        builder.append(contextToString(iterator.next()));
+        if (!iterator.hasNext()) {
+          return builder.append(']').toString();
         }
+
+        builder.append(" => ");
       }
     }
 
-    return new HashSet<T>(candidates.values());
+    return "";
+  }
+
+  private static void register(@NotNull final Logger logger) {
+    synchronized (sMutex) {
+      sLoggers.put(logger, null);
+      logger.setPrinter(sConnector);
+    }
   }
 
   /**
@@ -262,8 +199,9 @@ public class Logger {
    * @param message the message.
    */
   public void dbg(@Nullable final String message) {
-    if (mLevel <= LEVEL_DEBUG) {
-      mLogPrinter.dbg(mContextList, message, null);
+    final LogPrinter printer = mPrinter;
+    if (printer.canLogDbg()) {
+      printer.dbg(printContexts(mContextList) + message, null);
     }
   }
 
@@ -274,8 +212,9 @@ public class Logger {
    * @param arg1   the first format argument.
    */
   public void dbg(@NotNull final String format, @Nullable final Object arg1) {
-    if (mLevel <= LEVEL_DEBUG) {
-      mLogPrinter.dbg(mContextList, String.format(DEFAULT_LOCALE, format, arg1), null);
+    final LogPrinter printer = mPrinter;
+    if (printer.canLogDbg()) {
+      printer.dbg(printContexts(mContextList) + String.format(mLocale, format, arg1), null);
     }
   }
 
@@ -288,8 +227,9 @@ public class Logger {
    */
   public void dbg(@NotNull final String format, @Nullable final Object arg1,
       @Nullable final Object arg2) {
-    if (mLevel <= LEVEL_DEBUG) {
-      mLogPrinter.dbg(mContextList, String.format(DEFAULT_LOCALE, format, arg1, arg2), null);
+    final LogPrinter printer = mPrinter;
+    if (printer.canLogDbg()) {
+      printer.dbg(printContexts(mContextList) + String.format(mLocale, format, arg1, arg2), null);
     }
   }
 
@@ -303,8 +243,10 @@ public class Logger {
    */
   public void dbg(@NotNull final String format, @Nullable final Object arg1,
       @Nullable final Object arg2, @Nullable final Object arg3) {
-    if (mLevel <= LEVEL_DEBUG) {
-      mLogPrinter.dbg(mContextList, String.format(DEFAULT_LOCALE, format, arg1, arg2, arg3), null);
+    final LogPrinter printer = mPrinter;
+    if (printer.canLogDbg()) {
+      printer.dbg(printContexts(mContextList) + String.format(mLocale, format, arg1, arg2, arg3),
+          null);
     }
   }
 
@@ -319,8 +261,10 @@ public class Logger {
    */
   public void dbg(@NotNull final String format, @Nullable final Object arg1,
       @Nullable final Object arg2, @Nullable final Object arg3, @Nullable final Object arg4) {
-    if (mLevel <= LEVEL_DEBUG) {
-      mLogPrinter.dbg(mContextList, String.format(DEFAULT_LOCALE, format, arg1, arg2, arg3, arg4),
+    final LogPrinter printer = mPrinter;
+    if (printer.canLogDbg()) {
+      printer.dbg(
+          printContexts(mContextList) + String.format(mLocale, format, arg1, arg2, arg3, arg4),
           null);
     }
   }
@@ -332,8 +276,9 @@ public class Logger {
    * @param args   the format arguments.
    */
   public void dbg(@NotNull final String format, @Nullable final Object... args) {
-    if (mLevel <= LEVEL_DEBUG) {
-      mLogPrinter.dbg(mContextList, String.format(DEFAULT_LOCALE, format, args), null);
+    final LogPrinter printer = mPrinter;
+    if (printer.canLogDbg()) {
+      printer.dbg(printContexts(mContextList) + String.format(mLocale, format, args), null);
     }
   }
 
@@ -343,8 +288,9 @@ public class Logger {
    * @param throwable the related throwable.
    */
   public void dbg(@Nullable final Throwable throwable) {
-    if (mLevel <= LEVEL_DEBUG) {
-      mLogPrinter.dbg(mContextList, "", throwable);
+    final LogPrinter printer = mPrinter;
+    if (printer.canLogDbg()) {
+      printer.dbg(printContexts(mContextList), throwable);
     }
   }
 
@@ -355,8 +301,9 @@ public class Logger {
    * @param message   the message.
    */
   public void dbg(@Nullable final Throwable throwable, @Nullable final String message) {
-    if (mLevel <= LEVEL_DEBUG) {
-      mLogPrinter.dbg(mContextList, message, throwable);
+    final LogPrinter printer = mPrinter;
+    if (printer.canLogDbg()) {
+      printer.dbg(printContexts(mContextList) + message, throwable);
     }
   }
 
@@ -369,8 +316,9 @@ public class Logger {
    */
   public void dbg(@NotNull final Throwable throwable, @NotNull final String format,
       @Nullable final Object arg1) {
-    if (mLevel <= LEVEL_DEBUG) {
-      mLogPrinter.dbg(mContextList, String.format(DEFAULT_LOCALE, format, arg1), throwable);
+    final LogPrinter printer = mPrinter;
+    if (printer.canLogDbg()) {
+      printer.dbg(printContexts(mContextList) + String.format(mLocale, format, arg1), throwable);
     }
   }
 
@@ -384,8 +332,10 @@ public class Logger {
    */
   public void dbg(@NotNull final Throwable throwable, @NotNull final String format,
       @Nullable final Object arg1, @Nullable final Object arg2) {
-    if (mLevel <= LEVEL_DEBUG) {
-      mLogPrinter.dbg(mContextList, String.format(DEFAULT_LOCALE, format, arg1, arg2), throwable);
+    final LogPrinter printer = mPrinter;
+    if (printer.canLogDbg()) {
+      printer.dbg(printContexts(mContextList) + String.format(mLocale, format, arg1, arg2),
+          throwable);
     }
   }
 
@@ -400,8 +350,9 @@ public class Logger {
    */
   public void dbg(@NotNull final Throwable throwable, @NotNull final String format,
       @Nullable final Object arg1, @Nullable final Object arg2, @Nullable final Object arg3) {
-    if (mLevel <= LEVEL_DEBUG) {
-      mLogPrinter.dbg(mContextList, String.format(DEFAULT_LOCALE, format, arg1, arg2, arg3),
+    final LogPrinter printer = mPrinter;
+    if (printer.canLogDbg()) {
+      printer.dbg(printContexts(mContextList) + String.format(mLocale, format, arg1, arg2, arg3),
           throwable);
     }
   }
@@ -419,8 +370,10 @@ public class Logger {
   public void dbg(@NotNull final Throwable throwable, @NotNull final String format,
       @Nullable final Object arg1, @Nullable final Object arg2, @Nullable final Object arg3,
       @Nullable final Object arg4) {
-    if (mLevel <= LEVEL_DEBUG) {
-      mLogPrinter.dbg(mContextList, String.format(DEFAULT_LOCALE, format, arg1, arg2, arg3, arg4),
+    final LogPrinter printer = mPrinter;
+    if (printer.canLogDbg()) {
+      printer.dbg(
+          printContexts(mContextList) + String.format(mLocale, format, arg1, arg2, arg3, arg4),
           throwable);
     }
   }
@@ -434,8 +387,9 @@ public class Logger {
    */
   public void dbg(@NotNull final Throwable throwable, @NotNull final String format,
       @Nullable final Object... args) {
-    if (mLevel <= LEVEL_DEBUG) {
-      mLogPrinter.dbg(mContextList, String.format(DEFAULT_LOCALE, format, args), throwable);
+    final LogPrinter printer = mPrinter;
+    if (printer.canLogDbg()) {
+      printer.dbg(printContexts(mContextList) + String.format(mLocale, format, args), throwable);
     }
   }
 
@@ -445,8 +399,9 @@ public class Logger {
    * @param message the message.
    */
   public void err(@Nullable final String message) {
-    if (mLevel <= LEVEL_ERROR) {
-      mLogPrinter.err(mContextList, message, null);
+    final LogPrinter printer = mPrinter;
+    if (printer.canLogErr()) {
+      printer.err(printContexts(mContextList) + message, null);
     }
   }
 
@@ -457,8 +412,9 @@ public class Logger {
    * @param arg1   the first format argument.
    */
   public void err(@NotNull final String format, @Nullable final Object arg1) {
-    if (mLevel <= LEVEL_ERROR) {
-      mLogPrinter.err(mContextList, String.format(DEFAULT_LOCALE, format, arg1), null);
+    final LogPrinter printer = mPrinter;
+    if (printer.canLogErr()) {
+      printer.err(printContexts(mContextList) + String.format(mLocale, format, arg1), null);
     }
   }
 
@@ -471,8 +427,9 @@ public class Logger {
    */
   public void err(@NotNull final String format, @Nullable final Object arg1,
       @Nullable final Object arg2) {
-    if (mLevel <= LEVEL_ERROR) {
-      mLogPrinter.err(mContextList, String.format(DEFAULT_LOCALE, format, arg1, arg2), null);
+    final LogPrinter printer = mPrinter;
+    if (printer.canLogErr()) {
+      printer.err(printContexts(mContextList) + String.format(mLocale, format, arg1, arg2), null);
     }
   }
 
@@ -486,8 +443,10 @@ public class Logger {
    */
   public void err(@NotNull final String format, @Nullable final Object arg1,
       @Nullable final Object arg2, @Nullable final Object arg3) {
-    if (mLevel <= LEVEL_ERROR) {
-      mLogPrinter.err(mContextList, String.format(DEFAULT_LOCALE, format, arg1, arg2, arg3), null);
+    final LogPrinter printer = mPrinter;
+    if (printer.canLogErr()) {
+      printer.err(printContexts(mContextList) + String.format(mLocale, format, arg1, arg2, arg3),
+          null);
     }
   }
 
@@ -502,8 +461,10 @@ public class Logger {
    */
   public void err(@NotNull final String format, @Nullable final Object arg1,
       @Nullable final Object arg2, @Nullable final Object arg3, @Nullable final Object arg4) {
-    if (mLevel <= LEVEL_ERROR) {
-      mLogPrinter.err(mContextList, String.format(DEFAULT_LOCALE, format, arg1, arg2, arg3, arg4),
+    final LogPrinter printer = mPrinter;
+    if (printer.canLogErr()) {
+      printer.err(
+          printContexts(mContextList) + String.format(mLocale, format, arg1, arg2, arg3, arg4),
           null);
     }
   }
@@ -515,8 +476,9 @@ public class Logger {
    * @param args   the format arguments.
    */
   public void err(@NotNull final String format, @Nullable final Object... args) {
-    if (mLevel <= LEVEL_ERROR) {
-      mLogPrinter.err(mContextList, String.format(DEFAULT_LOCALE, format, args), null);
+    final LogPrinter printer = mPrinter;
+    if (printer.canLogErr()) {
+      printer.err(printContexts(mContextList) + String.format(mLocale, format, args), null);
     }
   }
 
@@ -526,8 +488,9 @@ public class Logger {
    * @param throwable the related throwable.
    */
   public void err(@NotNull final Throwable throwable) {
-    if (mLevel <= LEVEL_ERROR) {
-      mLogPrinter.err(mContextList, "", throwable);
+    final LogPrinter printer = mPrinter;
+    if (printer.canLogErr()) {
+      printer.err(printContexts(mContextList), throwable);
     }
   }
 
@@ -538,8 +501,9 @@ public class Logger {
    * @param message   the message.
    */
   public void err(@NotNull final Throwable throwable, @Nullable final String message) {
-    if (mLevel <= LEVEL_ERROR) {
-      mLogPrinter.err(mContextList, message, throwable);
+    final LogPrinter printer = mPrinter;
+    if (printer.canLogErr()) {
+      printer.err(printContexts(mContextList) + message, throwable);
     }
   }
 
@@ -552,8 +516,9 @@ public class Logger {
    */
   public void err(@NotNull final Throwable throwable, @NotNull final String format,
       @Nullable final Object arg1) {
-    if (mLevel <= LEVEL_ERROR) {
-      mLogPrinter.err(mContextList, String.format(DEFAULT_LOCALE, format, arg1), throwable);
+    final LogPrinter printer = mPrinter;
+    if (printer.canLogErr()) {
+      printer.err(printContexts(mContextList) + String.format(mLocale, format, arg1), throwable);
     }
   }
 
@@ -567,8 +532,10 @@ public class Logger {
    */
   public void err(@NotNull final Throwable throwable, @NotNull final String format,
       @Nullable final Object arg1, @Nullable final Object arg2) {
-    if (mLevel <= LEVEL_ERROR) {
-      mLogPrinter.err(mContextList, String.format(DEFAULT_LOCALE, format, arg1, arg2), throwable);
+    final LogPrinter printer = mPrinter;
+    if (printer.canLogErr()) {
+      printer.err(printContexts(mContextList) + String.format(mLocale, format, arg1, arg2),
+          throwable);
     }
   }
 
@@ -583,8 +550,9 @@ public class Logger {
    */
   public void err(@NotNull final Throwable throwable, @NotNull final String format,
       @Nullable final Object arg1, @Nullable final Object arg2, @Nullable final Object arg3) {
-    if (mLevel <= LEVEL_ERROR) {
-      mLogPrinter.err(mContextList, String.format(DEFAULT_LOCALE, format, arg1, arg2, arg3),
+    final LogPrinter printer = mPrinter;
+    if (printer.canLogErr()) {
+      printer.err(printContexts(mContextList) + String.format(mLocale, format, arg1, arg2, arg3),
           throwable);
     }
   }
@@ -602,8 +570,10 @@ public class Logger {
   public void err(@NotNull final Throwable throwable, @NotNull final String format,
       @Nullable final Object arg1, @Nullable final Object arg2, @Nullable final Object arg3,
       @Nullable final Object arg4) {
-    if (mLevel <= LEVEL_ERROR) {
-      mLogPrinter.err(mContextList, String.format(DEFAULT_LOCALE, format, arg1, arg2, arg3, arg4),
+    final LogPrinter printer = mPrinter;
+    if (printer.canLogErr()) {
+      printer.err(
+          printContexts(mContextList) + String.format(mLocale, format, arg1, arg2, arg3, arg4),
           throwable);
     }
   }
@@ -617,19 +587,20 @@ public class Logger {
    */
   public void err(@NotNull final Throwable throwable, @NotNull final String format,
       @Nullable final Object... args) {
-    if (mLevel <= LEVEL_ERROR) {
-      mLogPrinter.err(mContextList, String.format(DEFAULT_LOCALE, format, args), throwable);
+    final LogPrinter printer = mPrinter;
+    if (printer.canLogErr()) {
+      printer.err(printContexts(mContextList) + String.format(mLocale, format, args), throwable);
     }
   }
 
-  /**
-   * Returns the log level of this logger.
-   *
-   * @return the log level.
-   */
   @NotNull
-  public LogLevel getLogLevel() {
-    return mLogLevel;
+  public Locale getLocale() {
+    return mLocale;
+  }
+
+  @NotNull
+  public String getName() {
+    return mLoggerName;
   }
 
   /**
@@ -638,8 +609,12 @@ public class Logger {
    * @return the log instance.
    */
   @NotNull
-  public LogPrinter getLogPrinter() {
-    return mLogPrinter;
+  public LogPrinter getPrinter() {
+    return mPrinter;
+  }
+
+  private void setPrinter(@NotNull final LogConnector connector) {
+    mPrinter = connector.getPrinter(mLoggerName, mContextList);
   }
 
   /**
@@ -651,35 +626,15 @@ public class Logger {
    */
   @NotNull
   public Logger newChildLogger(@NotNull final Object context) {
-    return newChildLogger(context, null, null);
-  }
-
-  @NotNull
-  public Logger newChildLogger(@NotNull final Object context, @Nullable final LogPrinter printer) {
-    return newChildLogger(context, printer, null);
-  }
-
-  @NotNull
-  public Logger newChildLogger(@NotNull final Object context, @Nullable final LogLevel level) {
-    return newChildLogger(context, null, level);
-  }
-
-  @NotNull
-  public Logger newChildLogger(@NotNull final Object context, @Nullable final LogPrinter printer,
-      @Nullable final LogLevel level) {
     ConstantConditions.notNull("context", context);
     final Object[] thisContexts = mContexts;
     final int thisLength = thisContexts.length;
     final Object[] newContexts = new Object[thisLength + 1];
     System.arraycopy(thisContexts, 0, newContexts, 0, thisLength);
     newContexts[thisLength] = context;
-    return new Logger(newContexts,
-        (printer != null) ? printer : getDefaultPrinter(context.getClass()),
-        (level != null) ? level : getDefaultLevel(context.getClass()));
-  }
-
-  public boolean willPrint(@NotNull final LogLevel level) {
-    return (mLevel <= level.ordinal());
+    final Logger logger = new Logger(newContexts, mLoggerName, mLocale);
+    register(logger);
+    return logger;
   }
 
   /**
@@ -688,8 +643,9 @@ public class Logger {
    * @param message the message.
    */
   public void wrn(@Nullable final String message) {
-    if (mLevel <= LEVEL_WARNING) {
-      mLogPrinter.wrn(mContextList, message, null);
+    final LogPrinter printer = mPrinter;
+    if (printer.canLogWrn()) {
+      printer.wrn(printContexts(mContextList) + message, null);
     }
   }
 
@@ -700,8 +656,9 @@ public class Logger {
    * @param arg1   the first format argument.
    */
   public void wrn(@NotNull final String format, @Nullable final Object arg1) {
-    if (mLevel <= LEVEL_WARNING) {
-      mLogPrinter.wrn(mContextList, String.format(DEFAULT_LOCALE, format, arg1), null);
+    final LogPrinter printer = mPrinter;
+    if (printer.canLogWrn()) {
+      printer.wrn(printContexts(mContextList) + String.format(mLocale, format, arg1), null);
     }
   }
 
@@ -714,8 +671,9 @@ public class Logger {
    */
   public void wrn(@NotNull final String format, @Nullable final Object arg1,
       @Nullable final Object arg2) {
-    if (mLevel <= LEVEL_WARNING) {
-      mLogPrinter.wrn(mContextList, String.format(DEFAULT_LOCALE, format, arg1, arg2), null);
+    final LogPrinter printer = mPrinter;
+    if (printer.canLogWrn()) {
+      printer.wrn(printContexts(mContextList) + String.format(mLocale, format, arg1, arg2), null);
     }
   }
 
@@ -729,8 +687,10 @@ public class Logger {
    */
   public void wrn(@NotNull final String format, @Nullable final Object arg1,
       @Nullable final Object arg2, @Nullable final Object arg3) {
-    if (mLevel <= LEVEL_WARNING) {
-      mLogPrinter.wrn(mContextList, String.format(DEFAULT_LOCALE, format, arg1, arg2, arg3), null);
+    final LogPrinter printer = mPrinter;
+    if (printer.canLogWrn()) {
+      printer.wrn(printContexts(mContextList) + String.format(mLocale, format, arg1, arg2, arg3),
+          null);
     }
   }
 
@@ -745,8 +705,10 @@ public class Logger {
    */
   public void wrn(@NotNull final String format, @Nullable final Object arg1,
       @Nullable final Object arg2, @Nullable final Object arg3, @Nullable final Object arg4) {
-    if (mLevel <= LEVEL_WARNING) {
-      mLogPrinter.wrn(mContextList, String.format(DEFAULT_LOCALE, format, arg1, arg2, arg3, arg4),
+    final LogPrinter printer = mPrinter;
+    if (printer.canLogWrn()) {
+      printer.wrn(
+          printContexts(mContextList) + String.format(mLocale, format, arg1, arg2, arg3, arg4),
           null);
     }
   }
@@ -758,8 +720,9 @@ public class Logger {
    * @param args   the format arguments.
    */
   public void wrn(@NotNull final String format, @Nullable final Object... args) {
-    if (mLevel <= LEVEL_WARNING) {
-      mLogPrinter.wrn(mContextList, String.format(DEFAULT_LOCALE, format, args), null);
+    final LogPrinter printer = mPrinter;
+    if (printer.canLogWrn()) {
+      printer.wrn(printContexts(mContextList) + String.format(mLocale, format, args), null);
     }
   }
 
@@ -769,8 +732,9 @@ public class Logger {
    * @param throwable the related throwable.
    */
   public void wrn(@NotNull final Throwable throwable) {
-    if (mLevel <= LEVEL_WARNING) {
-      mLogPrinter.wrn(mContextList, "", throwable);
+    final LogPrinter printer = mPrinter;
+    if (printer.canLogWrn()) {
+      printer.wrn(printContexts(mContextList), throwable);
     }
   }
 
@@ -781,8 +745,9 @@ public class Logger {
    * @param message   the message.
    */
   public void wrn(@NotNull final Throwable throwable, @Nullable final String message) {
-    if (mLevel <= LEVEL_WARNING) {
-      mLogPrinter.wrn(mContextList, message, throwable);
+    final LogPrinter printer = mPrinter;
+    if (printer.canLogWrn()) {
+      printer.wrn(printContexts(mContextList) + message, throwable);
     }
   }
 
@@ -795,8 +760,9 @@ public class Logger {
    */
   public void wrn(@NotNull final Throwable throwable, @NotNull final String format,
       @Nullable final Object arg1) {
-    if (mLevel <= LEVEL_WARNING) {
-      mLogPrinter.wrn(mContextList, String.format(DEFAULT_LOCALE, format, arg1), throwable);
+    final LogPrinter printer = mPrinter;
+    if (printer.canLogWrn()) {
+      printer.wrn(printContexts(mContextList) + String.format(mLocale, format, arg1), throwable);
     }
   }
 
@@ -810,8 +776,10 @@ public class Logger {
    */
   public void wrn(@NotNull final Throwable throwable, @NotNull final String format,
       @Nullable final Object arg1, @Nullable final Object arg2) {
-    if (mLevel <= LEVEL_WARNING) {
-      mLogPrinter.wrn(mContextList, String.format(DEFAULT_LOCALE, format, arg1, arg2), throwable);
+    final LogPrinter printer = mPrinter;
+    if (printer.canLogWrn()) {
+      printer.wrn(printContexts(mContextList) + String.format(mLocale, format, arg1, arg2),
+          throwable);
     }
   }
 
@@ -826,8 +794,9 @@ public class Logger {
    */
   public void wrn(@NotNull final Throwable throwable, @NotNull final String format,
       @Nullable final Object arg1, @Nullable final Object arg2, @Nullable final Object arg3) {
-    if (mLevel <= LEVEL_WARNING) {
-      mLogPrinter.wrn(mContextList, String.format(DEFAULT_LOCALE, format, arg1, arg2, arg3),
+    final LogPrinter printer = mPrinter;
+    if (printer.canLogWrn()) {
+      printer.wrn(printContexts(mContextList) + String.format(mLocale, format, arg1, arg2, arg3),
           throwable);
     }
   }
@@ -845,8 +814,10 @@ public class Logger {
   public void wrn(@NotNull final Throwable throwable, @NotNull final String format,
       @Nullable final Object arg1, @Nullable final Object arg2, @Nullable final Object arg3,
       @Nullable final Object arg4) {
-    if (mLevel <= LEVEL_WARNING) {
-      mLogPrinter.wrn(mContextList, String.format(DEFAULT_LOCALE, format, arg1, arg2, arg3, arg4),
+    final LogPrinter printer = mPrinter;
+    if (printer.canLogWrn()) {
+      printer.wrn(
+          printContexts(mContextList) + String.format(mLocale, format, arg1, arg2, arg3, arg4),
           throwable);
     }
   }
@@ -860,39 +831,97 @@ public class Logger {
    */
   public void wrn(@NotNull final Throwable throwable, @NotNull final String format,
       @Nullable final Object... args) {
-    if (mLevel <= LEVEL_WARNING) {
-      mLogPrinter.wrn(mContextList, String.format(DEFAULT_LOCALE, format, args), throwable);
+    final LogPrinter printer = mPrinter;
+    if (printer.canLogWrn()) {
+      printer.wrn(printContexts(mContextList) + String.format(mLocale, format, args), throwable);
     }
   }
 
-  private static class CompositeLogPrinter implements LogPrinter, Serializable {
+  private static class MultiConnector implements LogConnector {
 
-    private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
+    private final LogConnector[] mConnectors;
 
-    private final Set<LogPrinter> mPrinters;
+    private MultiConnector(@NotNull final LogConnector currentConnector,
+        @NotNull final LogConnector newConnector) {
+      mConnectors = new LogConnector[]{currentConnector, newConnector};
+    }
 
-    private CompositeLogPrinter(@NotNull final Set<LogPrinter> printers) {
+    private MultiConnector(@NotNull final MultiConnector currentConnector,
+        @NotNull final LogConnector newConnector) {
+      final LogConnector[] currentConnectors = currentConnector.mConnectors;
+      final int length = currentConnectors.length;
+      final LogConnector[] connectors = new LogConnector[length];
+      System.arraycopy(currentConnectors, 0, connectors, 0, length);
+      connectors[length] = newConnector;
+      mConnectors = connectors;
+    }
+
+    public LogPrinter getPrinter(@NotNull final String loggerName,
+        @NotNull final List<Object> contexts) {
+      final LogConnector[] connectors = mConnectors;
+      final int length = connectors.length;
+      final LogPrinter[] printers = new LogPrinter[length];
+      for (int i = 0; i < length; ++i) {
+        printers[i] = connectors[i].getPrinter(loggerName, contexts);
+      }
+
+      return new MultiPrinter(printers);
+    }
+  }
+
+  private static class MultiPrinter implements LogPrinter {
+
+    private final LogPrinter[] mPrinters;
+
+    private MultiPrinter(@NotNull final LogPrinter[] printers) {
       mPrinters = printers;
     }
 
-    public void dbg(@NotNull final List<Object> contexts, @Nullable final String message,
-        @Nullable final Throwable throwable) {
+    public boolean canLogDbg() {
       for (final LogPrinter printer : mPrinters) {
-        printer.dbg(contexts, message, throwable);
+        if (printer.canLogDbg()) {
+          return true;
+        }
+      }
+
+      return false;
+    }
+
+    public boolean canLogErr() {
+      for (final LogPrinter printer : mPrinters) {
+        if (printer.canLogErr()) {
+          return true;
+        }
+      }
+
+      return false;
+    }
+
+    public boolean canLogWrn() {
+      for (final LogPrinter printer : mPrinters) {
+        if (printer.canLogWrn()) {
+          return true;
+        }
+      }
+
+      return false;
+    }
+
+    public void dbg(@Nullable final String message, @Nullable final Throwable throwable) {
+      for (final LogPrinter printer : mPrinters) {
+        printer.dbg(message, throwable);
       }
     }
 
-    public void err(@NotNull final List<Object> contexts, @Nullable final String message,
-        @Nullable final Throwable throwable) {
+    public void err(@Nullable final String message, @Nullable final Throwable throwable) {
       for (final LogPrinter printer : mPrinters) {
-        printer.err(contexts, message, throwable);
+        printer.err(message, throwable);
       }
     }
 
-    public void wrn(@NotNull final List<Object> contexts, @Nullable final String message,
-        @Nullable final Throwable throwable) {
+    public void wrn(@Nullable final String message, @Nullable final Throwable throwable) {
       for (final LogPrinter printer : mPrinters) {
-        printer.wrn(contexts, message, throwable);
+        printer.wrn(message, throwable);
       }
     }
   }

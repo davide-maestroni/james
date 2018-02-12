@@ -67,6 +67,21 @@ class LoopForker<S, V>
     return stack.withStack(forker.done(stack.getStack(), statement));
   }
 
+  public ForkerStack<S, V> evaluation(final ForkerStack<S, V> stack,
+      @NotNull final AsyncEvaluations<V> evaluation, @NotNull final AsyncLoop<V> statement) throws
+      Exception {
+    return stack.withStack(mForker.evaluation(stack.getStack(), new AsyncEvaluation<Iterable<V>>() {
+
+      public void fail(@NotNull final Throwable failure) {
+        evaluation.addFailure(failure).set();
+      }
+
+      public void set(final Iterable<V> value) {
+        evaluation.addValues(value).set();
+      }
+    }, statement));
+  }
+
   public ForkerStack<S, V> failure(final ForkerStack<S, V> stack, @NotNull final Throwable failure,
       @NotNull final AsyncLoop<V> statement) throws Exception {
     if (stack.getValues() == null) {
@@ -79,22 +94,6 @@ class LoopForker<S, V>
   public ForkerStack<S, V> init(@NotNull final AsyncLoop<V> statement) throws Exception {
     return new ForkerStack<S, V>().withStack(mForker.init(statement))
                                   .withValues(new ArrayList<V>());
-  }
-
-  public ForkerStack<S, V> evaluation(final ForkerStack<S, V> stack,
-      @NotNull final AsyncEvaluations<V> evaluation, @NotNull final AsyncLoop<V> statement) throws
-      Exception {
-    return stack.withStack(
-        mForker.evaluation(stack.getStack(), new AsyncEvaluation<Iterable<V>>() {
-
-          public void fail(@NotNull final Throwable failure) {
-            evaluation.addFailure(failure).set();
-          }
-
-          public void set(final Iterable<V> value) {
-            evaluation.addValues(value).set();
-          }
-        }, statement));
   }
 
   public ForkerStack<S, V> value(final ForkerStack<S, V> stack, final V value,

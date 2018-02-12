@@ -33,8 +33,6 @@ import dm.jail.async.Mapper;
 import dm.jail.async.Observer;
 import dm.jail.async.RuntimeInterruptedException;
 import dm.jail.config.BuildConfig;
-import dm.jail.log.LogLevel;
-import dm.jail.log.LogPrinter;
 import dm.jail.util.ConstantConditions;
 import dm.jail.util.Iterables;
 import dm.jail.util.SerializableProxy;
@@ -49,20 +47,17 @@ public class Async {
 
   private final boolean mIsUnevaluated;
 
-  private final LogLevel mLogLevel;
-
-  private final LogPrinter mLogPrinter;
+  private final String mLoggerName;
 
   public Async() {
-    this(false, null, null, null);
+    this(false, null, null);
   }
 
   private Async(final boolean isUnevaluated, @Nullable final Executor executor,
-      @Nullable final LogPrinter printer, @Nullable final LogLevel level) {
+      @Nullable final String loggerName) {
     mIsUnevaluated = isUnevaluated;
     mExecutor = executor;
-    mLogPrinter = printer;
-    mLogLevel = level;
+    mLoggerName = loggerName;
   }
 
   @NotNull
@@ -76,13 +71,8 @@ public class Async {
   }
 
   @NotNull
-  public Async log(@Nullable final LogLevel level) {
-    return new Async(mIsUnevaluated, mExecutor, mLogPrinter, level);
-  }
-
-  @NotNull
-  public Async log(@Nullable final LogPrinter printer) {
-    return new Async(mIsUnevaluated, mExecutor, printer, mLogLevel);
+  public Async loggerName(@Nullable final String loggerName) {
+    return new Async(mIsUnevaluated, mExecutor, loggerName);
   }
 
   @NotNull
@@ -101,7 +91,7 @@ public class Async {
     final Observer<AsyncEvaluations<V>> loopObserver = loopObserver(observer);
     return new DefaultAsyncLoop<V>(
         (isUnevaluated) ? new UnevaluatedObserver<V, AsyncEvaluations<V>>(loopObserver)
-            : loopObserver, !isUnevaluated, mLogPrinter, mLogLevel);
+            : loopObserver, !isUnevaluated, mLoggerName);
   }
 
   @NotNull
@@ -133,7 +123,7 @@ public class Async {
 
   @NotNull
   public Async on(@Nullable final Executor executor) {
-    return new Async(mIsUnevaluated, executor, mLogPrinter, mLogLevel);
+    return new Async(mIsUnevaluated, executor, mLoggerName);
   }
 
   @NotNull
@@ -142,7 +132,7 @@ public class Async {
     final Observer<AsyncEvaluation<V>> statementObserver = statementObserver(observer);
     return new DefaultAsyncStatement<V>(
         (isUnevaluated) ? new UnevaluatedObserver<V, AsyncEvaluation<V>>(statementObserver)
-            : statementObserver, !isUnevaluated, mLogPrinter, mLogLevel);
+            : statementObserver, !isUnevaluated, mLoggerName);
   }
 
   @NotNull
@@ -170,7 +160,7 @@ public class Async {
 
   @NotNull
   public Async unevaluated() {
-    return new Async(true, mExecutor, mLogPrinter, mLogLevel);
+    return new Async(true, mExecutor, mLoggerName);
   }
 
   @NotNull

@@ -17,16 +17,13 @@
 package dm.jail.log;
 
 import org.jetbrains.annotations.NotNull;
-import org.jetbrains.annotations.Nullable;
 
 import java.util.List;
 
 /**
- * Created by davide-maestroni on 02/08/2018.
+ * Created by davide-maestroni on 02/11/2018.
  */
-public interface LogFormatter {
+public interface LogConnector {
 
-  @NotNull
-  String format(@NotNull LogLevel level, @NotNull List<Object> contexts, @Nullable String message,
-      @Nullable Throwable throwable);
+  LogPrinter getPrinter(@NotNull String loggerName, @NotNull List<Object> contexts);
 }
