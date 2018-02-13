@@ -27,26 +27,26 @@ import java.util.concurrent.Executor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 
-import dm.jail.async.AsyncEvaluations;
-import dm.jail.async.AsyncLoop;
-import dm.jail.async.AsyncStatement.Forker;
-import dm.jail.async.RuntimeInterruptedException;
-import dm.jail.async.SimpleState;
-import dm.jail.config.BuildConfig;
-import dm.jail.executor.ExecutorPool;
-import dm.jail.executor.OwnerExecutor;
-import dm.jail.util.ConstantConditions;
-import dm.jail.util.Iterables;
-import dm.jail.util.SerializableProxy;
-import dm.jail.util.TimeUnits;
-import dm.jail.util.TimeUnits.Condition;
+import dm.jale.async.AsyncEvaluations;
+import dm.jale.async.AsyncLoop;
+import dm.jale.async.AsyncStatement.Forker;
+import dm.jale.async.RuntimeInterruptedException;
+import dm.jale.async.SimpleState;
+import dm.jale.executor.ExecutorPool;
+import dm.jale.executor.OwnerExecutor;
+import dm.jale.ext.config.BuildConfig;
 import dm.jale.ext.fork.BackoffForker.ForkerEvaluations;
+import dm.jale.util.ConstantConditions;
+import dm.jale.util.Iterables;
+import dm.jale.util.SerializableProxy;
+import dm.jale.util.TimeUnits;
+import dm.jale.util.TimeUnits.Condition;
 
 /**
  * Created by davide-maestroni on 02/09/2018.
  */
 class BackoffForker<S, V>
-    implements Forker<ForkerEvaluations, AsyncLoop<V>, V, AsyncEvaluations<V>>, Serializable {
+    implements Forker<ForkerEvaluations<S, V>, V, AsyncEvaluations<V>, AsyncLoop<V>>, Serializable {
 
   private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
 
@@ -59,14 +59,14 @@ class BackoffForker<S, V>
     mBackoffer = ConstantConditions.notNull("backoffer", backoffer);
   }
 
-  public ForkerEvaluations done(final ForkerEvaluations stack,
-      @NotNull final AsyncLoop<V> loop) throws Exception {
+  public ForkerEvaluations<S, V> done(final ForkerEvaluations<S, V> stack,
+      @NotNull final AsyncLoop<V> async) throws Exception {
     mBackoffer.done(stack.getStack(), stack);
     return stack.withStack(null);
   }
 
-  public ForkerEvaluations evaluation(final ForkerEvaluations stack,
-      @NotNull final AsyncEvaluations<V> evaluations, @NotNull final AsyncLoop<V> loop) throws
+  public ForkerEvaluations<S, V> evaluation(final ForkerEvaluations<S, V> stack,
+      @NotNull final AsyncEvaluations<V> evaluations, @NotNull final AsyncLoop<V> async) throws
       Exception {
     if (!stack.setEvaluations(evaluations)) {
       evaluations.addFailure(new IllegalStateException("the loop cannot be chained")).set();
@@ -75,17 +75,17 @@ class BackoffForker<S, V>
     return stack;
   }
 
-  public ForkerEvaluations failure(final ForkerEvaluations stack, @NotNull final Throwable failure,
-      @NotNull final AsyncLoop<V> loop) throws Exception {
+  public ForkerEvaluations<S, V> failure(final ForkerEvaluations<S, V> stack,
+      @NotNull final Throwable failure, @NotNull final AsyncLoop<V> async) throws Exception {
     return stack.withStack(mBackoffer.failure(stack.getStack(), failure, stack));
   }
 
-  public ForkerEvaluations init(@NotNull final AsyncLoop<V> loop) throws Exception {
-    return new ForkerEvaluations(mBackoffer.init());
+  public ForkerEvaluations<S, V> init(@NotNull final AsyncLoop<V> async) throws Exception {
+    return new ForkerEvaluations<S, V>(mExecutor, mBackoffer.init());
   }
 
-  public ForkerEvaluations value(final ForkerEvaluations stack, final V value,
-      @NotNull final AsyncLoop<V> loop) throws Exception {
+  public ForkerEvaluations<S, V> value(final ForkerEvaluations<S, V> stack, final V value,
+      @NotNull final AsyncLoop<V> async) throws Exception {
     return stack.withStack(mBackoffer.value(stack.getStack(), value, stack));
   }
 
@@ -94,28 +94,9 @@ class BackoffForker<S, V>
     return new ForkerProxy<S, V>(mExecutor, mBackoffer);
   }
 
-  private static class ForkerProxy<S, V> extends SerializableProxy {
+  static class ForkerEvaluations<S, V> implements PendingEvaluations<V> {
 
-    private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
-
-    private ForkerProxy(final Executor executor, final Backoffer<S, V> backoffer) {
-      super(executor, proxy(backoffer));
-    }
-
-    @NotNull
-    @SuppressWarnings("unchecked")
-    Object readResolve() throws ObjectStreamException {
-      try {
-        final Object[] args = deserializeArgs();
-        return new BackoffForker<S, V>((Executor) args[0], (Backoffer<S, V>) args[1]);
-
-      } catch (final Throwable t) {
-        throw new InvalidObjectException(t.getMessage());
-      }
-    }
-  }
-
-  class ForkerEvaluations implements PendingEvaluations<V> {
+    private final OwnerExecutor mExecutor;
 
     private final AtomicBoolean mIsSet = new AtomicBoolean(false);
 
@@ -131,7 +112,8 @@ class BackoffForker<S, V>
 
     private S mStack;
 
-    private ForkerEvaluations(final S stack) {
+    private ForkerEvaluations(@NotNull final OwnerExecutor executor, final S stack) {
+      mExecutor = executor;
       mStack = stack;
     }
 
@@ -424,9 +406,30 @@ class BackoffForker<S, V>
       return false;
     }
 
-    private ForkerEvaluations withStack(final S stack) {
+    private ForkerEvaluations<S, V> withStack(final S stack) {
       mStack = stack;
       return this;
+    }
+  }
+
+  private static class ForkerProxy<S, V> extends SerializableProxy {
+
+    private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
+
+    private ForkerProxy(final Executor executor, final Backoffer<S, V> backoffer) {
+      super(executor, proxy(backoffer));
+    }
+
+    @NotNull
+    @SuppressWarnings("unchecked")
+    Object readResolve() throws ObjectStreamException {
+      try {
+        final Object[] args = deserializeArgs();
+        return new BackoffForker<S, V>((Executor) args[0], (Backoffer<S, V>) args[1]);
+
+      } catch (final Throwable t) {
+        throw new InvalidObjectException(t.getMessage());
+      }
     }
   }
 }

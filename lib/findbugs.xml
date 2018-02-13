@@ -17,7 +17,7 @@
 
 <FindBugsFilter>
     <Match>
-        <Package name="~dm\.jail.*"/>
+        <Package name="~dm\.jale.*"/>
         <Bug pattern="SE_BAD_FIELD,SE_BAD_FIELD_STORE,SE_NO_SUITABLE_CONSTRUCTOR"/>
         <!--
         writeReplace makes objects serializable. This is a limitation of FindBugs as discussed here:
@@ -25,32 +25,32 @@
         -->
     </Match>
     <Match>
-        <Class name="dm.jail.util.TimeUnits"/>
+        <Class name="dm.jale.util.TimeUnits"/>
         <Method name="~waitSince.*"/>
         <Bug pattern="WA_NOT_IN_LOOP"/>
     </Match>
     <Match>
-        <Class name="dm.jail.async.FailureException"/>
+        <Class name="dm.jale.async.FailureException"/>
         <Method name="wrapIfNot"/>
         <Bug pattern="BC_UNCONFIRMED_CAST"/>
     </Match>
     <Match>
-        <Class name="dm.jail.async.RuntimeInterruptedException"/>
+        <Class name="dm.jale.async.RuntimeInterruptedException"/>
         <Method name="toInterruptedException"/>
         <Bug pattern="BC_UNCONFIRMED_CAST_OF_RETURN_VALUE"/>
     </Match>
     <Match>
-        <Class name="dm.jail.async.RuntimeTimeoutException"/>
+        <Class name="dm.jale.async.RuntimeTimeoutException"/>
         <Method name="toTimeoutException"/>
         <Bug pattern="BC_UNCONFIRMED_CAST_OF_RETURN_VALUE"/>
     </Match>
     <Match>
-        <Class name="dm.jail.DefaultAsyncStatement"/>
+        <Class name="dm.jale.DefaultAsyncStatement"/>
         <Method name="failure"/>
         <Bug pattern="NP_NULL_ON_SOME_PATH_FROM_RETURN_VALUE"/>
     </Match>
     <Match>
-        <Class name="dm.jail.DefaultAsyncLoop"/>
+        <Class name="dm.jale.DefaultAsyncLoop"/>
         <Method name="failure"/>
         <Bug pattern="NP_NULL_ON_SOME_PATH_FROM_RETURN_VALUE"/>
     </Match>

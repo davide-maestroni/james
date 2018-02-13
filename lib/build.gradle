@@ -49,7 +49,7 @@ dependencies {
 }
 
 buildConfig {
-  packageName 'dm.jail.config'
+  packageName 'dm.jale.config'
   buildConfigField 'long', 'VERSION_HASH_CODE', project.version.hashCode() + 'L'
 }
 

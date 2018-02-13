@@ -21,13 +21,13 @@ import org.jetbrains.annotations.Nullable;
 
 import java.util.concurrent.Executor;
 
-import dm.jail.async.AsyncEvaluations;
-import dm.jail.async.AsyncLoop;
-import dm.jail.async.AsyncStatement.Forker;
-import dm.jail.async.Completer;
-import dm.jail.async.Provider;
-import dm.jail.async.Updater;
-import dm.jail.util.ConstantConditions;
+import dm.jale.async.AsyncEvaluations;
+import dm.jale.async.AsyncLoop;
+import dm.jale.async.AsyncStatement.Forker;
+import dm.jale.async.Completer;
+import dm.jale.async.Provider;
+import dm.jale.async.Updater;
+import dm.jale.util.ConstantConditions;
 
 /**
  * Created by davide-maestroni on 02/09/2018.
@@ -39,17 +39,19 @@ public class Forkers {
   }
 
   @NotNull
-  public static <S, V> Forker<?, AsyncLoop<V>, V, AsyncEvaluations<V>> backoffOn(
+  public static <S, V> Forker<?, V, AsyncEvaluations<V>, AsyncLoop<V>> backoffOn(
       @NotNull final Executor executor, @NotNull final Backoffer<S, V> backoffer) {
     return new BackoffForker<S, V>(executor, backoffer);
   }
 
   @NotNull
-  public static <S, V> Forker<?, AsyncLoop<V>, V, AsyncEvaluations<V>> backoffOn(
+  public static <S, V> Forker<?, V, AsyncEvaluations<V>, AsyncLoop<V>> backoffOn(
       @NotNull final Executor executor, @Nullable final Provider<S> init,
-      @Nullable final Updater<S, ? super V, ? super PendingEvaluations<V>> value,
-      @Nullable final Updater<S, ? super Throwable, ? super PendingEvaluations<V>> failure,
-      @Nullable final Completer<S, ? super PendingEvaluations<V>> done) {
-    return backoffOn(executor, new ComposedBackoffer<S, V>(init, value, failure, done));
+      @Nullable final Updater<S, ? super V, ? super dm.jale.ext.fork.PendingEvaluations<V>> value,
+      @Nullable final Updater<S, ? super Throwable, ? super dm.jale.ext.fork
+          .PendingEvaluations<V>> failure,
+      @Nullable final Completer<S, ? super dm.jale.ext.fork.PendingEvaluations<V>> done) {
+    return backoffOn(executor,
+        new dm.jale.ext.fork.ComposedBackoffer<S, V>(init, value, failure, done));
   }
 }

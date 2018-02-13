@@ -16,7 +16,7 @@
 
 package dm.jale.ext.yield;
 
-import dm.jail.util.ConstantConditions;
+import dm.jale.util.ConstantConditions;
 
 /**
  * Created by davide-maestroni on 02/09/2018.

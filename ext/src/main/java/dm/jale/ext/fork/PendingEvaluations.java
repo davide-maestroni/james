@@ -20,7 +20,7 @@ import org.jetbrains.annotations.NotNull;
 
 import java.util.concurrent.TimeUnit;
 
-import dm.jail.async.AsyncEvaluations;
+import dm.jale.async.AsyncEvaluations;
 
 /**
  * Created by davide-maestroni on 02/09/2018.

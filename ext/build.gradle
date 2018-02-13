@@ -57,7 +57,7 @@ project.conditionalDependencies {
 }
 
 buildConfig {
-  packageName 'dm.jail.config'
+  packageName 'dm.jale.ext.config'
   buildConfigField 'long', 'VERSION_HASH_CODE', project.version.hashCode() + 'L'
 }
 
@@ -78,4 +78,8 @@ jacoco {
 
 findbugs {
   toolVersion project.getProperty('findbugsVersion')
+}
+
+tasks.withType(FindBugs) {
+  excludeFilter = file('findbugs.xml')
 }

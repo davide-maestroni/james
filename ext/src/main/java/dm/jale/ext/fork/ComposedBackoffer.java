@@ -22,10 +22,10 @@ import org.jetbrains.annotations.Nullable;
 import java.io.ObjectStreamException;
 import java.io.Serializable;
 
-import dm.jail.async.Completer;
-import dm.jail.async.Provider;
-import dm.jail.async.Updater;
-import dm.jail.config.BuildConfig;
+import dm.jale.async.Completer;
+import dm.jale.async.Provider;
+import dm.jale.async.Updater;
+import dm.jale.ext.config.BuildConfig;
 
 /**
  * Created by davide-maestroni on 02/09/2018.
