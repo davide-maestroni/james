@@ -30,9 +30,7 @@ class CollectionYielder<V> implements Yielder<ArrayList<V>, V, V> {
 
   public void done(final ArrayList<V> stack, @NotNull final YieldOutputs<V> outputs) throws
       Exception {
-    if (stack != null) {
-      outputs.yieldValues(stack);
-    }
+    outputs.yieldValues(stack);
   }
 
   public ArrayList<V> failure(final ArrayList<V> stack, @NotNull final Throwable failure,

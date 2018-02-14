@@ -22,7 +22,6 @@ import org.jetbrains.annotations.Nullable;
 import java.io.InvalidObjectException;
 import java.io.ObjectStreamException;
 import java.io.Serializable;
-import java.util.ArrayList;
 import java.util.concurrent.Executor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -31,7 +30,6 @@ import dm.jale.async.AsyncEvaluations;
 import dm.jale.async.AsyncLoop;
 import dm.jale.async.AsyncStatement.Forker;
 import dm.jale.async.RuntimeInterruptedException;
-import dm.jale.async.SimpleState;
 import dm.jale.executor.ExecutorPool;
 import dm.jale.executor.OwnerExecutor;
 import dm.jale.ext.config.BuildConfig;
@@ -102,8 +100,6 @@ class BackoffForker<S, V>
 
     private final Object mMutex = new Object();
 
-    private final ArrayList<SimpleState<V>> mStates = new ArrayList<SimpleState<V>>();
-
     private AsyncEvaluations<V> mEvaluations;
 
     private int mPendingTasks;
@@ -121,79 +117,56 @@ class BackoffForker<S, V>
     public AsyncEvaluations<V> addFailure(@NotNull final Throwable failure) {
       checkSet();
       final AsyncEvaluations<V> evaluations = mEvaluations;
-      if (evaluations == null) {
-        mStates.add(SimpleState.<V>ofFailure(failure));
-        synchronized (mMutex) {
-          mPendingTasks = 1;
-          ++mPendingValues;
-        }
-
-      } else {
-        synchronized (mMutex) {
-          ++mPendingTasks;
-          ++mPendingValues;
-        }
-
-        mExecutor.execute(new Runnable() {
-
-          public void run() {
-            try {
-              evaluations.addFailure(failure);
-
-            } finally {
-              decrementPendingValues(1);
-              decrementPendingTasks();
-            }
-          }
-        });
+      synchronized (mMutex) {
+        ++mPendingTasks;
+        ++mPendingValues;
       }
 
+      mExecutor.execute(new Runnable() {
+
+        public void run() {
+          try {
+            evaluations.addFailure(failure);
+
+          } finally {
+            decrementPendingValues(1);
+            decrementPendingTasks();
+          }
+        }
+      });
       return this;
     }
 
     @NotNull
     public AsyncEvaluations<V> addFailures(@Nullable final Iterable<? extends Throwable> failures) {
       checkSet();
-      if (failures != null) {
-        if (Iterables.contains(failures, null)) {
-          throw new NullPointerException("failures cannot contain null objects");
-        }
-
-        final AsyncEvaluations<V> evaluations = mEvaluations;
-        if (evaluations == null) {
-          int count = 0;
-          for (final Throwable failure : failures) {
-            mStates.add(SimpleState.<V>ofFailure(failure));
-            ++count;
-          }
-
-          synchronized (mMutex) {
-            mPendingTasks = 1;
-            mPendingValues += count;
-          }
-
-        } else {
-          final int size = Iterables.size(failures);
-          synchronized (mMutex) {
-            ++mPendingTasks;
-            mPendingValues += size;
-          }
-
-          mExecutor.execute(new Runnable() {
-
-            public void run() {
-              try {
-                evaluations.addFailures(failures);
-
-              } finally {
-                decrementPendingValues(size);
-                decrementPendingTasks();
-              }
-            }
-          });
-        }
+      if (failures == null) {
+        return this;
       }
 
+      if (Iterables.contains(failures, null)) {
+        throw new NullPointerException("failures cannot contain null objects");
+      }
+
+      final AsyncEvaluations<V> evaluations = mEvaluations;
+      final int size = Iterables.size(failures);
+      synchronized (mMutex) {
+        ++mPendingTasks;
+        mPendingValues += size;
+      }
+
+      mExecutor.execute(new Runnable() {
+
+        public void run() {
+          try {
+            evaluations.addFailures(failures);
+
+          } finally {
+            decrementPendingValues(size);
+            decrementPendingTasks();
+          }
+        }
+      });
       return this;
     }
 
@@ -201,75 +174,52 @@ class BackoffForker<S, V>
     public AsyncEvaluations<V> addValue(final V value) {
       checkSet();
       final AsyncEvaluations<V> evaluations = mEvaluations;
-      if (evaluations == null) {
-        mStates.add(SimpleState.ofValue(value));
-        synchronized (mMutex) {
-          mPendingTasks = 1;
-          ++mPendingValues;
-        }
-
-      } else {
-        synchronized (mMutex) {
-          ++mPendingTasks;
-          ++mPendingValues;
-        }
-
-        mExecutor.execute(new Runnable() {
-
-          public void run() {
-            try {
-              evaluations.addValue(value);
-
-            } finally {
-              decrementPendingValues(1);
-              decrementPendingTasks();
-            }
-          }
-        });
+      synchronized (mMutex) {
+        ++mPendingTasks;
+        ++mPendingValues;
       }
 
+      mExecutor.execute(new Runnable() {
+
+        public void run() {
+          try {
+            evaluations.addValue(value);
+
+          } finally {
+            decrementPendingValues(1);
+            decrementPendingTasks();
+          }
+        }
+      });
       return this;
     }
 
     @NotNull
     public AsyncEvaluations<V> addValues(@Nullable final Iterable<? extends V> values) {
       checkSet();
-      if (values != null) {
-        final AsyncEvaluations<V> evaluations = mEvaluations;
-        if (evaluations == null) {
-          int count = 0;
-          for (final V value : values) {
-            mStates.add(SimpleState.ofValue(value));
-            ++count;
-          }
-
-          synchronized (mMutex) {
-            mPendingTasks = 1;
-            mPendingValues += count;
-          }
-
-        } else {
-          final int size = Iterables.size(values);
-          synchronized (mMutex) {
-            ++mPendingTasks;
-            mPendingValues += size;
-          }
-
-          mExecutor.execute(new Runnable() {
-
-            public void run() {
-              try {
-                evaluations.addValues(values);
-
-              } finally {
-                decrementPendingValues(size);
-                decrementPendingTasks();
-              }
-            }
-          });
-        }
+      if (values == null) {
+        return this;
       }
 
+      final AsyncEvaluations<V> evaluations = mEvaluations;
+      final int size = Iterables.size(values);
+      synchronized (mMutex) {
+        ++mPendingTasks;
+        mPendingValues += size;
+      }
+
+      mExecutor.execute(new Runnable() {
+
+        public void run() {
+          try {
+            evaluations.addValues(values);
+
+          } finally {
+            decrementPendingValues(size);
+            decrementPendingTasks();
+          }
+        }
+      });
       return this;
     }
 
@@ -279,28 +229,21 @@ class BackoffForker<S, V>
       }
 
       final AsyncEvaluations<V> evaluations = mEvaluations;
-      if (evaluations == null) {
-        synchronized (mMutex) {
-          mPendingTasks = 1;
-        }
-
-      } else {
-        synchronized (mMutex) {
-          ++mPendingTasks;
-        }
-
-        mExecutor.execute(new Runnable() {
-
-          public void run() {
-            try {
-              evaluations.set();
-
-            } finally {
-              decrementPendingTasks();
-            }
-          }
-        });
+      synchronized (mMutex) {
+        ++mPendingTasks;
       }
+
+      mExecutor.execute(new Runnable() {
+
+        public void run() {
+          try {
+            evaluations.set();
+
+          } finally {
+            decrementPendingTasks();
+          }
+        }
+      });
     }
 
     public int pendingTasks() {
@@ -394,12 +337,6 @@ class BackoffForker<S, V>
     private boolean setEvaluations(@NotNull final AsyncEvaluations<V> evaluations) {
       if (mEvaluations == null) {
         mEvaluations = evaluations;
-        final ArrayList<SimpleState<V>> states = mStates;
-        for (final SimpleState<V> state : states) {
-          state.addTo(evaluations);
-        }
-
-        states.clear();
         return true;
       }
 

@@ -33,8 +33,6 @@ public abstract class SimpleState<V> implements AsyncState<V>, Serializable {
   private SimpleState() {
   }
 
-  // TODO: 12/02/2018 cancel(Throwable)?
-
   @NotNull
   @SuppressWarnings("unchecked")
   public static <V> SimpleState<V> canceled() {
@@ -134,7 +132,7 @@ public abstract class SimpleState<V> implements AsyncState<V>, Serializable {
     }
 
     public boolean isFailed() {
-      return !isCancelled();
+      return true;
     }
 
     public boolean isEvaluating() {

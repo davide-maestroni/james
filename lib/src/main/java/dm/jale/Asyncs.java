@@ -22,6 +22,8 @@ import org.jetbrains.annotations.Nullable;
 import java.io.Closeable;
 import java.io.IOException;
 
+import dm.jale.async.AsyncEvaluation;
+import dm.jale.async.AsyncEvaluations;
 import dm.jale.log.Logger;
 
 /**
@@ -50,5 +52,25 @@ class Asyncs {
     }
 
     closeable.close();
+  }
+
+  static void failSafe(@NotNull final AsyncEvaluation<?> evaluation,
+      @NotNull final Throwable failure) {
+    try {
+      evaluation.fail(failure);
+
+    } catch (final Throwable ignored) {
+      // Just ignore it
+    }
+  }
+
+  static void failSafe(@NotNull final AsyncEvaluations<?> evaluations,
+      @NotNull final Throwable failure) {
+    try {
+      evaluations.addFailure(failure).set();
+
+    } catch (final Throwable ignored) {
+      // Just ignore it
+    }
   }
 }

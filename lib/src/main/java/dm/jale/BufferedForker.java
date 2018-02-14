@@ -23,9 +23,7 @@ import java.io.ObjectStreamException;
 import java.io.Serializable;
 import java.util.ArrayList;
 
-import dm.jale.BufferedLoopForker.ForkerStack;
-import dm.jale.async.AsyncEvaluations;
-import dm.jale.async.AsyncLoop;
+import dm.jale.BufferedForker.ForkerStack;
 import dm.jale.async.AsyncStatement.Forker;
 import dm.jale.async.SimpleState;
 import dm.jale.config.BuildConfig;
@@ -35,75 +33,66 @@ import dm.jale.util.SerializableProxy;
 /**
  * Created by davide-maestroni on 02/13/2018.
  */
-class BufferedLoopForker<S, V>
-    implements Forker<ForkerStack<S, V>, V, AsyncEvaluations<V>, AsyncLoop<V>>, Serializable {
+class BufferedForker<S, V, R, A> implements Forker<ForkerStack<S, V, R, A>, V, R, A>, Serializable {
 
   private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
 
-  private final Forker<S, ? super V, ? super AsyncEvaluations<V>, ? super AsyncLoop<V>> mForker;
+  private final Forker<S, ? super V, ? super R, ? super A> mForker;
 
-  BufferedLoopForker(
-      @NotNull final Forker<S, ? super V, ? super AsyncEvaluations<V>, ? super AsyncLoop<V>>
-          forker) {
+  BufferedForker(@NotNull final Forker<S, ? super V, ? super R, ? super A> forker) {
     mForker = ConstantConditions.notNull("forker", forker);
   }
 
-  public ForkerStack<S, V> done(final ForkerStack<S, V> stack,
-      @NotNull final AsyncLoop<V> async) throws Exception {
+  public ForkerStack<S, V, R, A> done(final ForkerStack<S, V, R, A> stack,
+      @NotNull final A async) throws Exception {
     return stack.settle(async);
   }
 
-  public ForkerStack<S, V> evaluation(final ForkerStack<S, V> stack,
-      @NotNull final AsyncEvaluations<V> evaluation, @NotNull final AsyncLoop<V> async) throws
-      Exception {
+  public ForkerStack<S, V, R, A> evaluation(final ForkerStack<S, V, R, A> stack,
+      @NotNull final R evaluation, @NotNull final A async) throws Exception {
     return stack.addEvaluations(evaluation, async);
   }
 
-  public ForkerStack<S, V> failure(final ForkerStack<S, V> stack, @NotNull final Throwable failure,
-      @NotNull final AsyncLoop<V> async) throws Exception {
+  public ForkerStack<S, V, R, A> failure(final ForkerStack<S, V, R, A> stack,
+      @NotNull final Throwable failure, @NotNull final A async) throws Exception {
     return stack.addFailure(failure, async);
   }
 
-  public ForkerStack<S, V> init(@NotNull final AsyncLoop<V> async) throws Exception {
-    return new ForkerStack<S, V>(mForker, async);
+  public ForkerStack<S, V, R, A> init(@NotNull final A async) throws Exception {
+    return new ForkerStack<S, V, R, A>(mForker, async);
   }
 
-  public ForkerStack<S, V> value(final ForkerStack<S, V> stack, final V value,
-      @NotNull final AsyncLoop<V> async) throws Exception {
+  public ForkerStack<S, V, R, A> value(final ForkerStack<S, V, R, A> stack, final V value,
+      @NotNull final A async) throws Exception {
     return stack.addValue(value, async);
   }
 
   @NotNull
   private Object writeReplace() throws ObjectStreamException {
-    return new ForkerProxy<S, V>(mForker);
+    return new ForkerProxy<S, V, R, A>(mForker);
   }
 
-  static class ForkerStack<S, V> {
+  static class ForkerStack<S, V, R, A> {
 
-    // TODO: 13/02/2018 boolean
-    private final ArrayList<AsyncEvaluations<V>> mEvaluations =
-        new ArrayList<AsyncEvaluations<V>>();
-
-    private final Forker<S, ? super V, ? super AsyncEvaluations<V>, ? super AsyncLoop<V>> mForker;
+    private final Forker<S, ? super V, ? super R, ? super A> mForker;
 
     private final ArrayList<SimpleState<V>> mStates = new ArrayList<SimpleState<V>>();
 
+    private boolean mHasEvaluation;
+
     private S mStack;
 
-    private ForkerStack(
-        @NotNull final Forker<S, ? super V, ? super AsyncEvaluations<V>, ? super AsyncLoop<V>>
-            forker,
-        @NotNull final AsyncLoop<V> async) throws Exception {
+    private ForkerStack(@NotNull final Forker<S, ? super V, ? super R, ? super A> forker,
+        @NotNull final A async) throws Exception {
       mForker = forker;
       mStack = forker.init(async);
     }
 
     @NotNull
-    private ForkerStack<S, V> addEvaluations(@NotNull final AsyncEvaluations<V> evaluations,
-        @NotNull final AsyncLoop<V> async) throws Exception {
-      final ArrayList<AsyncEvaluations<V>> asyncEvaluations = mEvaluations;
-      final boolean isFirst = asyncEvaluations.isEmpty();
-      asyncEvaluations.add(evaluations);
+    private ForkerStack<S, V, R, A> addEvaluations(@NotNull final R evaluations,
+        @NotNull final A async) throws Exception {
+      final boolean isFirst = !mHasEvaluation;
+      mHasEvaluation = true;
       if (isFirst) {
         mStack = mForker.evaluation(mStack, evaluations, async);
         final ArrayList<SimpleState<V>> states = mStates;
@@ -129,9 +118,9 @@ class BufferedLoopForker<S, V>
     }
 
     @NotNull
-    private ForkerStack<S, V> addFailure(@NotNull final Throwable failure,
-        @NotNull final AsyncLoop<V> async) throws Exception {
-      if (!mEvaluations.isEmpty()) {
+    private ForkerStack<S, V, R, A> addFailure(@NotNull final Throwable failure,
+        @NotNull final A async) throws Exception {
+      if (mHasEvaluation) {
         mStack = mForker.failure(mStack, failure, async);
 
       } else {
@@ -142,9 +131,9 @@ class BufferedLoopForker<S, V>
     }
 
     @NotNull
-    private ForkerStack<S, V> addValue(final V value, @NotNull final AsyncLoop<V> async) throws
+    private ForkerStack<S, V, R, A> addValue(final V value, @NotNull final A async) throws
         Exception {
-      if (!mEvaluations.isEmpty()) {
+      if (mHasEvaluation) {
         mStack = mForker.value(mStack, value, async);
 
       } else {
@@ -155,8 +144,8 @@ class BufferedLoopForker<S, V>
     }
 
     @NotNull
-    private ForkerStack<S, V> settle(@NotNull final AsyncLoop<V> async) throws Exception {
-      if (!mEvaluations.isEmpty()) {
+    private ForkerStack<S, V, R, A> settle(@NotNull final A async) throws Exception {
+      if (mHasEvaluation) {
         mStack = mForker.done(mStack, async);
 
       } else {
@@ -167,12 +156,11 @@ class BufferedLoopForker<S, V>
     }
   }
 
-  private static class ForkerProxy<S, V> extends SerializableProxy {
+  private static class ForkerProxy<S, V, R, A> extends SerializableProxy {
 
     private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
 
-    private ForkerProxy(
-        final Forker<S, ? super V, ? super AsyncEvaluations<V>, ? super AsyncLoop<V>> forker) {
+    private ForkerProxy(final Forker<S, ? super V, ? super R, ? super A> forker) {
       super(proxy(forker));
     }
 
@@ -181,8 +169,7 @@ class BufferedLoopForker<S, V>
     Object readResolve() throws ObjectStreamException {
       try {
         final Object[] args = deserializeArgs();
-        return new BufferedLoopForker<S, V>(
-            (Forker<S, ? super V, ? super AsyncEvaluations<V>, ? super AsyncLoop<V>>) args[0]);
+        return new BufferedForker<S, V, R, A>((Forker<S, ? super V, ? super R, ? super A>) args[0]);
 
       } catch (final Throwable t) {
         throw new InvalidObjectException(t.getMessage());

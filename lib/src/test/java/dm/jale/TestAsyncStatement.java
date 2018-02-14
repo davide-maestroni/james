@@ -93,36 +93,43 @@ public class TestAsyncStatement {
 
   @NotNull
   private static <V> AsyncStatement<V> fork(@NotNull final AsyncStatement<V> statement) {
-    // TODO: 04/02/2018 ForkStack default implementation
-    return statement.fork(new Forker<AsyncState<V>, V, AsyncEvaluation<V>, AsyncStatement<V>>() {
+    return statement.fork(
+        Async.buffered(new Forker<AsyncEvaluation<V>, V, AsyncEvaluation<V>, AsyncStatement<V>>() {
 
-      public AsyncState<V> done(final AsyncState<V> stack, @NotNull final AsyncStatement<V> async) {
-        return stack;
-      }
+          public AsyncEvaluation<V> done(final AsyncEvaluation<V> stack,
+              @NotNull final AsyncStatement<V> async) {
+            return stack;
+          }
 
-      public AsyncState<V> evaluation(final AsyncState<V> stack,
-          @NotNull final AsyncEvaluation<V> evaluation, @NotNull final AsyncStatement<V> async) {
-        if (stack != null) {
-          stack.to(evaluation);
-        }
+          public AsyncEvaluation<V> evaluation(final AsyncEvaluation<V> stack,
+              @NotNull final AsyncEvaluation<V> evaluation,
+              @NotNull final AsyncStatement<V> async) {
+            if (stack != null) {
+              evaluation.fail(new IllegalStateException());
 
-        return null;
-      }
+            } else {
+              return evaluation;
+            }
 
-      public AsyncState<V> failure(final AsyncState<V> stack, @NotNull final Throwable failure,
-          @NotNull final AsyncStatement<V> async) {
-        return SimpleState.ofFailure(failure);
-      }
+            return stack;
+          }
 
-      public AsyncState<V> init(@NotNull final AsyncStatement<V> async) {
-        return null;
-      }
+          public AsyncEvaluation<V> failure(final AsyncEvaluation<V> stack,
+              @NotNull final Throwable failure, @NotNull final AsyncStatement<V> async) {
+            stack.fail(failure);
+            return stack;
+          }
 
-      public AsyncState<V> value(final AsyncState<V> stack, final V value,
-          @NotNull final AsyncStatement<V> async) {
-        return SimpleState.ofValue(value);
-      }
-    });
+          public AsyncEvaluation<V> init(@NotNull final AsyncStatement<V> async) {
+            return null;
+          }
+
+          public AsyncEvaluation<V> value(final AsyncEvaluation<V> stack, final V value,
+              @NotNull final AsyncStatement<V> async) {
+            stack.set(value);
+            return stack;
+          }
+        }));
   }
 
   @Test
@@ -204,7 +211,7 @@ public class TestAsyncStatement {
     final AsyncStatement<String> statement =
         new Async().evaluateOn(withDelay(100, TimeUnit.MILLISECONDS, backgroundExecutor()))
                    .value("test");
-    statement.waitDone();
+    statement.getDone();
     assertThat(statement.isDone()).isTrue();
   }
 
@@ -1553,7 +1560,7 @@ public class TestAsyncStatement {
     final AsyncStatement<String> statement =
         new Async().evaluateOn(withDelay(1, TimeUnit.SECONDS, backgroundExecutor())).value("test");
     statement.cancel(true);
-    statement.waitDone();
+    statement.getDone();
     assertThat(statement.isCancelled()).isTrue();
     assertThat(statement.isDone()).isTrue();
     assertThat(statement.isEvaluating()).isFalse();
@@ -2231,7 +2238,7 @@ public class TestAsyncStatement {
   @Test(expected = NullPointerException.class)
   @SuppressWarnings("ConstantConditions")
   public void waitDoneNPE() {
-    new Async().value(null).waitDone(0, null);
+    new Async().value(null).getDone(0, null);
   }
 
   @Test
@@ -2239,7 +2246,7 @@ public class TestAsyncStatement {
     final AsyncStatement<String> statement =
         new Async().evaluateOn(withDelay(100, TimeUnit.MILLISECONDS, backgroundExecutor()))
                    .value("test");
-    assertThat(statement.waitDone(1, TimeUnit.SECONDS)).isTrue();
+    assertThat(statement.getDone(1, TimeUnit.SECONDS)).isTrue();
   }
 
   @Test
@@ -2248,7 +2255,7 @@ public class TestAsyncStatement {
         new Async().value("test")
                    .forkOn(withDelay(1, TimeUnit.SECONDS, backgroundExecutor()))
                    .then(new ToUpper());
-    assertThat(statement.waitDone(1, TimeUnit.MILLISECONDS)).isFalse();
+    assertThat(statement.getDone(1, TimeUnit.MILLISECONDS)).isFalse();
   }
 
   @Test(expected = NullPointerException.class)

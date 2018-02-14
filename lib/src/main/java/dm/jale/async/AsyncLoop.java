@@ -62,7 +62,7 @@ public interface AsyncLoop<V> extends AsyncStatement<Iterable<V>>, Serializable 
       @Nullable Updater<S, ? super Throwable, ? super AsyncStatement<Iterable<V>>> failure,
       @Nullable Completer<S, ? super AsyncStatement<Iterable<V>>> done,
       @Nullable Updater<S, ? super AsyncEvaluation<Iterable<V>>, ? super
-          AsyncStatement<Iterable<V>>> statement);
+          AsyncStatement<Iterable<V>>> evaluation);
 
   @NotNull
   AsyncLoop<V> forkOn(@NotNull Executor executor);
@@ -162,13 +162,13 @@ public interface AsyncLoop<V> extends AsyncStatement<Iterable<V>>, Serializable 
       @Nullable Updater<S, ? super V, ? super AsyncLoop<V>> value,
       @Nullable Updater<S, ? super Throwable, ? super AsyncLoop<V>> failure,
       @Nullable Completer<S, ? super AsyncLoop<V>> done,
-      @Nullable Updater<S, ? super AsyncEvaluations<V>, ? super AsyncLoop<V>> statement);
+      @Nullable Updater<S, ? super AsyncEvaluations<V>, ? super AsyncLoop<V>> evaluation);
 
   @NotNull
-  AsyncLoop<V> forkOn(@NotNull Executor executor, int maxBatch);
+  AsyncLoop<V> forkOn(@NotNull Executor executor, int maxValues, final int maxFailures);
 
   @NotNull
-  AsyncLoop<V> forkOnParallel(@NotNull Executor executor, int maxBatch);
+  AsyncLoop<V> forkOnParallel(@NotNull Executor executor, int maxValues, final int maxFailures);
 
   @NotNull
   AsyncLoop<V> forkOnParallel(@NotNull Executor executor);
@@ -206,7 +206,7 @@ public interface AsyncLoop<V> extends AsyncStatement<Iterable<V>>, Serializable 
   <S, R> AsyncLoop<R> yield(@Nullable Provider<S> init, @Nullable Mapper<S, ? extends Boolean> loop,
       @Nullable Updater<S, ? super V, ? super YieldOutputs<R>> value,
       @Nullable Updater<S, ? super Throwable, ? super YieldOutputs<R>> failure,
-      @Nullable Completer<S, ? super YieldOutputs<R>> done);
+      @Nullable Settler<S, ? super YieldOutputs<R>> done);
 
   @NotNull
   <S, R> AsyncLoop<R> yieldOrdered(@NotNull Yielder<S, ? super V, R> yielder);
@@ -216,7 +216,7 @@ public interface AsyncLoop<V> extends AsyncStatement<Iterable<V>>, Serializable 
       @Nullable Mapper<S, ? extends Boolean> loop,
       @Nullable Updater<S, ? super V, ? super YieldOutputs<R>> value,
       @Nullable Updater<S, ? super Throwable, ? super YieldOutputs<R>> failure,
-      @Nullable Completer<S, ? super YieldOutputs<R>> done);
+      @Nullable Settler<S, ? super YieldOutputs<R>> done);
 
   interface AsyncGenerator<V> extends Iterable<V> {
 

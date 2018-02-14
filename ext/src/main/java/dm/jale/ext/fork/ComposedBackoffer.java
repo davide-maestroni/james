@@ -19,13 +19,15 @@ package dm.jale.ext.fork;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
+import java.io.InvalidObjectException;
 import java.io.ObjectStreamException;
 import java.io.Serializable;
 
-import dm.jale.async.Completer;
 import dm.jale.async.Provider;
+import dm.jale.async.Settler;
 import dm.jale.async.Updater;
 import dm.jale.ext.config.BuildConfig;
+import dm.jale.util.SerializableProxy;
 
 /**
  * Created by davide-maestroni on 02/09/2018.
@@ -34,7 +36,7 @@ class ComposedBackoffer<S, V> implements Backoffer<S, V>, Serializable {
 
   private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
 
-  private final Completer<S, ? super PendingEvaluations<V>> mDone;
+  private final Settler<S, ? super PendingEvaluations<V>> mDone;
 
   private final Updater<S, ? super Throwable, ? super PendingEvaluations<V>> mFailure;
 
@@ -46,15 +48,15 @@ class ComposedBackoffer<S, V> implements Backoffer<S, V>, Serializable {
   ComposedBackoffer(@Nullable final Provider<S> init,
       @Nullable final Updater<S, ? super V, ? super PendingEvaluations<V>> value,
       @Nullable final Updater<S, ? super Throwable, ? super PendingEvaluations<V>> failure,
-      @Nullable final Completer<S, ? super PendingEvaluations<V>> done) {
+      @Nullable final Settler<S, ? super PendingEvaluations<V>> done) {
     mInit = (Provider<S>) ((init != null) ? init : DefaultInit.sInstance);
     mValue = (Updater<S, ? super V, ? super PendingEvaluations<V>>) ((value != null) ? value
         : DefaultUpdater.sInstance);
     mFailure =
         (Updater<S, ? super Throwable, ? super PendingEvaluations<V>>) ((failure != null) ? failure
             : DefaultUpdater.sInstance);
-    mDone = (Completer<S, ? super PendingEvaluations<V>>) ((done != null) ? done
-        : DefaultCompleter.sInstance);
+    mDone = (Settler<S, ? super PendingEvaluations<V>>) ((done != null) ? done
+        : DefaultSettler.sInstance);
   }
 
   public void done(final S stack, @NotNull final PendingEvaluations<V> evaluations) throws
@@ -76,21 +78,9 @@ class ComposedBackoffer<S, V> implements Backoffer<S, V>, Serializable {
     return mValue.update(stack, value, evaluations);
   }
 
-  private static class DefaultCompleter<S, V>
-      implements Completer<S, PendingEvaluations<V>>, Serializable {
-
-    private static final DefaultCompleter<?, ?> sInstance = new DefaultCompleter<Object, Object>();
-
-    private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
-
-    public S complete(final S stack, @NotNull final PendingEvaluations<V> evaluations) {
-      return stack;
-    }
-
-    @NotNull
-    Object readResolve() throws ObjectStreamException {
-      return sInstance;
-    }
+  @NotNull
+  private Object writeReplace() throws ObjectStreamException {
+    return new ForkerProxy<S, V>(mInit, mValue, mFailure, mDone);
   }
 
   private static class DefaultInit<S> implements Provider<S>, Serializable {
@@ -101,6 +91,22 @@ class ComposedBackoffer<S, V> implements Backoffer<S, V>, Serializable {
 
     public S get() {
       return null;
+    }
+
+    @NotNull
+    Object readResolve() throws ObjectStreamException {
+      return sInstance;
+    }
+  }
+
+  private static class DefaultSettler<S, V>
+      implements Settler<S, PendingEvaluations<V>>, Serializable {
+
+    private static final DefaultSettler<?, ?> sInstance = new DefaultSettler<Object, Object>();
+
+    private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
+
+    public void complete(final S stack, @NotNull final PendingEvaluations<V> evaluations) {
     }
 
     @NotNull
@@ -125,6 +131,33 @@ class ComposedBackoffer<S, V> implements Backoffer<S, V>, Serializable {
     @NotNull
     Object readResolve() throws ObjectStreamException {
       return sInstance;
+    }
+  }
+
+  private static class ForkerProxy<S, V> extends SerializableProxy {
+
+    private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
+
+    private ForkerProxy(final Provider<S> init,
+        final Updater<S, ? super V, ? super PendingEvaluations<V>> value,
+        final Updater<S, ? super Throwable, ? super PendingEvaluations<V>> failure,
+        final Settler<S, ? super PendingEvaluations<V>> done) {
+      super(proxy(init), proxy(value), proxy(failure), proxy(done));
+    }
+
+    @NotNull
+    @SuppressWarnings("unchecked")
+    Object readResolve() throws ObjectStreamException {
+      try {
+        final Object[] args = deserializeArgs();
+        return new ComposedBackoffer<S, V>((Provider<S>) args[0],
+            (Updater<S, ? super V, ? super PendingEvaluations<V>>) args[2],
+            (Updater<S, ? super Throwable, ? super PendingEvaluations<V>>) args[3],
+            (Settler<S, ? super PendingEvaluations<V>>) args[4]);
+
+      } catch (final Throwable t) {
+        throw new InvalidObjectException(t.getMessage());
+      }
     }
   }
 }

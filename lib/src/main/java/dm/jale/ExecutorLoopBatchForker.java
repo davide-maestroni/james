@@ -17,35 +17,53 @@
 package dm.jale;
 
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 
 import java.io.InvalidObjectException;
 import java.io.ObjectStreamException;
 import java.io.Serializable;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
 import java.util.concurrent.Executor;
 import java.util.concurrent.atomic.AtomicLong;
 
-import dm.jale.ExecutorLoopForker.Stack;
+import dm.jale.ExecutorLoopBatchForker.Stack;
 import dm.jale.async.AsyncEvaluations;
 import dm.jale.async.AsyncLoop;
 import dm.jale.async.AsyncStatement.Forker;
 import dm.jale.config.BuildConfig;
 import dm.jale.executor.ExecutorPool;
 import dm.jale.executor.OwnerExecutor;
+import dm.james.util.ConstantConditions;
 
 /**
  * Created by davide-maestroni on 02/12/2018.
  */
-class ExecutorLoopForker<V> extends BufferedForker<Stack<V>, V, AsyncEvaluations<V>, AsyncLoop<V>> {
+class ExecutorLoopBatchForker<V>
+    extends BufferedForker<Stack<V>, V, AsyncEvaluations<V>, AsyncLoop<V>> {
 
   private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
 
-  ExecutorLoopForker(@NotNull final Executor executor) {
-    super(new LoopForker<V>(executor));
+  ExecutorLoopBatchForker(@NotNull final Executor executor, final int maxValues,
+      final int maxFailures) {
+    super(new LoopForker<V>(executor, maxValues, maxFailures));
+  }
+
+  @Nullable
+  private static <E> List<E> copyOrNull(@NotNull final List<E> list) {
+    final int size = list.size();
+    return (size == 0) ? null
+        : (size == 1) ? Collections.singletonList(list.get(0)) : new ArrayList<E>(list);
   }
 
   static class Stack<V> {
 
+    private final ArrayList<Throwable> failures = new ArrayList<Throwable>();
+
     private final AtomicLong pendingCount = new AtomicLong();
+
+    private final ArrayList<V> values = new ArrayList<V>();
 
     private AsyncEvaluations<V> evaluations;
   }
@@ -57,8 +75,15 @@ class ExecutorLoopForker<V> extends BufferedForker<Stack<V>, V, AsyncEvaluations
 
     private final OwnerExecutor mExecutor;
 
-    private LoopForker(@NotNull final Executor executor) {
+    private final int mMaxFailures;
+
+    private final int mMaxValues;
+
+    private LoopForker(@NotNull final Executor executor, final int maxValues,
+        final int maxFailures) {
       mExecutor = ExecutorPool.register(executor);
+      mMaxValues = ConstantConditions.positive("maxValues", maxValues);
+      mMaxFailures = ConstantConditions.positive("maxFailures", maxFailures);
     }
 
     public Stack<V> done(final Stack<V> stack, @NotNull final AsyncLoop<V> async) {
@@ -70,6 +95,7 @@ class ExecutorLoopForker<V> extends BufferedForker<Stack<V>, V, AsyncEvaluations
           }
         }
       });
+
       return stack;
     }
 
@@ -89,16 +115,31 @@ class ExecutorLoopForker<V> extends BufferedForker<Stack<V>, V, AsyncEvaluations
         @NotNull final AsyncLoop<V> async) {
       final AtomicLong pendingCount = stack.pendingCount;
       final AsyncEvaluations<V> evaluations = stack.evaluations;
+      final ArrayList<V> values = stack.values;
+      final List<V> valueList = copyOrNull(values);
+      values.clear();
+      final ArrayList<Throwable> failures = stack.failures;
+      failures.add(failure);
+      final List<Throwable> failureList;
+      if (failures.size() >= mMaxFailures) {
+        failureList = copyOrNull(failures);
+        failures.clear();
+
+      } else {
+        failureList = null;
+      }
+
       pendingCount.incrementAndGet();
       mExecutor.execute(new Runnable() {
 
         public void run() {
-          evaluations.addFailure(failure);
+          evaluations.addValues(valueList).addFailures(failureList);
           if (pendingCount.decrementAndGet() == 0) {
             evaluations.set();
           }
         }
       });
+
       return stack;
     }
 
@@ -110,22 +151,37 @@ class ExecutorLoopForker<V> extends BufferedForker<Stack<V>, V, AsyncEvaluations
         @NotNull final AsyncLoop<V> async) throws Exception {
       final AtomicLong pendingCount = stack.pendingCount;
       final AsyncEvaluations<V> evaluations = stack.evaluations;
+      final ArrayList<Throwable> failures = stack.failures;
+      final List<Throwable> failureList = copyOrNull(failures);
+      failures.clear();
+      final ArrayList<V> values = stack.values;
+      values.add(value);
+      final List<V> valueList;
+      if (values.size() >= mMaxValues) {
+        valueList = copyOrNull(values);
+        values.clear();
+
+      } else {
+        valueList = null;
+      }
+
       pendingCount.incrementAndGet();
       mExecutor.execute(new Runnable() {
 
         public void run() {
-          evaluations.addValue(value);
+          evaluations.addFailures(failureList).addValues(valueList);
           if (pendingCount.decrementAndGet() == 0) {
             evaluations.set();
           }
         }
       });
+
       return stack;
     }
 
     @NotNull
     private Object writeReplace() throws ObjectStreamException {
-      return new ForkerProxy<V>(mExecutor);
+      return new ForkerProxy<V>(mExecutor, mMaxValues, mMaxFailures);
     }
 
     private static class ForkerProxy<V> implements Serializable {
@@ -134,14 +190,20 @@ class ExecutorLoopForker<V> extends BufferedForker<Stack<V>, V, AsyncEvaluations
 
       private final Executor mExecutor;
 
-      private ForkerProxy(final Executor executor) {
+      private final int mMaxFailures;
+
+      private final int mMaxValues;
+
+      private ForkerProxy(final Executor executor, final int maxValues, final int maxFailures) {
         mExecutor = executor;
+        mMaxValues = maxValues;
+        mMaxFailures = maxFailures;
       }
 
       @NotNull
       Object readResolve() throws ObjectStreamException {
         try {
-          return new ExecutorLoopForker<V>(mExecutor);
+          return new ExecutorLoopBatchForker<V>(mExecutor, mMaxValues, mMaxFailures);
 
         } catch (final Throwable t) {
           throw new InvalidObjectException(t.getMessage());

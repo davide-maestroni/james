@@ -22,6 +22,7 @@ import org.jetbrains.annotations.Nullable;
 import java.io.PrintWriter;
 import java.io.StringWriter;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Locale;
@@ -73,7 +74,7 @@ public class Logger {
     mContexts = contexts;
     mLoggerName = loggerName;
     mLocale = locale;
-    mContextList = Arrays.asList(contexts);
+    mContextList = Collections.unmodifiableList(Arrays.asList(contexts));
   }
 
   public static void addConnector(@NotNull final LogConnector connector) {

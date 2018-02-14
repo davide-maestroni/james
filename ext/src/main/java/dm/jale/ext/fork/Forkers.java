@@ -21,11 +21,12 @@ import org.jetbrains.annotations.Nullable;
 
 import java.util.concurrent.Executor;
 
+import dm.jale.Async;
 import dm.jale.async.AsyncEvaluations;
 import dm.jale.async.AsyncLoop;
 import dm.jale.async.AsyncStatement.Forker;
-import dm.jale.async.Completer;
 import dm.jale.async.Provider;
+import dm.jale.async.Settler;
 import dm.jale.async.Updater;
 import dm.jale.util.ConstantConditions;
 
@@ -39,19 +40,17 @@ public class Forkers {
   }
 
   @NotNull
-  public static <S, V> Forker<?, V, AsyncEvaluations<V>, AsyncLoop<V>> backoffOn(
+  public static <S, V> Forker<?, V, AsyncEvaluations<V>, AsyncLoop<V>> onBackoffed(
       @NotNull final Executor executor, @NotNull final Backoffer<S, V> backoffer) {
-    return new BackoffForker<S, V>(executor, backoffer);
+    return Async.buffered(new BackoffForker<S, V>(executor, backoffer));
   }
 
   @NotNull
-  public static <S, V> Forker<?, V, AsyncEvaluations<V>, AsyncLoop<V>> backoffOn(
+  public static <S, V> Forker<?, V, AsyncEvaluations<V>, AsyncLoop<V>> onBackoffed(
       @NotNull final Executor executor, @Nullable final Provider<S> init,
-      @Nullable final Updater<S, ? super V, ? super dm.jale.ext.fork.PendingEvaluations<V>> value,
-      @Nullable final Updater<S, ? super Throwable, ? super dm.jale.ext.fork
-          .PendingEvaluations<V>> failure,
-      @Nullable final Completer<S, ? super dm.jale.ext.fork.PendingEvaluations<V>> done) {
-    return backoffOn(executor,
-        new dm.jale.ext.fork.ComposedBackoffer<S, V>(init, value, failure, done));
+      @Nullable final Updater<S, ? super V, ? super PendingEvaluations<V>> value,
+      @Nullable final Updater<S, ? super Throwable, ? super PendingEvaluations<V>> failure,
+      @Nullable final Settler<S, ? super PendingEvaluations<V>> done) {
+    return onBackoffed(executor, new ComposedBackoffer<S, V>(init, value, failure, done));
   }
 }

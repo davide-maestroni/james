@@ -52,7 +52,6 @@ public interface AsyncStatement<V> extends AsyncState<V>, Future<V>, Serializabl
   AsyncStatement<V> evaluated();
 
   // TODO: 12/02/2018 tryFork?
-  // TODO: 13/02/2018 forkBuffered
 
   @NotNull
   <S> AsyncStatement<V> fork(
@@ -63,10 +62,14 @@ public interface AsyncStatement<V> extends AsyncState<V>, Future<V>, Serializabl
       @Nullable Updater<S, ? super V, ? super AsyncStatement<V>> value,
       @Nullable Updater<S, ? super Throwable, ? super AsyncStatement<V>> failure,
       @Nullable Completer<S, ? super AsyncStatement<V>> done,
-      @Nullable Updater<S, ? super AsyncEvaluation<V>, ? super AsyncStatement<V>> statement);
+      @Nullable Updater<S, ? super AsyncEvaluation<V>, ? super AsyncStatement<V>> evaluation);
 
   @NotNull
   AsyncStatement<V> forkOn(@NotNull Executor executor);
+
+  boolean getDone();
+
+  boolean getDone(long timeout, @NotNull TimeUnit timeUnit);
 
   @Nullable
   FailureException getFailure();
@@ -100,10 +103,6 @@ public interface AsyncStatement<V> extends AsyncState<V>, Future<V>, Serializabl
   @NotNull
   <R> AsyncStatement<R> thenTryIf(@NotNull Mapper<? super V, ? extends Closeable> closeable,
       @NotNull Mapper<? super V, ? extends AsyncStatement<R>> mapper);
-
-  void waitDone();
-
-  boolean waitDone(long timeout, @NotNull TimeUnit timeUnit);
 
   @NotNull
   AsyncStatement<V> whenDone(@NotNull Action action);

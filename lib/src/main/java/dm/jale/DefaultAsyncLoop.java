@@ -49,6 +49,7 @@ import dm.jale.async.Observer;
 import dm.jale.async.Provider;
 import dm.jale.async.RuntimeInterruptedException;
 import dm.jale.async.RuntimeTimeoutException;
+import dm.jale.async.Settler;
 import dm.jale.async.SimpleState;
 import dm.jale.async.Updater;
 import dm.jale.config.BuildConfig;
@@ -60,6 +61,9 @@ import dm.jale.util.Iterables;
 import dm.jale.util.SerializableProxy;
 import dm.jale.util.TimeUnits;
 import dm.jale.util.TimeUnits.Condition;
+
+import static dm.jale.executor.ExecutorPool.immediateExecutor;
+import static dm.jale.executor.ExecutorPool.withThrottling;
 
 /**
  * Created by davide-maestroni on 02/01/2018.
@@ -350,6 +354,33 @@ class DefaultAsyncLoop<V> implements AsyncLoop<V>, Serializable {
     to((AsyncEvaluations<V>) VOID_EVALUATIONS);
   }
 
+  public boolean getDone() {
+    return getDone(-1, TimeUnit.MILLISECONDS);
+  }
+
+  public boolean getDone(final long timeout, @NotNull final TimeUnit timeUnit) {
+    checkSupported();
+    deadLockWarning(timeout);
+    @SuppressWarnings("UnnecessaryLocalVariable") final ChainHead<?> head = mHead;
+    synchronized (mMutex) {
+      try {
+        if (TimeUnits.waitUntil(mMutex, new Condition() {
+
+          public boolean isTrue() {
+            return head.getState().isDone();
+          }
+        }, timeout, timeUnit)) {
+          return true;
+        }
+
+      } catch (final InterruptedException e) {
+        throw new RuntimeInterruptedException(e);
+      }
+    }
+
+    return false;
+  }
+
   @Nullable
   public FailureException getFailure() {
     return getFailure(-1, TimeUnit.MILLISECONDS);
@@ -454,33 +485,6 @@ class DefaultAsyncLoop<V> implements AsyncLoop<V>, Serializable {
     return toStatement().thenTryIf(closeable, mapper);
   }
 
-  public void waitDone() {
-    waitDone(-1, TimeUnit.MILLISECONDS);
-  }
-
-  public boolean waitDone(final long timeout, @NotNull final TimeUnit timeUnit) {
-    checkSupported();
-    deadLockWarning(timeout);
-    @SuppressWarnings("UnnecessaryLocalVariable") final ChainHead<?> head = mHead;
-    synchronized (mMutex) {
-      try {
-        if (TimeUnits.waitUntil(mMutex, new Condition() {
-
-          public boolean isTrue() {
-            return head.getState().isDone();
-          }
-        }, timeout, timeUnit)) {
-          return true;
-        }
-
-      } catch (final InterruptedException e) {
-        throw new RuntimeInterruptedException(e);
-      }
-    }
-
-    return false;
-  }
-
   @NotNull
   public AsyncStatement<Iterable<V>> whenDone(@NotNull final Action action) {
     return toStatement().whenDone(action);
@@ -546,13 +550,14 @@ class DefaultAsyncLoop<V> implements AsyncLoop<V>, Serializable {
       @Nullable final Updater<S, ? super Throwable, ? super AsyncStatement<Iterable<V>>> failure,
       @Nullable final Completer<S, ? super AsyncStatement<Iterable<V>>> done,
       @Nullable final Updater<S, ? super AsyncEvaluation<Iterable<V>>, ? super
-          AsyncStatement<Iterable<V>>> statement) {
-    return fork(new ComposedStatementForker<S, Iterable<V>>(init, value, failure, done, statement));
+          AsyncStatement<Iterable<V>>> evaluation) {
+    return fork(
+        new ComposedStatementForker<S, Iterable<V>>(init, value, failure, done, evaluation));
   }
 
   @NotNull
   public AsyncLoop<V> forkOn(@NotNull final Executor executor) {
-    return forkLoop(new ExecutorLoopForker<V>(ExecutorPool.withThrottling(1, executor)));
+    return forkLoop(new ExecutorLoopForker<V>(withThrottling(1, executor)));
   }
 
   @NotNull
@@ -719,20 +724,21 @@ class DefaultAsyncLoop<V> implements AsyncLoop<V>, Serializable {
       @Nullable final Updater<S, ? super V, ? super AsyncLoop<V>> value,
       @Nullable final Updater<S, ? super Throwable, ? super AsyncLoop<V>> failure,
       @Nullable final Completer<S, ? super AsyncLoop<V>> done,
-      @Nullable final Updater<S, ? super AsyncEvaluations<V>, ? super AsyncLoop<V>> statement) {
-    return forkLoop(new ComposedLoopForker<S, V>(init, value, failure, done, statement));
+      @Nullable final Updater<S, ? super AsyncEvaluations<V>, ? super AsyncLoop<V>> evaluation) {
+    return forkLoop(new ComposedLoopForker<S, V>(init, value, failure, done, evaluation));
   }
 
   @NotNull
-  public AsyncLoop<V> forkOn(@NotNull final Executor executor, final int maxBatch) {
-    // TODO: 12/02/2018 implement batch version
-    return yield(new BatchYielder<V>(maxBatch)).forkOn(executor);
+  public AsyncLoop<V> forkOn(@NotNull final Executor executor, final int maxValues,
+      final int maxFailures) {
+    return forkLoop(
+        new ExecutorLoopBatchForker<V>(withThrottling(1, executor), maxValues, maxFailures));
   }
 
   @NotNull
-  public AsyncLoop<V> forkOnParallel(@NotNull final Executor executor, final int maxBatch) {
-    // TODO: 12/02/2018 implement batch version
-    return yield(new BatchYielder<V>(maxBatch)).forkOnParallel(executor);
+  public AsyncLoop<V> forkOnParallel(@NotNull final Executor executor, final int maxValues,
+      final int maxFailures) {
+    return forkLoop(new ExecutorLoopBatchForker<V>(executor, maxValues, maxFailures));
   }
 
   @NotNull
@@ -855,7 +861,7 @@ class DefaultAsyncLoop<V> implements AsyncLoop<V>, Serializable {
       @Nullable final Mapper<S, ? extends Boolean> loop,
       @Nullable final Updater<S, ? super V, ? super YieldOutputs<R>> value,
       @Nullable final Updater<S, ? super Throwable, ? super YieldOutputs<R>> failure,
-      @Nullable final Completer<S, ? super YieldOutputs<R>> done) {
+      @Nullable final Settler<S, ? super YieldOutputs<R>> done) {
     return yield(new ComposedYielder<S, V, R>(init, loop, value, failure, done));
   }
 
@@ -869,7 +875,7 @@ class DefaultAsyncLoop<V> implements AsyncLoop<V>, Serializable {
       @Nullable final Mapper<S, ? extends Boolean> loop,
       @Nullable final Updater<S, ? super V, ? super YieldOutputs<R>> value,
       @Nullable final Updater<S, ? super Throwable, ? super YieldOutputs<R>> failure,
-      @Nullable final Completer<S, ? super YieldOutputs<R>> done) {
+      @Nullable final Settler<S, ? super YieldOutputs<R>> done) {
     return yieldOrdered(new ComposedYielder<S, V, R>(init, loop, value, failure, done));
   }
 
@@ -2494,7 +2500,7 @@ class DefaultAsyncLoop<V> implements AsyncLoop<V>, Serializable {
       mForker =
           (Forker<S, V, AsyncEvaluations<V>, AsyncLoop<V>>) ConstantConditions.notNull("forker",
               forker);
-      mExecutor = ExecutorPool.withThrottling(1, ExecutorPool.immediateExecutor());
+      mExecutor = withThrottling(1, immediateExecutor());
       mLoop = loop;
     }
 

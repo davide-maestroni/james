@@ -29,9 +29,16 @@ import dm.jale.async.AsyncEvaluation;
 import dm.jale.async.AsyncEvaluations;
 import dm.jale.async.AsyncLoop;
 import dm.jale.async.AsyncStatement;
+import dm.jale.async.AsyncStatement.Forker;
+import dm.jale.async.CombinationCompleter;
+import dm.jale.async.CombinationSettler;
+import dm.jale.async.CombinationUpdater;
+import dm.jale.async.Combiner;
+import dm.jale.async.Completer;
 import dm.jale.async.Mapper;
 import dm.jale.async.Observer;
 import dm.jale.async.RuntimeInterruptedException;
+import dm.jale.async.Updater;
 import dm.jale.config.BuildConfig;
 import dm.jale.util.ConstantConditions;
 import dm.jale.util.Iterables;
@@ -42,6 +49,8 @@ import dm.jale.util.Threads;
  * Created by davide-maestroni on 01/12/2018.
  */
 public class Async {
+
+  // TODO: 14/02/2018 AsyncIO, AsyncMath, AsyncRange
 
   private final Executor mExecutor;
 
@@ -58,6 +67,33 @@ public class Async {
     mIsUnevaluated = isUnevaluated;
     mExecutor = executor;
     mLoggerName = loggerName;
+  }
+
+  @NotNull
+  public static <S, V, R, A> Forker<?, V, R, A> buffered(@NotNull final Forker<S, V, R, A> forker) {
+    return new BufferedForker<S, V, R, A>(forker);
+  }
+
+  @NotNull
+  public static <S, V> Forker<?, V, AsyncEvaluations<V>, AsyncLoop<V>> bufferedLoop(
+      @Nullable Mapper<? super AsyncLoop<V>, S> init,
+      @Nullable Updater<S, ? super V, ? super AsyncLoop<V>> value,
+      @Nullable Updater<S, ? super Throwable, ? super AsyncLoop<V>> failure,
+      @Nullable Completer<S, ? super AsyncLoop<V>> done,
+      @Nullable Updater<S, ? super AsyncEvaluations<V>, ? super AsyncLoop<V>> evaluation) {
+    return new BufferedForker<S, V, AsyncEvaluations<V>, AsyncLoop<V>>(
+        new ComposedLoopForker<S, V>(init, value, failure, done, evaluation));
+  }
+
+  @NotNull
+  public static <S, V> Forker<?, V, AsyncEvaluation<V>, AsyncStatement<V>> bufferedStatement(
+      @Nullable final Mapper<? super AsyncStatement<V>, S> init,
+      @Nullable Updater<S, ? super V, ? super AsyncStatement<V>> value,
+      @Nullable Updater<S, ? super Throwable, ? super AsyncStatement<V>> failure,
+      @Nullable Completer<S, ? super AsyncStatement<V>> done,
+      @Nullable Updater<S, ? super AsyncEvaluation<V>, ? super AsyncStatement<V>> evaluation) {
+    return new BufferedForker<S, V, AsyncEvaluation<V>, AsyncStatement<V>>(
+        new ComposedStatementForker<S, V>(init, value, failure, done, evaluation));
   }
 
   @NotNull
@@ -93,34 +129,31 @@ public class Async {
   @NotNull
   public <V> AsyncLoop<V> loop(@NotNull final Observer<AsyncEvaluations<V>> observer) {
     final boolean isUnevaluated = mIsUnevaluated;
-    final String loggerName = mLoggerName;
     final Observer<AsyncEvaluations<V>> loopObserver = loopObserver(observer);
     return new DefaultAsyncLoop<V>(
         (isUnevaluated) ? new UnevaluatedObserver<V, AsyncEvaluations<V>>(loopObserver)
-            : loopObserver, !isUnevaluated,
-        (loggerName != null) ? loggerName : AsyncLoop.class.getName());
+            : loopObserver, !isUnevaluated, loopLoggerName());
   }
 
   @NotNull
   public <S, V, R> AsyncLoop<R> loopOf(
-      @NotNull final Combiner<S, ? super AsyncLoop<V>, ? super V, ? super AsyncEvaluations<?
-          extends R>> combiner,
+      @NotNull final Combiner<S, ? super V, ? super AsyncEvaluations<R>, AsyncLoop<V>> combiner,
       @NotNull final Iterable<? extends AsyncLoop<? extends V>> loops) {
-    return null;
+    return loop(new CombinationLoopObserver<S, V, R>(combiner, loops, loopLoggerName()));
   }
 
   @NotNull
   public <S, V, R> AsyncLoop<R> loopOf(@Nullable final Mapper<? super List<AsyncLoop<V>>, S> init,
-      @Nullable final CombinationUpdater<S, ? super AsyncLoop<V>, ? super V, ? super
-          AsyncEvaluations<? extends R>> value,
-      @Nullable final CombinationUpdater<S, ? super AsyncLoop<V>, ? super Throwable, ? super
-          AsyncEvaluations<? extends R>> failure,
-      @Nullable final CombinationCompleter<S, ? super AsyncLoop<V>, ? super AsyncEvaluations<?
-          extends R>> done,
-      @Nullable final CombinationSettler<S, ? super AsyncLoop<V>, ? super AsyncEvaluations<?
-          extends R>> settle,
+      @Nullable final CombinationUpdater<S, ? super V, ? super AsyncEvaluations<? extends R>,
+          AsyncLoop<V>> value,
+      @Nullable final CombinationUpdater<S, ? super Throwable, ? super AsyncEvaluations<? extends
+          R>, AsyncLoop<V>> failure,
+      @Nullable final CombinationCompleter<S, ? super AsyncEvaluations<? extends R>,
+          AsyncLoop<V>> done,
+      @Nullable final CombinationSettler<S, ? super AsyncEvaluations<? extends R>, AsyncLoop<V>>
+          settle,
       @NotNull final Iterable<? extends AsyncLoop<? extends V>> loops) {
-    return null;
+    return loopOf(new ComposedLoopCombiner<S, V, R>(init, value, failure, done, settle), loops);
   }
 
   @NotNull
@@ -131,35 +164,34 @@ public class Async {
   @NotNull
   public <V> AsyncStatement<V> statement(@NotNull final Observer<AsyncEvaluation<V>> observer) {
     final boolean isUnevaluated = mIsUnevaluated;
-    final String loggerName = mLoggerName;
     final Observer<AsyncEvaluation<V>> statementObserver = statementObserver(observer);
     return new DefaultAsyncStatement<V>(
         (isUnevaluated) ? new UnevaluatedObserver<V, AsyncEvaluation<V>>(statementObserver)
-            : statementObserver, !isUnevaluated,
-        (loggerName != null) ? loggerName : AsyncStatement.class.getName());
+            : statementObserver, !isUnevaluated, statementLoggerName());
   }
 
   @NotNull
   public <S, V, R> AsyncStatement<R> statementOf(
-      @NotNull final Combiner<S, ? super AsyncStatement<V>, ? super V, ? super AsyncEvaluation<?
-          extends R>> combiner,
+      @NotNull final Combiner<S, ? super V, ? super AsyncEvaluation<R>, AsyncStatement<V>> combiner,
       @NotNull final Iterable<? extends AsyncStatement<? extends V>> statements) {
-    return null;
+    return statement(
+        new CombinationStatementObserver<S, V, R>(combiner, statements, statementLoggerName()));
   }
 
   @NotNull
   public <S, V, R> AsyncStatement<R> statementOf(
       @Nullable final Mapper<? super List<AsyncStatement<V>>, S> init,
-      @Nullable final CombinationUpdater<S, ? super AsyncStatement<V>, ? super V, ? super
-          AsyncEvaluation<? extends R>> value,
-      @Nullable final CombinationUpdater<S, ? super AsyncStatement<V>, ? super Throwable, ? super
-          AsyncEvaluation<? extends R>> failure,
-      @Nullable final CombinationCompleter<S, ? super AsyncStatement<V>, ? super
-          AsyncEvaluation<? extends R>> done,
-      @Nullable final CombinationSettler<S, ? super AsyncStatement<V>, ? super AsyncEvaluation<?
-          extends R>> settle,
+      @Nullable final CombinationUpdater<S, ? super V, ? super AsyncEvaluation<? extends R>,
+          AsyncStatement<V>> value,
+      @Nullable final CombinationUpdater<S, ? super Throwable, ? super AsyncEvaluation<? extends
+          R>, AsyncStatement<V>> failure,
+      @Nullable final CombinationCompleter<S, ? super AsyncEvaluation<? extends R>,
+          AsyncStatement<V>> done,
+      @Nullable final CombinationSettler<S, ? super AsyncEvaluation<? extends R>,
+          AsyncStatement<V>> settle,
       @NotNull final Iterable<? extends AsyncStatement<? extends V>> statements) {
-    return null;
+    return statementOf(new ComposedStatementCombiner<S, V, R>(init, value, failure, done, settle),
+        statements);
   }
 
   @NotNull
@@ -177,6 +209,11 @@ public class Async {
     return loop(new ValuesObserver<V>(values));
   }
 
+  private String loopLoggerName() {
+    final String loggerName = mLoggerName;
+    return (loggerName != null) ? loggerName : AsyncLoop.class.getName();
+  }
+
   @NotNull
   private <V> Observer<AsyncEvaluations<V>> loopObserver(
       @NotNull final Observer<AsyncEvaluations<V>> observer) {
@@ -188,6 +225,11 @@ public class Async {
     return observer;
   }
 
+  private String statementLoggerName() {
+    final String loggerName = mLoggerName;
+    return (loggerName != null) ? loggerName : AsyncStatement.class.getName();
+  }
+
   @NotNull
   private <V> Observer<AsyncEvaluation<V>> statementObserver(
       @NotNull final Observer<AsyncEvaluation<V>> observer) {
@@ -197,37 +239,6 @@ public class Async {
     }
 
     return observer;
-  }
-
-  interface CombinationCompleter<S, A, R> {
-
-    S complete(@NotNull List<A> statements, int index, S stack, @NotNull R result) throws Exception;
-  }
-
-  interface CombinationSettler<S, A, R> {
-
-    void settle(@NotNull List<A> statements, S stack, @NotNull R result) throws Exception;
-  }
-
-  interface CombinationUpdater<S, A, V, R> {
-
-    S update(@NotNull List<A> statements, int index, S stack, V value, @NotNull R result) throws
-        Exception;
-  }
-
-  interface Combiner<S, A, V, R> {
-
-    S done(@NotNull List<A> statements, int index, S stack, @NotNull R result) throws Exception;
-
-    S failure(@NotNull List<A> statements, int index, S stack, Throwable failure,
-        @NotNull R result) throws Exception;
-
-    S init(@NotNull List<A> statements) throws Exception;
-
-    void settle(@NotNull List<A> statements, S stack, @NotNull R result) throws Exception;
-
-    S value(@NotNull List<A> statements, int index, S stack, V value, @NotNull R result) throws
-        Exception;
   }
 
   private static class FailureObserver<V> implements Observer<AsyncEvaluation<V>>, Serializable {

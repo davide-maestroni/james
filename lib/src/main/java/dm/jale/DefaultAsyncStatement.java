@@ -51,6 +51,9 @@ import dm.jale.util.SerializableProxy;
 import dm.jale.util.TimeUnits;
 import dm.jale.util.TimeUnits.Condition;
 
+import static dm.jale.executor.ExecutorPool.immediateExecutor;
+import static dm.jale.executor.ExecutorPool.withThrottling;
+
 /**
  * Created by davide-maestroni on 01/12/2018.
  */
@@ -343,13 +346,41 @@ class DefaultAsyncStatement<V> implements AsyncStatement<V>, Serializable {
       @Nullable final Updater<S, ? super V, ? super AsyncStatement<V>> value,
       @Nullable final Updater<S, ? super Throwable, ? super AsyncStatement<V>> failure,
       @Nullable final Completer<S, ? super AsyncStatement<V>> done,
-      @Nullable final Updater<S, ? super AsyncEvaluation<V>, ? super AsyncStatement<V>> statement) {
-    return fork(new ComposedStatementForker<S, V>(init, value, failure, done, statement));
+      @Nullable final Updater<S, ? super AsyncEvaluation<V>, ? super AsyncStatement<V>>
+          evaluation) {
+    return fork(new ComposedStatementForker<S, V>(init, value, failure, done, evaluation));
   }
 
   @NotNull
   public AsyncStatement<V> forkOn(@NotNull final Executor executor) {
     return fork(new ExecutorStatementForker<V>(executor));
+  }
+
+  public boolean getDone() {
+    return getDone(-1, TimeUnit.MILLISECONDS);
+  }
+
+  public boolean getDone(final long timeout, @NotNull final TimeUnit timeUnit) {
+    checkSupported();
+    deadLockWarning(timeout);
+    @SuppressWarnings("UnnecessaryLocalVariable") final ChainHead<?> head = mHead;
+    synchronized (mMutex) {
+      try {
+        if (TimeUnits.waitUntil(mMutex, new Condition() {
+
+          public boolean isTrue() {
+            return head.getState().isDone();
+          }
+        }, timeout, timeUnit)) {
+          return true;
+        }
+
+      } catch (final InterruptedException e) {
+        throw new RuntimeInterruptedException(e);
+      }
+    }
+
+    return false;
   }
 
   @Nullable
@@ -457,33 +488,6 @@ class DefaultAsyncStatement<V> implements AsyncStatement<V>, Serializable {
       @NotNull final Mapper<? super V, ? extends Closeable> closeable,
       @NotNull final Mapper<? super V, ? extends AsyncStatement<R>> mapper) {
     return chain(new TryIfStatementHandler<V, R>(closeable, mapper, mLogger.getName()));
-  }
-
-  public void waitDone() {
-    waitDone(-1, TimeUnit.MILLISECONDS);
-  }
-
-  public boolean waitDone(final long timeout, @NotNull final TimeUnit timeUnit) {
-    checkSupported();
-    deadLockWarning(timeout);
-    @SuppressWarnings("UnnecessaryLocalVariable") final ChainHead<?> head = mHead;
-    synchronized (mMutex) {
-      try {
-        if (TimeUnits.waitUntil(mMutex, new Condition() {
-
-          public boolean isTrue() {
-            return head.getState().isDone();
-          }
-        }, timeout, timeUnit)) {
-          return true;
-        }
-
-      } catch (final InterruptedException e) {
-        throw new RuntimeInterruptedException(e);
-      }
-    }
-
-    return false;
   }
 
   @NotNull
@@ -981,7 +985,7 @@ class DefaultAsyncStatement<V> implements AsyncStatement<V>, Serializable {
       mForker =
           (Forker<S, V, AsyncEvaluation<V>, AsyncStatement<V>>) ConstantConditions.notNull("forker",
               forker);
-      mExecutor = ExecutorPool.withThrottling(1, ExecutorPool.immediateExecutor());
+      mExecutor = withThrottling(1, immediateExecutor());
       mStatement = statement;
     }
 

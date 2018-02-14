@@ -42,12 +42,12 @@ class ComposedStatementForker<S, V>
 
   private final Completer<S, ? super AsyncStatement<V>> mDone;
 
+  private final Updater<S, ? super AsyncEvaluation<? extends V>, ? super AsyncStatement<V>>
+      mEvaluation;
+
   private final Updater<S, ? super Throwable, ? super AsyncStatement<V>> mFailure;
 
   private final Mapper<? super AsyncStatement<V>, S> mInit;
-
-  private final Updater<S, ? super AsyncEvaluation<? extends V>, ? super AsyncStatement<V>>
-      mStatement;
 
   private final Updater<S, ? super V, ? super AsyncStatement<V>> mValue;
 
@@ -56,7 +56,8 @@ class ComposedStatementForker<S, V>
       @Nullable final Updater<S, ? super V, ? super AsyncStatement<V>> value,
       @Nullable final Updater<S, ? super Throwable, ? super AsyncStatement<V>> failure,
       @Nullable final Completer<S, ? super AsyncStatement<V>> done,
-      @Nullable final Updater<S, ? super AsyncEvaluation<V>, ? super AsyncStatement<V>> statement) {
+      @Nullable final Updater<S, ? super AsyncEvaluation<V>, ? super AsyncStatement<V>>
+          evaluation) {
     mInit = (Mapper<? super AsyncStatement<V>, S>) ((init != null) ? init : DefaultInit.sInstance);
     mValue = (Updater<S, ? super V, ? super AsyncStatement<V>>) ((value != null) ? value
         : DefaultUpdater.sInstance);
@@ -65,8 +66,8 @@ class ComposedStatementForker<S, V>
             : DefaultUpdater.sInstance);
     mDone = (Completer<S, ? super AsyncStatement<V>>) ((done != null) ? done
         : DefaultCompleter.sInstance);
-    mStatement = (Updater<S, ? super AsyncEvaluation<? extends V>, ? super AsyncStatement<V>>) (
-        (statement != null) ? statement : DefaultEvaluationUpdater.sInstance);
+    mEvaluation = (Updater<S, ? super AsyncEvaluation<? extends V>, ? super AsyncStatement<V>>) (
+        (evaluation != null) ? evaluation : DefaultEvaluationUpdater.sInstance);
   }
 
   public S done(final S stack, @NotNull final AsyncStatement<V> async) throws Exception {
@@ -75,7 +76,7 @@ class ComposedStatementForker<S, V>
 
   public S evaluation(final S stack, @NotNull final AsyncEvaluation<V> evaluation,
       @NotNull final AsyncStatement<V> async) throws Exception {
-    return mStatement.update(stack, evaluation, async);
+    return mEvaluation.update(stack, evaluation, async);
   }
 
   public S failure(final S stack, @NotNull final Throwable failure,
@@ -94,7 +95,7 @@ class ComposedStatementForker<S, V>
 
   @NotNull
   private Object writeReplace() throws ObjectStreamException {
-    return new ForkerProxy<S, V>(mInit, mValue, mFailure, mDone, mStatement);
+    return new ForkerProxy<S, V>(mInit, mValue, mFailure, mDone, mEvaluation);
   }
 
   private static class DefaultCompleter<S, V>
