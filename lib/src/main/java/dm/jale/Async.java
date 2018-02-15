@@ -50,7 +50,9 @@ import dm.jale.util.Threads;
  */
 public class Async {
 
+  // TODO: 14/02/2018 ExecutorPool.withBackoff()?
   // TODO: 14/02/2018 AsyncIO, AsyncMath, AsyncRange
+  // TODO: 15/02/2018 readResolve => private?
 
   private final Executor mExecutor;
 

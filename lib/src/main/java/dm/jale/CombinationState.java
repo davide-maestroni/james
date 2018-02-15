@@ -16,6 +16,10 @@
 
 package dm.jale;
 
+import org.jetbrains.annotations.NotNull;
+
+import dm.james.util.ConstantConditions;
+
 /**
  * Created by davide-maestroni on 02/14/2018.
  */
@@ -23,9 +27,9 @@ class CombinationState<S> {
 
   private final int mCount;
 
-  private boolean mIsRejected;
+  private volatile Throwable mFailure;
 
-  private int mResolved;
+  private int mSet;
 
   private S mState;
 
@@ -37,19 +41,23 @@ class CombinationState<S> {
     return mState;
   }
 
+  Throwable getFailure() {
+    return mFailure;
+  }
+
   boolean isFailed() {
-    return mIsRejected;
+    return (mFailure != null);
+  }
+
+  void setFailed(@NotNull final Throwable failure) {
+    mFailure = ConstantConditions.notNull("failure", failure);
   }
 
   boolean set() {
-    return (++mResolved >= mCount);
+    return (++mSet >= mCount);
   }
 
   void set(final S state) {
     mState = state;
-  }
-
-  void setFailed() {
-    mIsRejected = true;
   }
 }

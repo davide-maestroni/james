@@ -14,16 +14,13 @@
  * limitations under the License.
  */
 
-package dm.jale.ext.yield;
+package dm.jale.async;
 
-import dm.jale.util.ConstantConditions;
+import dm.jale.async.AsyncStatement.Forker;
 
 /**
- * Created by davide-maestroni on 02/09/2018.
+ * Created by davide-maestroni on 02/15/2018.
  */
-public class Yielders {
+public interface StatementForker<S, V> extends Forker<S, V, AsyncEvaluation<V>, AsyncStatement<V>> {
 
-  private Yielders() {
-    ConstantConditions.avoid();
-  }
 }

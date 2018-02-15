@@ -43,7 +43,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 /**
  * Created by davide-maestroni on 01/17/2018.
  */
-public class TestAsync {
+public class AsyncTest {
 
   private static void aaa() {
 

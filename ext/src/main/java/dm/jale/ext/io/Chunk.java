@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package dm.jale.io;
+package dm.jale.ext.io;
 
 import org.jetbrains.annotations.NotNull;
 
@@ -28,8 +28,6 @@ import java.nio.channels.WritableByteChannel;
  * Created by davide-maestroni on 08/10/2017.
  */
 public interface Chunk extends Closeable {
-
-  // TODO: 13/02/2018 AsyncExt?
 
   int available();
 

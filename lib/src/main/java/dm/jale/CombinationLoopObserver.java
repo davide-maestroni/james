@@ -30,6 +30,7 @@ import java.util.concurrent.Executor;
 import dm.jale.async.AsyncEvaluations;
 import dm.jale.async.AsyncLoop;
 import dm.jale.async.Combiner;
+import dm.jale.async.FailureException;
 import dm.jale.async.Observer;
 import dm.jale.async.RuntimeInterruptedException;
 import dm.jale.config.BuildConfig;
@@ -85,12 +86,12 @@ class CombinationLoopObserver<S, V, R> implements Observer<AsyncEvaluations<R>>,
 
     } catch (final CancellationException e) {
       mLogger.wrn(e, "Loop has been cancelled");
-      state.setFailed();
+      state.setFailed(e);
       Asyncs.failSafe(evaluations, e);
 
     } catch (final Throwable t) {
       mLogger.err(t, "Error while initializing statements combination");
-      state.setFailed();
+      state.setFailed(t);
       Asyncs.failSafe(evaluations, RuntimeInterruptedException.wrapIfInterrupt(t));
     }
   }
@@ -116,10 +117,11 @@ class CombinationLoopObserver<S, V, R> implements Observer<AsyncEvaluations<R>>,
 
     private final CombinationState<S> mState;
 
-    private AsyncEvaluationsCombination(final CombinationState<S> state,
-        final Combiner<S, ? super V, ? super AsyncEvaluations<R>, AsyncLoop<V>> combiner,
-        final Executor executor, final AsyncEvaluations<R> evaluations,
-        final List<? extends AsyncLoop<? extends V>> loops, final int index, final Logger logger) {
+    private AsyncEvaluationsCombination(@NotNull final CombinationState<S> state,
+        @NotNull final Combiner<S, ? super V, ? super AsyncEvaluations<R>, AsyncLoop<V>> combiner,
+        @NotNull final Executor executor, @NotNull final AsyncEvaluations<R> evaluations,
+        @NotNull final List<? extends AsyncLoop<? extends V>> loops, final int index,
+        @NotNull final Logger logger) {
       mState = state;
       mCombiner = combiner;
       mExecutor = executor;
@@ -131,6 +133,7 @@ class CombinationLoopObserver<S, V, R> implements Observer<AsyncEvaluations<R>>,
 
     @NotNull
     public AsyncEvaluations<V> addFailure(@NotNull final Throwable failure) {
+      checkFailed();
       mExecutor.execute(new Runnable() {
 
         public void run() {
@@ -148,12 +151,12 @@ class CombinationLoopObserver<S, V, R> implements Observer<AsyncEvaluations<R>>,
 
           } catch (final CancellationException e) {
             mLogger.wrn(e, "Loop has been cancelled");
-            state.setFailed();
+            state.setFailed(e);
             Asyncs.failSafe(evaluations, e);
 
           } catch (final Throwable t) {
             mLogger.err(t, "Error while processing failure: %s", failure);
-            state.setFailed();
+            state.setFailed(t);
             Asyncs.failSafe(evaluations, RuntimeInterruptedException.wrapIfInterrupt(t));
           }
         }
@@ -163,6 +166,7 @@ class CombinationLoopObserver<S, V, R> implements Observer<AsyncEvaluations<R>>,
 
     @NotNull
     public AsyncEvaluations<V> addFailures(@Nullable final Iterable<? extends Throwable> failures) {
+      checkFailed();
       mExecutor.execute(new Runnable() {
 
         public void run() {
@@ -188,12 +192,12 @@ class CombinationLoopObserver<S, V, R> implements Observer<AsyncEvaluations<R>>,
 
             } catch (final CancellationException e) {
               mLogger.wrn(e, "Loop has been cancelled");
-              state.setFailed();
+              state.setFailed(e);
               Asyncs.failSafe(evaluations, e);
 
             } catch (final Throwable t) {
               mLogger.err(t, "Error while processing failures: %s", failures);
-              state.setFailed();
+              state.setFailed(t);
               Asyncs.failSafe(evaluations, RuntimeInterruptedException.wrapIfInterrupt(t));
             }
           }
@@ -204,6 +208,7 @@ class CombinationLoopObserver<S, V, R> implements Observer<AsyncEvaluations<R>>,
 
     @NotNull
     public AsyncEvaluations<V> addValue(final V value) {
+      checkFailed();
       mExecutor.execute(new Runnable() {
 
         public void run() {
@@ -221,12 +226,12 @@ class CombinationLoopObserver<S, V, R> implements Observer<AsyncEvaluations<R>>,
 
           } catch (final CancellationException e) {
             mLogger.wrn(e, "Loop has been cancelled");
-            state.setFailed();
+            state.setFailed(e);
             Asyncs.failSafe(evaluations, e);
 
           } catch (final Throwable t) {
             mLogger.err(t, "Error while processing value: %s", value);
-            state.setFailed();
+            state.setFailed(t);
             Asyncs.failSafe(evaluations, RuntimeInterruptedException.wrapIfInterrupt(t));
           }
         }
@@ -236,6 +241,7 @@ class CombinationLoopObserver<S, V, R> implements Observer<AsyncEvaluations<R>>,
 
     @NotNull
     public AsyncEvaluations<V> addValues(@Nullable final Iterable<? extends V> values) {
+      checkFailed();
       mExecutor.execute(new Runnable() {
 
         public void run() {
@@ -261,12 +267,12 @@ class CombinationLoopObserver<S, V, R> implements Observer<AsyncEvaluations<R>>,
 
             } catch (final CancellationException e) {
               mLogger.wrn(e, "Loop has been cancelled");
-              state.setFailed();
+              state.setFailed(e);
               Asyncs.failSafe(evaluations, e);
 
             } catch (final Throwable t) {
               mLogger.err(t, "Error while processing values: %s", values);
-              state.setFailed();
+              state.setFailed(t);
               Asyncs.failSafe(evaluations, RuntimeInterruptedException.wrapIfInterrupt(t));
             }
           }
@@ -276,6 +282,7 @@ class CombinationLoopObserver<S, V, R> implements Observer<AsyncEvaluations<R>>,
     }
 
     public void set() {
+      checkFailed();
       mExecutor.execute(new Runnable() {
 
         public void run() {
@@ -299,16 +306,23 @@ class CombinationLoopObserver<S, V, R> implements Observer<AsyncEvaluations<R>>,
 
           } catch (final CancellationException e) {
             mLogger.wrn(e, "Statement has been cancelled");
-            state.setFailed();
+            state.setFailed(e);
             Asyncs.failSafe(evaluations, e);
 
           } catch (final Throwable t) {
             mLogger.err(t, "Error while completing loop");
-            state.setFailed();
+            state.setFailed(t);
             Asyncs.failSafe(evaluations, RuntimeInterruptedException.wrapIfInterrupt(t));
           }
         }
       });
+    }
+
+    private void checkFailed() {
+      final CombinationState<S> state = mState;
+      if (state.isFailed()) {
+        throw FailureException.wrap(state.getFailure());
+      }
     }
   }
 

@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package dm.jale.ext.fork;
+package dm.jale.ext;
 
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -28,12 +28,14 @@ import java.util.concurrent.atomic.AtomicBoolean;
 
 import dm.jale.async.AsyncEvaluations;
 import dm.jale.async.AsyncLoop;
-import dm.jale.async.AsyncStatement.Forker;
+import dm.jale.async.LoopForker;
 import dm.jale.async.RuntimeInterruptedException;
 import dm.jale.executor.ExecutorPool;
 import dm.jale.executor.OwnerExecutor;
+import dm.jale.ext.BackoffForker.ForkerEvaluations;
 import dm.jale.ext.config.BuildConfig;
-import dm.jale.ext.fork.BackoffForker.ForkerEvaluations;
+import dm.jale.ext.backoff.Backoffer;
+import dm.jale.ext.backoff.PendingEvaluations;
 import dm.jale.util.ConstantConditions;
 import dm.jale.util.Iterables;
 import dm.jale.util.SerializableProxy;
@@ -43,8 +45,7 @@ import dm.jale.util.TimeUnits.Condition;
 /**
  * Created by davide-maestroni on 02/09/2018.
  */
-class BackoffForker<S, V>
-    implements Forker<ForkerEvaluations<S, V>, V, AsyncEvaluations<V>, AsyncLoop<V>>, Serializable {
+class BackoffForker<S, V> implements LoopForker<ForkerEvaluations<S, V>, V>, Serializable {
 
   private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
 

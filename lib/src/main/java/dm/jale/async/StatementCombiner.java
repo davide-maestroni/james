@@ -14,21 +14,12 @@
  * limitations under the License.
  */
 
-package dm.jale.ext.fork;
-
-import org.jetbrains.annotations.NotNull;
+package dm.jale.async;
 
 /**
- * Created by davide-maestroni on 02/09/2018.
+ * Created by davide-maestroni on 02/15/2018.
  */
-public interface Backoffer<S, V> {
+public interface StatementCombiner<S, V, R>
+    extends Combiner<S, V, AsyncEvaluation<R>, AsyncStatement<V>> {
 
-  void done(S stack, @NotNull PendingEvaluations<V> evaluations) throws Exception;
-
-  S failure(S stack, @NotNull Throwable failure, @NotNull PendingEvaluations<V> evaluations) throws
-      Exception;
-
-  S init() throws Exception;
-
-  S value(S stack, V value, @NotNull PendingEvaluations<V> evaluations) throws Exception;
 }

@@ -17,20 +17,25 @@
 package dm.jale;
 
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 
 import java.io.InvalidObjectException;
 import java.io.ObjectStreamException;
 import java.io.Serializable;
+import java.util.Locale;
+import java.util.concurrent.CancellationException;
 import java.util.concurrent.Executor;
 import java.util.concurrent.atomic.AtomicLong;
 
 import dm.jale.ExecutorLoopForker.Stack;
 import dm.jale.async.AsyncEvaluations;
 import dm.jale.async.AsyncLoop;
-import dm.jale.async.AsyncStatement.Forker;
+import dm.jale.async.FailureException;
+import dm.jale.async.LoopForker;
 import dm.jale.config.BuildConfig;
 import dm.jale.executor.ExecutorPool;
 import dm.jale.executor.OwnerExecutor;
+import dm.jale.log.Logger;
 
 /**
  * Created by davide-maestroni on 02/12/2018.
@@ -39,35 +44,44 @@ class ExecutorLoopForker<V> extends BufferedForker<Stack<V>, V, AsyncEvaluations
 
   private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
 
-  ExecutorLoopForker(@NotNull final Executor executor) {
-    super(new LoopForker<V>(executor));
+  ExecutorLoopForker(@NotNull final Executor executor, @Nullable final String loggerName) {
+    super(new InnerForker<V>(executor, loggerName));
   }
 
   static class Stack<V> {
 
-    private final AtomicLong pendingCount = new AtomicLong();
+    private final AtomicLong pendingCount = new AtomicLong(1);
 
     private AsyncEvaluations<V> evaluations;
+
+    private volatile Throwable failure;
   }
 
-  private static class LoopForker<V>
-      implements Forker<Stack<V>, V, AsyncEvaluations<V>, AsyncLoop<V>>, Serializable {
+  private static class InnerForker<V> implements LoopForker<Stack<V>, V>, Serializable {
 
     private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
 
     private final OwnerExecutor mExecutor;
 
-    private LoopForker(@NotNull final Executor executor) {
+    private final Logger mLogger;
+
+    private InnerForker(@NotNull final Executor executor, @Nullable final String loggerName) {
       mExecutor = ExecutorPool.register(executor);
+      mLogger = Logger.newLogger(this, loggerName, Locale.ENGLISH);
+    }
+
+    private static void checkFailed(@NotNull final Stack<?> stack) {
+      final Throwable failure = stack.failure;
+      if (failure != null) {
+        throw FailureException.wrap(failure);
+      }
     }
 
     public Stack<V> done(final Stack<V> stack, @NotNull final AsyncLoop<V> async) {
-      mExecutor.execute(new Runnable() {
+      checkFailed(stack);
+      mExecutor.execute(new ForkerRunnable(stack) {
 
-        public void run() {
-          if (stack.pendingCount.decrementAndGet() == 0) {
-            stack.evaluations.set();
-          }
+        protected void innerRun(@NotNull final AsyncEvaluations<V> evaluations) {
         }
       });
       return stack;
@@ -75,6 +89,7 @@ class ExecutorLoopForker<V> extends BufferedForker<Stack<V>, V, AsyncEvaluations
 
     public Stack<V> evaluation(final Stack<V> stack, @NotNull final AsyncEvaluations<V> evaluations,
         @NotNull final AsyncLoop<V> async) {
+      checkFailed(stack);
       if (stack.evaluations == null) {
         stack.evaluations = evaluations;
 
@@ -87,16 +102,12 @@ class ExecutorLoopForker<V> extends BufferedForker<Stack<V>, V, AsyncEvaluations
 
     public Stack<V> failure(final Stack<V> stack, @NotNull final Throwable failure,
         @NotNull final AsyncLoop<V> async) {
-      final AtomicLong pendingCount = stack.pendingCount;
-      final AsyncEvaluations<V> evaluations = stack.evaluations;
-      pendingCount.incrementAndGet();
-      mExecutor.execute(new Runnable() {
+      checkFailed(stack);
+      stack.pendingCount.incrementAndGet();
+      mExecutor.execute(new ForkerRunnable(stack) {
 
-        public void run() {
+        protected void innerRun(@NotNull final AsyncEvaluations<V> evaluations) {
           evaluations.addFailure(failure);
-          if (pendingCount.decrementAndGet() == 0) {
-            evaluations.set();
-          }
         }
       });
       return stack;
@@ -108,16 +119,12 @@ class ExecutorLoopForker<V> extends BufferedForker<Stack<V>, V, AsyncEvaluations
 
     public Stack<V> value(final Stack<V> stack, final V value,
         @NotNull final AsyncLoop<V> async) throws Exception {
-      final AtomicLong pendingCount = stack.pendingCount;
-      final AsyncEvaluations<V> evaluations = stack.evaluations;
-      pendingCount.incrementAndGet();
-      mExecutor.execute(new Runnable() {
+      checkFailed(stack);
+      stack.pendingCount.incrementAndGet();
+      mExecutor.execute(new ForkerRunnable(stack) {
 
-        public void run() {
+        protected void innerRun(@NotNull final AsyncEvaluations<V> evaluations) {
           evaluations.addValue(value);
-          if (pendingCount.decrementAndGet() == 0) {
-            evaluations.set();
-          }
         }
       });
       return stack;
@@ -125,7 +132,7 @@ class ExecutorLoopForker<V> extends BufferedForker<Stack<V>, V, AsyncEvaluations
 
     @NotNull
     private Object writeReplace() throws ObjectStreamException {
-      return new ForkerProxy<V>(mExecutor);
+      return new ForkerProxy<V>(mExecutor, mLogger.getName());
     }
 
     private static class ForkerProxy<V> implements Serializable {
@@ -134,19 +141,58 @@ class ExecutorLoopForker<V> extends BufferedForker<Stack<V>, V, AsyncEvaluations
 
       private final Executor mExecutor;
 
-      private ForkerProxy(final Executor executor) {
+      private final String mLoggerName;
+
+      private ForkerProxy(final Executor executor, final String loggerName) {
         mExecutor = executor;
+        mLoggerName = loggerName;
       }
 
       @NotNull
       Object readResolve() throws ObjectStreamException {
         try {
-          return new ExecutorLoopForker<V>(mExecutor);
+          return new ExecutorLoopForker<V>(mExecutor, mLoggerName);
 
         } catch (final Throwable t) {
           throw new InvalidObjectException(t.getMessage());
         }
       }
+    }
+
+    private abstract class ForkerRunnable implements Runnable {
+
+      private final Stack<V> mStack;
+
+      private ForkerRunnable(@NotNull final Stack<V> stack) {
+        mStack = stack;
+      }
+
+      public void run() {
+        final Stack<V> stack = mStack;
+        final AsyncEvaluations<V> evaluations = stack.evaluations;
+        try {
+          if (stack.failure != null) {
+            mLogger.wrn("Ignoring values");
+            evaluations.set();
+            return;
+          }
+
+          innerRun(evaluations);
+          if (stack.pendingCount.decrementAndGet() == 0) {
+            evaluations.set();
+          }
+
+        } catch (final CancellationException e) {
+          mLogger.wrn(e, "Loop has been cancelled");
+          stack.failure = e;
+
+        } catch (final Throwable t) {
+          mLogger.err(t, "Loop has failed");
+          stack.failure = t;
+        }
+      }
+
+      protected abstract void innerRun(@NotNull AsyncEvaluations<V> evaluations) throws Exception;
     }
   }
 }

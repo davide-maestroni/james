@@ -541,7 +541,7 @@ class DefaultAsyncLoop<V> implements AsyncLoop<V>, Serializable {
   public <S> AsyncLoop<V> fork(
       @NotNull final Forker<S, ? super Iterable<V>, ? super AsyncEvaluation<Iterable<V>>, ? super
           AsyncStatement<Iterable<V>>> forker) {
-    return forkLoop(new LoopForker<S, V>(forker));
+    return forkLoop(new StatementLoopForker<S, V>(forker));
   }
 
   @NotNull
@@ -557,7 +557,7 @@ class DefaultAsyncLoop<V> implements AsyncLoop<V>, Serializable {
 
   @NotNull
   public AsyncLoop<V> forkOn(@NotNull final Executor executor) {
-    return forkLoop(new ExecutorLoopForker<V>(withThrottling(1, executor)));
+    return forkLoop(new ExecutorLoopForker<V>(withThrottling(1, executor), mLogger.getName()));
   }
 
   @NotNull
@@ -732,18 +732,20 @@ class DefaultAsyncLoop<V> implements AsyncLoop<V>, Serializable {
   public AsyncLoop<V> forkOn(@NotNull final Executor executor, final int maxValues,
       final int maxFailures) {
     return forkLoop(
-        new ExecutorLoopBatchForker<V>(withThrottling(1, executor), maxValues, maxFailures));
+        new ExecutorLoopBatchForker<V>(withThrottling(1, executor), maxValues, maxFailures,
+            mLogger.getName()));
   }
 
   @NotNull
   public AsyncLoop<V> forkOnParallel(@NotNull final Executor executor, final int maxValues,
       final int maxFailures) {
-    return forkLoop(new ExecutorLoopBatchForker<V>(executor, maxValues, maxFailures));
+    return forkLoop(
+        new ExecutorLoopBatchForker<V>(executor, maxValues, maxFailures, mLogger.getName()));
   }
 
   @NotNull
   public AsyncLoop<V> forkOnParallel(@NotNull final Executor executor) {
-    return forkLoop(new ExecutorLoopForker<V>(executor));
+    return forkLoop(new ExecutorLoopForker<V>(executor, mLogger.getName()));
   }
 
   @NotNull

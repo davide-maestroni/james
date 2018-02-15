@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package dm.jale.ext.fork;
+package dm.jale.ext;
 
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -27,6 +27,8 @@ import dm.jale.async.Provider;
 import dm.jale.async.Settler;
 import dm.jale.async.Updater;
 import dm.jale.ext.config.BuildConfig;
+import dm.jale.ext.backoff.Backoffer;
+import dm.jale.ext.backoff.PendingEvaluations;
 import dm.jale.util.SerializableProxy;
 
 /**

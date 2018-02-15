@@ -40,6 +40,7 @@ dependencies {
 
 project.conditionalDependencies {
   compile name: 'lib', version: libVersion
+  compile name: 'ext', version: libVersion
 }
 
 jacocoTestReport {

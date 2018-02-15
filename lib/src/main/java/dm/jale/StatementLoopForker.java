@@ -24,7 +24,7 @@ import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.List;
 
-import dm.jale.LoopForker.ForkerStack;
+import dm.jale.StatementLoopForker.ForkerStack;
 import dm.jale.async.AsyncEvaluation;
 import dm.jale.async.AsyncEvaluations;
 import dm.jale.async.AsyncLoop;
@@ -37,7 +37,7 @@ import dm.jale.util.SerializableProxy;
 /**
  * Created by davide-maestroni on 02/05/2018.
  */
-class LoopForker<S, V>
+class StatementLoopForker<S, V>
     implements Forker<ForkerStack<S, V>, V, AsyncEvaluations<V>, AsyncLoop<V>>, Serializable {
 
   private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
@@ -46,7 +46,7 @@ class LoopForker<S, V>
       mForker;
 
   @SuppressWarnings("unchecked")
-  LoopForker(
+  StatementLoopForker(
       @NotNull final Forker<S, ? super Iterable<V>, ? super AsyncEvaluation<Iterable<V>>, ? super
           AsyncStatement<Iterable<V>>> forker) {
     mForker =
@@ -160,7 +160,7 @@ class LoopForker<S, V>
     Object readResolve() throws ObjectStreamException {
       try {
         final Object[] args = deserializeArgs();
-        return new LoopForker<S, V>(
+        return new StatementLoopForker<S, V>(
             (Forker<S, Iterable<V>, AsyncEvaluation<Iterable<V>>, AsyncStatement<Iterable<V>>>)
                 args[0]);
 

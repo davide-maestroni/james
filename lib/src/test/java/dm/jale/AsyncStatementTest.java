@@ -56,7 +56,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 /**
  * Created by davide-maestroni on 01/19/2018.
  */
-public class TestAsyncStatement {
+public class AsyncStatementTest {
 
   @NotNull
   private static AsyncStatement<String> createStatement() {

@@ -14,26 +14,11 @@
  * limitations under the License.
  */
 
-package dm.jale.ext.fork;
-
-import org.jetbrains.annotations.NotNull;
-
-import java.util.concurrent.TimeUnit;
-
-import dm.jale.async.AsyncEvaluations;
+package dm.jale.async;
 
 /**
- * Created by davide-maestroni on 02/09/2018.
+ * Created by davide-maestroni on 02/15/2018.
  */
-public interface PendingEvaluations<V> extends AsyncEvaluations<V> {
+public interface LoopCombiner<S, V, R> extends Combiner<S, V, AsyncEvaluations<R>, AsyncLoop<V>> {
 
-  int pendingTasks();
-
-  long pendingValues();
-
-  void wait(long timeout, @NotNull TimeUnit timeUnit);
-
-  boolean waitTasks(int maxCount, long timeout, @NotNull TimeUnit timeUnit);
-
-  boolean waitValues(long maxCount, long timeout, @NotNull TimeUnit timeUnit);
 }

@@ -33,6 +33,7 @@ import dm.jale.async.AsyncLoop;
 import dm.jale.async.AsyncLoop.YieldOutputs;
 import dm.jale.async.AsyncLoop.Yielder;
 import dm.jale.async.AsyncStatement;
+import dm.jale.async.FailureException;
 import dm.jale.async.RuntimeInterruptedException;
 import dm.jale.config.BuildConfig;
 import dm.jale.log.Logger;
@@ -57,7 +58,7 @@ class YieldLoopHandler<S, V, R> extends AsyncLoopHandler<V, R> implements Serial
 
   private final YielderOutputs<R> mYielderOutputs = new YielderOutputs<R>();
 
-  private boolean mIsFailed;
+  private volatile Throwable mFailure;
 
   private boolean mIsInitialized;
 
@@ -73,6 +74,7 @@ class YieldLoopHandler<S, V, R> extends AsyncLoopHandler<V, R> implements Serial
   @Override
   void addFailure(@NotNull final Throwable failure,
       @NotNull final AsyncEvaluations<R> evaluations) {
+    checkFailed();
     mExecutor.execute(new YielderRunnable(evaluations) {
 
       @Override
@@ -85,6 +87,7 @@ class YieldLoopHandler<S, V, R> extends AsyncLoopHandler<V, R> implements Serial
   @Override
   void addFailures(@Nullable final Iterable<? extends Throwable> failures,
       @NotNull final AsyncEvaluations<R> evaluations) {
+    checkFailed();
     if (failures == null) {
       return;
     }
@@ -104,6 +107,7 @@ class YieldLoopHandler<S, V, R> extends AsyncLoopHandler<V, R> implements Serial
 
   @Override
   void addValue(final V value, @NotNull final AsyncEvaluations<R> evaluations) {
+    checkFailed();
     mExecutor.execute(new YielderRunnable(evaluations) {
 
       @Override
@@ -116,6 +120,7 @@ class YieldLoopHandler<S, V, R> extends AsyncLoopHandler<V, R> implements Serial
   @Override
   void addValues(@Nullable final Iterable<? extends V> values,
       @NotNull final AsyncEvaluations<R> evaluations) {
+    checkFailed();
     if (values == null) {
       return;
     }
@@ -141,6 +146,7 @@ class YieldLoopHandler<S, V, R> extends AsyncLoopHandler<V, R> implements Serial
 
   @Override
   void set(@NotNull final AsyncEvaluations<R> evaluations) {
+    checkFailed();
     mExecutor.execute(new YielderRunnable(evaluations) {
 
       @Override
@@ -149,6 +155,12 @@ class YieldLoopHandler<S, V, R> extends AsyncLoopHandler<V, R> implements Serial
         outputs.set();
       }
     });
+  }
+
+  private void checkFailed() {
+    if (mFailure != null) {
+      throw FailureException.wrap(mFailure);
+    }
   }
 
   private void failSafe(@NotNull final AsyncEvaluations<R> evaluations,
@@ -320,7 +332,7 @@ class YieldLoopHandler<S, V, R> extends AsyncLoopHandler<V, R> implements Serial
     public void run() {
       final AsyncEvaluations<R> evaluations = mEvaluations;
       try {
-        if (mIsFailed) {
+        if (mFailure != null) {
           evaluations.set();
           return;
         }
@@ -334,19 +346,13 @@ class YieldLoopHandler<S, V, R> extends AsyncLoopHandler<V, R> implements Serial
         evaluations.set();
 
       } catch (final CancellationException e) {
-        if (!mIsFailed) {
-          mLogger.wrn(e, "Loop has been cancelled");
-        }
-
-        mIsFailed = true;
+        mLogger.wrn(e, "Loop has been cancelled");
+        mFailure = e;
         failSafe(evaluations, e);
 
       } catch (final Throwable t) {
-        if (!mIsFailed) {
-          mLogger.err(t, "Error while completing loop");
-        }
-
-        mIsFailed = true;
+        mLogger.err(t, "Error while completing loop");
+        mFailure = t;
         failSafe(evaluations, RuntimeInterruptedException.wrapIfInterrupt(t));
       }
     }

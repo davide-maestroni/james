@@ -29,6 +29,7 @@ import java.util.concurrent.Executor;
 import dm.jale.async.AsyncEvaluation;
 import dm.jale.async.AsyncStatement;
 import dm.jale.async.Combiner;
+import dm.jale.async.FailureException;
 import dm.jale.async.Observer;
 import dm.jale.async.RuntimeInterruptedException;
 import dm.jale.config.BuildConfig;
@@ -84,12 +85,12 @@ class CombinationStatementObserver<S, V, R> implements Observer<AsyncEvaluation<
 
     } catch (final CancellationException e) {
       mLogger.wrn(e, "Statement has been cancelled");
-      state.setFailed();
+      state.setFailed(e);
       Asyncs.failSafe(evaluation, e);
 
     } catch (final Throwable t) {
       mLogger.err(t, "Error while initializing statements combination");
-      state.setFailed();
+      state.setFailed(t);
       Asyncs.failSafe(evaluation, RuntimeInterruptedException.wrapIfInterrupt(t));
     }
   }
@@ -115,11 +116,12 @@ class CombinationStatementObserver<S, V, R> implements Observer<AsyncEvaluation<
 
     private final List<? extends AsyncStatement<? extends V>> mStatements;
 
-    private AsyncEvaluationCombination(final CombinationState<S> state,
-        final Combiner<S, ? super V, ? super AsyncEvaluation<R>, AsyncStatement<V>> combiner,
-        final Executor executor, final AsyncEvaluation<R> evaluation,
-        final List<? extends AsyncStatement<? extends V>> statements, final int index,
-        final Logger logger) {
+    private AsyncEvaluationCombination(@NotNull final CombinationState<S> state,
+        @NotNull final Combiner<S, ? super V, ? super AsyncEvaluation<R>, AsyncStatement<V>>
+            combiner,
+        @NotNull final Executor executor, final AsyncEvaluation<R> evaluation,
+        @NotNull final List<? extends AsyncStatement<? extends V>> statements, final int index,
+        @NotNull final Logger logger) {
       mState = state;
       mCombiner = combiner;
       mExecutor = executor;
@@ -130,6 +132,7 @@ class CombinationStatementObserver<S, V, R> implements Observer<AsyncEvaluation<
     }
 
     public void fail(@NotNull final Throwable failure) {
+      checkFailed();
       mExecutor.execute(new Runnable() {
 
         public void run() {
@@ -154,12 +157,12 @@ class CombinationStatementObserver<S, V, R> implements Observer<AsyncEvaluation<
 
           } catch (final CancellationException e) {
             mLogger.wrn(e, "Statement has been cancelled");
-            state.setFailed();
+            state.setFailed(e);
             Asyncs.failSafe(evaluation, e);
 
           } catch (final Throwable t) {
             mLogger.err(t, "Error while processing failure: %s", failure);
-            state.setFailed();
+            state.setFailed(t);
             Asyncs.failSafe(evaluation, RuntimeInterruptedException.wrapIfInterrupt(t));
           }
         }
@@ -167,6 +170,7 @@ class CombinationStatementObserver<S, V, R> implements Observer<AsyncEvaluation<
     }
 
     public void set(final V value) {
+      checkFailed();
       mExecutor.execute(new Runnable() {
 
         public void run() {
@@ -191,16 +195,23 @@ class CombinationStatementObserver<S, V, R> implements Observer<AsyncEvaluation<
 
           } catch (final CancellationException e) {
             mLogger.wrn(e, "Statement has been cancelled");
-            state.setFailed();
+            state.setFailed(e);
             Asyncs.failSafe(evaluation, e);
 
           } catch (final Throwable t) {
             mLogger.err(t, "Error while processing value: %s", value);
-            state.setFailed();
+            state.setFailed(t);
             Asyncs.failSafe(evaluation, RuntimeInterruptedException.wrapIfInterrupt(t));
           }
         }
       });
+    }
+
+    private void checkFailed() {
+      final CombinationState<S> state = mState;
+      if (state.isFailed()) {
+        throw FailureException.wrap(state.getFailure());
+      }
     }
   }
 

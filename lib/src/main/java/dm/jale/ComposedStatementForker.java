@@ -25,9 +25,9 @@ import java.io.Serializable;
 
 import dm.jale.async.AsyncEvaluation;
 import dm.jale.async.AsyncStatement;
-import dm.jale.async.AsyncStatement.Forker;
 import dm.jale.async.Completer;
 import dm.jale.async.Mapper;
+import dm.jale.async.StatementForker;
 import dm.jale.async.Updater;
 import dm.jale.config.BuildConfig;
 import dm.jale.util.SerializableProxy;
@@ -35,8 +35,7 @@ import dm.jale.util.SerializableProxy;
 /**
  * Created by davide-maestroni on 01/19/2018.
  */
-class ComposedStatementForker<S, V>
-    implements Forker<S, V, AsyncEvaluation<V>, AsyncStatement<V>>, Serializable {
+class ComposedStatementForker<S, V> implements StatementForker<S, V>, Serializable {
 
   private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
 

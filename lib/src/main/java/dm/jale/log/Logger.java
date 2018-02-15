@@ -177,7 +177,7 @@ public class Logger {
       while (true) {
         builder.append(contextToString(iterator.next()));
         if (!iterator.hasNext()) {
-          return builder.append(']').toString();
+          return builder.append(']').append(' ').toString();
         }
 
         builder.append(" => ");

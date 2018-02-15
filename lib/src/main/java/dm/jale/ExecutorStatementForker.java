@@ -25,7 +25,7 @@ import java.util.concurrent.Executor;
 
 import dm.jale.async.AsyncEvaluation;
 import dm.jale.async.AsyncStatement;
-import dm.jale.async.AsyncStatement.Forker;
+import dm.jale.async.StatementForker;
 import dm.jale.config.BuildConfig;
 import dm.jale.executor.ExecutorPool;
 import dm.jale.executor.OwnerExecutor;
@@ -39,18 +39,17 @@ class ExecutorStatementForker<V>
   private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
 
   ExecutorStatementForker(@NotNull final Executor executor) {
-    super(new StatementForker<V>(executor));
+    super(new InnerForker<V>(executor));
   }
 
-  private static class StatementForker<V>
-      implements Forker<AsyncEvaluation<V>, V, AsyncEvaluation<V>, AsyncStatement<V>>,
-      Serializable {
+  private static class InnerForker<V>
+      implements StatementForker<AsyncEvaluation<V>, V>, Serializable {
 
     private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
 
     private final OwnerExecutor mExecutor;
 
-    private StatementForker(@NotNull final Executor executor) {
+    private InnerForker(@NotNull final Executor executor) {
       mExecutor = ExecutorPool.register(executor);
     }
 
@@ -115,7 +114,7 @@ class ExecutorStatementForker<V>
       @NotNull
       Object readResolve() throws ObjectStreamException {
         try {
-          return new StatementForker<V>(mExecutor);
+          return new InnerForker<V>(mExecutor);
 
         } catch (final Throwable t) {
           throw new InvalidObjectException(t.getMessage());

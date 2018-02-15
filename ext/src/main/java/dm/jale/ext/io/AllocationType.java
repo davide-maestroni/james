@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package dm.jale.io;
+package dm.jale.ext.io;
 
 import org.jetbrains.annotations.NotNull;
 
