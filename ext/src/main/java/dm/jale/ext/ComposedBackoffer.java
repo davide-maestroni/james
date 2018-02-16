@@ -26,9 +26,9 @@ import java.io.Serializable;
 import dm.jale.async.Provider;
 import dm.jale.async.Settler;
 import dm.jale.async.Updater;
-import dm.jale.ext.config.BuildConfig;
 import dm.jale.ext.backoff.Backoffer;
 import dm.jale.ext.backoff.PendingEvaluations;
+import dm.jale.ext.config.BuildConfig;
 import dm.jale.util.SerializableProxy;
 
 /**
@@ -96,7 +96,7 @@ class ComposedBackoffer<S, V> implements Backoffer<S, V>, Serializable {
     }
 
     @NotNull
-    Object readResolve() throws ObjectStreamException {
+    private Object readResolve() throws ObjectStreamException {
       return sInstance;
     }
   }
@@ -112,7 +112,7 @@ class ComposedBackoffer<S, V> implements Backoffer<S, V>, Serializable {
     }
 
     @NotNull
-    Object readResolve() throws ObjectStreamException {
+    private Object readResolve() throws ObjectStreamException {
       return sInstance;
     }
   }
@@ -131,7 +131,7 @@ class ComposedBackoffer<S, V> implements Backoffer<S, V>, Serializable {
     }
 
     @NotNull
-    Object readResolve() throws ObjectStreamException {
+    private Object readResolve() throws ObjectStreamException {
       return sInstance;
     }
   }
@@ -149,7 +149,7 @@ class ComposedBackoffer<S, V> implements Backoffer<S, V>, Serializable {
 
     @NotNull
     @SuppressWarnings("unchecked")
-    Object readResolve() throws ObjectStreamException {
+    private Object readResolve() throws ObjectStreamException {
       try {
         final Object[] args = deserializeArgs();
         return new ComposedBackoffer<S, V>((Provider<S>) args[0],

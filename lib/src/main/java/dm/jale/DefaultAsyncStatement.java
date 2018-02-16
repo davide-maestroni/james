@@ -96,7 +96,7 @@ class DefaultAsyncStatement<V> implements AsyncStatement<V>, Serializable {
       final boolean isEvaluated, @Nullable final String loggerName) {
     mObserver = (Observer<AsyncEvaluation<?>>) ConstantConditions.notNull("observer", observer);
     mIsEvaluated = isEvaluated;
-    mIsFork = (observer instanceof ForkObserver);
+    mIsFork = false;
     mLogger = Logger.newLogger(this, loggerName, Locale.ENGLISH);
     final ChainHead<V> head = new ChainHead<V>();
     head.setLogger(mLogger);
@@ -168,7 +168,7 @@ class DefaultAsyncStatement<V> implements AsyncStatement<V>, Serializable {
     // chaining
     mObserver = observer;
     mIsEvaluated = isEvaluated;
-    mIsFork = (observer instanceof ForkObserver);
+    mIsFork = false;
     mLogger = logger;
     mMutex = head.getMutex();
     mHead = head;
@@ -702,7 +702,7 @@ class DefaultAsyncStatement<V> implements AsyncStatement<V>, Serializable {
       }
 
       @NotNull
-      Object readResolve() throws ObjectStreamException {
+      private Object readResolve() throws ObjectStreamException {
         try {
           final ForkObserver<S, V> observer = mObserver;
           observer.accept(null);
@@ -746,7 +746,7 @@ class DefaultAsyncStatement<V> implements AsyncStatement<V>, Serializable {
       }
 
       @NotNull
-      Object readResolve() throws ObjectStreamException {
+      private Object readResolve() throws ObjectStreamException {
         try {
           return new ChainHandler<V, R>(mHandler);
 
@@ -1109,7 +1109,7 @@ class DefaultAsyncStatement<V> implements AsyncStatement<V>, Serializable {
 
       @NotNull
       @SuppressWarnings("unchecked")
-      Object readResolve() throws ObjectStreamException {
+      private Object readResolve() throws ObjectStreamException {
         try {
           final Object[] args = deserializeArgs();
           return new ForkObserver<S, V>((DefaultAsyncStatement<V>) args[0],
@@ -1280,7 +1280,7 @@ class DefaultAsyncStatement<V> implements AsyncStatement<V>, Serializable {
 
     @NotNull
     @SuppressWarnings("unchecked")
-    Object readResolve() throws ObjectStreamException {
+    private Object readResolve() throws ObjectStreamException {
       try {
         final Object[] args = deserializeArgs();
         final ChainHead<Object> head = new ChainHead<Object>();

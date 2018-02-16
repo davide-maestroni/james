@@ -123,7 +123,7 @@ class OwnerScheduledExecutorServiceWrapper
     }
 
     @NotNull
-    Object readResolve() throws ObjectStreamException {
+    private Object readResolve() throws ObjectStreamException {
       try {
         return of(mService);
 
@@ -174,7 +174,7 @@ class OwnerScheduledExecutorServiceWrapper
       }
 
       @NotNull
-      Object readResolve() throws ObjectStreamException {
+      private Object readResolve() throws ObjectStreamException {
         try {
           return new UnstoppableScheduledServiceExecutor(mService);
 

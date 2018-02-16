@@ -78,7 +78,7 @@ class ElseDoStatementHandler<V> extends AsyncStatementHandler<V, V> implements S
 
     @NotNull
     @SuppressWarnings("unchecked")
-    Object readResolve() throws ObjectStreamException {
+    private Object readResolve() throws ObjectStreamException {
       try {
         final Object[] args = deserializeArgs();
         return new ElseDoStatementHandler<V>((Observer<? super Throwable>) args[0],

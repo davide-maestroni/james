@@ -22,7 +22,6 @@ import org.jetbrains.annotations.Nullable;
 import java.nio.ByteBuffer;
 
 import dm.jale.async.AsyncEvaluations;
-import dm.jale.async.Observer;
 import dm.jale.ext.io.AllocationType;
 import dm.jale.ext.io.Chunk;
 import dm.jale.ext.io.ChunkOutputStream;
@@ -31,43 +30,22 @@ import dm.jale.util.ConstantConditions;
 /**
  * Created by davide-maestroni on 02/15/2018.
  */
-class ByteBufferChunkObserver implements Observer<AsyncEvaluations<Chunk>> {
-
-  private final AllocationType mAllocationType;
-
-  private final Integer mBufferSize;
+class ByteBufferChunkObserver extends ChunkObserver {
 
   private final ByteBuffer mByteBuffer;
-
-  private final Integer mCoreSize;
-
-  private final Integer mPoolSize;
 
   ByteBufferChunkObserver(@NotNull final ByteBuffer buffer,
       @Nullable final AllocationType allocationType, @Nullable final Integer coreSize,
       @Nullable final Integer bufferSize, @Nullable final Integer poolSize) {
+    super(allocationType, coreSize, bufferSize, poolSize);
     mByteBuffer = ConstantConditions.notNull("buffer", buffer);
-    mCoreSize = (coreSize != null) ? ConstantConditions.positive("coreSize", coreSize) : null;
-    mBufferSize =
-        (bufferSize != null) ? ConstantConditions.positive("bufferSize", bufferSize) : null;
-    mPoolSize = (poolSize != null) ? ConstantConditions.positive("poolSize", poolSize) : null;
-    mAllocationType = allocationType;
   }
 
   public void accept(final AsyncEvaluations<Chunk> evaluations) throws Exception {
-    final ChunkOutputStream outputStream;
-    if (mCoreSize != null) {
-      outputStream = new ChunkOutputStream(evaluations, mAllocationType, mCoreSize);
-
-    } else if ((mBufferSize != null) && (mPoolSize != null)) {
-      outputStream = new ChunkOutputStream(evaluations, mAllocationType, mBufferSize, mPoolSize);
-
-    } else {
-      outputStream = new ChunkOutputStream(evaluations, mAllocationType);
-    }
-
+    final ChunkOutputStream outputStream = newStream(evaluations);
     try {
       outputStream.write(mByteBuffer);
+      evaluations.set();
 
     } finally {
       outputStream.close();

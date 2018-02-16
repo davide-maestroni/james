@@ -124,7 +124,7 @@ class ScheduledThreadPoolExecutorService extends ScheduledThreadPoolExecutor
     }
 
     @NotNull
-    Object readResolve() throws ObjectStreamException {
+    private Object readResolve() throws ObjectStreamException {
       try {
         return new ScheduledThreadPoolExecutorService(mService);
 

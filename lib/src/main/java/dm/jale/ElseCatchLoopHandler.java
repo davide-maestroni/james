@@ -119,7 +119,7 @@ class ElseCatchLoopHandler<V> extends AsyncLoopHandler<V, V> implements Serializ
 
     @NotNull
     @SuppressWarnings("unchecked")
-    Object readResolve() throws ObjectStreamException {
+    private Object readResolve() throws ObjectStreamException {
       try {
         final Object[] args = deserializeArgs();
         return new ElseCatchLoopHandler<V>((Mapper<? super Throwable, ? extends V>) args[0],

@@ -227,7 +227,7 @@ class CombinationStatementObserver<S, V, R> implements Observer<AsyncEvaluation<
 
     @NotNull
     @SuppressWarnings("unchecked")
-    Object readResolve() throws ObjectStreamException {
+    private Object readResolve() throws ObjectStreamException {
       try {
         final Object[] args = deserializeArgs();
         return new CombinationStatementObserver<S, V, R>(

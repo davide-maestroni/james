@@ -79,7 +79,7 @@ public abstract class SimpleState<V> implements AsyncState<V>, Serializable {
     }
 
     @NotNull
-    Object readResolve() throws ObjectStreamException {
+    private Object readResolve() throws ObjectStreamException {
       return sInstance;
     }
 
@@ -159,7 +159,7 @@ public abstract class SimpleState<V> implements AsyncState<V>, Serializable {
     private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
 
     @NotNull
-    Object readResolve() throws ObjectStreamException {
+    private Object readResolve() throws ObjectStreamException {
       return sInstance;
     }
 
@@ -204,7 +204,7 @@ public abstract class SimpleState<V> implements AsyncState<V>, Serializable {
     private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
 
     @NotNull
-    Object readResolve() throws ObjectStreamException {
+    private Object readResolve() throws ObjectStreamException {
       return sInstance;
     }
 

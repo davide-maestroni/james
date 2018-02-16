@@ -439,7 +439,7 @@ public class ExecutorPool {
       }
 
       @NotNull
-      Object readResolve() throws ObjectStreamException {
+      private Object readResolve() throws ObjectStreamException {
         return ThreadOwnerExecutor.of(mExecutor);
       }
     }
@@ -467,7 +467,7 @@ public class ExecutorPool {
       private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
 
       @NotNull
-      Object readResolve() throws ObjectStreamException {
+      private Object readResolve() throws ObjectStreamException {
         return backgroundExecutor();
       }
     }
@@ -494,7 +494,7 @@ public class ExecutorPool {
       private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
 
       @NotNull
-      Object readResolve() throws ObjectStreamException {
+      private Object readResolve() throws ObjectStreamException {
         return defaultExecutor();
       }
     }
@@ -522,7 +522,7 @@ public class ExecutorPool {
       private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
 
       @NotNull
-      Object readResolve() throws ObjectStreamException {
+      private Object readResolve() throws ObjectStreamException {
         return foregroundExecutor();
       }
     }

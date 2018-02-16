@@ -82,7 +82,7 @@ class ElseLoopIfStatementHandler<V> extends AsyncStatementLoopHandler<V, V>
 
     @NotNull
     @SuppressWarnings("unchecked")
-    Object readResolve() throws ObjectStreamException {
+    private Object readResolve() throws ObjectStreamException {
       try {
         final Object[] args = deserializeArgs();
         return new ElseLoopIfStatementHandler<V>(

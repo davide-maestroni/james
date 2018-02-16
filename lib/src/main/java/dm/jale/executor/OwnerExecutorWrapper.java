@@ -96,7 +96,7 @@ class OwnerExecutorWrapper implements OwnerExecutor, Serializable {
     }
 
     @NotNull
-    Object readResolve() throws ObjectStreamException {
+    private Object readResolve() throws ObjectStreamException {
       try {
         return of(mExecutor);
 

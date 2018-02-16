@@ -33,9 +33,9 @@ import dm.jale.async.RuntimeInterruptedException;
 import dm.jale.executor.ExecutorPool;
 import dm.jale.executor.OwnerExecutor;
 import dm.jale.ext.BackoffForker.ForkerEvaluations;
-import dm.jale.ext.config.BuildConfig;
 import dm.jale.ext.backoff.Backoffer;
 import dm.jale.ext.backoff.PendingEvaluations;
+import dm.jale.ext.config.BuildConfig;
 import dm.jale.util.ConstantConditions;
 import dm.jale.util.Iterables;
 import dm.jale.util.SerializableProxy;
@@ -360,7 +360,7 @@ class BackoffForker<S, V> implements LoopForker<ForkerEvaluations<S, V>, V>, Ser
 
     @NotNull
     @SuppressWarnings("unchecked")
-    Object readResolve() throws ObjectStreamException {
+    private Object readResolve() throws ObjectStreamException {
       try {
         final Object[] args = deserializeArgs();
         return new BackoffForker<S, V>((Executor) args[0], (Backoffer<S, V>) args[1]);

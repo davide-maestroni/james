@@ -119,7 +119,7 @@ class DynamicScheduledThreadPoolExecutorService extends ScheduledThreadPoolExecu
 
     @NotNull
     @SuppressWarnings("unchecked")
-    Object readResolve() throws ObjectStreamException {
+    private Object readResolve() throws ObjectStreamException {
       try {
         final Object[] args = deserializeArgs();
         return new DynamicScheduledThreadPoolExecutorService((Integer) args[0], (Integer) args[1],

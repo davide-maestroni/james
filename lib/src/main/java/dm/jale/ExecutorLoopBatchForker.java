@@ -39,7 +39,7 @@ import dm.jale.config.BuildConfig;
 import dm.jale.executor.ExecutorPool;
 import dm.jale.executor.OwnerExecutor;
 import dm.jale.log.Logger;
-import dm.james.util.ConstantConditions;
+import dm.jale.util.ConstantConditions;
 
 /**
  * Created by davide-maestroni on 02/12/2018.
@@ -210,7 +210,7 @@ class ExecutorLoopBatchForker<V>
       }
 
       @NotNull
-      Object readResolve() throws ObjectStreamException {
+      private Object readResolve() throws ObjectStreamException {
         try {
           return new ExecutorLoopBatchForker<V>(mExecutor, mMaxValues, mMaxFailures, mLoggerName);
 

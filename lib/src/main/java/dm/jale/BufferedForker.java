@@ -166,7 +166,7 @@ class BufferedForker<S, V, R, A> implements Forker<ForkerStack<S, V, R, A>, V, R
 
     @NotNull
     @SuppressWarnings("unchecked")
-    Object readResolve() throws ObjectStreamException {
+    private Object readResolve() throws ObjectStreamException {
       try {
         final Object[] args = deserializeArgs();
         return new BufferedForker<S, V, R, A>((Forker<S, ? super V, ? super R, ? super A>) args[0]);

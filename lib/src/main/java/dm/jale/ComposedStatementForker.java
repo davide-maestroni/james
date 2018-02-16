@@ -109,7 +109,7 @@ class ComposedStatementForker<S, V> implements StatementForker<S, V>, Serializab
     }
 
     @NotNull
-    Object readResolve() throws ObjectStreamException {
+    private Object readResolve() throws ObjectStreamException {
       return sInstance;
     }
   }
@@ -129,7 +129,7 @@ class ComposedStatementForker<S, V> implements StatementForker<S, V>, Serializab
     }
 
     @NotNull
-    Object readResolve() throws ObjectStreamException {
+    private Object readResolve() throws ObjectStreamException {
       return sInstance;
     }
   }
@@ -145,7 +145,7 @@ class ComposedStatementForker<S, V> implements StatementForker<S, V>, Serializab
     }
 
     @NotNull
-    Object readResolve() throws ObjectStreamException {
+    private Object readResolve() throws ObjectStreamException {
       return sInstance;
     }
   }
@@ -159,7 +159,7 @@ class ComposedStatementForker<S, V> implements StatementForker<S, V>, Serializab
     private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
 
     @NotNull
-    Object readResolve() throws ObjectStreamException {
+    private Object readResolve() throws ObjectStreamException {
       return sInstance;
     }
 
@@ -183,7 +183,7 @@ class ComposedStatementForker<S, V> implements StatementForker<S, V>, Serializab
 
     @NotNull
     @SuppressWarnings("unchecked")
-    Object readResolve() throws ObjectStreamException {
+    private Object readResolve() throws ObjectStreamException {
       try {
         final Object[] args = deserializeArgs();
         return new ComposedStatementForker<S, V>((Mapper<? super AsyncStatement<V>, S>) args[0],

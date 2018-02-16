@@ -125,7 +125,7 @@ class DefaultAsyncLoop<V> implements AsyncLoop<V>, Serializable {
       final boolean isEvaluated, @Nullable final String loggerName) {
     mObserver = (Observer<AsyncEvaluations<?>>) observer;
     mIsEvaluated = isEvaluated;
-    mIsFork = (observer instanceof ForkObserver);
+    mIsFork = false;
     mLogger = Logger.newLogger(this, loggerName, Locale.ENGLISH);
     final ChainHead<V> head = new ChainHead<V>();
     head.setLogger(mLogger);
@@ -1119,7 +1119,7 @@ class DefaultAsyncLoop<V> implements AsyncLoop<V>, Serializable {
       }
 
       @NotNull
-      Object readResolve() throws ObjectStreamException {
+      private Object readResolve() throws ObjectStreamException {
         try {
           final ForkObserver<S, V> observer = mObserver;
           observer.accept(null);
@@ -1348,7 +1348,7 @@ class DefaultAsyncLoop<V> implements AsyncLoop<V>, Serializable {
       }
 
       @NotNull
-      Object readResolve() throws ObjectStreamException {
+      private Object readResolve() throws ObjectStreamException {
         try {
           return new ChainLoopHandler<V, R>(mHandler);
 
@@ -1539,7 +1539,7 @@ class DefaultAsyncLoop<V> implements AsyncLoop<V>, Serializable {
       }
 
       @NotNull
-      Object readResolve() throws ObjectStreamException {
+      private Object readResolve() throws ObjectStreamException {
         try {
           return new ChainLoopHandlerOrdered<V, R>(mHandler);
 
@@ -1757,7 +1757,7 @@ class DefaultAsyncLoop<V> implements AsyncLoop<V>, Serializable {
       }
 
       @NotNull
-      Object readResolve() throws ObjectStreamException {
+      private Object readResolve() throws ObjectStreamException {
         try {
           return new ChainStatementHandler<V, R>(mHandler);
 
@@ -1940,7 +1940,7 @@ class DefaultAsyncLoop<V> implements AsyncLoop<V>, Serializable {
       }
 
       @NotNull
-      Object readResolve() throws ObjectStreamException {
+      private Object readResolve() throws ObjectStreamException {
         try {
           return new ChainStatementHandlerOrdered<V, R>(mHandler);
 
@@ -2113,7 +2113,7 @@ class DefaultAsyncLoop<V> implements AsyncLoop<V>, Serializable {
       }
 
       @NotNull
-      Object readResolve() throws ObjectStreamException {
+      private Object readResolve() throws ObjectStreamException {
         try {
           return new ChainStatementLoopHandler<V, R>(mHandler);
 
@@ -2305,7 +2305,7 @@ class DefaultAsyncLoop<V> implements AsyncLoop<V>, Serializable {
       }
 
       @NotNull
-      Object readResolve() throws ObjectStreamException {
+      private Object readResolve() throws ObjectStreamException {
         try {
           return new ChainStatementLoopHandlerOrdered<V, R>(mHandler);
 
@@ -2700,7 +2700,7 @@ class DefaultAsyncLoop<V> implements AsyncLoop<V>, Serializable {
 
       @NotNull
       @SuppressWarnings("unchecked")
-      Object readResolve() throws ObjectStreamException {
+      private Object readResolve() throws ObjectStreamException {
         try {
           final Object[] args = deserializeArgs();
           return new ForkObserver<S, V>((DefaultAsyncLoop<V>) args[0],
@@ -3104,7 +3104,7 @@ class DefaultAsyncLoop<V> implements AsyncLoop<V>, Serializable {
 
     @NotNull
     @SuppressWarnings("unchecked")
-    Object readResolve() throws ObjectStreamException {
+    private Object readResolve() throws ObjectStreamException {
       try {
         final Object[] args = deserializeArgs();
         final ChainHead<Object> head = new ChainHead<Object>();

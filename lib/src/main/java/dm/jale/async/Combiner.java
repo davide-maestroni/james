@@ -27,8 +27,8 @@ public interface Combiner<S, V, R, A> {
 
   S done(S stack, @NotNull R evaluation, @NotNull List<A> asyncs, int index) throws Exception;
 
-  S failure(S stack, Throwable failure, @NotNull R evaluation, @NotNull List<A> asyncs, int
-      index) throws Exception;
+  S failure(S stack, Throwable failure, @NotNull R evaluation, @NotNull List<A> asyncs,
+      int index) throws Exception;
 
   S init(@NotNull List<A> asyncs) throws Exception;
 

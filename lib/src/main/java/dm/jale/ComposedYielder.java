@@ -103,7 +103,7 @@ class ComposedYielder<S, V, R> implements Yielder<S, V, R>, Serializable {
     }
 
     @NotNull
-    Object readResolve() throws ObjectStreamException {
+    private Object readResolve() throws ObjectStreamException {
       return sInstance;
     }
   }
@@ -119,7 +119,7 @@ class ComposedYielder<S, V, R> implements Yielder<S, V, R>, Serializable {
     }
 
     @NotNull
-    Object readResolve() throws ObjectStreamException {
+    private Object readResolve() throws ObjectStreamException {
       return sInstance;
     }
   }
@@ -134,7 +134,7 @@ class ComposedYielder<S, V, R> implements Yielder<S, V, R>, Serializable {
     }
 
     @NotNull
-    Object readResolve() throws ObjectStreamException {
+    private Object readResolve() throws ObjectStreamException {
       return sInstance;
     }
   }
@@ -152,7 +152,7 @@ class ComposedYielder<S, V, R> implements Yielder<S, V, R>, Serializable {
     }
 
     @NotNull
-    Object readResolve() throws ObjectStreamException {
+    private Object readResolve() throws ObjectStreamException {
       return sInstance;
     }
   }
@@ -170,7 +170,7 @@ class ComposedYielder<S, V, R> implements Yielder<S, V, R>, Serializable {
 
     @NotNull
     @SuppressWarnings("unchecked")
-    Object readResolve() throws ObjectStreamException {
+    private Object readResolve() throws ObjectStreamException {
       try {
         final Object[] args = deserializeArgs();
         return new ComposedYielder<S, V, R>((Provider<S>) args[0],

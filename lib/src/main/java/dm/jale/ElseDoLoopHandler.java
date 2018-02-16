@@ -107,7 +107,7 @@ class ElseDoLoopHandler<V> extends AsyncLoopHandler<V, V> implements Serializabl
 
     @NotNull
     @SuppressWarnings("unchecked")
-    Object readResolve() throws ObjectStreamException {
+    private Object readResolve() throws ObjectStreamException {
       try {
         final Object[] args = deserializeArgs();
         return new ElseDoLoopHandler<V>((Observer<? super Throwable>) args[0],

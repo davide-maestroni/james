@@ -149,7 +149,7 @@ class ExecutorLoopForker<V> extends BufferedForker<Stack<V>, V, AsyncEvaluations
       }
 
       @NotNull
-      Object readResolve() throws ObjectStreamException {
+      private Object readResolve() throws ObjectStreamException {
         try {
           return new ExecutorLoopForker<V>(mExecutor, mLoggerName);
 

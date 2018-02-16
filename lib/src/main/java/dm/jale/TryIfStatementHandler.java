@@ -81,7 +81,7 @@ class TryIfStatementHandler<V, R> extends AsyncStatementHandler<V, R> implements
 
     @NotNull
     @SuppressWarnings("unchecked")
-    Object readResolve() throws ObjectStreamException {
+    private Object readResolve() throws ObjectStreamException {
       try {
         final Object[] args = deserializeArgs();
         return new TryIfStatementHandler<V, R>((Mapper<? super V, ? extends Closeable>) args[0],

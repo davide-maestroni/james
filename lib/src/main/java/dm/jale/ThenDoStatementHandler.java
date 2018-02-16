@@ -62,7 +62,7 @@ class ThenDoStatementHandler<V, R> extends AsyncStatementHandler<V, R> implement
 
     @NotNull
     @SuppressWarnings("unchecked")
-    Object readResolve() throws ObjectStreamException {
+    private Object readResolve() throws ObjectStreamException {
       try {
         final Object[] args = deserializeArgs();
         return new ThenDoStatementHandler<V, R>((Observer<? super V>) args[0]);

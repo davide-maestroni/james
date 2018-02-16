@@ -118,7 +118,7 @@ class NoDelayExecutor extends ScheduledExecutorDecorator implements Serializable
     }
 
     @NotNull
-    Object readResolve() throws ObjectStreamException {
+    private Object readResolve() throws ObjectStreamException {
       try {
         return new NoDelayExecutor(mExecutor);
 

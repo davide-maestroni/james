@@ -86,7 +86,7 @@ class ThenLoopLoopHandler<V, R> extends AsyncLoopHandler<V, R> implements Serial
 
     @NotNull
     @SuppressWarnings("unchecked")
-    Object readResolve() throws ObjectStreamException {
+    private Object readResolve() throws ObjectStreamException {
       try {
         final Object[] args = deserializeArgs();
         return new ThenLoopLoopHandler<V, R>(

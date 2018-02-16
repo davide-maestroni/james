@@ -123,7 +123,7 @@ class ElseLoopLoopHandler<V> extends AsyncLoopHandler<V, V> implements Serializa
 
     @NotNull
     @SuppressWarnings("unchecked")
-    Object readResolve() throws ObjectStreamException {
+    private Object readResolve() throws ObjectStreamException {
       try {
         final Object[] args = deserializeArgs();
         return new ElseLoopLoopHandler<V>(

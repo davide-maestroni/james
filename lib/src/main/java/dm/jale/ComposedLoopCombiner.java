@@ -126,7 +126,7 @@ class ComposedLoopCombiner<S, V, R>
 
     @NotNull
     @SuppressWarnings("unchecked")
-    Object readResolve() throws ObjectStreamException {
+    private Object readResolve() throws ObjectStreamException {
       try {
         final Object[] args = deserializeArgs();
         return new ComposedLoopCombiner<S, V, R>((Mapper<? super List<AsyncLoop<V>>, S>) args[0],
@@ -158,7 +158,7 @@ class ComposedLoopCombiner<S, V, R>
     }
 
     @NotNull
-    Object readResolve() throws ObjectStreamException {
+    private Object readResolve() throws ObjectStreamException {
       return sInstance;
     }
   }
@@ -174,7 +174,7 @@ class ComposedLoopCombiner<S, V, R>
     }
 
     @NotNull
-    Object readResolve() throws ObjectStreamException {
+    private Object readResolve() throws ObjectStreamException {
       return sInstance;
     }
   }
@@ -193,7 +193,7 @@ class ComposedLoopCombiner<S, V, R>
     }
 
     @NotNull
-    Object readResolve() throws ObjectStreamException {
+    private Object readResolve() throws ObjectStreamException {
       return sInstance;
     }
   }
@@ -214,7 +214,7 @@ class ComposedLoopCombiner<S, V, R>
     }
 
     @NotNull
-    Object readResolve() throws ObjectStreamException {
+    private Object readResolve() throws ObjectStreamException {
       return sInstance;
     }
   }

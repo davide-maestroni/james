@@ -189,7 +189,7 @@ class YieldLoopHandler<S, V, R> extends AsyncLoopHandler<V, R> implements Serial
 
     @NotNull
     @SuppressWarnings("unchecked")
-    Object readResolve() throws ObjectStreamException {
+    private Object readResolve() throws ObjectStreamException {
       try {
         final Object[] args = deserializeArgs();
         return new YieldLoopHandler<S, V, R>((Yielder<S, ? super V, R>) args[0], (String) args[1]);

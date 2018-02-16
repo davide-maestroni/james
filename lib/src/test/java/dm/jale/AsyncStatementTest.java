@@ -23,6 +23,7 @@ import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.Closeable;
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.io.Serializable;
@@ -2268,6 +2269,22 @@ public class AsyncStatementTest {
 
     public V apply(final V input) {
       return input;
+    }
+  }
+
+  private static class MyObjectInputStream extends ObjectInputStream {
+
+    // TODO: 16/02/2018 Service executor stop
+
+    public MyObjectInputStream(final InputStream inputStream) throws IOException {
+      super(inputStream);
+      enableResolveObject(true);
+    }
+
+    @Override
+    protected Object resolveObject(final Object o) throws IOException {
+      System.out.println("Deserialized instance of: " + o.getClass().getName());
+      return super.resolveObject(o);
     }
   }
 

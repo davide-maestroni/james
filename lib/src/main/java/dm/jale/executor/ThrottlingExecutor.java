@@ -148,7 +148,7 @@ class ThrottlingExecutor extends ScheduledExecutorDecorator implements Serializa
     }
 
     @NotNull
-    Object readResolve() throws ObjectStreamException {
+    private Object readResolve() throws ObjectStreamException {
       try {
         return new ThrottlingExecutor(mExecutor, mMaxCommands);
 

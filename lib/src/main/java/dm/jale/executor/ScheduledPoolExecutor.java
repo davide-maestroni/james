@@ -85,7 +85,7 @@ class ScheduledPoolExecutor extends ScheduledExecutorDecorator implements Serial
     }
 
     @NotNull
-    Object readResolve() throws ObjectStreamException {
+    private Object readResolve() throws ObjectStreamException {
       final int poolSize = mPoolSize;
       final ThreadFactory threadFactory = mThreadFactory;
       if (poolSize == Integer.MIN_VALUE) {

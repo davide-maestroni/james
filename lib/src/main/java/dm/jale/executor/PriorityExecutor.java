@@ -197,7 +197,7 @@ class PriorityExecutor {
       }
 
       @NotNull
-      Object readResolve() throws ObjectStreamException {
+      private Object readResolve() throws ObjectStreamException {
         try {
           return new PriorityExecutor.SerializableExecutor(mExecutor, mPriority);
 

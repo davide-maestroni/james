@@ -82,7 +82,7 @@ class ElseIfStatementHandler<V> extends AsyncStatementHandler<V, V> implements S
 
     @NotNull
     @SuppressWarnings("unchecked")
-    Object readResolve() throws ObjectStreamException {
+    private Object readResolve() throws ObjectStreamException {
       try {
         final Object[] args = deserializeArgs();
         return new ElseIfStatementHandler<V>(

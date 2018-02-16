@@ -18,7 +18,7 @@ package dm.jale;
 
 import org.jetbrains.annotations.NotNull;
 
-import dm.james.util.ConstantConditions;
+import dm.jale.util.ConstantConditions;
 
 /**
  * Created by davide-maestroni on 02/14/2018.

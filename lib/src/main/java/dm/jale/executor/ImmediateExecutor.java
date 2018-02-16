@@ -70,7 +70,7 @@ class ImmediateExecutor implements OwnerExecutor, Serializable {
   }
 
   @NotNull
-  Object readResolve() throws ObjectStreamException {
+  private Object readResolve() throws ObjectStreamException {
     return sInstance;
   }
 }

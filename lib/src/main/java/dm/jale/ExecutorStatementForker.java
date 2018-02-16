@@ -112,7 +112,7 @@ class ExecutorStatementForker<V>
       }
 
       @NotNull
-      Object readResolve() throws ObjectStreamException {
+      private Object readResolve() throws ObjectStreamException {
         try {
           return new InnerForker<V>(mExecutor);
 

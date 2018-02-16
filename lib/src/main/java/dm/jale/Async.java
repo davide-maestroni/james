@@ -51,8 +51,6 @@ import dm.jale.util.Threads;
 public class Async {
 
   // TODO: 14/02/2018 ExecutorPool.withBackoff()?
-  // TODO: 14/02/2018 AsyncIO, AsyncMath, AsyncRange
-  // TODO: 15/02/2018 readResolve => private?
 
   private final Executor mExecutor;
 
@@ -320,7 +318,7 @@ public class Async {
 
       @NotNull
       @SuppressWarnings("unchecked")
-      Object readResolve() throws ObjectStreamException {
+      private Object readResolve() throws ObjectStreamException {
         try {
           final Object[] args = deserializeArgs();
           return new LoopExecutorObserver<V>((Observer<AsyncEvaluations<V>>) args[0],
@@ -460,7 +458,7 @@ public class Async {
 
       @NotNull
       @SuppressWarnings("unchecked")
-      Object readResolve() throws ObjectStreamException {
+      private Object readResolve() throws ObjectStreamException {
         try {
           final Object[] args = deserializeArgs();
           return new StatementExecutorObserver<V>((Observer<AsyncEvaluation<V>>) args[0],
@@ -534,7 +532,7 @@ public class Async {
 
       @NotNull
       @SuppressWarnings("unchecked")
-      Object readResolve() throws ObjectStreamException {
+      private Object readResolve() throws ObjectStreamException {
         try {
           final Object[] args = deserializeArgs();
           return new UnevaluatedObserver<V, R>((Observer<R>) args[0]);

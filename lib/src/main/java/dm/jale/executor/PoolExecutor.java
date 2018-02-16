@@ -94,7 +94,7 @@ class PoolExecutor implements StoppableExecutor, Serializable {
     }
 
     @NotNull
-    Object readResolve() throws ObjectStreamException {
+    private Object readResolve() throws ObjectStreamException {
       final int nThreads = mNumThreads;
       final ThreadFactory threadFactory = mThreadFactory;
       if (nThreads == Integer.MIN_VALUE) {

@@ -118,7 +118,7 @@ class DoneLoopHandler<V> extends AsyncLoopHandler<V, V> implements Serializable 
 
     @NotNull
     @SuppressWarnings("unchecked")
-    Object readResolve() throws ObjectStreamException {
+    private Object readResolve() throws ObjectStreamException {
       try {
         final Object[] args = deserializeArgs();
         return new DoneLoopHandler<V>((Action) args[0]);

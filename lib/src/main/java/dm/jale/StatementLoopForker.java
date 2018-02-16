@@ -157,7 +157,7 @@ class StatementLoopForker<S, V>
 
     @NotNull
     @SuppressWarnings("unchecked")
-    Object readResolve() throws ObjectStreamException {
+    private Object readResolve() throws ObjectStreamException {
       try {
         final Object[] args = deserializeArgs();
         return new StatementLoopForker<S, V>(

@@ -29,6 +29,7 @@ import dm.jale.Async;
 import dm.jale.async.AsyncEvaluation;
 import dm.jale.async.AsyncEvaluations;
 import dm.jale.async.AsyncLoop;
+import dm.jale.async.AsyncState;
 import dm.jale.async.AsyncStatement;
 import dm.jale.async.AsyncStatement.Forker;
 import dm.jale.async.CombinationCompleter;
@@ -50,13 +51,19 @@ import dm.jale.ext.io.Chunk;
  */
 public class AsyncExt extends Async {
 
+  // TODO: 16/02/2018 Combiners: concat(), switch(), first()
+  // TODO: 16/02/2018 Yielders: delayFailures(), sum(), sumLong(), average(), averageLong(), min(),
+  // TODO: 16/02/2018 - max(), distinct()
+  // TODO: 16/02/2018 Forkers: retry(), repeat(), repeatAll(), repeatLast(), repeatFirst(),
+  // TODO: 16/02/2018 - repeatNewerThan()
+
   private final Async mAsync;
 
   public AsyncExt() {
     mAsync = new Async();
   }
 
-  private AsyncExt(Async async) {
+  private AsyncExt(@NotNull final Async async) {
     mAsync = async;
   }
 
@@ -73,6 +80,18 @@ public class AsyncExt extends Async {
       @Nullable final Updater<S, ? super Throwable, ? super PendingEvaluations<V>> failure,
       @Nullable final Settler<S, ? super PendingEvaluations<V>> done) {
     return onBackoffed(executor, new ComposedBackoffer<S, V>(init, value, failure, done));
+  }
+
+  @NotNull
+  public <V> AsyncStatement<List<V>> allOf(
+      @NotNull final Iterable<? extends AsyncStatement<? extends V>> statements) {
+    return statementOf(AllOfCombiner.<V>instance(), statements);
+  }
+
+  @NotNull
+  public <V> AsyncStatement<V> anyOf(
+      @NotNull final Iterable<? extends AsyncStatement<? extends V>> statements) {
+    return statementOf(AnyOfCombiner.<V>instance(), statements);
   }
 
   @NotNull
@@ -280,5 +299,111 @@ public class AsyncExt extends Async {
   public AsyncLoop<Chunk> inChunks(@NotNull final byte[] buffer,
       @Nullable final AllocationType allocationType, final int bufferSize, final int poolSize) {
     return loop(new ByteArrayChunkObserver(buffer, allocationType, null, bufferSize, poolSize));
+  }
+
+  @NotNull
+  public <V extends Comparable<V>> AsyncLoop<V> inRange(@NotNull final V start,
+      @NotNull final V end, @NotNull final Mapper<? super V, ? extends V> increment) {
+    return loop(new InRangeComparableObserver<V>(start, end, increment, false));
+  }
+
+  @NotNull
+  public AsyncLoop<Integer> inRange(final int start, final int end) {
+    return inRange(start, end, (start <= end) ? 1 : -1);
+  }
+
+  @NotNull
+  public AsyncLoop<Integer> inRange(final int start, final int end, final int increment) {
+    return loop(new InRangeIntegerObserver(start, end, increment, false));
+  }
+
+  @NotNull
+  public AsyncLoop<Long> inRange(final long start, final long end) {
+    return inRange(start, end, (start <= end) ? 1 : -1);
+  }
+
+  @NotNull
+  public AsyncLoop<Long> inRange(final long start, final long end, final long increment) {
+    return loop(new InRangeLongObserver(start, end, increment, false));
+  }
+
+  @NotNull
+  public AsyncLoop<Float> inRange(final float start, final float end) {
+    return inRange(start, end, (start <= end) ? 1 : -1);
+  }
+
+  @NotNull
+  public AsyncLoop<Float> inRange(final float start, final float end, final float increment) {
+    return loop(new InRangeFloatObserver(start, end, increment, false));
+  }
+
+  @NotNull
+  public AsyncLoop<Double> inRange(final double start, final double end) {
+    return inRange(start, end, (start <= end) ? 1 : -1);
+  }
+
+  @NotNull
+  public AsyncLoop<Double> inRange(final double start, final double end, final double increment) {
+    return loop(new InRangeDoubleObserver(start, end, increment, false));
+  }
+
+  @NotNull
+  public <V extends Comparable<V>> AsyncLoop<V> inRangeInclusive(@NotNull final V start,
+      @NotNull final V end, @NotNull final Mapper<? super V, ? extends V> increment) {
+    return loop(new InRangeComparableObserver<V>(start, end, increment, true));
+  }
+
+  @NotNull
+  public AsyncLoop<Integer> inRangeInclusive(final int start, final int end) {
+    return inRangeInclusive(start, end, (start <= end) ? 1 : -1);
+  }
+
+  @NotNull
+  public AsyncLoop<Integer> inRangeInclusive(final int start, final int end, final int increment) {
+    return loop(new InRangeIntegerObserver(start, end, increment, true));
+  }
+
+  @NotNull
+  public AsyncLoop<Long> inRangeInclusive(final long start, final long end) {
+    return inRangeInclusive(start, end, (start <= end) ? 1 : -1);
+  }
+
+  @NotNull
+  public AsyncLoop<Long> inRangeInclusive(final long start, final long end, final long increment) {
+    return loop(new InRangeLongObserver(start, end, increment, true));
+  }
+
+  @NotNull
+  public AsyncLoop<Float> inRangeInclusive(final float start, final float end) {
+    return inRangeInclusive(start, end, (start <= end) ? 1 : -1);
+  }
+
+  @NotNull
+  public AsyncLoop<Float> inRangeInclusive(final float start, final float end,
+      final float increment) {
+    return loop(new InRangeFloatObserver(start, end, increment, true));
+  }
+
+  @NotNull
+  public AsyncLoop<Double> inRangeInclusive(final double start, final double end) {
+    return inRangeInclusive(start, end, (start <= end) ? 1 : -1);
+  }
+
+  @NotNull
+  public AsyncLoop<Double> inRangeInclusive(final double start, final double end,
+      final double increment) {
+    return loop(new InRangeDoubleObserver(start, end, increment, true));
+  }
+
+  @NotNull
+  public <V> AsyncLoop<V> inSequence(@NotNull final V start, final long count,
+      @NotNull final Mapper<? super V, ? extends V> increment) {
+    return loop(new InSequenceObserver<V>(start, count, increment));
+  }
+
+  @NotNull
+  public <V> AsyncStatement<List<AsyncState<V>>> statesOf(
+      @NotNull final Iterable<? extends AsyncStatement<? extends V>> statements) {
+    return statementOf(StatesOfCombiner.<V>instance(), statements);
   }
 }

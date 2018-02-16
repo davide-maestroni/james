@@ -83,7 +83,7 @@ class ThenLoopHandler<V, R> extends AsyncLoopHandler<V, R> implements Serializab
 
     @NotNull
     @SuppressWarnings("unchecked")
-    Object readResolve() throws ObjectStreamException {
+    private Object readResolve() throws ObjectStreamException {
       try {
         final Object[] args = deserializeArgs();
         return new ThenLoopHandler<V, R>((Mapper<? super V, ? extends R>) args[0]);

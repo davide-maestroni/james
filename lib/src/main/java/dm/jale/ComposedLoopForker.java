@@ -104,7 +104,7 @@ class ComposedLoopForker<S, V> implements LoopForker<S, V>, Serializable {
     }
 
     @NotNull
-    Object readResolve() throws ObjectStreamException {
+    private Object readResolve() throws ObjectStreamException {
       return sInstance;
     }
   }
@@ -124,7 +124,7 @@ class ComposedLoopForker<S, V> implements LoopForker<S, V>, Serializable {
     }
 
     @NotNull
-    Object readResolve() throws ObjectStreamException {
+    private Object readResolve() throws ObjectStreamException {
       return sInstance;
     }
   }
@@ -140,7 +140,7 @@ class ComposedLoopForker<S, V> implements LoopForker<S, V>, Serializable {
     }
 
     @NotNull
-    Object readResolve() throws ObjectStreamException {
+    private Object readResolve() throws ObjectStreamException {
       return sInstance;
     }
   }
@@ -154,7 +154,7 @@ class ComposedLoopForker<S, V> implements LoopForker<S, V>, Serializable {
     private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
 
     @NotNull
-    Object readResolve() throws ObjectStreamException {
+    private Object readResolve() throws ObjectStreamException {
       return sInstance;
     }
 
@@ -177,7 +177,7 @@ class ComposedLoopForker<S, V> implements LoopForker<S, V>, Serializable {
 
     @NotNull
     @SuppressWarnings("unchecked")
-    Object readResolve() throws ObjectStreamException {
+    private Object readResolve() throws ObjectStreamException {
       try {
         final Object[] args = deserializeArgs();
         return new ComposedLoopForker<S, V>((Mapper<? super AsyncLoop<V>, S>) args[0],

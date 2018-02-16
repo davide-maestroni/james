@@ -62,7 +62,7 @@ class ThenIfStatementHandler<V, R> extends AsyncStatementHandler<V, R> implement
 
     @NotNull
     @SuppressWarnings("unchecked")
-    Object readResolve() throws ObjectStreamException {
+    private Object readResolve() throws ObjectStreamException {
       try {
         final Object[] args = deserializeArgs();
         return new ThenIfStatementHandler<V, R>(

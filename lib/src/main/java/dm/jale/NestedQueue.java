@@ -21,7 +21,7 @@ import org.jetbrains.annotations.Nullable;
 
 import java.util.Collection;
 
-import dm.james.util.DoubleQueue;
+import dm.jale.util.DoubleQueue;
 
 /**
  * Implementation of a nested queue ensuring that data are returned in the same order as they are

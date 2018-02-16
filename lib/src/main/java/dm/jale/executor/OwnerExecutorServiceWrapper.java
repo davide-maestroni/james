@@ -100,7 +100,7 @@ class OwnerExecutorServiceWrapper implements OwnerExecutor, StoppableExecutor, S
     }
 
     @NotNull
-    Object readResolve() throws ObjectStreamException {
+    private Object readResolve() throws ObjectStreamException {
       try {
         return of(mService);
 

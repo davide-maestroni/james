@@ -131,7 +131,7 @@ class ComposedStatementCombiner<S, V, R>
 
     @NotNull
     @SuppressWarnings("unchecked")
-    Object readResolve() throws ObjectStreamException {
+    private Object readResolve() throws ObjectStreamException {
       try {
         final Object[] args = deserializeArgs();
         return new ComposedStatementCombiner<S, V, R>(
@@ -166,7 +166,7 @@ class ComposedStatementCombiner<S, V, R>
     }
 
     @NotNull
-    Object readResolve() throws ObjectStreamException {
+    private Object readResolve() throws ObjectStreamException {
       return sInstance;
     }
   }
@@ -183,7 +183,7 @@ class ComposedStatementCombiner<S, V, R>
     }
 
     @NotNull
-    Object readResolve() throws ObjectStreamException {
+    private Object readResolve() throws ObjectStreamException {
       return sInstance;
     }
   }
@@ -203,7 +203,7 @@ class ComposedStatementCombiner<S, V, R>
     }
 
     @NotNull
-    Object readResolve() throws ObjectStreamException {
+    private Object readResolve() throws ObjectStreamException {
       return sInstance;
     }
   }
@@ -224,7 +224,7 @@ class ComposedStatementCombiner<S, V, R>
     }
 
     @NotNull
-    Object readResolve() throws ObjectStreamException {
+    private Object readResolve() throws ObjectStreamException {
       return sInstance;
     }
   }

@@ -80,7 +80,7 @@ class TryStatementLoopHandler<V, R> extends AsyncStatementLoopHandler<V, R>
 
     @NotNull
     @SuppressWarnings("unchecked")
-    Object readResolve() throws ObjectStreamException {
+    private Object readResolve() throws ObjectStreamException {
       try {
         final Object[] args = deserializeArgs();
         return new TryStatementLoopHandler<V, R>((Mapper<? super V, ? extends Closeable>) args[0],

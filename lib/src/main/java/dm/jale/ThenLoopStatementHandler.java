@@ -62,7 +62,7 @@ class ThenLoopStatementHandler<V, R> extends AsyncStatementLoopHandler<V, R>
 
     @NotNull
     @SuppressWarnings("unchecked")
-    Object readResolve() throws ObjectStreamException {
+    private Object readResolve() throws ObjectStreamException {
       try {
         final Object[] args = deserializeArgs();
         return new ThenLoopStatementHandler<V, R>(

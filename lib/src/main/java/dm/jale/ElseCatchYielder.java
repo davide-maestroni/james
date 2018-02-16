@@ -79,7 +79,7 @@ class ElseCatchYielder<V> extends CollectionYielder<V> implements Serializable {
 
     @NotNull
     @SuppressWarnings("unchecked")
-    Object readResolve() throws ObjectStreamException {
+    private Object readResolve() throws ObjectStreamException {
       try {
         final Object[] args = deserializeArgs();
         return new ElseCatchYielder<V>((Mapper<? super Throwable, ? extends Iterable<V>>) args[0],

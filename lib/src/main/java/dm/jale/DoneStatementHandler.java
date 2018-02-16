@@ -69,7 +69,7 @@ class DoneStatementHandler<V> extends AsyncStatementHandler<V, V> implements Ser
 
     @NotNull
     @SuppressWarnings("unchecked")
-    Object readResolve() throws ObjectStreamException {
+    private Object readResolve() throws ObjectStreamException {
       try {
         final Object[] args = deserializeArgs();
         return new DoneStatementHandler<V>((Action) args[0]);

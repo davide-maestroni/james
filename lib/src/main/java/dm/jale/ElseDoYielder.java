@@ -79,7 +79,7 @@ class ElseDoYielder<V> extends CollectionYielder<V> implements Serializable {
 
     @NotNull
     @SuppressWarnings("unchecked")
-    Object readResolve() throws ObjectStreamException {
+    private Object readResolve() throws ObjectStreamException {
       try {
         final Object[] args = deserializeArgs();
         return new ElseDoYielder<V>((Observer<? super Throwable>) args[0], (Class<?>[]) args[1]);

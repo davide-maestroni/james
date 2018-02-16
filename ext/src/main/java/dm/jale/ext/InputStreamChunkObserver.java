@@ -22,7 +22,6 @@ import org.jetbrains.annotations.Nullable;
 import java.io.InputStream;
 
 import dm.jale.async.AsyncEvaluations;
-import dm.jale.async.Observer;
 import dm.jale.ext.io.AllocationType;
 import dm.jale.ext.io.Chunk;
 import dm.jale.ext.io.ChunkOutputStream;
@@ -31,43 +30,22 @@ import dm.jale.util.ConstantConditions;
 /**
  * Created by davide-maestroni on 02/15/2018.
  */
-class InputStreamChunkObserver implements Observer<AsyncEvaluations<Chunk>> {
-
-  private final AllocationType mAllocationType;
-
-  private final Integer mBufferSize;
-
-  private final Integer mCoreSize;
+class InputStreamChunkObserver extends ChunkObserver {
 
   private final InputStream mInputStream;
-
-  private final Integer mPoolSize;
 
   InputStreamChunkObserver(@NotNull final InputStream inputStream,
       @Nullable final AllocationType allocationType, @Nullable final Integer coreSize,
       @Nullable final Integer bufferSize, @Nullable final Integer poolSize) {
+    super(allocationType, coreSize, bufferSize, poolSize);
     mInputStream = ConstantConditions.notNull("inputStream", inputStream);
-    mCoreSize = (coreSize != null) ? ConstantConditions.positive("coreSize", coreSize) : null;
-    mBufferSize =
-        (bufferSize != null) ? ConstantConditions.positive("bufferSize", bufferSize) : null;
-    mPoolSize = (poolSize != null) ? ConstantConditions.positive("poolSize", poolSize) : null;
-    mAllocationType = allocationType;
   }
 
   public void accept(final AsyncEvaluations<Chunk> evaluations) throws Exception {
-    final ChunkOutputStream outputStream;
-    if (mCoreSize != null) {
-      outputStream = new ChunkOutputStream(evaluations, mAllocationType, mCoreSize);
-
-    } else if ((mBufferSize != null) && (mPoolSize != null)) {
-      outputStream = new ChunkOutputStream(evaluations, mAllocationType, mBufferSize, mPoolSize);
-
-    } else {
-      outputStream = new ChunkOutputStream(evaluations, mAllocationType);
-    }
-
+    final ChunkOutputStream outputStream = newStream(evaluations);
     try {
       outputStream.transfer(mInputStream);
+      evaluations.set();
 
     } finally {
       outputStream.close();
