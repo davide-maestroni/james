@@ -27,7 +27,7 @@ import dm.jale.async.Provider;
 import dm.jale.async.Settler;
 import dm.jale.async.Updater;
 import dm.jale.ext.backoff.Backoffer;
-import dm.jale.ext.backoff.PendingEvaluations;
+import dm.jale.ext.backoff.PendingEvaluation;
 import dm.jale.ext.config.BuildConfig;
 import dm.jale.util.SerializableProxy;
 
@@ -38,37 +38,36 @@ class ComposedBackoffer<S, V> implements Backoffer<S, V>, Serializable {
 
   private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
 
-  private final Settler<S, ? super PendingEvaluations<V>> mDone;
+  private final Settler<S, ? super PendingEvaluation<V>> mDone;
 
-  private final Updater<S, ? super Throwable, ? super PendingEvaluations<V>> mFailure;
+  private final Updater<S, ? super Throwable, ? super PendingEvaluation<V>> mFailure;
 
   private final Provider<S> mInit;
 
-  private final Updater<S, ? super V, ? super PendingEvaluations<V>> mValue;
+  private final Updater<S, ? super V, ? super PendingEvaluation<V>> mValue;
 
   @SuppressWarnings("unchecked")
   ComposedBackoffer(@Nullable final Provider<S> init,
-      @Nullable final Updater<S, ? super V, ? super PendingEvaluations<V>> value,
-      @Nullable final Updater<S, ? super Throwable, ? super PendingEvaluations<V>> failure,
-      @Nullable final Settler<S, ? super PendingEvaluations<V>> done) {
+      @Nullable final Updater<S, ? super V, ? super PendingEvaluation<V>> value,
+      @Nullable final Updater<S, ? super Throwable, ? super PendingEvaluation<V>> failure,
+      @Nullable final Settler<S, ? super PendingEvaluation<V>> done) {
     mInit = (Provider<S>) ((init != null) ? init : DefaultInit.sInstance);
-    mValue = (Updater<S, ? super V, ? super PendingEvaluations<V>>) ((value != null) ? value
+    mValue = (Updater<S, ? super V, ? super PendingEvaluation<V>>) ((value != null) ? value
         : DefaultUpdater.sInstance);
     mFailure =
-        (Updater<S, ? super Throwable, ? super PendingEvaluations<V>>) ((failure != null) ? failure
+        (Updater<S, ? super Throwable, ? super PendingEvaluation<V>>) ((failure != null) ? failure
             : DefaultUpdater.sInstance);
-    mDone = (Settler<S, ? super PendingEvaluations<V>>) ((done != null) ? done
+    mDone = (Settler<S, ? super PendingEvaluation<V>>) ((done != null) ? done
         : DefaultSettler.sInstance);
   }
 
-  public void done(final S stack, @NotNull final PendingEvaluations<V> evaluations) throws
-      Exception {
-    mDone.complete(stack, evaluations);
+  public void done(final S stack, @NotNull final PendingEvaluation<V> evaluation) throws Exception {
+    mDone.complete(stack, evaluation);
   }
 
   public S failure(final S stack, @NotNull final Throwable failure,
-      @NotNull final PendingEvaluations<V> evaluations) throws Exception {
-    return mFailure.update(stack, failure, evaluations);
+      @NotNull final PendingEvaluation<V> evaluation) throws Exception {
+    return mFailure.update(stack, failure, evaluation);
   }
 
   public S init() throws Exception {
@@ -76,8 +75,8 @@ class ComposedBackoffer<S, V> implements Backoffer<S, V>, Serializable {
   }
 
   public S value(final S stack, final V value,
-      @NotNull final PendingEvaluations<V> evaluations) throws Exception {
-    return mValue.update(stack, value, evaluations);
+      @NotNull final PendingEvaluation<V> evaluation) throws Exception {
+    return mValue.update(stack, value, evaluation);
   }
 
   @NotNull
@@ -102,13 +101,13 @@ class ComposedBackoffer<S, V> implements Backoffer<S, V>, Serializable {
   }
 
   private static class DefaultSettler<S, V>
-      implements Settler<S, PendingEvaluations<V>>, Serializable {
+      implements Settler<S, PendingEvaluation<V>>, Serializable {
 
     private static final DefaultSettler<?, ?> sInstance = new DefaultSettler<Object, Object>();
 
     private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
 
-    public void complete(final S stack, @NotNull final PendingEvaluations<V> evaluations) {
+    public void complete(final S stack, @NotNull final PendingEvaluation<V> evaluation) {
     }
 
     @NotNull
@@ -118,15 +117,14 @@ class ComposedBackoffer<S, V> implements Backoffer<S, V>, Serializable {
   }
 
   private static class DefaultUpdater<S, V, I>
-      implements Updater<S, I, PendingEvaluations<V>>, Serializable {
+      implements Updater<S, I, PendingEvaluation<V>>, Serializable {
 
     private static final DefaultUpdater<?, ?, ?> sInstance =
         new DefaultUpdater<Object, Object, Object>();
 
     private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
 
-    public S update(final S stack, final I input,
-        @NotNull final PendingEvaluations<V> evaluations) {
+    public S update(final S stack, final I input, @NotNull final PendingEvaluation<V> evaluation) {
       return stack;
     }
 
@@ -141,9 +139,9 @@ class ComposedBackoffer<S, V> implements Backoffer<S, V>, Serializable {
     private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
 
     private ForkerProxy(final Provider<S> init,
-        final Updater<S, ? super V, ? super PendingEvaluations<V>> value,
-        final Updater<S, ? super Throwable, ? super PendingEvaluations<V>> failure,
-        final Settler<S, ? super PendingEvaluations<V>> done) {
+        final Updater<S, ? super V, ? super PendingEvaluation<V>> value,
+        final Updater<S, ? super Throwable, ? super PendingEvaluation<V>> failure,
+        final Settler<S, ? super PendingEvaluation<V>> done) {
       super(proxy(init), proxy(value), proxy(failure), proxy(done));
     }
 
@@ -153,9 +151,9 @@ class ComposedBackoffer<S, V> implements Backoffer<S, V>, Serializable {
       try {
         final Object[] args = deserializeArgs();
         return new ComposedBackoffer<S, V>((Provider<S>) args[0],
-            (Updater<S, ? super V, ? super PendingEvaluations<V>>) args[2],
-            (Updater<S, ? super Throwable, ? super PendingEvaluations<V>>) args[3],
-            (Settler<S, ? super PendingEvaluations<V>>) args[4]);
+            (Updater<S, ? super V, ? super PendingEvaluation<V>>) args[2],
+            (Updater<S, ? super Throwable, ? super PendingEvaluation<V>>) args[3],
+            (Settler<S, ? super PendingEvaluation<V>>) args[4]);
 
       } catch (final Throwable t) {
         throw new InvalidObjectException(t.getMessage());

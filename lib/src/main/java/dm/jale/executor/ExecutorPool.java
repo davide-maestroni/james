@@ -38,6 +38,8 @@ import dm.jale.util.WeakIdentityHashMap;
 @SuppressWarnings("WeakerAccess")
 public class ExecutorPool {
 
+  // TODO: 14/02/2018 ExecutorPool.withBackoff()?
+
   private static final Object sMutex = new Object();
 
   private static ScheduledExecutor sBackgroundExecutor;

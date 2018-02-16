@@ -63,10 +63,10 @@ class Asyncs {
     }
   }
 
-  static void failSafe(@NotNull final EvaluationCollection<?> evaluations,
+  static void failSafe(@NotNull final EvaluationCollection<?> evaluation,
       @NotNull final Throwable failure) {
     try {
-      evaluations.addFailure(failure).set();
+      evaluation.addFailure(failure).set();
 
     } catch (final Throwable ignored) {
       // Just ignore it

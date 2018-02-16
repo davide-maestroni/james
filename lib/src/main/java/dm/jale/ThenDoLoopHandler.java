@@ -44,16 +44,15 @@ class ThenDoLoopHandler<V, R> extends AsyncLoopHandler<V, R> implements Serializ
   }
 
   @Override
-  void addValue(final V value, @NotNull final EvaluationCollection<R> evaluations) throws
-      Exception {
+  void addValue(final V value, @NotNull final EvaluationCollection<R> evaluation) throws Exception {
     mObserver.accept(value);
-    super.addValue(value, evaluations);
+    super.addValue(value, evaluation);
   }
 
   @Override
   @SuppressWarnings("unchecked")
   void addValues(@Nullable final Iterable<? extends V> values,
-      @NotNull final EvaluationCollection<R> evaluations) throws Exception {
+      @NotNull final EvaluationCollection<R> evaluation) throws Exception {
     if (values == null) {
       return;
     }
@@ -67,7 +66,7 @@ class ThenDoLoopHandler<V, R> extends AsyncLoopHandler<V, R> implements Serializ
       }
 
     } finally {
-      evaluations.addValues((Iterable<R>) Iterables.asList(values).subList(0, index)).set();
+      evaluation.addValues((Iterable<R>) Iterables.asList(values).subList(0, index)).set();
     }
   }
 

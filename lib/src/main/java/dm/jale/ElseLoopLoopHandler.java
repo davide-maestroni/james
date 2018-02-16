@@ -56,20 +56,20 @@ class ElseLoopLoopHandler<V> extends AsyncLoopHandler<V, V> implements Serializa
   @Override
   @SuppressWarnings("unchecked")
   void addFailure(@NotNull final Throwable failure,
-      @NotNull final EvaluationCollection<V> evaluations) throws Exception {
+      @NotNull final EvaluationCollection<V> evaluation) throws Exception {
     for (final Class<?> type : mTypes) {
       if (type.isInstance(failure)) {
-        evaluations.addValues(mMapper.apply(failure)).set();
+        evaluation.addValues(mMapper.apply(failure)).set();
         return;
       }
     }
 
-    super.addFailure(failure, evaluations);
+    super.addFailure(failure, evaluation);
   }
 
   @Override
   void addFailures(@Nullable final Iterable<? extends Throwable> failures,
-      @NotNull final EvaluationCollection<V> evaluations) throws Exception {
+      @NotNull final EvaluationCollection<V> evaluation) throws Exception {
     if (failures == null) {
       return;
     }
@@ -92,18 +92,18 @@ class ElseLoopLoopHandler<V> extends AsyncLoopHandler<V, V> implements Serializa
 
         if (!found) {
           if (outputs.isEmpty()) {
-            evaluations.addFailure(failure);
+            evaluation.addFailure(failure);
 
           } else {
             final ArrayList<V> values = new ArrayList<V>(outputs);
             outputs.clear();
-            evaluations.addValues(values).addFailure(failure);
+            evaluation.addValues(values).addFailure(failure);
           }
         }
       }
 
     } finally {
-      evaluations.addValues(outputs).set();
+      evaluation.addValues(outputs).set();
     }
   }
 

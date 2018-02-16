@@ -49,7 +49,7 @@ public class AsyncTest {
 
     class ForkStack<V> {
 
-      ArrayList<Evaluation<V>> evaluations = new ArrayList<Evaluation<V>>();
+      ArrayList<Evaluation<V>> evaluation = new ArrayList<Evaluation<V>>();
 
       Statement<String> forked;
 
@@ -72,7 +72,7 @@ public class AsyncTest {
                          @NotNull final Statement<String> async) {
                        final EvaluationState<String> state = stack.state;
                        if (state == null) {
-                         stack.evaluations.add(evaluation);
+                         stack.evaluation.add(evaluation);
 
                        } else if (state.isFailed()) {
                          evaluation.fail(state.failure());
@@ -94,11 +94,11 @@ public class AsyncTest {
                      public ForkStack<String> failure(final ForkStack<String> stack,
                          @NotNull final Throwable failure, @NotNull final Statement<String> async) {
                        stack.state = SimpleState.ofFailure(failure);
-                       for (final Evaluation<String> evaluation : stack.evaluations) {
+                       for (final Evaluation<String> evaluation : stack.evaluation) {
                          evaluation.fail(failure);
                        }
 
-                       stack.evaluations.clear();
+                       stack.evaluation.clear();
                        return stack;
                      }
 
@@ -110,11 +110,11 @@ public class AsyncTest {
                          final String value, @NotNull final Statement<String> async) {
                        stack.timestamp = System.currentTimeMillis();
                        stack.state = SimpleState.ofValue(value);
-                       for (final Evaluation<String> evaluation : stack.evaluations) {
+                       for (final Evaluation<String> evaluation : stack.evaluation) {
                          evaluation.set(value);
                        }
 
-                       stack.evaluations.clear();
+                       stack.evaluation.clear();
                        return stack;
                      }
                    });
@@ -125,8 +125,8 @@ public class AsyncTest {
     // TODO: 08/02/2018 move to loop tests
     assertThat(new Async().loop(new Observer<EvaluationCollection<Object>>() {
 
-      public void accept(final EvaluationCollection<Object> evaluations) {
-        evaluations.addFailures(Collections.<Throwable>singletonList(null)).set();
+      public void accept(final EvaluationCollection<Object> evaluation) {
+        evaluation.addFailures(Collections.<Throwable>singletonList(null)).set();
       }
     }).isFailed()).isTrue();
   }

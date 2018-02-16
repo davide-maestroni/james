@@ -45,23 +45,23 @@ class InRangeFloatObserver implements Observer<EvaluationCollection<Float>>, Ser
     mIsInclusive = isInclusive;
   }
 
-  public void accept(final EvaluationCollection<Float> evaluations) throws Exception {
+  public void accept(final EvaluationCollection<Float> evaluation) throws Exception {
     float value = mStart;
     @SuppressWarnings("UnnecessaryLocalVariable") final float end = mEnd;
     @SuppressWarnings("UnnecessaryLocalVariable") final float increment = mIncrement;
     if (mIsInclusive) {
       while (value < end) {
-        evaluations.addValue(value);
+        evaluation.addValue(value);
         value += increment;
       }
 
     } else {
       while (value <= end) {
-        evaluations.addValue(value);
+        evaluation.addValue(value);
         value += increment;
       }
     }
 
-    evaluations.set();
+    evaluation.set();
   }
 }

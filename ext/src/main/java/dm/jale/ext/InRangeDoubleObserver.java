@@ -45,23 +45,23 @@ class InRangeDoubleObserver implements Observer<EvaluationCollection<Double>>, S
     mIsInclusive = isInclusive;
   }
 
-  public void accept(final EvaluationCollection<Double> evaluations) throws Exception {
+  public void accept(final EvaluationCollection<Double> evaluation) throws Exception {
     double value = mStart;
     @SuppressWarnings("UnnecessaryLocalVariable") final double end = mEnd;
     @SuppressWarnings("UnnecessaryLocalVariable") final double increment = mIncrement;
     if (mIsInclusive) {
       while (value < end) {
-        evaluations.addValue(value);
+        evaluation.addValue(value);
         value += increment;
       }
 
     } else {
       while (value <= end) {
-        evaluations.addValue(value);
+        evaluation.addValue(value);
         value += increment;
       }
     }
 
-    evaluations.set();
+    evaluation.set();
   }
 }

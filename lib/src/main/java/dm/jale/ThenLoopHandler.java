@@ -44,14 +44,13 @@ class ThenLoopHandler<V, R> extends AsyncLoopHandler<V, R> implements Serializab
   }
 
   @Override
-  void addValue(final V value, @NotNull final EvaluationCollection<R> evaluations) throws
-      Exception {
-    evaluations.addValue(mMapper.apply(value)).set();
+  void addValue(final V value, @NotNull final EvaluationCollection<R> evaluation) throws Exception {
+    evaluation.addValue(mMapper.apply(value)).set();
   }
 
   @Override
   void addValues(@Nullable final Iterable<? extends V> values,
-      @NotNull final EvaluationCollection<R> evaluations) throws Exception {
+      @NotNull final EvaluationCollection<R> evaluation) throws Exception {
     if (values == null) {
       return;
     }
@@ -65,7 +64,7 @@ class ThenLoopHandler<V, R> extends AsyncLoopHandler<V, R> implements Serializab
       }
 
     } finally {
-      evaluations.addValues(outputs).set();
+      evaluation.addValues(outputs).set();
     }
   }
 

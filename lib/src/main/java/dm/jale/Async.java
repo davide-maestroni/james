@@ -50,8 +50,6 @@ import dm.jale.util.Threads;
  */
 public class Async {
 
-  // TODO: 14/02/2018 ExecutorPool.withBackoff()?
-
   private final Executor mExecutor;
 
   private final boolean mIsUnevaluated;
@@ -269,8 +267,8 @@ public class Async {
       mFailures = failures;
     }
 
-    public void accept(final EvaluationCollection<V> evaluations) {
-      evaluations.addFailures(mFailures).set();
+    public void accept(final EvaluationCollection<V> evaluation) {
+      evaluation.addFailures(mFailures).set();
     }
   }
 
@@ -330,7 +328,7 @@ public class Async {
       }
     }
 
-    public void accept(final EvaluationCollection<V> evaluations) {
+    public void accept(final EvaluationCollection<V> evaluation) {
       mExecutor.execute(new Runnable() {
 
         public void run() {
@@ -339,7 +337,7 @@ public class Async {
           }
 
           try {
-            mObserver.accept(evaluations);
+            mObserver.accept(evaluation);
 
           } catch (final Throwable t) {
             synchronized (mMutex) {
@@ -347,7 +345,7 @@ public class Async {
             }
 
             try {
-              evaluations.addFailure(RuntimeInterruptedException.wrapIfInterrupt(t)).set();
+              evaluation.addFailure(RuntimeInterruptedException.wrapIfInterrupt(t)).set();
 
             } catch (final Throwable ignored) {
               // cannot take any action
@@ -374,17 +372,17 @@ public class Async {
       return new LoopObserver<V>(mStatement.evaluate());
     }
 
-    public void accept(final EvaluationCollection<V> evaluations) {
+    public void accept(final EvaluationCollection<V> evaluation) {
       mStatement.then(new Mapper<Iterable<V>, Void>() {
 
         public Void apply(final Iterable<V> values) {
-          evaluations.addValues(values).set();
+          evaluation.addValues(values).set();
           return null;
         }
       }).elseCatch(new Mapper<Throwable, Void>() {
 
         public Void apply(final Throwable failure) {
-          evaluations.addFailure(failure).set();
+          evaluation.addFailure(failure).set();
           return null;
         }
       });
@@ -407,17 +405,17 @@ public class Async {
       return new SingleLoopObserver<V>(mStatement.evaluate());
     }
 
-    public void accept(final EvaluationCollection<V> evaluations) {
+    public void accept(final EvaluationCollection<V> evaluation) {
       mStatement.then(new Mapper<V, Void>() {
 
         public Void apply(final V value) {
-          evaluations.addValue(value).set();
+          evaluation.addValue(value).set();
           return null;
         }
       }).elseCatch(new Mapper<Throwable, Void>() {
 
         public Void apply(final Throwable failure) {
-          evaluations.addFailure(failure).set();
+          evaluation.addFailure(failure).set();
           return null;
         }
       });
@@ -578,8 +576,8 @@ public class Async {
       mValues = values;
     }
 
-    public void accept(final EvaluationCollection<V> evaluations) {
-      evaluations.addValues(mValues).set();
+    public void accept(final EvaluationCollection<V> evaluation) {
+      evaluation.addValues(mValues).set();
     }
   }
 }

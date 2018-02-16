@@ -39,11 +39,11 @@ class ByteArrayChunkObserver extends ChunkObserver {
     mBuffer = ConstantConditions.notNull("buffer", buffer);
   }
 
-  public void accept(final EvaluationCollection<Chunk> evaluations) throws Exception {
-    final ChunkOutputStream outputStream = newStream(evaluations);
+  public void accept(final EvaluationCollection<Chunk> evaluation) throws Exception {
+    final ChunkOutputStream outputStream = newStream(evaluation);
     try {
       outputStream.write(mBuffer);
-      evaluations.set();
+      evaluation.set();
 
     } finally {
       outputStream.close();

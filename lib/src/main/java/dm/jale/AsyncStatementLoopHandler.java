@@ -26,8 +26,8 @@ import dm.jale.async.EvaluationCollection;
 class AsyncStatementLoopHandler<V, R> {
 
   void failure(@NotNull final Throwable failure,
-      @NotNull final EvaluationCollection<R> evaluations) throws Exception {
-    evaluations.addFailure(failure).set();
+      @NotNull final EvaluationCollection<R> evaluation) throws Exception {
+    evaluation.addFailure(failure).set();
   }
 
   @NotNull
@@ -36,7 +36,7 @@ class AsyncStatementLoopHandler<V, R> {
   }
 
   @SuppressWarnings("unchecked")
-  void value(final V value, @NotNull final EvaluationCollection<R> evaluations) throws Exception {
-    evaluations.addValue((R) value).set();
+  void value(final V value, @NotNull final EvaluationCollection<R> evaluation) throws Exception {
+    evaluation.addValue((R) value).set();
   }
 }

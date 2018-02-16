@@ -27,25 +27,24 @@ import dm.jale.async.EvaluationCollection;
 class AsyncLoopHandler<V, R> {
 
   void addFailure(@NotNull final Throwable failure,
-      @NotNull final EvaluationCollection<R> evaluations) throws Exception {
-    evaluations.addFailure(failure).set();
+      @NotNull final EvaluationCollection<R> evaluation) throws Exception {
+    evaluation.addFailure(failure).set();
   }
 
   void addFailures(@Nullable final Iterable<? extends Throwable> failures,
-      @NotNull final EvaluationCollection<R> evaluations) throws Exception {
-    evaluations.addFailures(failures).set();
+      @NotNull final EvaluationCollection<R> evaluation) throws Exception {
+    evaluation.addFailures(failures).set();
   }
 
   @SuppressWarnings("unchecked")
-  void addValue(final V value, @NotNull final EvaluationCollection<R> evaluations) throws
-      Exception {
-    evaluations.addValue((R) value).set();
+  void addValue(final V value, @NotNull final EvaluationCollection<R> evaluation) throws Exception {
+    evaluation.addValue((R) value).set();
   }
 
   @SuppressWarnings("unchecked")
   void addValues(@Nullable final Iterable<? extends V> values,
-      @NotNull final EvaluationCollection<R> evaluations) throws Exception {
-    evaluations.addValues((Iterable<R>) values).set();
+      @NotNull final EvaluationCollection<R> evaluation) throws Exception {
+    evaluation.addValues((Iterable<R>) values).set();
   }
 
   @NotNull
@@ -53,7 +52,7 @@ class AsyncLoopHandler<V, R> {
     return this;
   }
 
-  void set(@NotNull final EvaluationCollection<R> evaluations) throws Exception {
-    evaluations.set();
+  void set(@NotNull final EvaluationCollection<R> evaluation) throws Exception {
+    evaluation.set();
   }
 }

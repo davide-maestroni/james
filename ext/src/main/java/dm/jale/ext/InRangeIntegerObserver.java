@@ -45,23 +45,23 @@ class InRangeIntegerObserver implements Observer<EvaluationCollection<Integer>>,
     mIsInclusive = isInclusive;
   }
 
-  public void accept(final EvaluationCollection<Integer> evaluations) throws Exception {
+  public void accept(final EvaluationCollection<Integer> evaluation) throws Exception {
     int value = mStart;
     @SuppressWarnings("UnnecessaryLocalVariable") final int end = mEnd;
     @SuppressWarnings("UnnecessaryLocalVariable") final int increment = mIncrement;
     if (mIsInclusive) {
       while (value < end) {
-        evaluations.addValue(value);
+        evaluation.addValue(value);
         value += increment;
       }
 
     } else {
       while (value <= end) {
-        evaluations.addValue(value);
+        evaluation.addValue(value);
         value += increment;
       }
     }
 
-    evaluations.set();
+    evaluation.set();
   }
 }

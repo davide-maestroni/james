@@ -68,7 +68,7 @@ class CombinationLoopObserver<S, V, R> implements Observer<EvaluationCollection<
   }
 
   @SuppressWarnings("unchecked")
-  public void accept(final EvaluationCollection<R> evaluations) throws Exception {
+  public void accept(final EvaluationCollection<R> evaluation) throws Exception {
     int i = 0;
     @SuppressWarnings("UnnecessaryLocalVariable") final Logger logger = mLogger;
     @SuppressWarnings("UnnecessaryLocalVariable") final Executor executor = mExecutor;
@@ -79,19 +79,19 @@ class CombinationLoopObserver<S, V, R> implements Observer<EvaluationCollection<
       state.set(combiner.init((List<Loop<V>>) loops));
       for (final Loop<? extends V> loop : loops) {
         final int index = i++;
-        loop.to(new EvaluationCollectionCombination<S, V, R>(state, combiner, executor, evaluations,
+        loop.to(new EvaluationCollectionCombination<S, V, R>(state, combiner, executor, evaluation,
             loops, index, logger));
       }
 
     } catch (final CancellationException e) {
       mLogger.wrn(e, "Loop has been cancelled");
       state.setFailed(e);
-      Asyncs.failSafe(evaluations, e);
+      Asyncs.failSafe(evaluation, e);
 
     } catch (final Throwable t) {
       mLogger.err(t, "Error while initializing statements combination");
       state.setFailed(t);
-      Asyncs.failSafe(evaluations, RuntimeInterruptedException.wrapIfInterrupt(t));
+      Asyncs.failSafe(evaluation, RuntimeInterruptedException.wrapIfInterrupt(t));
     }
   }
 
@@ -104,7 +104,7 @@ class CombinationLoopObserver<S, V, R> implements Observer<EvaluationCollection<
 
     private final Combiner<S, ? super V, ? super EvaluationCollection<R>, Loop<V>> mCombiner;
 
-    private final EvaluationCollection<R> mEvaluations;
+    private final EvaluationCollection<R> mEvaluation;
 
     private final Executor mExecutor;
 
@@ -118,13 +118,13 @@ class CombinationLoopObserver<S, V, R> implements Observer<EvaluationCollection<
 
     private EvaluationCollectionCombination(@NotNull final CombinationState<S> state,
         @NotNull final Combiner<S, ? super V, ? super EvaluationCollection<R>, Loop<V>> combiner,
-        @NotNull final Executor executor, @NotNull final EvaluationCollection<R> evaluations,
+        @NotNull final Executor executor, @NotNull final EvaluationCollection<R> evaluation,
         @NotNull final List<? extends Loop<? extends V>> loops, final int index,
         @NotNull final Logger logger) {
       mState = state;
       mCombiner = combiner;
       mExecutor = executor;
-      mEvaluations = evaluations;
+      mEvaluation = evaluation;
       mLoops = loops;
       mIndex = index;
       mLogger = logger;
@@ -142,20 +142,20 @@ class CombinationLoopObserver<S, V, R> implements Observer<EvaluationCollection<
             return;
           }
 
-          final EvaluationCollection<R> evaluations = mEvaluations;
+          final EvaluationCollection<R> evaluation = mEvaluation;
           try {
             @SuppressWarnings("unchecked") final List<Loop<V>> loops = (List<Loop<V>>) mLoops;
-            state.set(mCombiner.failure(state.get(), failure, evaluations, loops, mIndex));
+            state.set(mCombiner.failure(state.get(), failure, evaluation, loops, mIndex));
 
           } catch (final CancellationException e) {
             mLogger.wrn(e, "Loop has been cancelled");
             state.setFailed(e);
-            Asyncs.failSafe(evaluations, e);
+            Asyncs.failSafe(evaluation, e);
 
           } catch (final Throwable t) {
             mLogger.err(t, "Error while processing failure: %s", failure);
             state.setFailed(t);
-            Asyncs.failSafe(evaluations, RuntimeInterruptedException.wrapIfInterrupt(t));
+            Asyncs.failSafe(evaluation, RuntimeInterruptedException.wrapIfInterrupt(t));
           }
         }
       });
@@ -176,7 +176,7 @@ class CombinationLoopObserver<S, V, R> implements Observer<EvaluationCollection<
           }
 
           if (failures != null) {
-            final EvaluationCollection<R> evaluations = mEvaluations;
+            final EvaluationCollection<R> evaluation = mEvaluation;
             try {
               @SuppressWarnings("UnnecessaryLocalVariable") final int index = mIndex;
               @SuppressWarnings(
@@ -185,18 +185,18 @@ class CombinationLoopObserver<S, V, R> implements Observer<EvaluationCollection<
                   combiner = mCombiner;
               @SuppressWarnings("unchecked") final List<Loop<V>> loops = (List<Loop<V>>) mLoops;
               for (final Throwable failure : failures) {
-                state.set(combiner.failure(state.get(), failure, evaluations, loops, index));
+                state.set(combiner.failure(state.get(), failure, evaluation, loops, index));
               }
 
             } catch (final CancellationException e) {
               mLogger.wrn(e, "Loop has been cancelled");
               state.setFailed(e);
-              Asyncs.failSafe(evaluations, e);
+              Asyncs.failSafe(evaluation, e);
 
             } catch (final Throwable t) {
               mLogger.err(t, "Error while processing failures: %s", failures);
               state.setFailed(t);
-              Asyncs.failSafe(evaluations, RuntimeInterruptedException.wrapIfInterrupt(t));
+              Asyncs.failSafe(evaluation, RuntimeInterruptedException.wrapIfInterrupt(t));
             }
           }
         }
@@ -216,20 +216,20 @@ class CombinationLoopObserver<S, V, R> implements Observer<EvaluationCollection<
             return;
           }
 
-          final EvaluationCollection<R> evaluations = mEvaluations;
+          final EvaluationCollection<R> evaluation = mEvaluation;
           try {
             @SuppressWarnings("unchecked") final List<Loop<V>> loops = (List<Loop<V>>) mLoops;
-            state.set(mCombiner.value(state.get(), value, evaluations, loops, mIndex));
+            state.set(mCombiner.value(state.get(), value, evaluation, loops, mIndex));
 
           } catch (final CancellationException e) {
             mLogger.wrn(e, "Loop has been cancelled");
             state.setFailed(e);
-            Asyncs.failSafe(evaluations, e);
+            Asyncs.failSafe(evaluation, e);
 
           } catch (final Throwable t) {
             mLogger.err(t, "Error while processing value: %s", value);
             state.setFailed(t);
-            Asyncs.failSafe(evaluations, RuntimeInterruptedException.wrapIfInterrupt(t));
+            Asyncs.failSafe(evaluation, RuntimeInterruptedException.wrapIfInterrupt(t));
           }
         }
       });
@@ -249,7 +249,7 @@ class CombinationLoopObserver<S, V, R> implements Observer<EvaluationCollection<
           }
 
           if (values != null) {
-            final EvaluationCollection<R> evaluations = mEvaluations;
+            final EvaluationCollection<R> evaluation = mEvaluation;
             try {
               @SuppressWarnings("UnnecessaryLocalVariable") final int index = mIndex;
               @SuppressWarnings(
@@ -258,18 +258,18 @@ class CombinationLoopObserver<S, V, R> implements Observer<EvaluationCollection<
                   combiner = mCombiner;
               @SuppressWarnings("unchecked") final List<Loop<V>> loops = (List<Loop<V>>) mLoops;
               for (final V value : values) {
-                state.set(combiner.value(state.get(), value, evaluations, loops, index));
+                state.set(combiner.value(state.get(), value, evaluation, loops, index));
               }
 
             } catch (final CancellationException e) {
               mLogger.wrn(e, "Loop has been cancelled");
               state.setFailed(e);
-              Asyncs.failSafe(evaluations, e);
+              Asyncs.failSafe(evaluation, e);
 
             } catch (final Throwable t) {
               mLogger.err(t, "Error while processing values: %s", values);
               state.setFailed(t);
-              Asyncs.failSafe(evaluations, RuntimeInterruptedException.wrapIfInterrupt(t));
+              Asyncs.failSafe(evaluation, RuntimeInterruptedException.wrapIfInterrupt(t));
             }
           }
         }
@@ -288,26 +288,26 @@ class CombinationLoopObserver<S, V, R> implements Observer<EvaluationCollection<
             return;
           }
 
-          final EvaluationCollection<R> evaluations = mEvaluations;
+          final EvaluationCollection<R> evaluation = mEvaluation;
           try {
             @SuppressWarnings("UnnecessaryLocalVariable") final int index = mIndex;
             final Combiner<S, ? super V, ? super EvaluationCollection<R>, Loop<V>> combiner =
                 mCombiner;
             @SuppressWarnings("unchecked") final List<Loop<V>> loops = (List<Loop<V>>) mLoops;
-            state.set(combiner.done(state.get(), evaluations, loops, index));
+            state.set(combiner.done(state.get(), evaluation, loops, index));
             if (state.set()) {
-              combiner.settle(state.get(), evaluations, loops);
+              combiner.settle(state.get(), evaluation, loops);
             }
 
           } catch (final CancellationException e) {
             mLogger.wrn(e, "Statement has been cancelled");
             state.setFailed(e);
-            Asyncs.failSafe(evaluations, e);
+            Asyncs.failSafe(evaluation, e);
 
           } catch (final Throwable t) {
             mLogger.err(t, "Error while completing loop");
             state.setFailed(t);
-            Asyncs.failSafe(evaluations, RuntimeInterruptedException.wrapIfInterrupt(t));
+            Asyncs.failSafe(evaluation, RuntimeInterruptedException.wrapIfInterrupt(t));
           }
         }
       });

@@ -42,7 +42,7 @@ import dm.jale.async.Statement;
 import dm.jale.async.Statement.Forker;
 import dm.jale.async.Updater;
 import dm.jale.ext.backoff.Backoffer;
-import dm.jale.ext.backoff.PendingEvaluations;
+import dm.jale.ext.backoff.PendingEvaluation;
 import dm.jale.ext.io.AllocationType;
 import dm.jale.ext.io.Chunk;
 
@@ -76,9 +76,9 @@ public class AsyncExt extends Async {
   @NotNull
   public static <S, V> Forker<?, V, EvaluationCollection<V>, Loop<V>> onBackoffed(
       @NotNull final Executor executor, @Nullable final Provider<S> init,
-      @Nullable final Updater<S, ? super V, ? super PendingEvaluations<V>> value,
-      @Nullable final Updater<S, ? super Throwable, ? super PendingEvaluations<V>> failure,
-      @Nullable final Settler<S, ? super PendingEvaluations<V>> done) {
+      @Nullable final Updater<S, ? super V, ? super PendingEvaluation<V>> value,
+      @Nullable final Updater<S, ? super Throwable, ? super PendingEvaluation<V>> failure,
+      @Nullable final Settler<S, ? super PendingEvaluation<V>> done) {
     return onBackoffed(executor, new ComposedBackoffer<S, V>(init, value, failure, done));
   }
 

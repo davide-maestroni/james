@@ -49,17 +49,17 @@ class InSequenceObserver<V> implements Observer<EvaluationCollection<V>>, Serial
     mIncrement = ConstantConditions.notNull("increment", increment);
   }
 
-  public void accept(final EvaluationCollection<V> evaluations) throws Exception {
+  public void accept(final EvaluationCollection<V> evaluation) throws Exception {
     V value = mStart;
     @SuppressWarnings("UnnecessaryLocalVariable") final long count = mCount;
     @SuppressWarnings("UnnecessaryLocalVariable") final Mapper<? super V, ? extends V> increment =
         mIncrement;
     for (int i = 0; i < count; ++i) {
-      evaluations.addValue(value);
+      evaluation.addValue(value);
       value = increment.apply(value);
     }
 
-    evaluations.set();
+    evaluation.set();
   }
 
   @NotNull

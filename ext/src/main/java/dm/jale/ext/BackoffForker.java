@@ -32,9 +32,9 @@ import dm.jale.async.LoopForker;
 import dm.jale.async.RuntimeInterruptedException;
 import dm.jale.executor.ExecutorPool;
 import dm.jale.executor.OwnerExecutor;
-import dm.jale.ext.BackoffForker.ForkerEvaluations;
+import dm.jale.ext.BackoffForker.ForkerEvaluation;
 import dm.jale.ext.backoff.Backoffer;
-import dm.jale.ext.backoff.PendingEvaluations;
+import dm.jale.ext.backoff.PendingEvaluation;
 import dm.jale.ext.config.BuildConfig;
 import dm.jale.util.ConstantConditions;
 import dm.jale.util.Iterables;
@@ -45,7 +45,7 @@ import dm.jale.util.TimeUnits.Condition;
 /**
  * Created by davide-maestroni on 02/09/2018.
  */
-class BackoffForker<S, V> implements LoopForker<ForkerEvaluations<S, V>, V>, Serializable {
+class BackoffForker<S, V> implements LoopForker<ForkerEvaluation<S, V>, V>, Serializable {
 
   private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
 
@@ -58,32 +58,32 @@ class BackoffForker<S, V> implements LoopForker<ForkerEvaluations<S, V>, V>, Ser
     mBackoffer = ConstantConditions.notNull("backoffer", backoffer);
   }
 
-  public ForkerEvaluations<S, V> done(final ForkerEvaluations<S, V> stack,
+  public ForkerEvaluation<S, V> done(final ForkerEvaluation<S, V> stack,
       @NotNull final Loop<V> async) throws Exception {
     mBackoffer.done(stack.getStack(), stack);
     return stack.withStack(null);
   }
 
-  public ForkerEvaluations<S, V> evaluation(final ForkerEvaluations<S, V> stack,
-      @NotNull final EvaluationCollection<V> evaluations, @NotNull final Loop<V> async) throws
+  public ForkerEvaluation<S, V> evaluation(final ForkerEvaluation<S, V> stack,
+      @NotNull final EvaluationCollection<V> evaluation, @NotNull final Loop<V> async) throws
       Exception {
-    if (!stack.setEvaluations(evaluations)) {
-      evaluations.addFailure(new IllegalStateException("the loop cannot be chained")).set();
+    if (!stack.setEvaluations(evaluation)) {
+      evaluation.addFailure(new IllegalStateException("the loop cannot be chained")).set();
     }
 
     return stack;
   }
 
-  public ForkerEvaluations<S, V> failure(final ForkerEvaluations<S, V> stack,
+  public ForkerEvaluation<S, V> failure(final ForkerEvaluation<S, V> stack,
       @NotNull final Throwable failure, @NotNull final Loop<V> async) throws Exception {
     return stack.withStack(mBackoffer.failure(stack.getStack(), failure, stack));
   }
 
-  public ForkerEvaluations<S, V> init(@NotNull final Loop<V> async) throws Exception {
-    return new ForkerEvaluations<S, V>(mExecutor, mBackoffer.init());
+  public ForkerEvaluation<S, V> init(@NotNull final Loop<V> async) throws Exception {
+    return new ForkerEvaluation<S, V>(mExecutor, mBackoffer.init());
   }
 
-  public ForkerEvaluations<S, V> value(final ForkerEvaluations<S, V> stack, final V value,
+  public ForkerEvaluation<S, V> value(final ForkerEvaluation<S, V> stack, final V value,
       @NotNull final Loop<V> async) throws Exception {
     return stack.withStack(mBackoffer.value(stack.getStack(), value, stack));
   }
@@ -93,7 +93,7 @@ class BackoffForker<S, V> implements LoopForker<ForkerEvaluations<S, V>, V>, Ser
     return new ForkerProxy<S, V>(mExecutor, mBackoffer);
   }
 
-  static class ForkerEvaluations<S, V> implements PendingEvaluations<V> {
+  static class ForkerEvaluation<S, V> implements PendingEvaluation<V> {
 
     private final OwnerExecutor mExecutor;
 
@@ -101,7 +101,7 @@ class BackoffForker<S, V> implements LoopForker<ForkerEvaluations<S, V>, V>, Ser
 
     private final Object mMutex = new Object();
 
-    private EvaluationCollection<V> mEvaluations;
+    private EvaluationCollection<V> mEvaluation;
 
     private int mPendingTasks;
 
@@ -109,7 +109,7 @@ class BackoffForker<S, V> implements LoopForker<ForkerEvaluations<S, V>, V>, Ser
 
     private S mStack;
 
-    private ForkerEvaluations(@NotNull final OwnerExecutor executor, final S stack) {
+    private ForkerEvaluation(@NotNull final OwnerExecutor executor, final S stack) {
       mExecutor = executor;
       mStack = stack;
     }
@@ -117,7 +117,7 @@ class BackoffForker<S, V> implements LoopForker<ForkerEvaluations<S, V>, V>, Ser
     @NotNull
     public EvaluationCollection<V> addFailure(@NotNull final Throwable failure) {
       checkSet();
-      final EvaluationCollection<V> evaluations = mEvaluations;
+      final EvaluationCollection<V> evaluation = mEvaluation;
       synchronized (mMutex) {
         ++mPendingTasks;
         ++mPendingValues;
@@ -127,7 +127,7 @@ class BackoffForker<S, V> implements LoopForker<ForkerEvaluations<S, V>, V>, Ser
 
         public void run() {
           try {
-            evaluations.addFailure(failure);
+            evaluation.addFailure(failure);
 
           } finally {
             decrementPendingValues(1);
@@ -150,7 +150,7 @@ class BackoffForker<S, V> implements LoopForker<ForkerEvaluations<S, V>, V>, Ser
         throw new NullPointerException("failures cannot contain null objects");
       }
 
-      final EvaluationCollection<V> evaluations = mEvaluations;
+      final EvaluationCollection<V> evaluation = mEvaluation;
       final int size = Iterables.size(failures);
       synchronized (mMutex) {
         ++mPendingTasks;
@@ -161,7 +161,7 @@ class BackoffForker<S, V> implements LoopForker<ForkerEvaluations<S, V>, V>, Ser
 
         public void run() {
           try {
-            evaluations.addFailures(failures);
+            evaluation.addFailures(failures);
 
           } finally {
             decrementPendingValues(size);
@@ -175,7 +175,7 @@ class BackoffForker<S, V> implements LoopForker<ForkerEvaluations<S, V>, V>, Ser
     @NotNull
     public EvaluationCollection<V> addValue(final V value) {
       checkSet();
-      final EvaluationCollection<V> evaluations = mEvaluations;
+      final EvaluationCollection<V> evaluation = mEvaluation;
       synchronized (mMutex) {
         ++mPendingTasks;
         ++mPendingValues;
@@ -185,7 +185,7 @@ class BackoffForker<S, V> implements LoopForker<ForkerEvaluations<S, V>, V>, Ser
 
         public void run() {
           try {
-            evaluations.addValue(value);
+            evaluation.addValue(value);
 
           } finally {
             decrementPendingValues(1);
@@ -203,7 +203,7 @@ class BackoffForker<S, V> implements LoopForker<ForkerEvaluations<S, V>, V>, Ser
         return this;
       }
 
-      final EvaluationCollection<V> evaluations = mEvaluations;
+      final EvaluationCollection<V> evaluation = mEvaluation;
       final int size = Iterables.size(values);
       synchronized (mMutex) {
         ++mPendingTasks;
@@ -214,7 +214,7 @@ class BackoffForker<S, V> implements LoopForker<ForkerEvaluations<S, V>, V>, Ser
 
         public void run() {
           try {
-            evaluations.addValues(values);
+            evaluation.addValues(values);
 
           } finally {
             decrementPendingValues(size);
@@ -230,7 +230,7 @@ class BackoffForker<S, V> implements LoopForker<ForkerEvaluations<S, V>, V>, Ser
         checkSet();
       }
 
-      final EvaluationCollection<V> evaluations = mEvaluations;
+      final EvaluationCollection<V> evaluation = mEvaluation;
       synchronized (mMutex) {
         ++mPendingTasks;
       }
@@ -239,7 +239,7 @@ class BackoffForker<S, V> implements LoopForker<ForkerEvaluations<S, V>, V>, Ser
 
         public void run() {
           try {
-            evaluations.set();
+            evaluation.set();
 
           } finally {
             decrementPendingTasks();
@@ -336,16 +336,16 @@ class BackoffForker<S, V> implements LoopForker<ForkerEvaluations<S, V>, V>, Ser
       return mStack;
     }
 
-    private boolean setEvaluations(@NotNull final EvaluationCollection<V> evaluations) {
-      if (mEvaluations == null) {
-        mEvaluations = evaluations;
+    private boolean setEvaluations(@NotNull final EvaluationCollection<V> evaluation) {
+      if (mEvaluation == null) {
+        mEvaluation = evaluation;
         return true;
       }
 
       return false;
     }
 
-    private ForkerEvaluations<S, V> withStack(final S stack) {
+    private ForkerEvaluation<S, V> withStack(final S stack) {
       mStack = stack;
       return this;
     }

@@ -23,12 +23,12 @@ import org.jetbrains.annotations.NotNull;
  */
 public interface Backoffer<S, V> {
 
-  void done(S stack, @NotNull PendingEvaluations<V> evaluations) throws Exception;
+  void done(S stack, @NotNull PendingEvaluation<V> evaluation) throws Exception;
 
-  S failure(S stack, @NotNull Throwable failure, @NotNull PendingEvaluations<V> evaluations) throws
+  S failure(S stack, @NotNull Throwable failure, @NotNull PendingEvaluation<V> evaluation) throws
       Exception;
 
   S init() throws Exception;
 
-  S value(S stack, V value, @NotNull PendingEvaluations<V> evaluations) throws Exception;
+  S value(S stack, V value, @NotNull PendingEvaluation<V> evaluation) throws Exception;
 }

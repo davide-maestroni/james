@@ -34,39 +34,39 @@ class ToEvaluationLoopHandler<V> extends AsyncLoopHandler<V, Void> implements Se
 
   private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
 
-  private final EvaluationCollection<V> mEvaluations;
+  private final EvaluationCollection<V> mEvaluation;
 
   @SuppressWarnings("unchecked")
-  ToEvaluationLoopHandler(@NotNull final EvaluationCollection<? super V> evaluations) {
-    mEvaluations = (EvaluationCollection<V>) ConstantConditions.notNull("evaluations", evaluations);
+  ToEvaluationLoopHandler(@NotNull final EvaluationCollection<? super V> evaluation) {
+    mEvaluation = (EvaluationCollection<V>) ConstantConditions.notNull("evaluation", evaluation);
   }
 
   @Override
   void addFailure(@NotNull final Throwable failure,
-      @NotNull final EvaluationCollection<Void> evaluations) {
-    mEvaluations.addFailure(failure);
+      @NotNull final EvaluationCollection<Void> evaluation) {
+    mEvaluation.addFailure(failure);
   }
 
   @Override
   void addFailures(@Nullable final Iterable<? extends Throwable> failures,
-      @NotNull final EvaluationCollection<Void> evaluations) {
-    mEvaluations.addFailures(failures);
+      @NotNull final EvaluationCollection<Void> evaluation) {
+    mEvaluation.addFailures(failures);
   }
 
   @Override
-  void addValue(final V value, @NotNull final EvaluationCollection<Void> evaluations) {
-    mEvaluations.addValue(value);
+  void addValue(final V value, @NotNull final EvaluationCollection<Void> evaluation) {
+    mEvaluation.addValue(value);
   }
 
   @Override
   void addValues(@Nullable final Iterable<? extends V> values,
-      @NotNull final EvaluationCollection<Void> evaluations) {
-    mEvaluations.addValues(values);
+      @NotNull final EvaluationCollection<Void> evaluation) {
+    mEvaluation.addValues(values);
   }
 
   @Override
-  void set(@NotNull final EvaluationCollection<Void> evaluations) {
-    mEvaluations.set();
+  void set(@NotNull final EvaluationCollection<Void> evaluation) {
+    mEvaluation.set();
   }
 
   @NotNull

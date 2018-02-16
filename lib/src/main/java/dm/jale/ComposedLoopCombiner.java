@@ -150,7 +150,7 @@ class ComposedLoopCombiner<S, V, R>
 
     private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
 
-    public S complete(final S stack, @NotNull final EvaluationCollection<? extends R> evaluations,
+    public S complete(final S stack, @NotNull final EvaluationCollection<? extends R> evaluation,
         @NotNull final List<Loop<V>> loops, final int index) {
       return stack;
     }
@@ -185,9 +185,9 @@ class ComposedLoopCombiner<S, V, R>
 
     private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
 
-    public void settle(final S stack, @NotNull final EvaluationCollection<? extends R> evaluations,
+    public void settle(final S stack, @NotNull final EvaluationCollection<? extends R> evaluation,
         @NotNull final List<Loop<V>> loops) throws Exception {
-      evaluations.set();
+      evaluation.set();
     }
 
     @NotNull
@@ -206,7 +206,7 @@ class ComposedLoopCombiner<S, V, R>
     private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
 
     public S update(final S stack, final I input,
-        @NotNull final EvaluationCollection<? extends R> evaluations,
+        @NotNull final EvaluationCollection<? extends R> evaluation,
         @NotNull final List<Loop<V>> loops, final int index) {
       return stack;
     }

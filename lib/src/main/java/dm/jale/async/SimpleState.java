@@ -61,7 +61,7 @@ public abstract class SimpleState<V> implements EvaluationState<V>, Serializable
     return (SimpleState<V>) SettledState.sInstance;
   }
 
-  public abstract void addTo(@NotNull EvaluationCollection<? super V> evaluations);
+  public abstract void addTo(@NotNull EvaluationCollection<? super V> evaluation);
 
   private static class CanceledState<V> extends SimpleState<V> {
 
@@ -69,8 +69,8 @@ public abstract class SimpleState<V> implements EvaluationState<V>, Serializable
 
     private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
 
-    public void addTo(@NotNull final EvaluationCollection<? super V> evaluations) {
-      evaluations.addFailure(new CancellationException());
+    public void addTo(@NotNull final EvaluationCollection<? super V> evaluation) {
+      evaluation.addFailure(new CancellationException());
     }
 
     @NotNull
@@ -118,8 +118,8 @@ public abstract class SimpleState<V> implements EvaluationState<V>, Serializable
       mFailure = ConstantConditions.notNull("failure", failure);
     }
 
-    public void addTo(@NotNull final EvaluationCollection<? super V> evaluations) {
-      evaluations.addFailure(mFailure);
+    public void addTo(@NotNull final EvaluationCollection<? super V> evaluation) {
+      evaluation.addFailure(mFailure);
     }
 
     @NotNull
@@ -163,7 +163,7 @@ public abstract class SimpleState<V> implements EvaluationState<V>, Serializable
       return sInstance;
     }
 
-    public void addTo(@NotNull final EvaluationCollection<? super V> evaluations) {
+    public void addTo(@NotNull final EvaluationCollection<? super V> evaluation) {
       ConstantConditions.unsupported();
     }
 
@@ -208,8 +208,8 @@ public abstract class SimpleState<V> implements EvaluationState<V>, Serializable
       return sInstance;
     }
 
-    public void addTo(@NotNull final EvaluationCollection<? super V> evaluations) {
-      evaluations.set();
+    public void addTo(@NotNull final EvaluationCollection<? super V> evaluation) {
+      evaluation.set();
     }
 
     @NotNull
@@ -252,8 +252,8 @@ public abstract class SimpleState<V> implements EvaluationState<V>, Serializable
       mValue = value;
     }
 
-    public void addTo(@NotNull final EvaluationCollection<? super V> evaluations) {
-      evaluations.addValue(mValue);
+    public void addTo(@NotNull final EvaluationCollection<? super V> evaluation) {
+      evaluation.addValue(mValue);
     }
 
     @NotNull

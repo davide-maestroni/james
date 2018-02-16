@@ -46,15 +46,15 @@ class DoneLoopHandler<V> extends AsyncLoopHandler<V, V> implements Serializable 
 
   @Override
   void addFailure(@NotNull final Throwable failure,
-      @NotNull final EvaluationCollection<V> evaluations) throws Exception {
+      @NotNull final EvaluationCollection<V> evaluation) throws Exception {
     mAction.perform();
-    super.addFailure(failure, evaluations);
+    super.addFailure(failure, evaluation);
   }
 
   @Override
   @SuppressWarnings("WhileLoopReplaceableByForEach")
   void addFailures(@Nullable final Iterable<? extends Throwable> failures,
-      @NotNull final EvaluationCollection<V> evaluations) throws Exception {
+      @NotNull final EvaluationCollection<V> evaluation) throws Exception {
     if (failures == null) {
       return;
     }
@@ -70,21 +70,20 @@ class DoneLoopHandler<V> extends AsyncLoopHandler<V, V> implements Serializable 
       }
 
     } finally {
-      evaluations.addFailures(Iterables.asList(failures).subList(0, index)).set();
+      evaluation.addFailures(Iterables.asList(failures).subList(0, index)).set();
     }
   }
 
   @Override
-  void addValue(final V value, @NotNull final EvaluationCollection<V> evaluations) throws
-      Exception {
+  void addValue(final V value, @NotNull final EvaluationCollection<V> evaluation) throws Exception {
     mAction.perform();
-    super.addValue(value, evaluations);
+    super.addValue(value, evaluation);
   }
 
   @Override
   @SuppressWarnings("WhileLoopReplaceableByForEach")
   void addValues(@Nullable final Iterable<? extends V> values,
-      @NotNull final EvaluationCollection<V> evaluations) throws Exception {
+      @NotNull final EvaluationCollection<V> evaluation) throws Exception {
     if (values == null) {
       return;
     }
@@ -100,7 +99,7 @@ class DoneLoopHandler<V> extends AsyncLoopHandler<V, V> implements Serializable 
       }
 
     } finally {
-      evaluations.addValues(Iterables.asList(values).subList(0, index)).set();
+      evaluation.addValues(Iterables.asList(values).subList(0, index)).set();
     }
   }
 

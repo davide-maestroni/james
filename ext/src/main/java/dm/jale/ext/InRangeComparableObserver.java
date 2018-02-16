@@ -53,24 +53,24 @@ class InRangeComparableObserver<V extends Comparable<V>>
     mIsInclusive = isInclusive;
   }
 
-  public void accept(final EvaluationCollection<V> evaluations) throws Exception {
+  public void accept(final EvaluationCollection<V> evaluation) throws Exception {
     V value = mStart;
     final V end = mEnd;
     final Mapper<? super V, ? extends V> increment = mIncrement;
     if (mIsInclusive) {
       while (value.compareTo(end) < 0) {
-        evaluations.addValue(value);
+        evaluation.addValue(value);
         value = increment.apply(value);
       }
 
     } else {
       while (value.compareTo(end) <= 0) {
-        evaluations.addValue(value);
+        evaluation.addValue(value);
         value = increment.apply(value);
       }
     }
 
-    evaluations.set();
+    evaluation.set();
   }
 
   @NotNull

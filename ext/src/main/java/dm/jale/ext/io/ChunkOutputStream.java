@@ -49,7 +49,7 @@ public class ChunkOutputStream extends OutputStream {
 
   private final int mCorePoolSize;
 
-  private final EvaluationCollection<Chunk> mEvaluations;
+  private final EvaluationCollection<Chunk> mEvaluation;
 
   private final int mMaxBufferSize;
 
@@ -59,14 +59,14 @@ public class ChunkOutputStream extends OutputStream {
 
   private boolean mIsClosed;
 
-  public ChunkOutputStream(@NotNull final EvaluationCollection<Chunk> evaluations,
+  public ChunkOutputStream(@NotNull final EvaluationCollection<Chunk> evaluation,
       @Nullable final AllocationType allocationType) {
-    this(evaluations, allocationType, DEFAULT_BUFFER_SIZE, DEFAULT_POOL_SIZE);
+    this(evaluation, allocationType, DEFAULT_BUFFER_SIZE, DEFAULT_POOL_SIZE);
   }
 
-  public ChunkOutputStream(@NotNull final EvaluationCollection<Chunk> evaluations,
+  public ChunkOutputStream(@NotNull final EvaluationCollection<Chunk> evaluation,
       @Nullable final AllocationType allocationType, final int coreSize) {
-    mEvaluations = ConstantConditions.notNull("evaluations", evaluations);
+    mEvaluation = ConstantConditions.notNull("evaluation", evaluation);
     final int poolSize =
         (mCorePoolSize = ConstantConditions.positive("coreSize", coreSize) / DEFAULT_BUFFER_SIZE);
     mMaxBufferSize = DEFAULT_BUFFER_SIZE;
@@ -74,9 +74,9 @@ public class ChunkOutputStream extends OutputStream {
     mPool = new DoubleQueue<ByteBuffer>(Math.max(poolSize, 1));
   }
 
-  public ChunkOutputStream(@NotNull final EvaluationCollection<Chunk> evaluations,
+  public ChunkOutputStream(@NotNull final EvaluationCollection<Chunk> evaluation,
       @Nullable final AllocationType allocationType, final int bufferSize, final int poolSize) {
-    mEvaluations = ConstantConditions.notNull("evaluations", evaluations);
+    mEvaluation = ConstantConditions.notNull("evaluation", evaluation);
     mCorePoolSize = ConstantConditions.positive("poolSize", poolSize);
     mMaxBufferSize = ConstantConditions.positive("bufferSize", bufferSize);
     mAllocation = (allocationType != null) ? allocationType : AllocationType.HEAP;
@@ -118,7 +118,7 @@ public class ChunkOutputStream extends OutputStream {
       written += Math.min(0, count);
       if (byteBuffer.remaining() == 0) {
         mBuffer = null;
-        mEvaluations.addValue(new DefaultChunk(this, byteBuffer));
+        mEvaluation.addValue(new DefaultChunk(this, byteBuffer));
       }
 
     } while (count >= 0);
@@ -160,7 +160,7 @@ public class ChunkOutputStream extends OutputStream {
       written += count;
       if (byteBuffer.remaining() == 0) {
         mBuffer = null;
-        mEvaluations.addValue(new DefaultChunk(this, byteBuffer));
+        mEvaluation.addValue(new DefaultChunk(this, byteBuffer));
       }
 
     } while (written < len);
@@ -186,7 +186,7 @@ public class ChunkOutputStream extends OutputStream {
       read = chunk.read(byteBuffer);
       if (byteBuffer.remaining() == 0) {
         mBuffer = null;
-        mEvaluations.addValue(new DefaultChunk(this, byteBuffer));
+        mEvaluation.addValue(new DefaultChunk(this, byteBuffer));
       }
     }
 
@@ -235,7 +235,7 @@ public class ChunkOutputStream extends OutputStream {
 
     if (byteBuffer.remaining() == 0) {
       mBuffer = null;
-      mEvaluations.addValue(new DefaultChunk(this, byteBuffer));
+      mEvaluation.addValue(new DefaultChunk(this, byteBuffer));
     }
 
     return read;
@@ -264,7 +264,7 @@ public class ChunkOutputStream extends OutputStream {
     final int read = channel.read(byteBuffer);
     if (byteBuffer.remaining() == 0) {
       mBuffer = null;
-      mEvaluations.addValue(new DefaultChunk(this, byteBuffer));
+      mEvaluation.addValue(new DefaultChunk(this, byteBuffer));
     }
 
     return read;
@@ -280,7 +280,7 @@ public class ChunkOutputStream extends OutputStream {
     byteBuffer.put((byte) b);
     if (byteBuffer.remaining() == 0) {
       mBuffer = null;
-      mEvaluations.addValue(new DefaultChunk(this, byteBuffer));
+      mEvaluation.addValue(new DefaultChunk(this, byteBuffer));
     }
   }
 
@@ -304,7 +304,7 @@ public class ChunkOutputStream extends OutputStream {
       written += count;
       if (byteBuffer.remaining() == 0) {
         mBuffer = null;
-        mEvaluations.addValue(new DefaultChunk(this, byteBuffer));
+        mEvaluation.addValue(new DefaultChunk(this, byteBuffer));
       }
 
     } while (written < len);
@@ -332,7 +332,7 @@ public class ChunkOutputStream extends OutputStream {
       written += count;
       if (byteBuffer.remaining() == 0) {
         mBuffer = null;
-        mEvaluations.addValue(new DefaultChunk(this, byteBuffer));
+        mEvaluation.addValue(new DefaultChunk(this, byteBuffer));
       }
 
     } while (written < len);
@@ -343,7 +343,7 @@ public class ChunkOutputStream extends OutputStream {
     final ByteBuffer byteBuffer = getBuffer();
     if (byteBuffer.remaining() == 0) {
       mBuffer = null;
-      mEvaluations.addValue(new DefaultChunk(this, byteBuffer));
+      mEvaluation.addValue(new DefaultChunk(this, byteBuffer));
     }
   }
 

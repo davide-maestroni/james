@@ -53,7 +53,7 @@ class ElseDoLoopHandler<V> extends AsyncLoopHandler<V, V> implements Serializabl
 
   @Override
   void addFailure(@NotNull final Throwable failure,
-      @NotNull final EvaluationCollection<V> evaluations) throws Exception {
+      @NotNull final EvaluationCollection<V> evaluation) throws Exception {
     for (final Class<?> type : mTypes) {
       if (type.isInstance(failure)) {
         mObserver.accept(failure);
@@ -61,12 +61,12 @@ class ElseDoLoopHandler<V> extends AsyncLoopHandler<V, V> implements Serializabl
       }
     }
 
-    super.addFailure(failure, evaluations);
+    super.addFailure(failure, evaluation);
   }
 
   @Override
   void addFailures(@Nullable final Iterable<? extends Throwable> failures,
-      @NotNull final EvaluationCollection<V> evaluations) throws Exception {
+      @NotNull final EvaluationCollection<V> evaluation) throws Exception {
     if (failures == null) {
       return;
     }
@@ -87,7 +87,7 @@ class ElseDoLoopHandler<V> extends AsyncLoopHandler<V, V> implements Serializabl
       }
 
     } finally {
-      evaluations.addFailures(Iterables.asList(failures).subList(0, index)).set();
+      evaluation.addFailures(Iterables.asList(failures).subList(0, index)).set();
     }
   }
 

@@ -830,9 +830,9 @@ class DefaultLoop<V> implements Loop<V>, Serializable {
     return new StateGenerator<V>(this, timeout, timeUnit);
   }
 
-  public void to(@NotNull final EvaluationCollection<? super V> evaluations) {
+  public void to(@NotNull final EvaluationCollection<? super V> evaluation) {
     checkEvaluated();
-    chain(new ToEvaluationLoopHandler<V>(evaluations));
+    chain(new ToEvaluationLoopHandler<V>(evaluation));
   }
 
   @NotNull
@@ -1302,7 +1302,7 @@ class DefaultLoop<V> implements Loop<V>, Serializable {
 
     private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
 
-    private final ChainEvaluations mEvaluations = new ChainEvaluations();
+    private final ChainEvaluationCollection mEvaluation = new ChainEvaluationCollection();
 
     private final AsyncLoopHandler<V, R> mHandler;
 
@@ -1351,12 +1351,12 @@ class DefaultLoop<V> implements Loop<V>, Serializable {
       }
     }
 
-    private class ChainEvaluations implements EvaluationCollection<R> {
+    private class ChainEvaluationCollection implements EvaluationCollection<R> {
 
       private volatile LoopChain<R, ?> mNext;
 
       @NotNull
-      ChainEvaluations withNext(final LoopChain<R, ?> next) {
+      ChainEvaluationCollection withNext(final LoopChain<R, ?> next) {
         mNext = next;
         return this;
       }
@@ -1395,7 +1395,7 @@ class DefaultLoop<V> implements Loop<V>, Serializable {
     void addFailure(final LoopChain<R, ?> next, @NotNull final Throwable failure) {
       mPendingCount.incrementAndGet();
       try {
-        mHandler.addFailure(failure, mEvaluations.withNext(next));
+        mHandler.addFailure(failure, mEvaluation.withNext(next));
 
       } catch (final CancellationException e) {
         getLogger().wrn(e, "Loop has been cancelled");
@@ -1411,7 +1411,7 @@ class DefaultLoop<V> implements Loop<V>, Serializable {
     void addValue(final LoopChain<R, ?> next, final V value) {
       mPendingCount.incrementAndGet();
       try {
-        mHandler.addValue(value, mEvaluations.withNext(next));
+        mHandler.addValue(value, mEvaluation.withNext(next));
 
       } catch (final CancellationException e) {
         getLogger().wrn(e, "Loop has been cancelled");
@@ -1427,7 +1427,7 @@ class DefaultLoop<V> implements Loop<V>, Serializable {
     void addValues(final LoopChain<R, ?> next, @NotNull final Iterable<? extends V> values) {
       mPendingCount.incrementAndGet();
       try {
-        mHandler.addValues(values, mEvaluations.withNext(next));
+        mHandler.addValues(values, mEvaluation.withNext(next));
 
       } catch (final CancellationException e) {
         getLogger().wrn(e, "Loop has been cancelled");
@@ -1450,7 +1450,7 @@ class DefaultLoop<V> implements Loop<V>, Serializable {
         @NotNull final Iterable<? extends Throwable> failures) {
       mPendingCount.incrementAndGet();
       try {
-        mHandler.addFailures(failures, mEvaluations.withNext(next));
+        mHandler.addFailures(failures, mEvaluation.withNext(next));
 
       } catch (final CancellationException e) {
         getLogger().wrn(e, "Loop has been cancelled");
@@ -1465,7 +1465,7 @@ class DefaultLoop<V> implements Loop<V>, Serializable {
     @Override
     void set(final LoopChain<R, ?> next) {
       try {
-        mHandler.set(mEvaluations.withNext(next));
+        mHandler.set(mEvaluation.withNext(next));
 
       } catch (final CancellationException e) {
         getLogger().wrn(e, "Loop has been cancelled");
@@ -2067,7 +2067,7 @@ class DefaultLoop<V> implements Loop<V>, Serializable {
 
     private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
 
-    private final ChainEvaluations mEvaluation = new ChainEvaluations();
+    private final ChainEvaluationCollection mEvaluation = new ChainEvaluationCollection();
 
     private final AsyncStatementLoopHandler<V, R> mHandler;
 
@@ -2116,12 +2116,12 @@ class DefaultLoop<V> implements Loop<V>, Serializable {
       }
     }
 
-    private class ChainEvaluations implements EvaluationCollection<R> {
+    private class ChainEvaluationCollection implements EvaluationCollection<R> {
 
       private volatile LoopChain<R, ?> mNext;
 
       @NotNull
-      ChainEvaluations withNext(final LoopChain<R, ?> next) {
+      ChainEvaluationCollection withNext(final LoopChain<R, ?> next) {
         mNext = next;
         return this;
       }
@@ -2191,7 +2191,7 @@ class DefaultLoop<V> implements Loop<V>, Serializable {
     @Override
     void addValues(final LoopChain<R, ?> next, @NotNull final Iterable<? extends V> values) {
       mPendingCount.addAndGet(Iterables.size(values));
-      final ChainEvaluations evaluation = mEvaluation.withNext(next);
+      final ChainEvaluationCollection evaluation = mEvaluation.withNext(next);
       for (final V value : values) {
         try {
           mHandler.value(value, evaluation);
@@ -2219,7 +2219,7 @@ class DefaultLoop<V> implements Loop<V>, Serializable {
     void addFailures(final LoopChain<R, ?> next,
         @NotNull final Iterable<? extends Throwable> failures) {
       mPendingCount.addAndGet(Iterables.size(failures));
-      final ChainEvaluations evaluation = mEvaluation.withNext(next);
+      final ChainEvaluationCollection evaluation = mEvaluation.withNext(next);
       for (final Throwable failure : failures) {
         try {
           mHandler.failure(failure, evaluation);
@@ -2502,7 +2502,7 @@ class DefaultLoop<V> implements Loop<V>, Serializable {
 
     @Override
     void addFailure(@NotNull final Throwable throwable,
-        @NotNull final EvaluationCollection<V> evaluations) {
+        @NotNull final EvaluationCollection<V> evaluation) {
       mExecutor.execute(new Runnable() {
 
         public void run() {
@@ -2526,7 +2526,7 @@ class DefaultLoop<V> implements Loop<V>, Serializable {
 
     @Override
     void addFailures(@Nullable final Iterable<? extends Throwable> failures,
-        @NotNull final EvaluationCollection<V> evaluations) {
+        @NotNull final EvaluationCollection<V> evaluation) {
       mExecutor.execute(new Runnable() {
 
         public void run() {
@@ -2556,7 +2556,7 @@ class DefaultLoop<V> implements Loop<V>, Serializable {
     }
 
     @Override
-    void addValue(final V value, @NotNull final EvaluationCollection<V> evaluations) {
+    void addValue(final V value, @NotNull final EvaluationCollection<V> evaluation) {
       mExecutor.execute(new Runnable() {
 
         public void run() {
@@ -2580,7 +2580,7 @@ class DefaultLoop<V> implements Loop<V>, Serializable {
 
     @Override
     void addValues(@Nullable final Iterable<? extends V> values,
-        @NotNull final EvaluationCollection<V> evaluations) {
+        @NotNull final EvaluationCollection<V> evaluation) {
       mExecutor.execute(new Runnable() {
 
         public void run() {
@@ -2615,7 +2615,7 @@ class DefaultLoop<V> implements Loop<V>, Serializable {
     }
 
     @Override
-    void set(@NotNull final EvaluationCollection<V> evaluations) {
+    void set(@NotNull final EvaluationCollection<V> evaluation) {
       mExecutor.execute(new Runnable() {
 
         public void run() {
@@ -2641,19 +2641,19 @@ class DefaultLoop<V> implements Loop<V>, Serializable {
       return mLoop.cancel(mayInterruptIfRunning);
     }
 
-    void chain(final EvaluationCollection<V> evaluations) {
+    void chain(final EvaluationCollection<V> evaluation) {
       mExecutor.execute(new Runnable() {
 
         public void run() {
           final Throwable failure = mFailure;
           if (failure != null) {
-            evaluations.addFailure(failure).set();
+            evaluation.addFailure(failure).set();
             return;
           }
 
-          mEvaluations.add(evaluations);
+          mEvaluations.add(evaluation);
           try {
-            mStack = mForker.evaluation(mStack, evaluations, mLoop);
+            mStack = mForker.evaluation(mStack, evaluation, mLoop);
 
           } catch (final Throwable t) {
             final Throwable throwable = RuntimeInterruptedException.wrapIfInterrupt(t);
@@ -2706,7 +2706,7 @@ class DefaultLoop<V> implements Loop<V>, Serializable {
       }
     }
 
-    public void accept(final EvaluationCollection<V> evaluations) {
+    public void accept(final EvaluationCollection<V> evaluation) {
       mExecutor.execute(new Runnable() {
 
         public void run() {

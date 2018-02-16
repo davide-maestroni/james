@@ -89,12 +89,12 @@ class BufferedForker<S, V, R, A> implements Forker<ForkerStack<S, V, R, A>, V, R
     }
 
     @NotNull
-    private ForkerStack<S, V, R, A> addEvaluations(@NotNull final R evaluations,
+    private ForkerStack<S, V, R, A> addEvaluations(@NotNull final R evaluation,
         @NotNull final A async) throws Exception {
       final boolean isFirst = !mHasEvaluation;
       mHasEvaluation = true;
       if (isFirst) {
-        mStack = mForker.evaluation(mStack, evaluations, async);
+        mStack = mForker.evaluation(mStack, evaluation, async);
         final ArrayList<SimpleState<V>> states = mStates;
         try {
           for (final SimpleState<V> state : states) {

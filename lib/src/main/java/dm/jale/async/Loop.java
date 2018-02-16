@@ -188,7 +188,7 @@ public interface Loop<V> extends Statement<Iterable<V>>, Serializable {
   @NotNull
   AsyncGenerator<EvaluationState<V>> stateGenerator(long timeout, @NotNull TimeUnit timeUnit);
 
-  void to(@NotNull EvaluationCollection<? super V> evaluations);
+  void to(@NotNull EvaluationCollection<? super V> evaluation);
 
   @NotNull
   AsyncGenerator<V> valueGenerator();

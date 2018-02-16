@@ -25,7 +25,7 @@ import dm.jale.async.EvaluationCollection;
 /**
  * Created by davide-maestroni on 02/09/2018.
  */
-public interface PendingEvaluations<V> extends EvaluationCollection<V> {
+public interface PendingEvaluation<V> extends EvaluationCollection<V> {
 
   int pendingTasks();
 

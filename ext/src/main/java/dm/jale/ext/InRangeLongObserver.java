@@ -45,23 +45,23 @@ class InRangeLongObserver implements Observer<EvaluationCollection<Long>>, Seria
     mIsInclusive = isInclusive;
   }
 
-  public void accept(final EvaluationCollection<Long> evaluations) throws Exception {
+  public void accept(final EvaluationCollection<Long> evaluation) throws Exception {
     long value = mStart;
     @SuppressWarnings("UnnecessaryLocalVariable") final long end = mEnd;
     @SuppressWarnings("UnnecessaryLocalVariable") final long increment = mIncrement;
     if (mIsInclusive) {
       while (value < end) {
-        evaluations.addValue(value);
+        evaluation.addValue(value);
         value += increment;
       }
 
     } else {
       while (value <= end) {
-        evaluations.addValue(value);
+        evaluation.addValue(value);
         value += increment;
       }
     }
 
-    evaluations.set();
+    evaluation.set();
   }
 }

@@ -69,7 +69,7 @@ class ExecutorLoopBatchForker<V>
 
     private final ArrayList<V> values = new ArrayList<V>();
 
-    private EvaluationCollection<V> evaluations;
+    private EvaluationCollection<V> evaluation;
 
     private volatile Throwable failure;
   }
@@ -105,20 +105,20 @@ class ExecutorLoopBatchForker<V>
       checkFailed(stack);
       mExecutor.execute(new ForkerRunnable(stack) {
 
-        protected void innerRun(@NotNull final EvaluationCollection<V> evaluations) {
+        protected void innerRun(@NotNull final EvaluationCollection<V> evaluation) {
         }
       });
       return stack;
     }
 
     public Stack<V> evaluation(final Stack<V> stack,
-        @NotNull final EvaluationCollection<V> evaluations, @NotNull final Loop<V> async) {
+        @NotNull final EvaluationCollection<V> evaluation, @NotNull final Loop<V> async) {
       checkFailed(stack);
-      if (stack.evaluations == null) {
-        stack.evaluations = evaluations;
+      if (stack.evaluation == null) {
+        stack.evaluation = evaluation;
 
       } else {
-        evaluations.addFailure(new IllegalStateException()).set();
+        evaluation.addFailure(new IllegalStateException()).set();
       }
 
       return stack;
@@ -145,8 +145,8 @@ class ExecutorLoopBatchForker<V>
       pendingCount.incrementAndGet();
       mExecutor.execute(new ForkerRunnable(stack) {
 
-        protected void innerRun(@NotNull final EvaluationCollection<V> evaluations) {
-          evaluations.addValues(valueList).addFailures(failureList);
+        protected void innerRun(@NotNull final EvaluationCollection<V> evaluation) {
+          evaluation.addValues(valueList).addFailures(failureList);
         }
       });
       return stack;
@@ -177,8 +177,8 @@ class ExecutorLoopBatchForker<V>
       pendingCount.incrementAndGet();
       mExecutor.execute(new ForkerRunnable(stack) {
 
-        protected void innerRun(@NotNull final EvaluationCollection<V> evaluations) {
-          evaluations.addFailures(failureList).addValues(valueList);
+        protected void innerRun(@NotNull final EvaluationCollection<V> evaluation) {
+          evaluation.addFailures(failureList).addValues(valueList);
         }
       });
       return stack;
@@ -230,17 +230,17 @@ class ExecutorLoopBatchForker<V>
 
       public void run() {
         final Stack<V> stack = mStack;
-        final EvaluationCollection<V> evaluations = stack.evaluations;
+        final EvaluationCollection<V> evaluation = stack.evaluation;
         try {
           if (stack.failure != null) {
             mLogger.wrn("Ignoring values");
-            evaluations.set();
+            evaluation.set();
             return;
           }
 
-          innerRun(evaluations);
+          innerRun(evaluation);
           if (stack.pendingCount.decrementAndGet() == 0) {
-            evaluations.set();
+            evaluation.set();
           }
 
         } catch (final CancellationException e) {
@@ -253,7 +253,7 @@ class ExecutorLoopBatchForker<V>
         }
       }
 
-      protected abstract void innerRun(@NotNull EvaluationCollection<V> evaluations) throws
+      protected abstract void innerRun(@NotNull EvaluationCollection<V> evaluation) throws
           Exception;
     }
   }

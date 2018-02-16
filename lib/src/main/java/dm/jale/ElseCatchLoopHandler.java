@@ -53,20 +53,20 @@ class ElseCatchLoopHandler<V> extends AsyncLoopHandler<V, V> implements Serializ
 
   @Override
   void addFailure(@NotNull final Throwable failure,
-      @NotNull final EvaluationCollection<V> evaluations) throws Exception {
+      @NotNull final EvaluationCollection<V> evaluation) throws Exception {
     for (final Class<?> type : mTypes) {
       if (type.isInstance(failure)) {
-        evaluations.addValue(mMapper.apply(failure)).set();
+        evaluation.addValue(mMapper.apply(failure)).set();
         return;
       }
     }
 
-    super.addFailure(failure, evaluations);
+    super.addFailure(failure, evaluation);
   }
 
   @Override
   void addFailures(@Nullable final Iterable<? extends Throwable> failures,
-      @NotNull final EvaluationCollection<V> evaluations) throws Exception {
+      @NotNull final EvaluationCollection<V> evaluation) throws Exception {
     if (failures == null) {
       return;
     }
@@ -88,18 +88,18 @@ class ElseCatchLoopHandler<V> extends AsyncLoopHandler<V, V> implements Serializ
 
         if (!found) {
           if (outputs.isEmpty()) {
-            evaluations.addFailure(failure);
+            evaluation.addFailure(failure);
 
           } else {
             final ArrayList<V> values = new ArrayList<V>(outputs);
             outputs.clear();
-            evaluations.addValues(values).addFailure(failure);
+            evaluation.addValues(values).addFailure(failure);
           }
         }
       }
 
     } finally {
-      evaluations.addValues(outputs).set();
+      evaluation.addValues(outputs).set();
     }
   }
 

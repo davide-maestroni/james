@@ -54,10 +54,10 @@ class TryStatementLoopHandler<V, R> extends AsyncStatementLoopHandler<V, R>
   }
 
   @Override
-  void value(final V value, @NotNull final EvaluationCollection<R> evaluations) throws Exception {
+  void value(final V value, @NotNull final EvaluationCollection<R> evaluation) throws Exception {
     final Closeable closeable = mCloseable.apply(value);
     try {
-      mHandler.value(value, evaluations);
+      mHandler.value(value, evaluation);
 
     } finally {
       Asyncs.close(closeable, mLogger);

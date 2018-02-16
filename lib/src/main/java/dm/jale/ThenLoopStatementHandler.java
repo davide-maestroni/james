@@ -43,8 +43,8 @@ class ThenLoopStatementHandler<V, R> extends AsyncStatementLoopHandler<V, R>
   }
 
   @Override
-  void value(final V value, @NotNull final EvaluationCollection<R> evaluations) throws Exception {
-    evaluations.addValues(mMapper.apply(value)).set();
+  void value(final V value, @NotNull final EvaluationCollection<R> evaluation) throws Exception {
+    evaluation.addValues(mMapper.apply(value)).set();
   }
 
   @NotNull

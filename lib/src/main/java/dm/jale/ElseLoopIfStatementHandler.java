@@ -55,15 +55,15 @@ class ElseLoopIfStatementHandler<V> extends AsyncStatementLoopHandler<V, V>
 
   @Override
   void failure(@NotNull final Throwable failure,
-      @NotNull final EvaluationCollection<V> evaluations) throws Exception {
+      @NotNull final EvaluationCollection<V> evaluation) throws Exception {
     for (final Class<?> type : mTypes) {
       if (type.isInstance(failure)) {
-        mMapper.apply(failure).to(evaluations);
+        mMapper.apply(failure).to(evaluation);
         return;
       }
     }
 
-    super.failure(failure, evaluations);
+    super.failure(failure, evaluation);
   }
 
   @NotNull

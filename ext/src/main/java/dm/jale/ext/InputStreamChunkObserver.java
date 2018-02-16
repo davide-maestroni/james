@@ -41,11 +41,11 @@ class InputStreamChunkObserver extends ChunkObserver {
     mInputStream = ConstantConditions.notNull("inputStream", inputStream);
   }
 
-  public void accept(final EvaluationCollection<Chunk> evaluations) throws Exception {
-    final ChunkOutputStream outputStream = newStream(evaluations);
+  public void accept(final EvaluationCollection<Chunk> evaluation) throws Exception {
+    final ChunkOutputStream outputStream = newStream(evaluation);
     try {
       outputStream.transfer(mInputStream);
-      evaluations.set();
+      evaluation.set();
 
     } finally {
       outputStream.close();
