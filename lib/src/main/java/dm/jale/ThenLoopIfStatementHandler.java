@@ -22,8 +22,8 @@ import java.io.InvalidObjectException;
 import java.io.ObjectStreamException;
 import java.io.Serializable;
 
-import dm.jale.async.AsyncEvaluations;
-import dm.jale.async.AsyncLoop;
+import dm.jale.async.EvaluationCollection;
+import dm.jale.async.Loop;
 import dm.jale.async.Mapper;
 import dm.jale.config.BuildConfig;
 import dm.jale.util.ConstantConditions;
@@ -37,14 +37,14 @@ class ThenLoopIfStatementHandler<V, R> extends AsyncStatementLoopHandler<V, R>
 
   private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
 
-  private final Mapper<? super V, ? extends AsyncLoop<R>> mMapper;
+  private final Mapper<? super V, ? extends Loop<R>> mMapper;
 
-  ThenLoopIfStatementHandler(@NotNull final Mapper<? super V, ? extends AsyncLoop<R>> mapper) {
+  ThenLoopIfStatementHandler(@NotNull final Mapper<? super V, ? extends Loop<R>> mapper) {
     mMapper = ConstantConditions.notNull("mapper", mapper);
   }
 
   @Override
-  void value(final V value, @NotNull final AsyncEvaluations<R> evaluations) throws Exception {
+  void value(final V value, @NotNull final EvaluationCollection<R> evaluations) throws Exception {
     mMapper.apply(value).to(evaluations);
   }
 
@@ -57,7 +57,7 @@ class ThenLoopIfStatementHandler<V, R> extends AsyncStatementLoopHandler<V, R>
 
     private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
 
-    private HandlerProxy(final Mapper<? super V, ? extends AsyncLoop<R>> mapper) {
+    private HandlerProxy(final Mapper<? super V, ? extends Loop<R>> mapper) {
       super(proxy(mapper));
     }
 
@@ -66,8 +66,7 @@ class ThenLoopIfStatementHandler<V, R> extends AsyncStatementLoopHandler<V, R>
     private Object readResolve() throws ObjectStreamException {
       try {
         final Object[] args = deserializeArgs();
-        return new ThenLoopIfStatementHandler<V, R>(
-            (Mapper<? super V, ? extends AsyncLoop<R>>) args[0]);
+        return new ThenLoopIfStatementHandler<V, R>((Mapper<? super V, ? extends Loop<R>>) args[0]);
 
       } catch (final Throwable t) {
         throw new InvalidObjectException(t.getMessage());

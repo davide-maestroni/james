@@ -28,7 +28,7 @@ import dm.jale.util.ConstantConditions;
 /**
  * Created by davide-maestroni on 01/11/2018.
  */
-public abstract class SimpleState<V> implements AsyncState<V>, Serializable {
+public abstract class SimpleState<V> implements EvaluationState<V>, Serializable {
 
   private SimpleState() {
   }
@@ -61,7 +61,7 @@ public abstract class SimpleState<V> implements AsyncState<V>, Serializable {
     return (SimpleState<V>) SettledState.sInstance;
   }
 
-  public abstract void addTo(@NotNull AsyncEvaluations<? super V> evaluations);
+  public abstract void addTo(@NotNull EvaluationCollection<? super V> evaluations);
 
   private static class CanceledState<V> extends SimpleState<V> {
 
@@ -69,7 +69,7 @@ public abstract class SimpleState<V> implements AsyncState<V>, Serializable {
 
     private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
 
-    public void addTo(@NotNull final AsyncEvaluations<? super V> evaluations) {
+    public void addTo(@NotNull final EvaluationCollection<? super V> evaluations) {
       evaluations.addFailure(new CancellationException());
     }
 
@@ -99,7 +99,7 @@ public abstract class SimpleState<V> implements AsyncState<V>, Serializable {
       return false;
     }
 
-    public void to(@NotNull final AsyncEvaluation<? super V> evaluation) {
+    public void to(@NotNull final Evaluation<? super V> evaluation) {
       evaluation.fail(new CancellationException());
     }
 
@@ -118,7 +118,7 @@ public abstract class SimpleState<V> implements AsyncState<V>, Serializable {
       mFailure = ConstantConditions.notNull("failure", failure);
     }
 
-    public void addTo(@NotNull final AsyncEvaluations<? super V> evaluations) {
+    public void addTo(@NotNull final EvaluationCollection<? super V> evaluations) {
       evaluations.addFailure(mFailure);
     }
 
@@ -143,7 +143,7 @@ public abstract class SimpleState<V> implements AsyncState<V>, Serializable {
       return false;
     }
 
-    public void to(@NotNull final AsyncEvaluation<? super V> evaluation) {
+    public void to(@NotNull final Evaluation<? super V> evaluation) {
       evaluation.fail(mFailure);
     }
 
@@ -163,7 +163,7 @@ public abstract class SimpleState<V> implements AsyncState<V>, Serializable {
       return sInstance;
     }
 
-    public void addTo(@NotNull final AsyncEvaluations<? super V> evaluations) {
+    public void addTo(@NotNull final EvaluationCollection<? super V> evaluations) {
       ConstantConditions.unsupported();
     }
 
@@ -188,7 +188,7 @@ public abstract class SimpleState<V> implements AsyncState<V>, Serializable {
       return false;
     }
 
-    public void to(@NotNull final AsyncEvaluation<? super V> evaluation) {
+    public void to(@NotNull final Evaluation<? super V> evaluation) {
       ConstantConditions.unsupported();
     }
 
@@ -208,7 +208,7 @@ public abstract class SimpleState<V> implements AsyncState<V>, Serializable {
       return sInstance;
     }
 
-    public void addTo(@NotNull final AsyncEvaluations<? super V> evaluations) {
+    public void addTo(@NotNull final EvaluationCollection<? super V> evaluations) {
       evaluations.set();
     }
 
@@ -233,7 +233,7 @@ public abstract class SimpleState<V> implements AsyncState<V>, Serializable {
       return false;
     }
 
-    public void to(@NotNull final AsyncEvaluation<? super V> evaluation) {
+    public void to(@NotNull final Evaluation<? super V> evaluation) {
       ConstantConditions.unsupported();
     }
 
@@ -252,7 +252,7 @@ public abstract class SimpleState<V> implements AsyncState<V>, Serializable {
       mValue = value;
     }
 
-    public void addTo(@NotNull final AsyncEvaluations<? super V> evaluations) {
+    public void addTo(@NotNull final EvaluationCollection<? super V> evaluations) {
       evaluations.addValue(mValue);
     }
 
@@ -277,7 +277,7 @@ public abstract class SimpleState<V> implements AsyncState<V>, Serializable {
       return true;
     }
 
-    public void to(@NotNull final AsyncEvaluation<? super V> evaluation) {
+    public void to(@NotNull final Evaluation<? super V> evaluation) {
       evaluation.set(mValue);
     }
 

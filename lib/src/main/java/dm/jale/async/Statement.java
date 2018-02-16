@@ -28,44 +28,41 @@ import java.util.concurrent.TimeUnit;
 /**
  * Created by davide-maestroni on 01/08/2018.
  */
-public interface AsyncStatement<V> extends AsyncState<V>, Future<V>, Serializable {
+public interface Statement<V> extends EvaluationState<V>, Future<V>, Serializable {
 
   void consume();
 
   @NotNull
-  AsyncStatement<V> elseCatch(@NotNull Mapper<? super Throwable, ? extends V> mapper,
+  Statement<V> elseCatch(@NotNull Mapper<? super Throwable, ? extends V> mapper,
       @Nullable Class<?>... exceptionTypes);
 
   @NotNull
-  AsyncStatement<V> elseDo(@NotNull Observer<? super Throwable> observer,
+  Statement<V> elseDo(@NotNull Observer<? super Throwable> observer,
       @Nullable Class<?>... exceptionTypes);
 
   @NotNull
-  AsyncStatement<V> elseIf(
-      @NotNull Mapper<? super Throwable, ? extends AsyncStatement<? extends V>> mapper,
+  Statement<V> elseIf(@NotNull Mapper<? super Throwable, ? extends Statement<? extends V>> mapper,
       @Nullable Class<?>... exceptionTypes);
 
   @NotNull
-  AsyncStatement<V> evaluate();
+  Statement<V> evaluate();
 
   @NotNull
-  AsyncStatement<V> evaluated();
-
-  // TODO: 12/02/2018 tryFork?
+  Statement<V> evaluated();
 
   @NotNull
-  <S> AsyncStatement<V> fork(
-      @NotNull Forker<S, ? super V, ? super AsyncEvaluation<V>, ? super AsyncStatement<V>> forker);
+  <S> Statement<V> fork(
+      @NotNull Forker<S, ? super V, ? super Evaluation<V>, ? super Statement<V>> forker);
 
   @NotNull
-  <S> AsyncStatement<V> fork(@Nullable Mapper<? super AsyncStatement<V>, S> init,
-      @Nullable Updater<S, ? super V, ? super AsyncStatement<V>> value,
-      @Nullable Updater<S, ? super Throwable, ? super AsyncStatement<V>> failure,
-      @Nullable Completer<S, ? super AsyncStatement<V>> done,
-      @Nullable Updater<S, ? super AsyncEvaluation<V>, ? super AsyncStatement<V>> evaluation);
+  <S> Statement<V> fork(@Nullable Mapper<? super Statement<V>, S> init,
+      @Nullable Updater<S, ? super V, ? super Statement<V>> value,
+      @Nullable Updater<S, ? super Throwable, ? super Statement<V>> failure,
+      @Nullable Completer<S, ? super Statement<V>> done,
+      @Nullable Updater<S, ? super Evaluation<V>, ? super Statement<V>> evaluation);
 
   @NotNull
-  AsyncStatement<V> forkOn(@NotNull Executor executor);
+  Statement<V> forkOn(@NotNull Executor executor);
 
   boolean getDone();
 
@@ -84,28 +81,28 @@ public interface AsyncStatement<V> extends AsyncState<V>, Future<V>, Serializabl
   boolean isFinal();
 
   @NotNull
-  <R> AsyncStatement<R> then(@NotNull Mapper<? super V, R> mapper);
+  <R> Statement<R> then(@NotNull Mapper<? super V, R> mapper);
 
   @NotNull
-  AsyncStatement<V> thenDo(@NotNull Observer<? super V> observer);
+  Statement<V> thenDo(@NotNull Observer<? super V> observer);
 
   @NotNull
-  <R> AsyncStatement<R> thenIf(@NotNull Mapper<? super V, ? extends AsyncStatement<R>> mapper);
+  <R> Statement<R> thenIf(@NotNull Mapper<? super V, ? extends Statement<R>> mapper);
 
   @NotNull
-  <R> AsyncStatement<R> thenTry(@NotNull Mapper<? super V, ? extends Closeable> closeable,
+  <R> Statement<R> thenTry(@NotNull Mapper<? super V, ? extends Closeable> closeable,
       @NotNull Mapper<? super V, R> mapper);
 
   @NotNull
-  AsyncStatement<V> thenTryDo(@NotNull Mapper<? super V, ? extends Closeable> closeable,
+  Statement<V> thenTryDo(@NotNull Mapper<? super V, ? extends Closeable> closeable,
       @NotNull Observer<? super V> observer);
 
   @NotNull
-  <R> AsyncStatement<R> thenTryIf(@NotNull Mapper<? super V, ? extends Closeable> closeable,
-      @NotNull Mapper<? super V, ? extends AsyncStatement<R>> mapper);
+  <R> Statement<R> thenTryIf(@NotNull Mapper<? super V, ? extends Closeable> closeable,
+      @NotNull Mapper<? super V, ? extends Statement<R>> mapper);
 
   @NotNull
-  AsyncStatement<V> whenDone(@NotNull Action action);
+  Statement<V> whenDone(@NotNull Action action);
 
   interface Forker<S, V, R, A> {
 

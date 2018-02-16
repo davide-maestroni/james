@@ -23,7 +23,7 @@ import java.io.ObjectStreamException;
 import java.io.Serializable;
 
 import dm.jale.async.Action;
-import dm.jale.async.AsyncEvaluation;
+import dm.jale.async.Evaluation;
 import dm.jale.config.BuildConfig;
 import dm.jale.util.ConstantConditions;
 import dm.jale.util.SerializableProxy;
@@ -42,14 +42,14 @@ class DoneStatementHandler<V> extends AsyncStatementHandler<V, V> implements Ser
   }
 
   @Override
-  void failure(@NotNull final Throwable failure,
-      @NotNull final AsyncEvaluation<V> evaluation) throws Exception {
+  void failure(@NotNull final Throwable failure, @NotNull final Evaluation<V> evaluation) throws
+      Exception {
     mAction.perform();
     super.failure(failure, evaluation);
   }
 
   @Override
-  void value(final V value, @NotNull final AsyncEvaluation<V> evaluation) throws Exception {
+  void value(final V value, @NotNull final Evaluation<V> evaluation) throws Exception {
     mAction.perform();
     super.value(value, evaluation);
   }

@@ -22,7 +22,7 @@ import java.io.InvalidObjectException;
 import java.io.ObjectStreamException;
 import java.io.Serializable;
 
-import dm.jale.async.AsyncEvaluations;
+import dm.jale.async.EvaluationCollection;
 import dm.jale.async.Mapper;
 import dm.jale.config.BuildConfig;
 import dm.jale.util.ConstantConditions;
@@ -43,7 +43,7 @@ class ThenLoopStatementHandler<V, R> extends AsyncStatementLoopHandler<V, R>
   }
 
   @Override
-  void value(final V value, @NotNull final AsyncEvaluations<R> evaluations) throws Exception {
+  void value(final V value, @NotNull final EvaluationCollection<R> evaluations) throws Exception {
     evaluations.addValues(mMapper.apply(value)).set();
   }
 

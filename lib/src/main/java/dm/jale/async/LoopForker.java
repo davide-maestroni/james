@@ -16,11 +16,11 @@
 
 package dm.jale.async;
 
-import dm.jale.async.AsyncStatement.Forker;
+import dm.jale.async.Statement.Forker;
 
 /**
  * Created by davide-maestroni on 02/15/2018.
  */
-public interface LoopForker<S, V> extends Forker<S, V, AsyncEvaluations<V>, AsyncLoop<V>> {
+public interface LoopForker<S, V> extends Forker<S, V, EvaluationCollection<V>, Loop<V>> {
 
 }

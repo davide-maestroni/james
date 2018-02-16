@@ -24,9 +24,9 @@ import java.io.ObjectStreamException;
 import java.io.Serializable;
 import java.util.Arrays;
 
-import dm.jale.async.AsyncEvaluation;
-import dm.jale.async.AsyncStatement;
+import dm.jale.async.Evaluation;
 import dm.jale.async.Mapper;
+import dm.jale.async.Statement;
 import dm.jale.config.BuildConfig;
 import dm.jale.util.ConstantConditions;
 import dm.jale.util.SerializableProxy;
@@ -38,12 +38,12 @@ class ElseIfStatementHandler<V> extends AsyncStatementHandler<V, V> implements S
 
   private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
 
-  private final Mapper<? super Throwable, ? extends AsyncStatement<? extends V>> mMapper;
+  private final Mapper<? super Throwable, ? extends Statement<? extends V>> mMapper;
 
   private final Class<?>[] mTypes;
 
   ElseIfStatementHandler(
-      @NotNull final Mapper<? super Throwable, ? extends AsyncStatement<? extends V>> mapper,
+      @NotNull final Mapper<? super Throwable, ? extends Statement<? extends V>> mapper,
       @Nullable final Class<?>[] exceptionTypes) {
     mMapper = ConstantConditions.notNull("mapper", mapper);
     mTypes = ConstantConditions.notNull("exception types", exceptionTypes);
@@ -53,8 +53,8 @@ class ElseIfStatementHandler<V> extends AsyncStatementHandler<V, V> implements S
   }
 
   @Override
-  void failure(@NotNull final Throwable failure,
-      @NotNull final AsyncEvaluation<V> evaluation) throws Exception {
+  void failure(@NotNull final Throwable failure, @NotNull final Evaluation<V> evaluation) throws
+      Exception {
     for (final Class<?> type : mTypes) {
       if (type.isInstance(failure)) {
         mMapper.apply(failure).to(evaluation);
@@ -74,8 +74,7 @@ class ElseIfStatementHandler<V> extends AsyncStatementHandler<V, V> implements S
 
     private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
 
-    private HandlerProxy(
-        final Mapper<? super Throwable, ? extends AsyncStatement<? extends V>> mapper,
+    private HandlerProxy(final Mapper<? super Throwable, ? extends Statement<? extends V>> mapper,
         final Class<?>[] exceptionTypes) {
       super(proxy(mapper), exceptionTypes);
     }
@@ -86,7 +85,7 @@ class ElseIfStatementHandler<V> extends AsyncStatementHandler<V, V> implements S
       try {
         final Object[] args = deserializeArgs();
         return new ElseIfStatementHandler<V>(
-            (Mapper<? super Throwable, ? extends AsyncStatement<? extends V>>) args[0],
+            (Mapper<? super Throwable, ? extends Statement<? extends V>>) args[0],
             (Class<?>[]) args[1]);
 
       } catch (final Throwable t) {

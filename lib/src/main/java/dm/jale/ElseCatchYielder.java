@@ -24,7 +24,7 @@ import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.Arrays;
 
-import dm.jale.async.AsyncLoop.YieldOutputs;
+import dm.jale.async.Loop.YieldOutputs;
 import dm.jale.async.Mapper;
 import dm.jale.config.BuildConfig;
 import dm.jale.util.ConstantConditions;

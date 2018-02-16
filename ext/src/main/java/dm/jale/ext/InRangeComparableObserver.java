@@ -22,7 +22,7 @@ import java.io.InvalidObjectException;
 import java.io.ObjectStreamException;
 import java.io.Serializable;
 
-import dm.jale.async.AsyncEvaluations;
+import dm.jale.async.EvaluationCollection;
 import dm.jale.async.Mapper;
 import dm.jale.async.Observer;
 import dm.jale.ext.config.BuildConfig;
@@ -33,7 +33,7 @@ import dm.jale.util.SerializableProxy;
  * Created by davide-maestroni on 02/16/2018.
  */
 class InRangeComparableObserver<V extends Comparable<V>>
-    implements Observer<AsyncEvaluations<V>>, Serializable {
+    implements Observer<EvaluationCollection<V>>, Serializable {
 
   private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
 
@@ -53,7 +53,7 @@ class InRangeComparableObserver<V extends Comparable<V>>
     mIsInclusive = isInclusive;
   }
 
-  public void accept(final AsyncEvaluations<V> evaluations) throws Exception {
+  public void accept(final EvaluationCollection<V> evaluations) throws Exception {
     V value = mStart;
     final V end = mEnd;
     final Mapper<? super V, ? extends V> increment = mIncrement;

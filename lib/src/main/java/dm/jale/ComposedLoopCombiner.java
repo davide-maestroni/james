@@ -24,12 +24,12 @@ import java.io.ObjectStreamException;
 import java.io.Serializable;
 import java.util.List;
 
-import dm.jale.async.AsyncEvaluations;
-import dm.jale.async.AsyncLoop;
 import dm.jale.async.CombinationCompleter;
 import dm.jale.async.CombinationSettler;
 import dm.jale.async.CombinationUpdater;
 import dm.jale.async.Combiner;
+import dm.jale.async.EvaluationCollection;
+import dm.jale.async.Loop;
 import dm.jale.async.Mapper;
 import dm.jale.config.BuildConfig;
 import dm.jale.util.SerializableProxy;
@@ -38,70 +38,69 @@ import dm.jale.util.SerializableProxy;
  * Created by davide-maestroni on 02/14/2018.
  */
 class ComposedLoopCombiner<S, V, R>
-    implements Combiner<S, V, AsyncEvaluations<R>, AsyncLoop<V>>, Serializable {
+    implements Combiner<S, V, EvaluationCollection<R>, Loop<V>>, Serializable {
 
   private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
 
-  private final CombinationCompleter<S, ? super AsyncEvaluations<? extends R>, AsyncLoop<V>> mDone;
+  private final CombinationCompleter<S, ? super EvaluationCollection<? extends R>, Loop<V>> mDone;
 
-  private final CombinationUpdater<S, ? super Throwable, ? super AsyncEvaluations<? extends R>,
-      AsyncLoop<V>>
+  private final CombinationUpdater<S, ? super Throwable, ? super EvaluationCollection<? extends
+      R>, Loop<V>>
       mFailure;
 
-  private final Mapper<? super List<AsyncLoop<V>>, S> mInit;
+  private final Mapper<? super List<Loop<V>>, S> mInit;
 
-  private final CombinationSettler<S, ? super AsyncEvaluations<? extends R>, AsyncLoop<V>> mSettle;
+  private final CombinationSettler<S, ? super EvaluationCollection<? extends R>, Loop<V>> mSettle;
 
-  private final CombinationUpdater<S, ? super V, ? super AsyncEvaluations<? extends R>,
-      AsyncLoop<V>>
+  private final CombinationUpdater<S, ? super V, ? super EvaluationCollection<? extends R>, Loop<V>>
       mValue;
 
   @SuppressWarnings("unchecked")
-  ComposedLoopCombiner(@Nullable final Mapper<? super List<AsyncLoop<V>>, S> init,
-      @Nullable final CombinationUpdater<S, ? super V, ? super AsyncEvaluations<? extends R>,
-          AsyncLoop<V>> value,
-      @Nullable final CombinationUpdater<S, ? super Throwable, ? super AsyncEvaluations<? extends
-          R>, AsyncLoop<V>> failure,
-      @Nullable final CombinationCompleter<S, ? super AsyncEvaluations<? extends R>,
-          AsyncLoop<V>> done,
-      @Nullable final CombinationSettler<S, ? super AsyncEvaluations<? extends R>, AsyncLoop<V>>
+  ComposedLoopCombiner(@Nullable final Mapper<? super List<Loop<V>>, S> init,
+      @Nullable final CombinationUpdater<S, ? super V, ? super EvaluationCollection<? extends R>,
+          Loop<V>> value,
+      @Nullable final CombinationUpdater<S, ? super Throwable, ? super EvaluationCollection<?
+          extends R>, Loop<V>> failure,
+      @Nullable final CombinationCompleter<S, ? super EvaluationCollection<? extends R>, Loop<V>>
+          done,
+      @Nullable final CombinationSettler<S, ? super EvaluationCollection<? extends R>, Loop<V>>
           settle) {
-    mInit = (Mapper<? super List<AsyncLoop<V>>, S>) ((init != null) ? init : DefaultInit.sInstance);
+    mInit = (Mapper<? super List<Loop<V>>, S>) ((init != null) ? init : DefaultInit.sInstance);
     mValue =
-        (CombinationUpdater<S, ? super V, ? super AsyncEvaluations<? extends R>, AsyncLoop<V>>) (
+        (CombinationUpdater<S, ? super V, ? super EvaluationCollection<? extends R>, Loop<V>>) (
             (value != null) ? value : DefaultUpdater.sInstance);
     mFailure =
-        (CombinationUpdater<S, ? super Throwable, ? super AsyncEvaluations<? extends R>,
-            AsyncLoop<V>>) (
+        (CombinationUpdater<S, ? super Throwable, ? super EvaluationCollection<? extends R>,
+            Loop<V>>) (
             (failure != null) ? failure : DefaultUpdater.sInstance);
-    mDone = (CombinationCompleter<S, ? super AsyncEvaluations<? extends R>, AsyncLoop<V>>) (
+    mDone = (CombinationCompleter<S, ? super EvaluationCollection<? extends R>, Loop<V>>) (
         (done != null) ? done : DefaultCompleter.sInstance);
-    mSettle = (CombinationSettler<S, ? super AsyncEvaluations<? extends R>, AsyncLoop<V>>) (
+    mSettle = (CombinationSettler<S, ? super EvaluationCollection<? extends R>, Loop<V>>) (
         (settle != null) ? settle : DefaultSettler.sInstance);
   }
 
-  public S done(final S stack, @NotNull final AsyncEvaluations<R> evaluation,
-      @NotNull final List<AsyncLoop<V>> asyncs, final int index) throws Exception {
+  public S done(final S stack, @NotNull final EvaluationCollection<R> evaluation,
+      @NotNull final List<Loop<V>> asyncs, final int index) throws Exception {
     return mDone.complete(stack, evaluation, asyncs, index);
   }
 
   public S failure(final S stack, final Throwable failure,
-      @NotNull final AsyncEvaluations<R> evaluation, @NotNull final List<AsyncLoop<V>> asyncs,
+      @NotNull final EvaluationCollection<R> evaluation, @NotNull final List<Loop<V>> asyncs,
       final int index) throws Exception {
     return mFailure.update(stack, failure, evaluation, asyncs, index);
   }
 
-  public S init(@NotNull final List<AsyncLoop<V>> asyncs) throws Exception {
+  public S init(@NotNull final List<Loop<V>> asyncs) throws Exception {
     return mInit.apply(asyncs);
   }
 
-  public void settle(final S stack, @NotNull final AsyncEvaluations<R> evaluation,
-      @NotNull final List<AsyncLoop<V>> asyncs) throws Exception {
+  public void settle(final S stack, @NotNull final EvaluationCollection<R> evaluation,
+      @NotNull final List<Loop<V>> asyncs) throws Exception {
     mSettle.settle(stack, evaluation, asyncs);
   }
 
-  public S value(final S stack, final V value, @NotNull final AsyncEvaluations<R> evaluation,
-      @NotNull final List<AsyncLoop<V>> asyncs, final int index) throws Exception {
+  public S value(final S stack, final V value, @NotNull final EvaluationCollection<R> evaluation,
+      @NotNull final List<Loop<V>> asyncs, final int index) throws Exception {
     return mValue.update(stack, value, evaluation, asyncs, index);
   }
 
@@ -114,13 +113,13 @@ class ComposedLoopCombiner<S, V, R>
 
     private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
 
-    private CombinerProxy(final Mapper<? super List<AsyncLoop<V>>, S> init,
-        final CombinationUpdater<S, ? super V, ? super AsyncEvaluations<? extends R>,
-            AsyncLoop<V>> value,
-        final CombinationUpdater<S, ? super Throwable, ? super AsyncEvaluations<? extends R>,
-            AsyncLoop<V>> failure,
-        final CombinationCompleter<S, ? super AsyncEvaluations<? extends R>, AsyncLoop<V>> done,
-        final CombinationSettler<S, ? super AsyncEvaluations<? extends R>, AsyncLoop<V>> settle) {
+    private CombinerProxy(final Mapper<? super List<Loop<V>>, S> init,
+        final CombinationUpdater<S, ? super V, ? super EvaluationCollection<? extends R>,
+            Loop<V>> value,
+        final CombinationUpdater<S, ? super Throwable, ? super EvaluationCollection<? extends R>,
+            Loop<V>> failure,
+        final CombinationCompleter<S, ? super EvaluationCollection<? extends R>, Loop<V>> done,
+        final CombinationSettler<S, ? super EvaluationCollection<? extends R>, Loop<V>> settle) {
       super(proxy(init), proxy(value), proxy(failure), proxy(done), proxy(settle));
     }
 
@@ -129,13 +128,13 @@ class ComposedLoopCombiner<S, V, R>
     private Object readResolve() throws ObjectStreamException {
       try {
         final Object[] args = deserializeArgs();
-        return new ComposedLoopCombiner<S, V, R>((Mapper<? super List<AsyncLoop<V>>, S>) args[0],
-            (CombinationUpdater<S, ? super V, ? super AsyncEvaluations<? extends R>,
-                AsyncLoop<V>>) args[1],
-            (CombinationUpdater<S, ? super Throwable, ? super AsyncEvaluations<? extends R>,
-                AsyncLoop<V>>) args[2],
-            (CombinationCompleter<S, ? super AsyncEvaluations<? extends R>, AsyncLoop<V>>) args[3],
-            (CombinationSettler<S, ? super AsyncEvaluations<? extends R>, AsyncLoop<V>>) args[4]);
+        return new ComposedLoopCombiner<S, V, R>((Mapper<? super List<Loop<V>>, S>) args[0],
+            (CombinationUpdater<S, ? super V, ? super EvaluationCollection<? extends R>,
+                Loop<V>>) args[1],
+            (CombinationUpdater<S, ? super Throwable, ? super EvaluationCollection<? extends R>,
+                Loop<V>>) args[2],
+            (CombinationCompleter<S, ? super EvaluationCollection<? extends R>, Loop<V>>) args[3],
+            (CombinationSettler<S, ? super EvaluationCollection<? extends R>, Loop<V>>) args[4]);
 
       } catch (final Throwable t) {
         throw new InvalidObjectException(t.getMessage());
@@ -144,16 +143,15 @@ class ComposedLoopCombiner<S, V, R>
   }
 
   private static class DefaultCompleter<S, V, R>
-      implements CombinationCompleter<S, AsyncEvaluations<? extends R>, AsyncLoop<V>>,
-      Serializable {
+      implements CombinationCompleter<S, EvaluationCollection<? extends R>, Loop<V>>, Serializable {
 
     private static final DefaultCompleter<?, ?, ?> sInstance =
         new DefaultCompleter<Object, Object, Object>();
 
     private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
 
-    public S complete(final S stack, @NotNull final AsyncEvaluations<? extends R> evaluations,
-        @NotNull final List<AsyncLoop<V>> loops, final int index) {
+    public S complete(final S stack, @NotNull final EvaluationCollection<? extends R> evaluations,
+        @NotNull final List<Loop<V>> loops, final int index) {
       return stack;
     }
 
@@ -163,13 +161,13 @@ class ComposedLoopCombiner<S, V, R>
     }
   }
 
-  private static class DefaultInit<S, V> implements Mapper<List<AsyncLoop<V>>, S>, Serializable {
+  private static class DefaultInit<S, V> implements Mapper<List<Loop<V>>, S>, Serializable {
 
     private static final DefaultInit<?, ?> sInstance = new DefaultInit<Object, Object>();
 
     private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
 
-    public S apply(final List<AsyncLoop<V>> loops) {
+    public S apply(final List<Loop<V>> loops) {
       return null;
     }
 
@@ -180,15 +178,15 @@ class ComposedLoopCombiner<S, V, R>
   }
 
   private static class DefaultSettler<S, V, R>
-      implements CombinationSettler<S, AsyncEvaluations<? extends R>, AsyncLoop<V>>, Serializable {
+      implements CombinationSettler<S, EvaluationCollection<? extends R>, Loop<V>>, Serializable {
 
     private static final DefaultSettler<?, ?, ?> sInstance =
         new DefaultSettler<Object, Object, Object>();
 
     private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
 
-    public void settle(final S stack, @NotNull final AsyncEvaluations<? extends R> evaluations,
-        @NotNull final List<AsyncLoop<V>> loops) throws Exception {
+    public void settle(final S stack, @NotNull final EvaluationCollection<? extends R> evaluations,
+        @NotNull final List<Loop<V>> loops) throws Exception {
       evaluations.set();
     }
 
@@ -199,7 +197,7 @@ class ComposedLoopCombiner<S, V, R>
   }
 
   private static class DefaultUpdater<S, V, I, R>
-      implements CombinationUpdater<S, I, AsyncEvaluations<? extends R>, AsyncLoop<V>>,
+      implements CombinationUpdater<S, I, EvaluationCollection<? extends R>, Loop<V>>,
       Serializable {
 
     private static final DefaultUpdater<?, ?, ?, ?> sInstance =
@@ -208,8 +206,8 @@ class ComposedLoopCombiner<S, V, R>
     private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
 
     public S update(final S stack, final I input,
-        @NotNull final AsyncEvaluations<? extends R> evaluations,
-        @NotNull final List<AsyncLoop<V>> loops, final int index) {
+        @NotNull final EvaluationCollection<? extends R> evaluations,
+        @NotNull final List<Loop<V>> loops, final int index) {
       return stack;
     }
 

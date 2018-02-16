@@ -23,8 +23,8 @@ import java.io.InvalidObjectException;
 import java.io.ObjectStreamException;
 import java.io.Serializable;
 
-import dm.jale.async.AsyncLoop.YieldOutputs;
-import dm.jale.async.AsyncLoop.Yielder;
+import dm.jale.async.Loop.YieldOutputs;
+import dm.jale.async.Loop.Yielder;
 import dm.jale.async.Mapper;
 import dm.jale.async.Provider;
 import dm.jale.async.Settler;

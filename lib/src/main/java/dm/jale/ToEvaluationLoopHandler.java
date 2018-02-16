@@ -23,7 +23,7 @@ import java.io.NotSerializableException;
 import java.io.ObjectStreamException;
 import java.io.Serializable;
 
-import dm.jale.async.AsyncEvaluations;
+import dm.jale.async.EvaluationCollection;
 import dm.jale.config.BuildConfig;
 import dm.jale.util.ConstantConditions;
 
@@ -34,38 +34,38 @@ class ToEvaluationLoopHandler<V> extends AsyncLoopHandler<V, Void> implements Se
 
   private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
 
-  private final AsyncEvaluations<V> mEvaluations;
+  private final EvaluationCollection<V> mEvaluations;
 
   @SuppressWarnings("unchecked")
-  ToEvaluationLoopHandler(@NotNull final AsyncEvaluations<? super V> evaluations) {
-    mEvaluations = (AsyncEvaluations<V>) ConstantConditions.notNull("evaluations", evaluations);
+  ToEvaluationLoopHandler(@NotNull final EvaluationCollection<? super V> evaluations) {
+    mEvaluations = (EvaluationCollection<V>) ConstantConditions.notNull("evaluations", evaluations);
   }
 
   @Override
   void addFailure(@NotNull final Throwable failure,
-      @NotNull final AsyncEvaluations<Void> evaluations) {
+      @NotNull final EvaluationCollection<Void> evaluations) {
     mEvaluations.addFailure(failure);
   }
 
   @Override
   void addFailures(@Nullable final Iterable<? extends Throwable> failures,
-      @NotNull final AsyncEvaluations<Void> evaluations) {
+      @NotNull final EvaluationCollection<Void> evaluations) {
     mEvaluations.addFailures(failures);
   }
 
   @Override
-  void addValue(final V value, @NotNull final AsyncEvaluations<Void> evaluations) {
+  void addValue(final V value, @NotNull final EvaluationCollection<Void> evaluations) {
     mEvaluations.addValue(value);
   }
 
   @Override
   void addValues(@Nullable final Iterable<? extends V> values,
-      @NotNull final AsyncEvaluations<Void> evaluations) {
+      @NotNull final EvaluationCollection<Void> evaluations) {
     mEvaluations.addValues(values);
   }
 
   @Override
-  void set(@NotNull final AsyncEvaluations<Void> evaluations) {
+  void set(@NotNull final EvaluationCollection<Void> evaluations) {
     mEvaluations.set();
   }
 

@@ -21,7 +21,7 @@ import org.jetbrains.annotations.Nullable;
 
 import java.io.InputStream;
 
-import dm.jale.async.AsyncEvaluations;
+import dm.jale.async.EvaluationCollection;
 import dm.jale.ext.io.AllocationType;
 import dm.jale.ext.io.Chunk;
 import dm.jale.ext.io.ChunkOutputStream;
@@ -41,7 +41,7 @@ class InputStreamChunkObserver extends ChunkObserver {
     mInputStream = ConstantConditions.notNull("inputStream", inputStream);
   }
 
-  public void accept(final AsyncEvaluations<Chunk> evaluations) throws Exception {
+  public void accept(final EvaluationCollection<Chunk> evaluations) throws Exception {
     final ChunkOutputStream outputStream = newStream(evaluations);
     try {
       outputStream.transfer(mInputStream);

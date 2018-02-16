@@ -20,12 +20,12 @@ import org.jetbrains.annotations.NotNull;
 
 import java.util.concurrent.TimeUnit;
 
-import dm.jale.async.AsyncEvaluations;
+import dm.jale.async.EvaluationCollection;
 
 /**
  * Created by davide-maestroni on 02/09/2018.
  */
-public interface PendingEvaluations<V> extends AsyncEvaluations<V> {
+public interface PendingEvaluations<V> extends EvaluationCollection<V> {
 
   int pendingTasks();
 

@@ -45,12 +45,12 @@
         <Bug pattern="BC_UNCONFIRMED_CAST_OF_RETURN_VALUE"/>
     </Match>
     <Match>
-        <Class name="dm.jale.DefaultAsyncStatement"/>
+        <Class name="dm.jale.DefaultStatement"/>
         <Method name="failure"/>
         <Bug pattern="NP_NULL_ON_SOME_PATH_FROM_RETURN_VALUE"/>
     </Match>
     <Match>
-        <Class name="dm.jale.DefaultAsyncLoop"/>
+        <Class name="dm.jale.DefaultLoop"/>
         <Method name="failure"/>
         <Bug pattern="NP_NULL_ON_SOME_PATH_FROM_RETURN_VALUE"/>
     </Match>

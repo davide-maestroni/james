@@ -24,7 +24,7 @@ import java.io.ObjectStreamException;
 import java.io.Serializable;
 import java.util.Arrays;
 
-import dm.jale.async.AsyncEvaluations;
+import dm.jale.async.EvaluationCollection;
 import dm.jale.async.Observer;
 import dm.jale.config.BuildConfig;
 import dm.jale.util.ConstantConditions;
@@ -53,7 +53,7 @@ class ElseDoLoopHandler<V> extends AsyncLoopHandler<V, V> implements Serializabl
 
   @Override
   void addFailure(@NotNull final Throwable failure,
-      @NotNull final AsyncEvaluations<V> evaluations) throws Exception {
+      @NotNull final EvaluationCollection<V> evaluations) throws Exception {
     for (final Class<?> type : mTypes) {
       if (type.isInstance(failure)) {
         mObserver.accept(failure);
@@ -66,7 +66,7 @@ class ElseDoLoopHandler<V> extends AsyncLoopHandler<V, V> implements Serializabl
 
   @Override
   void addFailures(@Nullable final Iterable<? extends Throwable> failures,
-      @NotNull final AsyncEvaluations<V> evaluations) throws Exception {
+      @NotNull final EvaluationCollection<V> evaluations) throws Exception {
     if (failures == null) {
       return;
     }

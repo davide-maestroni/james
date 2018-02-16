@@ -27,10 +27,10 @@ import java.util.List;
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.Executor;
 
-import dm.jale.async.AsyncEvaluations;
-import dm.jale.async.AsyncLoop;
 import dm.jale.async.Combiner;
+import dm.jale.async.EvaluationCollection;
 import dm.jale.async.FailureException;
+import dm.jale.async.Loop;
 import dm.jale.async.Observer;
 import dm.jale.async.RuntimeInterruptedException;
 import dm.jale.config.BuildConfig;
@@ -45,21 +45,21 @@ import static dm.jale.executor.ExecutorPool.withThrottling;
 /**
  * Created by davide-maestroni on 02/14/2018.
  */
-class CombinationLoopObserver<S, V, R> implements Observer<AsyncEvaluations<R>>, Serializable {
+class CombinationLoopObserver<S, V, R> implements Observer<EvaluationCollection<R>>, Serializable {
 
   private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
 
-  private final Combiner<S, ? super V, ? super AsyncEvaluations<R>, AsyncLoop<V>> mCombiner;
+  private final Combiner<S, ? super V, ? super EvaluationCollection<R>, Loop<V>> mCombiner;
 
   private final Executor mExecutor;
 
   private final Logger mLogger;
 
-  private final List<AsyncLoop<? extends V>> mLoopList;
+  private final List<Loop<? extends V>> mLoopList;
 
   CombinationLoopObserver(
-      @NotNull final Combiner<S, ? super V, ? super AsyncEvaluations<R>, AsyncLoop<V>> combiner,
-      @NotNull final Iterable<? extends AsyncLoop<? extends V>> loops,
+      @NotNull final Combiner<S, ? super V, ? super EvaluationCollection<R>, Loop<V>> combiner,
+      @NotNull final Iterable<? extends Loop<? extends V>> loops,
       @NotNull final String loggerName) {
     mCombiner = ConstantConditions.notNull("combiner", combiner);
     mLoopList = Collections.unmodifiableList(Iterables.toList(loops));
@@ -68,20 +68,19 @@ class CombinationLoopObserver<S, V, R> implements Observer<AsyncEvaluations<R>>,
   }
 
   @SuppressWarnings("unchecked")
-  public void accept(final AsyncEvaluations<R> evaluations) throws Exception {
+  public void accept(final EvaluationCollection<R> evaluations) throws Exception {
     int i = 0;
     @SuppressWarnings("UnnecessaryLocalVariable") final Logger logger = mLogger;
     @SuppressWarnings("UnnecessaryLocalVariable") final Executor executor = mExecutor;
-    final Combiner<S, ? super V, ? super AsyncEvaluations<R>, AsyncLoop<V>> combiner = mCombiner;
-    final List<? extends AsyncLoop<? extends V>> loops = mLoopList;
+    final Combiner<S, ? super V, ? super EvaluationCollection<R>, Loop<V>> combiner = mCombiner;
+    final List<? extends Loop<? extends V>> loops = mLoopList;
     final CombinationState<S> state = new CombinationState<S>(loops.size());
     try {
-      state.set(combiner.init((List<AsyncLoop<V>>) loops));
-      for (final AsyncLoop<? extends V> loop : loops) {
+      state.set(combiner.init((List<Loop<V>>) loops));
+      for (final Loop<? extends V> loop : loops) {
         final int index = i++;
-        loop.to(
-            new AsyncEvaluationsCombination<S, V, R>(state, combiner, executor, evaluations, loops,
-                index, logger));
+        loop.to(new EvaluationCollectionCombination<S, V, R>(state, combiner, executor, evaluations,
+            loops, index, logger));
       }
 
     } catch (final CancellationException e) {
@@ -101,11 +100,11 @@ class CombinationLoopObserver<S, V, R> implements Observer<AsyncEvaluations<R>>,
     return new ObserverProxy<S, V, R>(mCombiner, mLoopList, mLogger.getName());
   }
 
-  private static class AsyncEvaluationsCombination<S, V, R> implements AsyncEvaluations<V> {
+  private static class EvaluationCollectionCombination<S, V, R> implements EvaluationCollection<V> {
 
-    private final Combiner<S, ? super V, ? super AsyncEvaluations<R>, AsyncLoop<V>> mCombiner;
+    private final Combiner<S, ? super V, ? super EvaluationCollection<R>, Loop<V>> mCombiner;
 
-    private final AsyncEvaluations<R> mEvaluations;
+    private final EvaluationCollection<R> mEvaluations;
 
     private final Executor mExecutor;
 
@@ -113,14 +112,14 @@ class CombinationLoopObserver<S, V, R> implements Observer<AsyncEvaluations<R>>,
 
     private final Logger mLogger;
 
-    private final List<? extends AsyncLoop<? extends V>> mLoops;
+    private final List<? extends Loop<? extends V>> mLoops;
 
     private final CombinationState<S> mState;
 
-    private AsyncEvaluationsCombination(@NotNull final CombinationState<S> state,
-        @NotNull final Combiner<S, ? super V, ? super AsyncEvaluations<R>, AsyncLoop<V>> combiner,
-        @NotNull final Executor executor, @NotNull final AsyncEvaluations<R> evaluations,
-        @NotNull final List<? extends AsyncLoop<? extends V>> loops, final int index,
+    private EvaluationCollectionCombination(@NotNull final CombinationState<S> state,
+        @NotNull final Combiner<S, ? super V, ? super EvaluationCollection<R>, Loop<V>> combiner,
+        @NotNull final Executor executor, @NotNull final EvaluationCollection<R> evaluations,
+        @NotNull final List<? extends Loop<? extends V>> loops, final int index,
         @NotNull final Logger logger) {
       mState = state;
       mCombiner = combiner;
@@ -132,7 +131,7 @@ class CombinationLoopObserver<S, V, R> implements Observer<AsyncEvaluations<R>>,
     }
 
     @NotNull
-    public AsyncEvaluations<V> addFailure(@NotNull final Throwable failure) {
+    public EvaluationCollection<V> addFailure(@NotNull final Throwable failure) {
       checkFailed();
       mExecutor.execute(new Runnable() {
 
@@ -143,10 +142,9 @@ class CombinationLoopObserver<S, V, R> implements Observer<AsyncEvaluations<R>>,
             return;
           }
 
-          final AsyncEvaluations<R> evaluations = mEvaluations;
+          final EvaluationCollection<R> evaluations = mEvaluations;
           try {
-            @SuppressWarnings("unchecked") final List<AsyncLoop<V>> loops =
-                (List<AsyncLoop<V>>) mLoops;
+            @SuppressWarnings("unchecked") final List<Loop<V>> loops = (List<Loop<V>>) mLoops;
             state.set(mCombiner.failure(state.get(), failure, evaluations, loops, mIndex));
 
           } catch (final CancellationException e) {
@@ -165,7 +163,8 @@ class CombinationLoopObserver<S, V, R> implements Observer<AsyncEvaluations<R>>,
     }
 
     @NotNull
-    public AsyncEvaluations<V> addFailures(@Nullable final Iterable<? extends Throwable> failures) {
+    public EvaluationCollection<V> addFailures(
+        @Nullable final Iterable<? extends Throwable> failures) {
       checkFailed();
       mExecutor.execute(new Runnable() {
 
@@ -177,15 +176,14 @@ class CombinationLoopObserver<S, V, R> implements Observer<AsyncEvaluations<R>>,
           }
 
           if (failures != null) {
-            final AsyncEvaluations<R> evaluations = mEvaluations;
+            final EvaluationCollection<R> evaluations = mEvaluations;
             try {
               @SuppressWarnings("UnnecessaryLocalVariable") final int index = mIndex;
               @SuppressWarnings(
                   "UnnecessaryLocalVariable") final Combiner<S, ? super V, ? super
-                  AsyncEvaluations<R>, AsyncLoop<V>>
+                  EvaluationCollection<R>, Loop<V>>
                   combiner = mCombiner;
-              @SuppressWarnings("unchecked") final List<AsyncLoop<V>> loops =
-                  (List<AsyncLoop<V>>) mLoops;
+              @SuppressWarnings("unchecked") final List<Loop<V>> loops = (List<Loop<V>>) mLoops;
               for (final Throwable failure : failures) {
                 state.set(combiner.failure(state.get(), failure, evaluations, loops, index));
               }
@@ -207,7 +205,7 @@ class CombinationLoopObserver<S, V, R> implements Observer<AsyncEvaluations<R>>,
     }
 
     @NotNull
-    public AsyncEvaluations<V> addValue(final V value) {
+    public EvaluationCollection<V> addValue(final V value) {
       checkFailed();
       mExecutor.execute(new Runnable() {
 
@@ -218,10 +216,9 @@ class CombinationLoopObserver<S, V, R> implements Observer<AsyncEvaluations<R>>,
             return;
           }
 
-          final AsyncEvaluations<R> evaluations = mEvaluations;
+          final EvaluationCollection<R> evaluations = mEvaluations;
           try {
-            @SuppressWarnings("unchecked") final List<AsyncLoop<V>> loops =
-                (List<AsyncLoop<V>>) mLoops;
+            @SuppressWarnings("unchecked") final List<Loop<V>> loops = (List<Loop<V>>) mLoops;
             state.set(mCombiner.value(state.get(), value, evaluations, loops, mIndex));
 
           } catch (final CancellationException e) {
@@ -240,7 +237,7 @@ class CombinationLoopObserver<S, V, R> implements Observer<AsyncEvaluations<R>>,
     }
 
     @NotNull
-    public AsyncEvaluations<V> addValues(@Nullable final Iterable<? extends V> values) {
+    public EvaluationCollection<V> addValues(@Nullable final Iterable<? extends V> values) {
       checkFailed();
       mExecutor.execute(new Runnable() {
 
@@ -252,15 +249,14 @@ class CombinationLoopObserver<S, V, R> implements Observer<AsyncEvaluations<R>>,
           }
 
           if (values != null) {
-            final AsyncEvaluations<R> evaluations = mEvaluations;
+            final EvaluationCollection<R> evaluations = mEvaluations;
             try {
               @SuppressWarnings("UnnecessaryLocalVariable") final int index = mIndex;
               @SuppressWarnings(
                   "UnnecessaryLocalVariable") final Combiner<S, ? super V, ? super
-                  AsyncEvaluations<R>, AsyncLoop<V>>
+                  EvaluationCollection<R>, Loop<V>>
                   combiner = mCombiner;
-              @SuppressWarnings("unchecked") final List<AsyncLoop<V>> loops =
-                  (List<AsyncLoop<V>>) mLoops;
+              @SuppressWarnings("unchecked") final List<Loop<V>> loops = (List<Loop<V>>) mLoops;
               for (final V value : values) {
                 state.set(combiner.value(state.get(), value, evaluations, loops, index));
               }
@@ -292,13 +288,12 @@ class CombinationLoopObserver<S, V, R> implements Observer<AsyncEvaluations<R>>,
             return;
           }
 
-          final AsyncEvaluations<R> evaluations = mEvaluations;
+          final EvaluationCollection<R> evaluations = mEvaluations;
           try {
             @SuppressWarnings("UnnecessaryLocalVariable") final int index = mIndex;
-            final Combiner<S, ? super V, ? super AsyncEvaluations<R>, AsyncLoop<V>> combiner =
+            final Combiner<S, ? super V, ? super EvaluationCollection<R>, Loop<V>> combiner =
                 mCombiner;
-            @SuppressWarnings("unchecked") final List<AsyncLoop<V>> loops =
-                (List<AsyncLoop<V>>) mLoops;
+            @SuppressWarnings("unchecked") final List<Loop<V>> loops = (List<Loop<V>>) mLoops;
             state.set(combiner.done(state.get(), evaluations, loops, index));
             if (state.set()) {
               combiner.settle(state.get(), evaluations, loops);
@@ -331,8 +326,8 @@ class CombinationLoopObserver<S, V, R> implements Observer<AsyncEvaluations<R>>,
     private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
 
     private ObserverProxy(
-        final Combiner<S, ? super V, ? super AsyncEvaluations<R>, AsyncLoop<V>> combiner,
-        final Iterable<? extends AsyncLoop<? extends V>> loops, final String loggerName) {
+        final Combiner<S, ? super V, ? super EvaluationCollection<R>, Loop<V>> combiner,
+        final Iterable<? extends Loop<? extends V>> loops, final String loggerName) {
       super(proxy(combiner), loops, loggerName);
     }
 
@@ -342,8 +337,8 @@ class CombinationLoopObserver<S, V, R> implements Observer<AsyncEvaluations<R>>,
       try {
         final Object[] args = deserializeArgs();
         return new CombinationLoopObserver<S, V, R>(
-            (Combiner<S, ? super V, ? super AsyncEvaluations<R>, AsyncLoop<V>>) args[0],
-            (Iterable<? extends AsyncLoop<? extends V>>) args[1], (String) args[2]);
+            (Combiner<S, ? super V, ? super EvaluationCollection<R>, Loop<V>>) args[0],
+            (Iterable<? extends Loop<? extends V>>) args[1], (String) args[2]);
 
       } catch (final Throwable t) {
         throw new InvalidObjectException(t.getMessage());

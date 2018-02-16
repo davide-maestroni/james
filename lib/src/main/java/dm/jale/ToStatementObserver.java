@@ -20,8 +20,8 @@ import org.jetbrains.annotations.NotNull;
 
 import java.io.Serializable;
 
-import dm.jale.async.AsyncEvaluation;
-import dm.jale.async.AsyncLoop;
+import dm.jale.async.Evaluation;
+import dm.jale.async.Loop;
 import dm.jale.async.Observer;
 import dm.jale.config.BuildConfig;
 import dm.jale.util.ConstantConditions;
@@ -29,23 +29,22 @@ import dm.jale.util.ConstantConditions;
 /**
  * Created by davide-maestroni on 02/02/2018.
  */
-class ToStatementObserver<V>
-    implements RenewableObserver<AsyncEvaluation<Iterable<V>>>, Serializable {
+class ToStatementObserver<V> implements RenewableObserver<Evaluation<Iterable<V>>>, Serializable {
 
   private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
 
-  private final AsyncLoop<V> mLoop;
+  private final Loop<V> mLoop;
 
-  ToStatementObserver(@NotNull final AsyncLoop<V> loop) {
+  ToStatementObserver(@NotNull final Loop<V> loop) {
     mLoop = ConstantConditions.notNull("loop", loop);
   }
 
-  public void accept(final AsyncEvaluation<Iterable<V>> evaluation) {
+  public void accept(final Evaluation<Iterable<V>> evaluation) {
     mLoop.to(evaluation);
   }
 
   @NotNull
-  public Observer<AsyncEvaluation<Iterable<V>>> renew() {
+  public Observer<Evaluation<Iterable<V>>> renew() {
     return new ToStatementObserver<V>(mLoop.evaluate());
   }
 }

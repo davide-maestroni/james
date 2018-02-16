@@ -34,14 +34,14 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
 import dm.jale.async.Action;
-import dm.jale.async.AsyncEvaluation;
-import dm.jale.async.AsyncStatement;
 import dm.jale.async.Completer;
+import dm.jale.async.Evaluation;
 import dm.jale.async.FailureException;
 import dm.jale.async.Mapper;
 import dm.jale.async.Observer;
 import dm.jale.async.RuntimeInterruptedException;
 import dm.jale.async.RuntimeTimeoutException;
+import dm.jale.async.Statement;
 import dm.jale.async.Updater;
 import dm.jale.config.BuildConfig;
 import dm.jale.executor.ExecutorPool;
@@ -57,9 +57,9 @@ import static dm.jale.executor.ExecutorPool.withThrottling;
 /**
  * Created by davide-maestroni on 01/12/2018.
  */
-class DefaultAsyncStatement<V> implements AsyncStatement<V>, Serializable {
+class DefaultStatement<V> implements Statement<V>, Serializable {
 
-  private static final AsyncEvaluation<?> VOID_EVALUATION = new AsyncEvaluation<Object>() {
+  private static final Evaluation<?> VOID_EVALUATION = new Evaluation<Object>() {
 
     public void fail(@NotNull final Throwable failure) {
     }
@@ -70,8 +70,8 @@ class DefaultAsyncStatement<V> implements AsyncStatement<V>, Serializable {
 
   private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
 
-  private final CopyOnWriteArrayList<AsyncStatement<?>> mForked =
-      new CopyOnWriteArrayList<AsyncStatement<?>>();
+  private final CopyOnWriteArrayList<Statement<?>> mForked =
+      new CopyOnWriteArrayList<Statement<?>>();
 
   private final ChainHead<?> mHead;
 
@@ -83,7 +83,7 @@ class DefaultAsyncStatement<V> implements AsyncStatement<V>, Serializable {
 
   private final Object mMutex;
 
-  private final Observer<AsyncEvaluation<?>> mObserver;
+  private final Observer<Evaluation<?>> mObserver;
 
   private final StatementChain<?, V> mTail;
 
@@ -92,9 +92,9 @@ class DefaultAsyncStatement<V> implements AsyncStatement<V>, Serializable {
   private StatementState mState = StatementState.Evaluating;
 
   @SuppressWarnings("unchecked")
-  DefaultAsyncStatement(@NotNull final Observer<? super AsyncEvaluation<V>> observer,
+  DefaultStatement(@NotNull final Observer<? super Evaluation<V>> observer,
       final boolean isEvaluated, @Nullable final String loggerName) {
-    mObserver = (Observer<AsyncEvaluation<?>>) ConstantConditions.notNull("observer", observer);
+    mObserver = (Observer<Evaluation<?>>) ConstantConditions.notNull("observer", observer);
     mIsEvaluated = isEvaluated;
     mIsFork = false;
     mLogger = Logger.newLogger(this, loggerName, Locale.ENGLISH);
@@ -113,10 +113,10 @@ class DefaultAsyncStatement<V> implements AsyncStatement<V>, Serializable {
   }
 
   @SuppressWarnings("unchecked")
-  private DefaultAsyncStatement(@NotNull final Observer<? super AsyncEvaluation<V>> observer,
+  private DefaultStatement(@NotNull final Observer<? super Evaluation<V>> observer,
       final boolean isEvaluated, @NotNull final Logger logger) {
     // forking
-    mObserver = (Observer<AsyncEvaluation<?>>) observer;
+    mObserver = (Observer<Evaluation<?>>) observer;
     mIsEvaluated = isEvaluated;
     mIsFork = (observer instanceof ForkObserver);
     mLogger = logger;
@@ -135,7 +135,7 @@ class DefaultAsyncStatement<V> implements AsyncStatement<V>, Serializable {
   }
 
   @SuppressWarnings("unchecked")
-  private DefaultAsyncStatement(@NotNull final Observer<AsyncEvaluation<?>> observer,
+  private DefaultStatement(@NotNull final Observer<Evaluation<?>> observer,
       final boolean isEvaluated, @Nullable final String loggerName,
       @NotNull final ChainHead<?> head, @NotNull final StatementChain<?, V> tail) {
     // serialization
@@ -162,7 +162,7 @@ class DefaultAsyncStatement<V> implements AsyncStatement<V>, Serializable {
   }
 
   @SuppressWarnings("unchecked")
-  private DefaultAsyncStatement(@NotNull final Observer<AsyncEvaluation<?>> observer,
+  private DefaultStatement(@NotNull final Observer<Evaluation<?>> observer,
       final boolean isEvaluated, @NotNull final Logger logger, @NotNull final ChainHead<?> head,
       @NotNull final StatementChain<?, ?> tail, @NotNull final StatementChain<?, V> chain) {
     // chaining
@@ -178,7 +178,7 @@ class DefaultAsyncStatement<V> implements AsyncStatement<V>, Serializable {
   }
 
   @SuppressWarnings("unchecked")
-  private DefaultAsyncStatement(@NotNull final Observer<AsyncEvaluation<?>> observer,
+  private DefaultStatement(@NotNull final Observer<Evaluation<?>> observer,
       final boolean isEvaluated, @NotNull final Logger logger, @NotNull final ChainHead<?> head,
       @NotNull final StatementChain<?, V> tail) {
     // copy
@@ -199,14 +199,14 @@ class DefaultAsyncStatement<V> implements AsyncStatement<V>, Serializable {
   }
 
   public boolean cancel(final boolean mayInterruptIfRunning) {
-    final Observer<? extends AsyncEvaluation<?>> observer = mObserver;
+    final Observer<? extends Evaluation<?>> observer = mObserver;
     if (mIsFork) {
       if (((ForkObserver<?, ?>) observer).cancel(mayInterruptIfRunning)) {
         return true;
       }
 
       boolean isCancelled = false;
-      for (final AsyncStatement<?> forked : mForked) {
+      for (final Statement<?> forked : mForked) {
         if (forked.cancel(mayInterruptIfRunning)) {
           isCancelled = true;
         }
@@ -283,33 +283,33 @@ class DefaultAsyncStatement<V> implements AsyncStatement<V>, Serializable {
 
   @SuppressWarnings("unchecked")
   public void consume() {
-    to((AsyncEvaluation<? super V>) VOID_EVALUATION);
+    to((Evaluation<? super V>) VOID_EVALUATION);
   }
 
   @NotNull
-  public AsyncStatement<V> elseCatch(@NotNull final Mapper<? super Throwable, ? extends V> mapper,
+  public Statement<V> elseCatch(@NotNull final Mapper<? super Throwable, ? extends V> mapper,
       @Nullable final Class<?>[] exceptionTypes) {
     return chain(
         new ElseCatchStatementHandler<V>(mapper, Asyncs.cloneExceptionTypes(exceptionTypes)));
   }
 
   @NotNull
-  public AsyncStatement<V> elseDo(@NotNull final Observer<? super Throwable> observer,
+  public Statement<V> elseDo(@NotNull final Observer<? super Throwable> observer,
       @Nullable final Class<?>[] exceptionTypes) {
     return chain(
         new ElseDoStatementHandler<V>(observer, Asyncs.cloneExceptionTypes(exceptionTypes)));
   }
 
   @NotNull
-  public AsyncStatement<V> elseIf(
-      @NotNull final Mapper<? super Throwable, ? extends AsyncStatement<? extends V>> mapper,
+  public Statement<V> elseIf(
+      @NotNull final Mapper<? super Throwable, ? extends Statement<? extends V>> mapper,
       @Nullable final Class<?>[] exceptionTypes) {
     return chain(new ElseIfStatementHandler<V>(mapper, Asyncs.cloneExceptionTypes(exceptionTypes)));
   }
 
   @NotNull
   @SuppressWarnings("unchecked")
-  public DefaultAsyncStatement<V> evaluate() {
+  public DefaultStatement<V> evaluate() {
     final Logger logger = mLogger;
     final ChainHead<?> head = mHead;
     final ChainHead<?> newHead = head.copy();
@@ -324,35 +324,32 @@ class DefaultAsyncStatement<V> implements AsyncStatement<V>, Serializable {
       newTail = chain;
     }
 
-    return new DefaultAsyncStatement<V>(renewObserver(), true, logger, newHead,
+    return new DefaultStatement<V>(renewObserver(), true, logger, newHead,
         (StatementChain<?, V>) newTail);
   }
 
   @NotNull
-  public AsyncStatement<V> evaluated() {
+  public Statement<V> evaluated() {
     return (mIsEvaluated) ? this : evaluate();
   }
 
   @NotNull
-  public <S> AsyncStatement<V> fork(
-      @NotNull final Forker<S, ? super V, ? super AsyncEvaluation<V>, ? super AsyncStatement<V>>
-          forker) {
-    return new DefaultAsyncStatement<V>(new ForkObserver<S, V>(this, forker), mIsEvaluated,
-        mLogger);
+  public <S> Statement<V> fork(
+      @NotNull final Forker<S, ? super V, ? super Evaluation<V>, ? super Statement<V>> forker) {
+    return new DefaultStatement<V>(new ForkObserver<S, V>(this, forker), mIsEvaluated, mLogger);
   }
 
   @NotNull
-  public <S> AsyncStatement<V> fork(@Nullable final Mapper<? super AsyncStatement<V>, S> init,
-      @Nullable final Updater<S, ? super V, ? super AsyncStatement<V>> value,
-      @Nullable final Updater<S, ? super Throwable, ? super AsyncStatement<V>> failure,
-      @Nullable final Completer<S, ? super AsyncStatement<V>> done,
-      @Nullable final Updater<S, ? super AsyncEvaluation<V>, ? super AsyncStatement<V>>
-          evaluation) {
+  public <S> Statement<V> fork(@Nullable final Mapper<? super Statement<V>, S> init,
+      @Nullable final Updater<S, ? super V, ? super Statement<V>> value,
+      @Nullable final Updater<S, ? super Throwable, ? super Statement<V>> failure,
+      @Nullable final Completer<S, ? super Statement<V>> done,
+      @Nullable final Updater<S, ? super Evaluation<V>, ? super Statement<V>> evaluation) {
     return fork(new ComposedStatementForker<S, V>(init, value, failure, done, evaluation));
   }
 
   @NotNull
-  public AsyncStatement<V> forkOn(@NotNull final Executor executor) {
+  public Statement<V> forkOn(@NotNull final Executor executor) {
     return fork(new ExecutorStatementForker<V>(executor));
   }
 
@@ -451,32 +448,29 @@ class DefaultAsyncStatement<V> implements AsyncStatement<V>, Serializable {
   }
 
   @NotNull
-  public <R> AsyncStatement<R> then(@NotNull final Mapper<? super V, R> mapper) {
+  public <R> Statement<R> then(@NotNull final Mapper<? super V, R> mapper) {
     return chain(new ThenStatementHandler<V, R>(mapper));
   }
 
   @NotNull
-  public AsyncStatement<V> thenDo(@NotNull final Observer<? super V> observer) {
+  public Statement<V> thenDo(@NotNull final Observer<? super V> observer) {
     return chain(new ThenDoStatementHandler<V, V>(observer));
   }
 
   @NotNull
-  public <R> AsyncStatement<R> thenIf(
-      @NotNull final Mapper<? super V, ? extends AsyncStatement<R>> mapper) {
+  public <R> Statement<R> thenIf(@NotNull final Mapper<? super V, ? extends Statement<R>> mapper) {
     return chain(new ThenIfStatementHandler<V, R>(mapper));
   }
 
   @NotNull
-  public <R> AsyncStatement<R> thenTry(
-      @NotNull final Mapper<? super V, ? extends Closeable> closeable,
+  public <R> Statement<R> thenTry(@NotNull final Mapper<? super V, ? extends Closeable> closeable,
       @NotNull final Mapper<? super V, R> mapper) {
     return chain(new TryStatementHandler<V, R>(closeable, new ThenStatementHandler<V, R>(mapper),
         mLogger.getName()));
   }
 
   @NotNull
-  public AsyncStatement<V> thenTryDo(
-      @NotNull final Mapper<? super V, ? extends Closeable> closeable,
+  public Statement<V> thenTryDo(@NotNull final Mapper<? super V, ? extends Closeable> closeable,
       @NotNull final Observer<? super V> observer) {
     return chain(
         new TryStatementHandler<V, V>(closeable, new ThenDoStatementHandler<V, V>(observer),
@@ -484,14 +478,13 @@ class DefaultAsyncStatement<V> implements AsyncStatement<V>, Serializable {
   }
 
   @NotNull
-  public <R> AsyncStatement<R> thenTryIf(
-      @NotNull final Mapper<? super V, ? extends Closeable> closeable,
-      @NotNull final Mapper<? super V, ? extends AsyncStatement<R>> mapper) {
+  public <R> Statement<R> thenTryIf(@NotNull final Mapper<? super V, ? extends Closeable> closeable,
+      @NotNull final Mapper<? super V, ? extends Statement<R>> mapper) {
     return chain(new TryIfStatementHandler<V, R>(closeable, mapper, mLogger.getName()));
   }
 
   @NotNull
-  public AsyncStatement<V> whenDone(@NotNull final Action action) {
+  public Statement<V> whenDone(@NotNull final Action action) {
     return chain(new DoneStatementHandler<V>(action));
   }
 
@@ -532,7 +525,7 @@ class DefaultAsyncStatement<V> implements AsyncStatement<V>, Serializable {
     }
   }
 
-  public void to(@NotNull final AsyncEvaluation<? super V> evaluation) {
+  public void to(@NotNull final Evaluation<? super V> evaluation) {
     ConstantConditions.notNull("evaluation", evaluation);
     checkEvaluated();
     then(new Mapper<V, Void>() {
@@ -562,20 +555,20 @@ class DefaultAsyncStatement<V> implements AsyncStatement<V>, Serializable {
   }
 
   @NotNull
-  private <R> AsyncStatement<R> chain(@NotNull final AsyncStatementHandler<V, R> handler) {
+  private <R> Statement<R> chain(@NotNull final AsyncStatementHandler<V, R> handler) {
     return chain(new ChainHandler<V, R>(handler));
   }
 
   @NotNull
   @SuppressWarnings("unchecked")
-  private <R> AsyncStatement<R> chain(@NotNull final StatementChain<V, R> chain) {
+  private <R> Statement<R> chain(@NotNull final StatementChain<V, R> chain) {
     final ChainHead<?> head = mHead;
     final Logger logger = mLogger;
     final Runnable chaining;
-    final Observer<? extends AsyncEvaluation<?>> observer = mObserver;
+    final Observer<? extends Evaluation<?>> observer = mObserver;
     if (mIsFork) {
-      final AsyncStatement<R> forked =
-          new DefaultAsyncStatement<V>(((ForkObserver<?, V>) observer).newObserver(), mIsEvaluated,
+      final Statement<R> forked =
+          new DefaultStatement<V>(((ForkObserver<?, V>) observer).newObserver(), mIsEvaluated,
               logger).chain(chain);
       mForked.add(forked);
       return forked;
@@ -594,9 +587,9 @@ class DefaultAsyncStatement<V> implements AsyncStatement<V>, Serializable {
       }
     }
 
-    final DefaultAsyncStatement<R> statement =
-        new DefaultAsyncStatement<R>((Observer<AsyncEvaluation<?>>) observer, mIsEvaluated, logger,
-            head, mTail, chain);
+    final DefaultStatement<R> statement =
+        new DefaultStatement<R>((Observer<Evaluation<?>>) observer, mIsEvaluated, logger, head,
+            mTail, chain);
     if (chaining != null) {
       chaining.run();
     }
@@ -635,10 +628,10 @@ class DefaultAsyncStatement<V> implements AsyncStatement<V>, Serializable {
   }
 
   @NotNull
-  private Observer<AsyncEvaluation<?>> renewObserver() {
-    final Observer<AsyncEvaluation<?>> observer = mObserver;
+  private Observer<Evaluation<?>> renewObserver() {
+    final Observer<Evaluation<?>> observer = mObserver;
     if (observer instanceof RenewableObserver) {
-      return ((RenewableObserver<AsyncEvaluation<?>>) observer).renew();
+      return ((RenewableObserver<Evaluation<?>>) observer).renew();
     }
 
     return observer;
@@ -665,7 +658,7 @@ class DefaultAsyncStatement<V> implements AsyncStatement<V>, Serializable {
   }
 
   private static class ChainForkObserver<S, V>
-      implements RenewableObserver<AsyncEvaluation<V>>, Serializable {
+      implements RenewableObserver<Evaluation<V>>, Serializable {
 
     private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
 
@@ -675,7 +668,7 @@ class DefaultAsyncStatement<V> implements AsyncStatement<V>, Serializable {
       mObserver = observer;
     }
 
-    public void accept(final AsyncEvaluation<V> evaluation) {
+    public void accept(final Evaluation<V> evaluation) {
       mObserver.chain(evaluation);
     }
 
@@ -962,29 +955,27 @@ class DefaultAsyncStatement<V> implements AsyncStatement<V>, Serializable {
   }
 
   private static class ForkObserver<S, V> extends AsyncStatementHandler<V, V>
-      implements RenewableObserver<AsyncEvaluation<V>>, Serializable {
+      implements RenewableObserver<Evaluation<V>>, Serializable {
 
     private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
 
-    private final List<AsyncEvaluation<V>> mEvaluations = new ArrayList<AsyncEvaluation<V>>();
+    private final List<Evaluation<V>> mEvaluations = new ArrayList<Evaluation<V>>();
 
     private final Executor mExecutor;
 
-    private final Forker<S, V, AsyncEvaluation<V>, AsyncStatement<V>> mForker;
+    private final Forker<S, V, Evaluation<V>, Statement<V>> mForker;
 
     private Throwable mFailure;
 
     private S mStack;
 
-    private DefaultAsyncStatement<V> mStatement;
+    private DefaultStatement<V> mStatement;
 
     @SuppressWarnings("unchecked")
-    private ForkObserver(@NotNull final DefaultAsyncStatement<V> statement,
-        @NotNull final Forker<S, ? super V, ? super AsyncEvaluation<V>, ? super
-            AsyncStatement<V>> forker) {
+    private ForkObserver(@NotNull final DefaultStatement<V> statement,
+        @NotNull final Forker<S, ? super V, ? super Evaluation<V>, ? super Statement<V>> forker) {
       mForker =
-          (Forker<S, V, AsyncEvaluation<V>, AsyncStatement<V>>) ConstantConditions.notNull("forker",
-              forker);
+          (Forker<S, V, Evaluation<V>, Statement<V>>) ConstantConditions.notNull("forker", forker);
       mExecutor = withThrottling(1, immediateExecutor());
       mStatement = statement;
     }
@@ -993,7 +984,7 @@ class DefaultAsyncStatement<V> implements AsyncStatement<V>, Serializable {
       return mStatement.cancel(mayInterruptIfRunning);
     }
 
-    void chain(final AsyncEvaluation<V> evaluation) {
+    void chain(final Evaluation<V> evaluation) {
       mExecutor.execute(new Runnable() {
 
         public void run() {
@@ -1017,7 +1008,7 @@ class DefaultAsyncStatement<V> implements AsyncStatement<V>, Serializable {
     }
 
     @Override
-    void failure(@NotNull final Throwable throwable, @NotNull final AsyncEvaluation<V> evaluation) {
+    void failure(@NotNull final Throwable throwable, @NotNull final Evaluation<V> evaluation) {
       mExecutor.execute(new Runnable() {
 
         public void run() {
@@ -1028,8 +1019,8 @@ class DefaultAsyncStatement<V> implements AsyncStatement<V>, Serializable {
           }
 
           try {
-            final Forker<S, V, AsyncEvaluation<V>, AsyncStatement<V>> forker = mForker;
-            final DefaultAsyncStatement<V> statement = mStatement;
+            final Forker<S, V, Evaluation<V>, Statement<V>> forker = mForker;
+            final DefaultStatement<V> statement = mStatement;
             final S stack = forker.failure(mStack, throwable, statement);
             mStack = forker.done(stack, statement);
 
@@ -1048,7 +1039,7 @@ class DefaultAsyncStatement<V> implements AsyncStatement<V>, Serializable {
     }
 
     @Override
-    void value(final V value, @NotNull final AsyncEvaluation<V> evaluation) {
+    void value(final V value, @NotNull final Evaluation<V> evaluation) {
       mExecutor.execute(new Runnable() {
 
         public void run() {
@@ -1059,8 +1050,8 @@ class DefaultAsyncStatement<V> implements AsyncStatement<V>, Serializable {
           }
 
           try {
-            final Forker<S, V, AsyncEvaluation<V>, AsyncStatement<V>> forker = mForker;
-            final DefaultAsyncStatement<V> statement = mStatement;
+            final Forker<S, V, Evaluation<V>, Statement<V>> forker = mForker;
+            final DefaultStatement<V> statement = mStatement;
             final S stack = forker.value(mStack, value, statement);
             mStack = forker.done(stack, statement);
 
@@ -1074,13 +1065,13 @@ class DefaultAsyncStatement<V> implements AsyncStatement<V>, Serializable {
     }
 
     @NotNull
-    Observer<AsyncEvaluation<V>> newObserver() {
+    Observer<Evaluation<V>> newObserver() {
       return new ChainForkObserver<S, V>(this);
     }
 
     private void clearEvaluations(@NotNull final Throwable failure) {
-      final List<AsyncEvaluation<V>> evaluations = mEvaluations;
-      for (final AsyncEvaluation<V> evaluation : evaluations) {
+      final List<Evaluation<V>> evaluations = mEvaluations;
+      for (final Evaluation<V> evaluation : evaluations) {
         try {
           evaluation.fail(failure);
 
@@ -1101,9 +1092,8 @@ class DefaultAsyncStatement<V> implements AsyncStatement<V>, Serializable {
 
       private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
 
-      private ObserverProxy(final DefaultAsyncStatement<V> statement,
-          final Forker<S, ? super V, ? super AsyncEvaluation<V>, ? super AsyncStatement<V>>
-              forker) {
+      private ObserverProxy(final DefaultStatement<V> statement,
+          final Forker<S, ? super V, ? super Evaluation<V>, ? super Statement<V>> forker) {
         super(statement, proxy(forker));
       }
 
@@ -1112,9 +1102,8 @@ class DefaultAsyncStatement<V> implements AsyncStatement<V>, Serializable {
       private Object readResolve() throws ObjectStreamException {
         try {
           final Object[] args = deserializeArgs();
-          return new ForkObserver<S, V>((DefaultAsyncStatement<V>) args[0],
-              (Forker<S, ? super V, ? super AsyncEvaluation<V>, ? super AsyncStatement<V>>)
-                  args[1]);
+          return new ForkObserver<S, V>((DefaultStatement<V>) args[0],
+              (Forker<S, ? super V, ? super Evaluation<V>, ? super Statement<V>>) args[1]);
 
         } catch (final Throwable t) {
           throw new InvalidObjectException(t.getMessage());
@@ -1122,12 +1111,12 @@ class DefaultAsyncStatement<V> implements AsyncStatement<V>, Serializable {
       }
     }
 
-    public void accept(final AsyncEvaluation<V> evaluation) {
+    public void accept(final Evaluation<V> evaluation) {
       mExecutor.execute(new Runnable() {
 
         public void run() {
           try {
-            final DefaultAsyncStatement<V> statement = mStatement;
+            final DefaultStatement<V> statement = mStatement;
             mStack = mForker.init(statement);
             statement.chain(ForkObserver.this);
 
@@ -1139,7 +1128,7 @@ class DefaultAsyncStatement<V> implements AsyncStatement<V>, Serializable {
     }
   }
 
-  private static abstract class StatementChain<V, R> implements AsyncEvaluation<V> {
+  private static abstract class StatementChain<V, R> implements Evaluation<V> {
 
     private volatile StateEvaluating mInnerState = new StateEvaluating();
 
@@ -1273,7 +1262,7 @@ class DefaultAsyncStatement<V> implements AsyncStatement<V>, Serializable {
 
     private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
 
-    private StatementProxy(final Observer<AsyncEvaluation<?>> observer, final boolean isEvaluated,
+    private StatementProxy(final Observer<Evaluation<?>> observer, final boolean isEvaluated,
         final String loggerName, final List<StatementChain<?, ?>> chains) {
       super(proxy(observer), isEvaluated, loggerName, chains);
     }
@@ -1290,8 +1279,8 @@ class DefaultAsyncStatement<V> implements AsyncStatement<V>, Serializable {
           tail = chain;
         }
 
-        return new DefaultAsyncStatement<Object>((Observer<AsyncEvaluation<?>>) args[0],
-            (Boolean) args[1], (String) args[2], head, (StatementChain<?, Object>) tail);
+        return new DefaultStatement<Object>((Observer<Evaluation<?>>) args[0], (Boolean) args[1],
+            (String) args[2], head, (StatementChain<?, Object>) tail);
 
       } catch (final Throwable t) {
         throw new InvalidObjectException(t.getMessage());

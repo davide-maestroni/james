@@ -23,7 +23,7 @@ import java.io.InvalidObjectException;
 import java.io.ObjectStreamException;
 import java.io.Serializable;
 
-import dm.jale.async.AsyncEvaluations;
+import dm.jale.async.EvaluationCollection;
 import dm.jale.async.Observer;
 import dm.jale.config.BuildConfig;
 import dm.jale.util.ConstantConditions;
@@ -44,7 +44,8 @@ class ThenDoLoopHandler<V, R> extends AsyncLoopHandler<V, R> implements Serializ
   }
 
   @Override
-  void addValue(final V value, @NotNull final AsyncEvaluations<R> evaluations) throws Exception {
+  void addValue(final V value, @NotNull final EvaluationCollection<R> evaluations) throws
+      Exception {
     mObserver.accept(value);
     super.addValue(value, evaluations);
   }
@@ -52,7 +53,7 @@ class ThenDoLoopHandler<V, R> extends AsyncLoopHandler<V, R> implements Serializ
   @Override
   @SuppressWarnings("unchecked")
   void addValues(@Nullable final Iterable<? extends V> values,
-      @NotNull final AsyncEvaluations<R> evaluations) throws Exception {
+      @NotNull final EvaluationCollection<R> evaluations) throws Exception {
     if (values == null) {
       return;
     }

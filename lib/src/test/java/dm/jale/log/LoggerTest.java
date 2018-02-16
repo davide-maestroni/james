@@ -35,8 +35,8 @@ public class LoggerTest {
     ConsoleHandler handler = new ConsoleHandler();
     handler.setFormatter(formatter);
     final java.util.logging.Logger loggerr = java.util.logging.Logger.getLogger("");
-//    loggerr.removeHandler(loggerr.getHandlers()[0]);
-//    loggerr.addHandler(handler);
+    //    loggerr.removeHandler(loggerr.getHandlers()[0]);
+    //    loggerr.addHandler(handler);
     loggerr.getHandlers()[0].setLevel(Level.FINEST);
     loggerr.setLevel(Level.FINEST);
     final Logger logger = Logger.newLogger(this);

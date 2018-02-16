@@ -23,7 +23,7 @@ import java.io.ObjectStreamException;
 import java.io.Serializable;
 import java.util.Arrays;
 
-import dm.jale.async.AsyncEvaluation;
+import dm.jale.async.Evaluation;
 import dm.jale.async.Mapper;
 import dm.jale.config.BuildConfig;
 import dm.jale.util.ConstantConditions;
@@ -50,8 +50,8 @@ class ElseCatchStatementHandler<V> extends AsyncStatementHandler<V, V> implement
   }
 
   @Override
-  void failure(@NotNull final Throwable failure,
-      @NotNull final AsyncEvaluation<V> evaluation) throws Exception {
+  void failure(@NotNull final Throwable failure, @NotNull final Evaluation<V> evaluation) throws
+      Exception {
     for (final Class<?> type : mTypes) {
       if (type.isInstance(failure)) {
         evaluation.set(mMapper.apply(failure));

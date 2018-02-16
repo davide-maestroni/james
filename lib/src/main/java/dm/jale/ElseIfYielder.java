@@ -24,9 +24,9 @@ import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.Arrays;
 
-import dm.jale.async.AsyncLoop.YieldOutputs;
-import dm.jale.async.AsyncStatement;
+import dm.jale.async.Loop.YieldOutputs;
 import dm.jale.async.Mapper;
+import dm.jale.async.Statement;
 import dm.jale.config.BuildConfig;
 import dm.jale.util.ConstantConditions;
 import dm.jale.util.SerializableProxy;
@@ -38,13 +38,12 @@ class ElseIfYielder<V> extends CollectionYielder<V> implements Serializable {
 
   private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
 
-  private final Mapper<? super Throwable, ? extends AsyncStatement<? extends Iterable<V>>> mMapper;
+  private final Mapper<? super Throwable, ? extends Statement<? extends Iterable<V>>> mMapper;
 
   private final Class<?>[] mTypes;
 
   ElseIfYielder(
-      @NotNull final Mapper<? super Throwable, ? extends AsyncStatement<? extends Iterable<V>>>
-          mapper,
+      @NotNull final Mapper<? super Throwable, ? extends Statement<? extends Iterable<V>>> mapper,
       @NotNull final Class<?>[] exceptionTypes) {
     mMapper = ConstantConditions.notNull("mapper", mapper);
     mTypes = ConstantConditions.notNull("exception types", exceptionTypes);
@@ -76,7 +75,7 @@ class ElseIfYielder<V> extends CollectionYielder<V> implements Serializable {
     private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
 
     private HandlerProxy(
-        final Mapper<? super Throwable, ? extends AsyncStatement<? extends Iterable<V>>> mapper,
+        final Mapper<? super Throwable, ? extends Statement<? extends Iterable<V>>> mapper,
         final Class<?>[] exceptionTypes) {
       super(proxy(mapper), exceptionTypes);
     }
@@ -87,7 +86,7 @@ class ElseIfYielder<V> extends CollectionYielder<V> implements Serializable {
       try {
         final Object[] args = deserializeArgs();
         return new ElseIfYielder<V>(
-            (Mapper<? super Throwable, ? extends AsyncStatement<? extends Iterable<V>>>) args[0],
+            (Mapper<? super Throwable, ? extends Statement<? extends Iterable<V>>>) args[0],
             (Class<?>[]) args[1]);
 
       } catch (final Throwable t) {

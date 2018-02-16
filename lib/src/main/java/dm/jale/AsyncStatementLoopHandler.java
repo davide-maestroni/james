@@ -18,7 +18,7 @@ package dm.jale;
 
 import org.jetbrains.annotations.NotNull;
 
-import dm.jale.async.AsyncEvaluations;
+import dm.jale.async.EvaluationCollection;
 
 /**
  * Created by davide-maestroni on 01/14/2018.
@@ -26,7 +26,7 @@ import dm.jale.async.AsyncEvaluations;
 class AsyncStatementLoopHandler<V, R> {
 
   void failure(@NotNull final Throwable failure,
-      @NotNull final AsyncEvaluations<R> evaluations) throws Exception {
+      @NotNull final EvaluationCollection<R> evaluations) throws Exception {
     evaluations.addFailure(failure).set();
   }
 
@@ -36,7 +36,7 @@ class AsyncStatementLoopHandler<V, R> {
   }
 
   @SuppressWarnings("unchecked")
-  void value(final V value, @NotNull final AsyncEvaluations<R> evaluations) throws Exception {
+  void value(final V value, @NotNull final EvaluationCollection<R> evaluations) throws Exception {
     evaluations.addValue((R) value).set();
   }
 }

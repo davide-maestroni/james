@@ -22,7 +22,7 @@ import java.io.InvalidObjectException;
 import java.io.ObjectStreamException;
 import java.io.Serializable;
 
-import dm.jale.async.AsyncEvaluation;
+import dm.jale.async.Evaluation;
 import dm.jale.async.Observer;
 import dm.jale.config.BuildConfig;
 import dm.jale.util.ConstantConditions;
@@ -42,7 +42,7 @@ class ThenDoStatementHandler<V, R> extends AsyncStatementHandler<V, R> implement
   }
 
   @Override
-  void value(final V value, @NotNull final AsyncEvaluation<R> evaluation) throws Exception {
+  void value(final V value, @NotNull final Evaluation<R> evaluation) throws Exception {
     mObserver.accept(value);
     super.value(value, evaluation);
   }

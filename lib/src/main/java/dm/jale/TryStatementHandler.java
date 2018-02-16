@@ -25,7 +25,7 @@ import java.io.ObjectStreamException;
 import java.io.Serializable;
 import java.util.Locale;
 
-import dm.jale.async.AsyncEvaluation;
+import dm.jale.async.Evaluation;
 import dm.jale.async.Mapper;
 import dm.jale.config.BuildConfig;
 import dm.jale.log.Logger;
@@ -53,7 +53,7 @@ class TryStatementHandler<V, R> extends AsyncStatementHandler<V, R> implements S
   }
 
   @Override
-  void value(final V value, @NotNull final AsyncEvaluation<R> evaluation) throws Exception {
+  void value(final V value, @NotNull final Evaluation<R> evaluation) throws Exception {
     final Closeable closeable = mCloseable.apply(value);
     try {
       mHandler.value(value, evaluation);

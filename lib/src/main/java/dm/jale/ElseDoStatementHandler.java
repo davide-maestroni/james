@@ -23,7 +23,7 @@ import java.io.ObjectStreamException;
 import java.io.Serializable;
 import java.util.Arrays;
 
-import dm.jale.async.AsyncEvaluation;
+import dm.jale.async.Evaluation;
 import dm.jale.async.Observer;
 import dm.jale.config.BuildConfig;
 import dm.jale.util.ConstantConditions;
@@ -50,8 +50,8 @@ class ElseDoStatementHandler<V> extends AsyncStatementHandler<V, V> implements S
   }
 
   @Override
-  void failure(@NotNull final Throwable failure,
-      @NotNull final AsyncEvaluation<V> evaluation) throws Exception {
+  void failure(@NotNull final Throwable failure, @NotNull final Evaluation<V> evaluation) throws
+      Exception {
     for (final Class<?> type : mTypes) {
       if (type.isInstance(failure)) {
         mObserver.accept(failure);

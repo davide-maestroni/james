@@ -17,24 +17,13 @@
 package dm.jale.async;
 
 import org.jetbrains.annotations.NotNull;
-import org.jetbrains.annotations.Nullable;
 
 /**
  * Created by davide-maestroni on 01/08/2018.
  */
-public interface AsyncEvaluations<V> {
+public interface Evaluation<V> {
 
-  @NotNull
-  AsyncEvaluations<V> addFailure(@NotNull Throwable failure);
+  void fail(@NotNull Throwable failure);
 
-  @NotNull
-  AsyncEvaluations<V> addFailures(@Nullable Iterable<? extends Throwable> failures);
-
-  @NotNull
-  AsyncEvaluations<V> addValue(V value);
-
-  @NotNull
-  AsyncEvaluations<V> addValues(@Nullable Iterable<? extends V> values);
-
-  void set();
+  void set(V value);
 }

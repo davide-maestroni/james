@@ -25,14 +25,14 @@ import java.util.List;
 import java.util.concurrent.TimeUnit;
 
 import dm.jale.TestLogPrinter.Level;
-import dm.jale.async.AsyncEvaluation;
-import dm.jale.async.AsyncEvaluations;
-import dm.jale.async.AsyncState;
-import dm.jale.async.AsyncStatement;
-import dm.jale.async.AsyncStatement.Forker;
+import dm.jale.async.Evaluation;
+import dm.jale.async.EvaluationCollection;
+import dm.jale.async.EvaluationState;
 import dm.jale.async.Mapper;
 import dm.jale.async.Observer;
 import dm.jale.async.SimpleState;
+import dm.jale.async.Statement;
+import dm.jale.async.Statement.Forker;
 import dm.jale.executor.ExecutorPool;
 import dm.jale.log.LogConnector;
 import dm.jale.log.LogPrinter;
@@ -49,29 +49,28 @@ public class AsyncTest {
 
     class ForkStack<V> {
 
-      ArrayList<AsyncEvaluation<V>> evaluations = new ArrayList<AsyncEvaluation<V>>();
+      ArrayList<Evaluation<V>> evaluations = new ArrayList<Evaluation<V>>();
 
-      AsyncStatement<String> forked;
+      Statement<String> forked;
 
-      AsyncState<V> state;
+      EvaluationState<V> state;
 
       long timestamp = -1;
     }
 
     new Async().value("hello")
                .fork(
-                   new Forker<ForkStack<String>, String, AsyncEvaluation<String>,
-                       AsyncStatement<String>>() {
+                   new Forker<ForkStack<String>, String, Evaluation<String>, Statement<String>>() {
 
                      public ForkStack<String> done(final ForkStack<String> stack,
-                         @NotNull final AsyncStatement<String> async) {
+                         @NotNull final Statement<String> async) {
                        return stack;
                      }
 
                      public ForkStack<String> evaluation(final ForkStack<String> stack,
-                         @NotNull final AsyncEvaluation<String> evaluation,
-                         @NotNull final AsyncStatement<String> async) {
-                       final AsyncState<String> state = stack.state;
+                         @NotNull final Evaluation<String> evaluation,
+                         @NotNull final Statement<String> async) {
+                       final EvaluationState<String> state = stack.state;
                        if (state == null) {
                          stack.evaluations.add(evaluation);
 
@@ -93,10 +92,9 @@ public class AsyncTest {
                      }
 
                      public ForkStack<String> failure(final ForkStack<String> stack,
-                         @NotNull final Throwable failure,
-                         @NotNull final AsyncStatement<String> async) {
+                         @NotNull final Throwable failure, @NotNull final Statement<String> async) {
                        stack.state = SimpleState.ofFailure(failure);
-                       for (final AsyncEvaluation<String> evaluation : stack.evaluations) {
+                       for (final Evaluation<String> evaluation : stack.evaluations) {
                          evaluation.fail(failure);
                        }
 
@@ -104,15 +102,15 @@ public class AsyncTest {
                        return stack;
                      }
 
-                     public ForkStack<String> init(@NotNull final AsyncStatement<String> async) {
+                     public ForkStack<String> init(@NotNull final Statement<String> async) {
                        return new ForkStack<String>();
                      }
 
                      public ForkStack<String> value(final ForkStack<String> stack,
-                         final String value, @NotNull final AsyncStatement<String> async) {
+                         final String value, @NotNull final Statement<String> async) {
                        stack.timestamp = System.currentTimeMillis();
                        stack.state = SimpleState.ofValue(value);
-                       for (final AsyncEvaluation<String> evaluation : stack.evaluations) {
+                       for (final Evaluation<String> evaluation : stack.evaluations) {
                          evaluation.set(value);
                        }
 
@@ -125,9 +123,9 @@ public class AsyncTest {
   @Test
   public void bbb() {
     // TODO: 08/02/2018 move to loop tests
-    assertThat(new Async().loop(new Observer<AsyncEvaluations<Object>>() {
+    assertThat(new Async().loop(new Observer<EvaluationCollection<Object>>() {
 
-      public void accept(final AsyncEvaluations<Object> evaluations) {
+      public void accept(final EvaluationCollection<Object> evaluations) {
         evaluations.addFailures(Collections.<Throwable>singletonList(null)).set();
       }
     }).isFailed()).isTrue();
@@ -230,9 +228,9 @@ public class AsyncTest {
   @SuppressWarnings("ConstantConditions")
   public void statementAsyncFailure() {
     assertThat(new Async().evaluateOn(ExecutorPool.backgroundExecutor())
-                          .statement(new Observer<AsyncEvaluation<Integer>>() {
+                          .statement(new Observer<Evaluation<Integer>>() {
 
-                            public void accept(final AsyncEvaluation<Integer> evaluation) {
+                            public void accept(final Evaluation<Integer> evaluation) {
                               evaluation.fail(new IllegalAccessException());
                             }
                           })
@@ -243,9 +241,9 @@ public class AsyncTest {
   @Test
   public void statementAsyncValue() {
     assertThat(new Async().evaluateOn(ExecutorPool.backgroundExecutor())
-                          .statement(new Observer<AsyncEvaluation<Integer>>() {
+                          .statement(new Observer<Evaluation<Integer>>() {
 
-                            public void accept(final AsyncEvaluation<Integer> evaluation) {
+                            public void accept(final Evaluation<Integer> evaluation) {
                               evaluation.set(3);
                             }
                           })
@@ -258,9 +256,9 @@ public class AsyncTest {
     final long startTime = System.currentTimeMillis();
     assertThat(new Async().evaluateOn(
         ExecutorPool.withDelay(100, TimeUnit.MILLISECONDS, ExecutorPool.backgroundExecutor()))
-                          .statement(new Observer<AsyncEvaluation<Integer>>() {
+                          .statement(new Observer<Evaluation<Integer>>() {
 
-                            public void accept(final AsyncEvaluation<Integer> evaluation) {
+                            public void accept(final Evaluation<Integer> evaluation) {
                               evaluation.fail(new IllegalAccessException());
                             }
                           })
@@ -274,9 +272,9 @@ public class AsyncTest {
     final long startTime = System.currentTimeMillis();
     assertThat(new Async().evaluateOn(
         ExecutorPool.withDelay(100, TimeUnit.MILLISECONDS, ExecutorPool.backgroundExecutor()))
-                          .statement(new Observer<AsyncEvaluation<Integer>>() {
+                          .statement(new Observer<Evaluation<Integer>>() {
 
-                            public void accept(final AsyncEvaluation<Integer> evaluation) {
+                            public void accept(final Evaluation<Integer> evaluation) {
                               evaluation.set(3);
                             }
                           })
@@ -287,9 +285,9 @@ public class AsyncTest {
   @Test
   @SuppressWarnings("ConstantConditions")
   public void statementFailure() {
-    assertThat(new Async().statement(new Observer<AsyncEvaluation<Integer>>() {
+    assertThat(new Async().statement(new Observer<Evaluation<Integer>>() {
 
-      public void accept(final AsyncEvaluation<Integer> evaluation) {
+      public void accept(final Evaluation<Integer> evaluation) {
         evaluation.fail(new IllegalAccessException());
       }
     }).getFailure().getCause()).isExactlyInstanceOf(IllegalAccessException.class);
@@ -303,9 +301,9 @@ public class AsyncTest {
 
   @Test
   public void statementValue() {
-    assertThat(new Async().statement(new Observer<AsyncEvaluation<Integer>>() {
+    assertThat(new Async().statement(new Observer<Evaluation<Integer>>() {
 
-      public void accept(final AsyncEvaluation<Integer> evaluation) {
+      public void accept(final Evaluation<Integer> evaluation) {
         evaluation.set(3);
       }
     }).getValue()).isEqualTo(3);
@@ -313,10 +311,10 @@ public class AsyncTest {
 
   @Test
   public void unevaluated() {
-    final AsyncStatement<Integer> unevaluatedStatement = new Async().unevaluated().value(3);
+    final Statement<Integer> unevaluatedStatement = new Async().unevaluated().value(3);
     assertThat(unevaluatedStatement.isSet()).isFalse();
     assertThat(unevaluatedStatement.isDone()).isFalse();
-    final AsyncStatement<Integer> statement = unevaluatedStatement.evaluate();
+    final Statement<Integer> statement = unevaluatedStatement.evaluate();
     assertThat(unevaluatedStatement.isSet()).isFalse();
     assertThat(unevaluatedStatement.isDone()).isFalse();
     assertThat(statement.isDone()).isTrue();
@@ -325,10 +323,10 @@ public class AsyncTest {
 
   @Test
   public void unevaluatedEvaluate() {
-    final AsyncStatement<Integer> unevaluatedStatement = new Async().unevaluated().value(3);
+    final Statement<Integer> unevaluatedStatement = new Async().unevaluated().value(3);
     assertThat(unevaluatedStatement.isSet()).isFalse();
     assertThat(unevaluatedStatement.isDone()).isFalse();
-    final AsyncStatement<Integer> statement = unevaluatedStatement.evaluate();
+    final Statement<Integer> statement = unevaluatedStatement.evaluate();
     assertThat(unevaluatedStatement.isSet()).isFalse();
     assertThat(unevaluatedStatement.isDone()).isFalse();
     assertThat(statement.isDone()).isTrue();

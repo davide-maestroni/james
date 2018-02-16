@@ -21,7 +21,7 @@ import org.jetbrains.annotations.Nullable;
 
 import java.nio.ByteBuffer;
 
-import dm.jale.async.AsyncEvaluations;
+import dm.jale.async.EvaluationCollection;
 import dm.jale.ext.io.AllocationType;
 import dm.jale.ext.io.Chunk;
 import dm.jale.ext.io.ChunkOutputStream;
@@ -41,7 +41,7 @@ class ByteBufferChunkObserver extends ChunkObserver {
     mByteBuffer = ConstantConditions.notNull("buffer", buffer);
   }
 
-  public void accept(final AsyncEvaluations<Chunk> evaluations) throws Exception {
+  public void accept(final EvaluationCollection<Chunk> evaluations) throws Exception {
     final ChunkOutputStream outputStream = newStream(evaluations);
     try {
       outputStream.write(mByteBuffer);

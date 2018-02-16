@@ -23,8 +23,8 @@ import java.io.ObjectStreamException;
 import java.io.Serializable;
 import java.util.concurrent.Executor;
 
-import dm.jale.async.AsyncEvaluation;
-import dm.jale.async.AsyncStatement;
+import dm.jale.async.Evaluation;
+import dm.jale.async.Statement;
 import dm.jale.async.StatementForker;
 import dm.jale.config.BuildConfig;
 import dm.jale.executor.ExecutorPool;
@@ -34,7 +34,7 @@ import dm.jale.executor.OwnerExecutor;
  * Created by davide-maestroni on 02/12/2018.
  */
 class ExecutorStatementForker<V>
-    extends BufferedForker<AsyncEvaluation<V>, V, AsyncEvaluation<V>, AsyncStatement<V>> {
+    extends BufferedForker<Evaluation<V>, V, Evaluation<V>, Statement<V>> {
 
   private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
 
@@ -42,8 +42,7 @@ class ExecutorStatementForker<V>
     super(new InnerForker<V>(executor));
   }
 
-  private static class InnerForker<V>
-      implements StatementForker<AsyncEvaluation<V>, V>, Serializable {
+  private static class InnerForker<V> implements StatementForker<Evaluation<V>, V>, Serializable {
 
     private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
 
@@ -53,13 +52,12 @@ class ExecutorStatementForker<V>
       mExecutor = ExecutorPool.register(executor);
     }
 
-    public AsyncEvaluation<V> done(final AsyncEvaluation<V> stack,
-        @NotNull final AsyncStatement<V> async) {
+    public Evaluation<V> done(final Evaluation<V> stack, @NotNull final Statement<V> async) {
       return stack;
     }
 
-    public AsyncEvaluation<V> evaluation(final AsyncEvaluation<V> stack,
-        @NotNull final AsyncEvaluation<V> evaluation, @NotNull final AsyncStatement<V> async) {
+    public Evaluation<V> evaluation(final Evaluation<V> stack,
+        @NotNull final Evaluation<V> evaluation, @NotNull final Statement<V> async) {
       if (stack == null) {
         return evaluation;
 
@@ -70,8 +68,8 @@ class ExecutorStatementForker<V>
       return stack;
     }
 
-    public AsyncEvaluation<V> failure(final AsyncEvaluation<V> stack,
-        @NotNull final Throwable failure, @NotNull final AsyncStatement<V> async) {
+    public Evaluation<V> failure(final Evaluation<V> stack, @NotNull final Throwable failure,
+        @NotNull final Statement<V> async) {
       mExecutor.execute(new Runnable() {
 
         public void run() {
@@ -81,12 +79,12 @@ class ExecutorStatementForker<V>
       return stack;
     }
 
-    public AsyncEvaluation<V> init(@NotNull final AsyncStatement<V> async) {
+    public Evaluation<V> init(@NotNull final Statement<V> async) {
       return null;
     }
 
-    public AsyncEvaluation<V> value(final AsyncEvaluation<V> stack, final V value,
-        @NotNull final AsyncStatement<V> async) {
+    public Evaluation<V> value(final Evaluation<V> stack, final V value,
+        @NotNull final Statement<V> async) {
       mExecutor.execute(new Runnable() {
 
         public void run() {

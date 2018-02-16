@@ -23,9 +23,9 @@ import java.io.InvalidObjectException;
 import java.io.ObjectStreamException;
 import java.io.Serializable;
 
-import dm.jale.async.AsyncEvaluations;
-import dm.jale.async.AsyncLoop;
 import dm.jale.async.Completer;
+import dm.jale.async.EvaluationCollection;
+import dm.jale.async.Loop;
 import dm.jale.async.LoopForker;
 import dm.jale.async.Mapper;
 import dm.jale.async.Updater;
@@ -39,52 +39,51 @@ class ComposedLoopForker<S, V> implements LoopForker<S, V>, Serializable {
 
   private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
 
-  private final Completer<S, ? super AsyncLoop<V>> mDone;
+  private final Completer<S, ? super Loop<V>> mDone;
 
-  private final Updater<S, ? super AsyncEvaluations<? extends V>, ? super AsyncLoop<V>> mEvaluation;
+  private final Updater<S, ? super EvaluationCollection<? extends V>, ? super Loop<V>> mEvaluation;
 
-  private final Updater<S, ? super Throwable, ? super AsyncLoop<V>> mFailure;
+  private final Updater<S, ? super Throwable, ? super Loop<V>> mFailure;
 
-  private final Mapper<? super AsyncLoop<V>, S> mInit;
+  private final Mapper<? super Loop<V>, S> mInit;
 
-  private final Updater<S, ? super V, ? super AsyncLoop<V>> mValue;
+  private final Updater<S, ? super V, ? super Loop<V>> mValue;
 
   @SuppressWarnings("unchecked")
-  ComposedLoopForker(@Nullable final Mapper<? super AsyncLoop<V>, S> init,
-      @Nullable final Updater<S, ? super V, ? super AsyncLoop<V>> value,
-      @Nullable final Updater<S, ? super Throwable, ? super AsyncLoop<V>> failure,
-      @Nullable final Completer<S, ? super AsyncLoop<V>> done,
-      @Nullable final Updater<S, ? super AsyncEvaluations<V>, ? super AsyncLoop<V>> evaluation) {
-    mInit = (Mapper<? super AsyncLoop<V>, S>) ((init != null) ? init : DefaultInit.sInstance);
-    mValue = (Updater<S, ? super V, ? super AsyncLoop<V>>) ((value != null) ? value
+  ComposedLoopForker(@Nullable final Mapper<? super Loop<V>, S> init,
+      @Nullable final Updater<S, ? super V, ? super Loop<V>> value,
+      @Nullable final Updater<S, ? super Throwable, ? super Loop<V>> failure,
+      @Nullable final Completer<S, ? super Loop<V>> done,
+      @Nullable final Updater<S, ? super EvaluationCollection<V>, ? super Loop<V>> evaluation) {
+    mInit = (Mapper<? super Loop<V>, S>) ((init != null) ? init : DefaultInit.sInstance);
+    mValue = (Updater<S, ? super V, ? super Loop<V>>) ((value != null) ? value
         : DefaultUpdater.sInstance);
-    mFailure = (Updater<S, ? super Throwable, ? super AsyncLoop<V>>) ((failure != null) ? failure
+    mFailure = (Updater<S, ? super Throwable, ? super Loop<V>>) ((failure != null) ? failure
         : DefaultUpdater.sInstance);
-    mDone =
-        (Completer<S, ? super AsyncLoop<V>>) ((done != null) ? done : DefaultCompleter.sInstance);
-    mEvaluation = (Updater<S, ? super AsyncEvaluations<? extends V>, ? super AsyncLoop<V>>) (
+    mDone = (Completer<S, ? super Loop<V>>) ((done != null) ? done : DefaultCompleter.sInstance);
+    mEvaluation = (Updater<S, ? super EvaluationCollection<? extends V>, ? super Loop<V>>) (
         (evaluation != null) ? evaluation : DefaultEvaluationUpdater.sInstance);
   }
 
-  public S done(final S stack, @NotNull final AsyncLoop<V> async) throws Exception {
+  public S done(final S stack, @NotNull final Loop<V> async) throws Exception {
     return mDone.complete(stack, async);
   }
 
-  public S evaluation(final S stack, @NotNull final AsyncEvaluations<V> evaluation,
-      @NotNull final AsyncLoop<V> async) throws Exception {
+  public S evaluation(final S stack, @NotNull final EvaluationCollection<V> evaluation,
+      @NotNull final Loop<V> async) throws Exception {
     return mEvaluation.update(stack, evaluation, async);
   }
 
   public S failure(final S stack, @NotNull final Throwable failure,
-      @NotNull final AsyncLoop<V> async) throws Exception {
+      @NotNull final Loop<V> async) throws Exception {
     return mFailure.update(stack, failure, async);
   }
 
-  public S init(@NotNull final AsyncLoop<V> async) throws Exception {
+  public S init(@NotNull final Loop<V> async) throws Exception {
     return mInit.apply(async);
   }
 
-  public S value(final S stack, final V value, @NotNull final AsyncLoop<V> async) throws Exception {
+  public S value(final S stack, final V value, @NotNull final Loop<V> async) throws Exception {
     return mValue.update(stack, value, async);
   }
 
@@ -93,13 +92,13 @@ class ComposedLoopForker<S, V> implements LoopForker<S, V>, Serializable {
     return new ForkerProxy<S, V>(mInit, mValue, mFailure, mDone, mEvaluation);
   }
 
-  private static class DefaultCompleter<S, V> implements Completer<S, AsyncLoop<V>>, Serializable {
+  private static class DefaultCompleter<S, V> implements Completer<S, Loop<V>>, Serializable {
 
     private static final DefaultCompleter<?, ?> sInstance = new DefaultCompleter<Object, Object>();
 
     private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
 
-    public S complete(final S stack, @NotNull final AsyncLoop<V> loop) {
+    public S complete(final S stack, @NotNull final Loop<V> loop) {
       return stack;
     }
 
@@ -110,15 +109,15 @@ class ComposedLoopForker<S, V> implements LoopForker<S, V>, Serializable {
   }
 
   private static class DefaultEvaluationUpdater<S, V>
-      implements Updater<S, AsyncEvaluations<V>, AsyncLoop<V>>, Serializable {
+      implements Updater<S, EvaluationCollection<V>, Loop<V>>, Serializable {
 
     private static final DefaultEvaluationUpdater<?, ?> sInstance =
         new DefaultEvaluationUpdater<Object, Object>();
 
     private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
 
-    public S update(final S stack, final AsyncEvaluations<V> evaluation,
-        @NotNull final AsyncLoop<V> loop) {
+    public S update(final S stack, final EvaluationCollection<V> evaluation,
+        @NotNull final Loop<V> loop) {
       evaluation.addFailure(new IllegalStateException("the loop cannot be chained")).set();
       return stack;
     }
@@ -129,13 +128,13 @@ class ComposedLoopForker<S, V> implements LoopForker<S, V>, Serializable {
     }
   }
 
-  private static class DefaultInit<S, V> implements Mapper<AsyncLoop<V>, S>, Serializable {
+  private static class DefaultInit<S, V> implements Mapper<Loop<V>, S>, Serializable {
 
     private static final DefaultInit<?, ?> sInstance = new DefaultInit<Object, Object>();
 
     private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
 
-    public S apply(final AsyncLoop<V> loop) {
+    public S apply(final Loop<V> loop) {
       return null;
     }
 
@@ -145,8 +144,7 @@ class ComposedLoopForker<S, V> implements LoopForker<S, V>, Serializable {
     }
   }
 
-  private static class DefaultUpdater<S, V, I>
-      implements Updater<S, I, AsyncLoop<V>>, Serializable {
+  private static class DefaultUpdater<S, V, I> implements Updater<S, I, Loop<V>>, Serializable {
 
     private static final DefaultUpdater<?, ?, ?> sInstance =
         new DefaultUpdater<Object, Object, Object>();
@@ -158,7 +156,7 @@ class ComposedLoopForker<S, V> implements LoopForker<S, V>, Serializable {
       return sInstance;
     }
 
-    public S update(final S stack, final I input, @NotNull final AsyncLoop<V> loop) {
+    public S update(final S stack, final I input, @NotNull final Loop<V> loop) {
       return stack;
     }
   }
@@ -167,11 +165,11 @@ class ComposedLoopForker<S, V> implements LoopForker<S, V>, Serializable {
 
     private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
 
-    private ForkerProxy(final Mapper<? super AsyncLoop<V>, S> init,
-        final Updater<S, ? super V, ? super AsyncLoop<V>> value,
-        final Updater<S, ? super Throwable, ? super AsyncLoop<V>> failure,
-        final Completer<S, ? super AsyncLoop<V>> done,
-        final Updater<S, ? super AsyncEvaluations<? extends V>, ? super AsyncLoop<V>> loop) {
+    private ForkerProxy(final Mapper<? super Loop<V>, S> init,
+        final Updater<S, ? super V, ? super Loop<V>> value,
+        final Updater<S, ? super Throwable, ? super Loop<V>> failure,
+        final Completer<S, ? super Loop<V>> done,
+        final Updater<S, ? super EvaluationCollection<? extends V>, ? super Loop<V>> loop) {
       super(proxy(init), proxy(value), proxy(failure), proxy(done), proxy(loop));
     }
 
@@ -180,11 +178,11 @@ class ComposedLoopForker<S, V> implements LoopForker<S, V>, Serializable {
     private Object readResolve() throws ObjectStreamException {
       try {
         final Object[] args = deserializeArgs();
-        return new ComposedLoopForker<S, V>((Mapper<? super AsyncLoop<V>, S>) args[0],
-            (Updater<S, ? super V, ? super AsyncLoop<V>>) args[1],
-            (Updater<S, ? super Throwable, ? super AsyncLoop<V>>) args[2],
-            (Completer<S, ? super AsyncLoop<V>>) args[3],
-            (Updater<S, ? super AsyncEvaluations<? extends V>, ? super AsyncLoop<V>>) args[4]);
+        return new ComposedLoopForker<S, V>((Mapper<? super Loop<V>, S>) args[0],
+            (Updater<S, ? super V, ? super Loop<V>>) args[1],
+            (Updater<S, ? super Throwable, ? super Loop<V>>) args[2],
+            (Completer<S, ? super Loop<V>>) args[3],
+            (Updater<S, ? super EvaluationCollection<? extends V>, ? super Loop<V>>) args[4]);
 
       } catch (final Throwable t) {
         throw new InvalidObjectException(t.getMessage());

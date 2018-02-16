@@ -28,9 +28,9 @@ import java.util.concurrent.Executor;
 import java.util.concurrent.atomic.AtomicLong;
 
 import dm.jale.ExecutorLoopForker.Stack;
-import dm.jale.async.AsyncEvaluations;
-import dm.jale.async.AsyncLoop;
+import dm.jale.async.EvaluationCollection;
 import dm.jale.async.FailureException;
+import dm.jale.async.Loop;
 import dm.jale.async.LoopForker;
 import dm.jale.config.BuildConfig;
 import dm.jale.executor.ExecutorPool;
@@ -40,7 +40,7 @@ import dm.jale.log.Logger;
 /**
  * Created by davide-maestroni on 02/12/2018.
  */
-class ExecutorLoopForker<V> extends BufferedForker<Stack<V>, V, AsyncEvaluations<V>, AsyncLoop<V>> {
+class ExecutorLoopForker<V> extends BufferedForker<Stack<V>, V, EvaluationCollection<V>, Loop<V>> {
 
   private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
 
@@ -52,7 +52,7 @@ class ExecutorLoopForker<V> extends BufferedForker<Stack<V>, V, AsyncEvaluations
 
     private final AtomicLong pendingCount = new AtomicLong(1);
 
-    private AsyncEvaluations<V> evaluations;
+    private EvaluationCollection<V> evaluations;
 
     private volatile Throwable failure;
   }
@@ -77,18 +77,18 @@ class ExecutorLoopForker<V> extends BufferedForker<Stack<V>, V, AsyncEvaluations
       }
     }
 
-    public Stack<V> done(final Stack<V> stack, @NotNull final AsyncLoop<V> async) {
+    public Stack<V> done(final Stack<V> stack, @NotNull final Loop<V> async) {
       checkFailed(stack);
       mExecutor.execute(new ForkerRunnable(stack) {
 
-        protected void innerRun(@NotNull final AsyncEvaluations<V> evaluations) {
+        protected void innerRun(@NotNull final EvaluationCollection<V> evaluations) {
         }
       });
       return stack;
     }
 
-    public Stack<V> evaluation(final Stack<V> stack, @NotNull final AsyncEvaluations<V> evaluations,
-        @NotNull final AsyncLoop<V> async) {
+    public Stack<V> evaluation(final Stack<V> stack,
+        @NotNull final EvaluationCollection<V> evaluations, @NotNull final Loop<V> async) {
       checkFailed(stack);
       if (stack.evaluations == null) {
         stack.evaluations = evaluations;
@@ -101,29 +101,29 @@ class ExecutorLoopForker<V> extends BufferedForker<Stack<V>, V, AsyncEvaluations
     }
 
     public Stack<V> failure(final Stack<V> stack, @NotNull final Throwable failure,
-        @NotNull final AsyncLoop<V> async) {
+        @NotNull final Loop<V> async) {
       checkFailed(stack);
       stack.pendingCount.incrementAndGet();
       mExecutor.execute(new ForkerRunnable(stack) {
 
-        protected void innerRun(@NotNull final AsyncEvaluations<V> evaluations) {
+        protected void innerRun(@NotNull final EvaluationCollection<V> evaluations) {
           evaluations.addFailure(failure);
         }
       });
       return stack;
     }
 
-    public Stack<V> init(@NotNull final AsyncLoop<V> async) throws Exception {
+    public Stack<V> init(@NotNull final Loop<V> async) throws Exception {
       return new Stack<V>();
     }
 
-    public Stack<V> value(final Stack<V> stack, final V value,
-        @NotNull final AsyncLoop<V> async) throws Exception {
+    public Stack<V> value(final Stack<V> stack, final V value, @NotNull final Loop<V> async) throws
+        Exception {
       checkFailed(stack);
       stack.pendingCount.incrementAndGet();
       mExecutor.execute(new ForkerRunnable(stack) {
 
-        protected void innerRun(@NotNull final AsyncEvaluations<V> evaluations) {
+        protected void innerRun(@NotNull final EvaluationCollection<V> evaluations) {
           evaluations.addValue(value);
         }
       });
@@ -169,7 +169,7 @@ class ExecutorLoopForker<V> extends BufferedForker<Stack<V>, V, AsyncEvaluations
 
       public void run() {
         final Stack<V> stack = mStack;
-        final AsyncEvaluations<V> evaluations = stack.evaluations;
+        final EvaluationCollection<V> evaluations = stack.evaluations;
         try {
           if (stack.failure != null) {
             mLogger.wrn("Ignoring values");
@@ -192,7 +192,8 @@ class ExecutorLoopForker<V> extends BufferedForker<Stack<V>, V, AsyncEvaluations
         }
       }
 
-      protected abstract void innerRun(@NotNull AsyncEvaluations<V> evaluations) throws Exception;
+      protected abstract void innerRun(@NotNull EvaluationCollection<V> evaluations) throws
+          Exception;
     }
   }
 }

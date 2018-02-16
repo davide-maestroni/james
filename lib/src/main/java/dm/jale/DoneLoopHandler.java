@@ -25,7 +25,7 @@ import java.io.Serializable;
 import java.util.Iterator;
 
 import dm.jale.async.Action;
-import dm.jale.async.AsyncEvaluations;
+import dm.jale.async.EvaluationCollection;
 import dm.jale.config.BuildConfig;
 import dm.jale.util.ConstantConditions;
 import dm.jale.util.Iterables;
@@ -46,7 +46,7 @@ class DoneLoopHandler<V> extends AsyncLoopHandler<V, V> implements Serializable 
 
   @Override
   void addFailure(@NotNull final Throwable failure,
-      @NotNull final AsyncEvaluations<V> evaluations) throws Exception {
+      @NotNull final EvaluationCollection<V> evaluations) throws Exception {
     mAction.perform();
     super.addFailure(failure, evaluations);
   }
@@ -54,7 +54,7 @@ class DoneLoopHandler<V> extends AsyncLoopHandler<V, V> implements Serializable 
   @Override
   @SuppressWarnings("WhileLoopReplaceableByForEach")
   void addFailures(@Nullable final Iterable<? extends Throwable> failures,
-      @NotNull final AsyncEvaluations<V> evaluations) throws Exception {
+      @NotNull final EvaluationCollection<V> evaluations) throws Exception {
     if (failures == null) {
       return;
     }
@@ -75,7 +75,8 @@ class DoneLoopHandler<V> extends AsyncLoopHandler<V, V> implements Serializable 
   }
 
   @Override
-  void addValue(final V value, @NotNull final AsyncEvaluations<V> evaluations) throws Exception {
+  void addValue(final V value, @NotNull final EvaluationCollection<V> evaluations) throws
+      Exception {
     mAction.perform();
     super.addValue(value, evaluations);
   }
@@ -83,7 +84,7 @@ class DoneLoopHandler<V> extends AsyncLoopHandler<V, V> implements Serializable 
   @Override
   @SuppressWarnings("WhileLoopReplaceableByForEach")
   void addValues(@Nullable final Iterable<? extends V> values,
-      @NotNull final AsyncEvaluations<V> evaluations) throws Exception {
+      @NotNull final EvaluationCollection<V> evaluations) throws Exception {
     if (values == null) {
       return;
     }

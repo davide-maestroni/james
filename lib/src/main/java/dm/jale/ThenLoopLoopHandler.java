@@ -24,7 +24,7 @@ import java.io.ObjectStreamException;
 import java.io.Serializable;
 import java.util.ArrayList;
 
-import dm.jale.async.AsyncEvaluations;
+import dm.jale.async.EvaluationCollection;
 import dm.jale.async.Mapper;
 import dm.jale.config.BuildConfig;
 import dm.jale.util.ConstantConditions;
@@ -46,13 +46,14 @@ class ThenLoopLoopHandler<V, R> extends AsyncLoopHandler<V, R> implements Serial
 
   @Override
   @SuppressWarnings("unchecked")
-  void addValue(final V value, @NotNull final AsyncEvaluations<R> evaluations) throws Exception {
+  void addValue(final V value, @NotNull final EvaluationCollection<R> evaluations) throws
+      Exception {
     evaluations.addValues(mMapper.apply(value)).set();
   }
 
   @Override
   void addValues(@Nullable final Iterable<? extends V> values,
-      @NotNull final AsyncEvaluations<R> evaluations) throws Exception {
+      @NotNull final EvaluationCollection<R> evaluations) throws Exception {
     if (values == null) {
       return;
     }

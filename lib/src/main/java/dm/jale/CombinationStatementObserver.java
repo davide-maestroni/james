@@ -26,12 +26,12 @@ import java.util.List;
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.Executor;
 
-import dm.jale.async.AsyncEvaluation;
-import dm.jale.async.AsyncStatement;
 import dm.jale.async.Combiner;
+import dm.jale.async.Evaluation;
 import dm.jale.async.FailureException;
 import dm.jale.async.Observer;
 import dm.jale.async.RuntimeInterruptedException;
+import dm.jale.async.Statement;
 import dm.jale.config.BuildConfig;
 import dm.jale.log.Logger;
 import dm.jale.util.ConstantConditions;
@@ -44,21 +44,21 @@ import static dm.jale.executor.ExecutorPool.withThrottling;
 /**
  * Created by davide-maestroni on 02/14/2018.
  */
-class CombinationStatementObserver<S, V, R> implements Observer<AsyncEvaluation<R>>, Serializable {
+class CombinationStatementObserver<S, V, R> implements Observer<Evaluation<R>>, Serializable {
 
   private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
 
-  private final Combiner<S, ? super V, ? super AsyncEvaluation<R>, AsyncStatement<V>> mCombiner;
+  private final Combiner<S, ? super V, ? super Evaluation<R>, Statement<V>> mCombiner;
 
   private final Executor mExecutor;
 
   private final Logger mLogger;
 
-  private final List<AsyncStatement<? extends V>> mStatementList;
+  private final List<Statement<? extends V>> mStatementList;
 
   CombinationStatementObserver(
-      @NotNull final Combiner<S, ? super V, ? super AsyncEvaluation<R>, AsyncStatement<V>> combiner,
-      @NotNull final Iterable<? extends AsyncStatement<? extends V>> statements,
+      @NotNull final Combiner<S, ? super V, ? super Evaluation<R>, Statement<V>> combiner,
+      @NotNull final Iterable<? extends Statement<? extends V>> statements,
       @NotNull final String loggerName) {
     mCombiner = ConstantConditions.notNull("combiner", combiner);
     mStatementList = Collections.unmodifiableList(Iterables.toList(statements));
@@ -67,20 +67,20 @@ class CombinationStatementObserver<S, V, R> implements Observer<AsyncEvaluation<
   }
 
   @SuppressWarnings("unchecked")
-  public void accept(final AsyncEvaluation<R> evaluation) throws Exception {
+  public void accept(final Evaluation<R> evaluation) throws Exception {
     int i = 0;
     @SuppressWarnings("UnnecessaryLocalVariable") final Logger logger = mLogger;
     @SuppressWarnings("UnnecessaryLocalVariable") final Executor executor = mExecutor;
-    final Combiner<S, ? super V, ? super AsyncEvaluation<R>, AsyncStatement<V>> combiner =
-        mCombiner;
-    final List<? extends AsyncStatement<? extends V>> statements = mStatementList;
+    final Combiner<S, ? super V, ? super Evaluation<R>, Statement<V>> combiner = mCombiner;
+    final List<? extends Statement<? extends V>> statements = mStatementList;
     final CombinationState<S> state = new CombinationState<S>(statements.size());
     try {
-      state.set(combiner.init((List<AsyncStatement<V>>) statements));
-      for (final AsyncStatement<? extends V> statement : statements) {
+      state.set(combiner.init((List<Statement<V>>) statements));
+      for (final Statement<? extends V> statement : statements) {
         final int index = i++;
-        statement.to(new AsyncEvaluationCombination<S, V, R>(state, combiner, executor, evaluation,
-            statements, index, logger));
+        statement.to(
+            new EvaluationCombination<S, V, R>(state, combiner, executor, evaluation, statements,
+                index, logger));
       }
 
     } catch (final CancellationException e) {
@@ -100,11 +100,11 @@ class CombinationStatementObserver<S, V, R> implements Observer<AsyncEvaluation<
     return new ObserverProxy<S, V, R>(mCombiner, mStatementList, mLogger.getName());
   }
 
-  private static class AsyncEvaluationCombination<S, V, R> implements AsyncEvaluation<V> {
+  private static class EvaluationCombination<S, V, R> implements Evaluation<V> {
 
-    private final Combiner<S, ? super V, ? super AsyncEvaluation<R>, AsyncStatement<V>> mCombiner;
+    private final Combiner<S, ? super V, ? super Evaluation<R>, Statement<V>> mCombiner;
 
-    private final AsyncEvaluation<R> mEvaluation;
+    private final Evaluation<R> mEvaluation;
 
     private final Executor mExecutor;
 
@@ -114,13 +114,12 @@ class CombinationStatementObserver<S, V, R> implements Observer<AsyncEvaluation<
 
     private final CombinationState<S> mState;
 
-    private final List<? extends AsyncStatement<? extends V>> mStatements;
+    private final List<? extends Statement<? extends V>> mStatements;
 
-    private AsyncEvaluationCombination(@NotNull final CombinationState<S> state,
-        @NotNull final Combiner<S, ? super V, ? super AsyncEvaluation<R>, AsyncStatement<V>>
-            combiner,
-        @NotNull final Executor executor, final AsyncEvaluation<R> evaluation,
-        @NotNull final List<? extends AsyncStatement<? extends V>> statements, final int index,
+    private EvaluationCombination(@NotNull final CombinationState<S> state,
+        @NotNull final Combiner<S, ? super V, ? super Evaluation<R>, Statement<V>> combiner,
+        @NotNull final Executor executor, final Evaluation<R> evaluation,
+        @NotNull final List<? extends Statement<? extends V>> statements, final int index,
         @NotNull final Logger logger) {
       mState = state;
       mCombiner = combiner;
@@ -142,13 +141,12 @@ class CombinationStatementObserver<S, V, R> implements Observer<AsyncEvaluation<
             return;
           }
 
-          final AsyncEvaluation<R> evaluation = mEvaluation;
+          final Evaluation<R> evaluation = mEvaluation;
           try {
             final int index = mIndex;
-            final Combiner<S, ? super V, ? super AsyncEvaluation<R>, AsyncStatement<V>> combiner =
-                mCombiner;
-            @SuppressWarnings("unchecked") final List<AsyncStatement<V>> statements =
-                (List<AsyncStatement<V>>) mStatements;
+            final Combiner<S, ? super V, ? super Evaluation<R>, Statement<V>> combiner = mCombiner;
+            @SuppressWarnings("unchecked") final List<Statement<V>> statements =
+                (List<Statement<V>>) mStatements;
             state.set(combiner.failure(state.get(), failure, evaluation, statements, index));
             state.set(combiner.done(state.get(), evaluation, statements, index));
             if (state.set()) {
@@ -180,13 +178,12 @@ class CombinationStatementObserver<S, V, R> implements Observer<AsyncEvaluation<
             return;
           }
 
-          final AsyncEvaluation<R> evaluation = mEvaluation;
+          final Evaluation<R> evaluation = mEvaluation;
           try {
             final int index = mIndex;
-            final Combiner<S, ? super V, ? super AsyncEvaluation<R>, AsyncStatement<V>> combiner =
-                mCombiner;
-            @SuppressWarnings("unchecked") final List<AsyncStatement<V>> statements =
-                (List<AsyncStatement<V>>) mStatements;
+            final Combiner<S, ? super V, ? super Evaluation<R>, Statement<V>> combiner = mCombiner;
+            @SuppressWarnings("unchecked") final List<Statement<V>> statements =
+                (List<Statement<V>>) mStatements;
             state.set(combiner.value(state.get(), value, evaluation, statements, index));
             state.set(combiner.done(state.get(), evaluation, statements, index));
             if (state.set()) {
@@ -220,8 +217,8 @@ class CombinationStatementObserver<S, V, R> implements Observer<AsyncEvaluation<
     private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
 
     private ObserverProxy(
-        final Combiner<S, ? super V, ? super AsyncEvaluation<R>, AsyncStatement<V>> combiner,
-        final Iterable<? extends AsyncStatement<? extends V>> statements, final String loggerName) {
+        final Combiner<S, ? super V, ? super Evaluation<R>, Statement<V>> combiner,
+        final Iterable<? extends Statement<? extends V>> statements, final String loggerName) {
       super(proxy(combiner), statements, loggerName);
     }
 
@@ -231,8 +228,8 @@ class CombinationStatementObserver<S, V, R> implements Observer<AsyncEvaluation<
       try {
         final Object[] args = deserializeArgs();
         return new CombinationStatementObserver<S, V, R>(
-            (Combiner<S, ? super V, ? super AsyncEvaluation<R>, AsyncStatement<V>>) args[0],
-            (Iterable<? extends AsyncStatement<? extends V>>) args[1], (String) args[2]);
+            (Combiner<S, ? super V, ? super Evaluation<R>, Statement<V>>) args[0],
+            (Iterable<? extends Statement<? extends V>>) args[1], (String) args[2]);
 
       } catch (final Throwable t) {
         throw new InvalidObjectException(t.getMessage());

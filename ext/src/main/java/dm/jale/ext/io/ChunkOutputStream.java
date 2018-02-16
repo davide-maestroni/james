@@ -31,7 +31,7 @@ import java.nio.ByteBuffer;
 import java.nio.channels.ReadableByteChannel;
 import java.nio.channels.WritableByteChannel;
 
-import dm.jale.async.AsyncEvaluations;
+import dm.jale.async.EvaluationCollection;
 import dm.jale.ext.config.BuildConfig;
 import dm.jale.util.ConstantConditions;
 import dm.jale.util.DoubleQueue;
@@ -49,7 +49,7 @@ public class ChunkOutputStream extends OutputStream {
 
   private final int mCorePoolSize;
 
-  private final AsyncEvaluations<Chunk> mEvaluations;
+  private final EvaluationCollection<Chunk> mEvaluations;
 
   private final int mMaxBufferSize;
 
@@ -59,12 +59,12 @@ public class ChunkOutputStream extends OutputStream {
 
   private boolean mIsClosed;
 
-  public ChunkOutputStream(@NotNull final AsyncEvaluations<Chunk> evaluations,
+  public ChunkOutputStream(@NotNull final EvaluationCollection<Chunk> evaluations,
       @Nullable final AllocationType allocationType) {
     this(evaluations, allocationType, DEFAULT_BUFFER_SIZE, DEFAULT_POOL_SIZE);
   }
 
-  public ChunkOutputStream(@NotNull final AsyncEvaluations<Chunk> evaluations,
+  public ChunkOutputStream(@NotNull final EvaluationCollection<Chunk> evaluations,
       @Nullable final AllocationType allocationType, final int coreSize) {
     mEvaluations = ConstantConditions.notNull("evaluations", evaluations);
     final int poolSize =
@@ -74,7 +74,7 @@ public class ChunkOutputStream extends OutputStream {
     mPool = new DoubleQueue<ByteBuffer>(Math.max(poolSize, 1));
   }
 
-  public ChunkOutputStream(@NotNull final AsyncEvaluations<Chunk> evaluations,
+  public ChunkOutputStream(@NotNull final EvaluationCollection<Chunk> evaluations,
       @Nullable final AllocationType allocationType, final int bufferSize, final int poolSize) {
     mEvaluations = ConstantConditions.notNull("evaluations", evaluations);
     mCorePoolSize = ConstantConditions.positive("poolSize", poolSize);

@@ -22,10 +22,10 @@ import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.List;
 
-import dm.jale.async.AsyncEvaluation;
-import dm.jale.async.AsyncState;
-import dm.jale.async.AsyncStatement;
+import dm.jale.async.Evaluation;
+import dm.jale.async.EvaluationState;
 import dm.jale.async.SimpleState;
+import dm.jale.async.Statement;
 import dm.jale.async.StatementCombiner;
 import dm.jale.ext.config.BuildConfig;
 
@@ -33,7 +33,8 @@ import dm.jale.ext.config.BuildConfig;
  * Created by davide-maestroni on 02/16/2018.
  */
 class StatesOfCombiner<V>
-    implements StatementCombiner<List<AsyncState<V>>, V, List<AsyncState<V>>>, Serializable {
+    implements StatementCombiner<List<EvaluationState<V>>, V, List<EvaluationState<V>>>,
+    Serializable {
 
   private static final StatesOfCombiner<?> sInstance = new StatesOfCombiner<Object>();
 
@@ -48,32 +49,32 @@ class StatesOfCombiner<V>
     return (StatesOfCombiner<V>) sInstance;
   }
 
-  public List<AsyncState<V>> done(final List<AsyncState<V>> stack,
-      @NotNull final AsyncEvaluation<List<AsyncState<V>>> evaluation,
-      @NotNull final List<AsyncStatement<V>> asyncs, final int index) {
+  public List<EvaluationState<V>> done(final List<EvaluationState<V>> stack,
+      @NotNull final Evaluation<List<EvaluationState<V>>> evaluation,
+      @NotNull final List<Statement<V>> asyncs, final int index) {
     return stack;
   }
 
-  public List<AsyncState<V>> failure(final List<AsyncState<V>> stack, final Throwable failure,
-      @NotNull final AsyncEvaluation<List<AsyncState<V>>> evaluation,
-      @NotNull final List<AsyncStatement<V>> asyncs, final int index) {
+  public List<EvaluationState<V>> failure(final List<EvaluationState<V>> stack,
+      final Throwable failure, @NotNull final Evaluation<List<EvaluationState<V>>> evaluation,
+      @NotNull final List<Statement<V>> asyncs, final int index) {
     stack.add(SimpleState.<V>ofFailure(failure));
     return stack;
   }
 
-  public List<AsyncState<V>> init(@NotNull final List<AsyncStatement<V>> asyncs) {
-    return new ArrayList<AsyncState<V>>();
+  public List<EvaluationState<V>> init(@NotNull final List<Statement<V>> asyncs) {
+    return new ArrayList<EvaluationState<V>>();
   }
 
-  public void settle(final List<AsyncState<V>> stack,
-      @NotNull final AsyncEvaluation<List<AsyncState<V>>> evaluation,
-      @NotNull final List<AsyncStatement<V>> asyncs) {
+  public void settle(final List<EvaluationState<V>> stack,
+      @NotNull final Evaluation<List<EvaluationState<V>>> evaluation,
+      @NotNull final List<Statement<V>> asyncs) {
     evaluation.set(stack);
   }
 
-  public List<AsyncState<V>> value(final List<AsyncState<V>> stack, final V value,
-      @NotNull final AsyncEvaluation<List<AsyncState<V>>> evaluation,
-      @NotNull final List<AsyncStatement<V>> asyncs, final int index) {
+  public List<EvaluationState<V>> value(final List<EvaluationState<V>> stack, final V value,
+      @NotNull final Evaluation<List<EvaluationState<V>>> evaluation,
+      @NotNull final List<Statement<V>> asyncs, final int index) {
     stack.add(SimpleState.ofValue(value));
     return stack;
   }

@@ -22,9 +22,9 @@ import java.io.InvalidObjectException;
 import java.io.ObjectStreamException;
 import java.io.Serializable;
 
-import dm.jale.async.AsyncEvaluation;
-import dm.jale.async.AsyncStatement;
+import dm.jale.async.Evaluation;
 import dm.jale.async.Mapper;
+import dm.jale.async.Statement;
 import dm.jale.config.BuildConfig;
 import dm.jale.util.ConstantConditions;
 import dm.jale.util.SerializableProxy;
@@ -36,14 +36,14 @@ class ThenIfStatementHandler<V, R> extends AsyncStatementHandler<V, R> implement
 
   private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
 
-  private final Mapper<? super V, ? extends AsyncStatement<R>> mMapper;
+  private final Mapper<? super V, ? extends Statement<R>> mMapper;
 
-  ThenIfStatementHandler(@NotNull final Mapper<? super V, ? extends AsyncStatement<R>> mapper) {
+  ThenIfStatementHandler(@NotNull final Mapper<? super V, ? extends Statement<R>> mapper) {
     mMapper = ConstantConditions.notNull("mapper", mapper);
   }
 
   @Override
-  void value(final V value, @NotNull final AsyncEvaluation<R> evaluation) throws Exception {
+  void value(final V value, @NotNull final Evaluation<R> evaluation) throws Exception {
     mMapper.apply(value).to(evaluation);
   }
 
@@ -56,7 +56,7 @@ class ThenIfStatementHandler<V, R> extends AsyncStatementHandler<V, R> implement
 
     private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
 
-    private HandlerProxy(final Mapper<? super V, ? extends AsyncStatement<R>> mapper) {
+    private HandlerProxy(final Mapper<? super V, ? extends Statement<R>> mapper) {
       super(proxy(mapper));
     }
 
@@ -66,7 +66,7 @@ class ThenIfStatementHandler<V, R> extends AsyncStatementHandler<V, R> implement
       try {
         final Object[] args = deserializeArgs();
         return new ThenIfStatementHandler<V, R>(
-            (Mapper<? super V, ? extends AsyncStatement<R>>) args[0]);
+            (Mapper<? super V, ? extends Statement<R>>) args[0]);
 
       } catch (final Throwable t) {
         throw new InvalidObjectException(t.getMessage());

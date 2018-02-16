@@ -24,8 +24,8 @@ import java.io.ObjectStreamException;
 import java.io.Serializable;
 import java.util.Arrays;
 
-import dm.jale.async.AsyncEvaluations;
-import dm.jale.async.AsyncLoop;
+import dm.jale.async.EvaluationCollection;
+import dm.jale.async.Loop;
 import dm.jale.async.Mapper;
 import dm.jale.config.BuildConfig;
 import dm.jale.util.ConstantConditions;
@@ -39,12 +39,12 @@ class ElseLoopIfStatementHandler<V> extends AsyncStatementLoopHandler<V, V>
 
   private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
 
-  private final Mapper<? super Throwable, ? extends AsyncLoop<? extends V>> mMapper;
+  private final Mapper<? super Throwable, ? extends Loop<? extends V>> mMapper;
 
   private final Class<?>[] mTypes;
 
   ElseLoopIfStatementHandler(
-      @NotNull final Mapper<? super Throwable, ? extends AsyncLoop<? extends V>> mapper,
+      @NotNull final Mapper<? super Throwable, ? extends Loop<? extends V>> mapper,
       @Nullable final Class<?>[] exceptionTypes) {
     mMapper = ConstantConditions.notNull("mapper", mapper);
     mTypes = ConstantConditions.notNull("exception types", exceptionTypes);
@@ -55,7 +55,7 @@ class ElseLoopIfStatementHandler<V> extends AsyncStatementLoopHandler<V, V>
 
   @Override
   void failure(@NotNull final Throwable failure,
-      @NotNull final AsyncEvaluations<V> evaluations) throws Exception {
+      @NotNull final EvaluationCollection<V> evaluations) throws Exception {
     for (final Class<?> type : mTypes) {
       if (type.isInstance(failure)) {
         mMapper.apply(failure).to(evaluations);
@@ -75,7 +75,7 @@ class ElseLoopIfStatementHandler<V> extends AsyncStatementLoopHandler<V, V>
 
     private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
 
-    private HandlerProxy(final Mapper<? super Throwable, ? extends AsyncLoop<? extends V>> mapper,
+    private HandlerProxy(final Mapper<? super Throwable, ? extends Loop<? extends V>> mapper,
         final Class<?>[] exceptionTypes) {
       super(proxy(mapper), exceptionTypes);
     }
@@ -86,8 +86,7 @@ class ElseLoopIfStatementHandler<V> extends AsyncStatementLoopHandler<V, V>
       try {
         final Object[] args = deserializeArgs();
         return new ElseLoopIfStatementHandler<V>(
-            (Mapper<? super Throwable, ? extends AsyncLoop<? extends V>>) args[0],
-            (Class<?>[]) args[1]);
+            (Mapper<? super Throwable, ? extends Loop<? extends V>>) args[0], (Class<?>[]) args[1]);
 
       } catch (final Throwable t) {
         throw new InvalidObjectException(t.getMessage());

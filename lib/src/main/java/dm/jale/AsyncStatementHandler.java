@@ -18,15 +18,15 @@ package dm.jale;
 
 import org.jetbrains.annotations.NotNull;
 
-import dm.jale.async.AsyncEvaluation;
+import dm.jale.async.Evaluation;
 
 /**
  * Created by davide-maestroni on 01/14/2018.
  */
 class AsyncStatementHandler<V, R> {
 
-  void failure(@NotNull final Throwable failure,
-      @NotNull final AsyncEvaluation<R> evaluation) throws Exception {
+  void failure(@NotNull final Throwable failure, @NotNull final Evaluation<R> evaluation) throws
+      Exception {
     evaluation.fail(failure);
   }
 
@@ -36,7 +36,7 @@ class AsyncStatementHandler<V, R> {
   }
 
   @SuppressWarnings("unchecked")
-  void value(final V value, @NotNull final AsyncEvaluation<R> evaluation) throws Exception {
+  void value(final V value, @NotNull final Evaluation<R> evaluation) throws Exception {
     evaluation.set((R) value);
   }
 }

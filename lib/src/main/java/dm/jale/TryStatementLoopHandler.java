@@ -25,7 +25,7 @@ import java.io.ObjectStreamException;
 import java.io.Serializable;
 import java.util.Locale;
 
-import dm.jale.async.AsyncEvaluations;
+import dm.jale.async.EvaluationCollection;
 import dm.jale.async.Mapper;
 import dm.jale.config.BuildConfig;
 import dm.jale.log.Logger;
@@ -54,7 +54,7 @@ class TryStatementLoopHandler<V, R> extends AsyncStatementLoopHandler<V, R>
   }
 
   @Override
-  void value(final V value, @NotNull final AsyncEvaluations<R> evaluations) throws Exception {
+  void value(final V value, @NotNull final EvaluationCollection<R> evaluations) throws Exception {
     final Closeable closeable = mCloseable.apply(value);
     try {
       mHandler.value(value, evaluations);

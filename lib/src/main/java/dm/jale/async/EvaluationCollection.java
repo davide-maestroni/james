@@ -17,26 +17,24 @@
 package dm.jale.async;
 
 import org.jetbrains.annotations.NotNull;
-
-import java.io.Serializable;
+import org.jetbrains.annotations.Nullable;
 
 /**
- * Created by davide-maestroni on 01/09/2018.
+ * Created by davide-maestroni on 01/08/2018.
  */
-public interface AsyncState<V> extends Serializable {
+public interface EvaluationCollection<V> {
 
   @NotNull
-  Throwable failure();
+  EvaluationCollection<V> addFailure(@NotNull Throwable failure);
 
-  boolean isCancelled();
+  @NotNull
+  EvaluationCollection<V> addFailures(@Nullable Iterable<? extends Throwable> failures);
 
-  boolean isEvaluating();
+  @NotNull
+  EvaluationCollection<V> addValue(V value);
 
-  boolean isFailed();
+  @NotNull
+  EvaluationCollection<V> addValues(@Nullable Iterable<? extends V> values);
 
-  boolean isSet();
-
-  void to(@NotNull AsyncEvaluation<? super V> evaluation);
-
-  V value();
+  void set();
 }

@@ -19,7 +19,6 @@ package dm.jale.async;
 /**
  * Created by davide-maestroni on 02/15/2018.
  */
-public interface StatementCombiner<S, V, R>
-    extends Combiner<S, V, AsyncEvaluation<R>, AsyncStatement<V>> {
+public interface StatementCombiner<S, V, R> extends Combiner<S, V, Evaluation<R>, Statement<V>> {
 
 }

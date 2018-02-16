@@ -17,11 +17,11 @@
 package dm.jale.sample;
 
 import dm.jale.Async;
-import dm.jale.async.AsyncStatement;
+import dm.jale.async.Statement;
 
 public class MyClass {
 
-  public static AsyncStatement<Integer> convert(CharSequence sequence) {
+  public static Statement<Integer> convert(CharSequence sequence) {
     return new Async().value(sequence).then(MyClass::count);
   }
 
@@ -34,7 +34,7 @@ public class MyClass {
   }
 
   public static void test() {
-    final AsyncStatement<String> statement = new Async().value("test");
+    final Statement<String> statement = new Async().value("test");
     statement.then(String::toLowerCase);
     statement.then(CharSequence::length);
     statement.then(MyClass::count);

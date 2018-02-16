@@ -26,9 +26,9 @@ import java.io.Serializable;
 import java.util.Locale;
 
 import dm.jale.async.Action;
-import dm.jale.async.AsyncEvaluation;
-import dm.jale.async.AsyncStatement;
+import dm.jale.async.Evaluation;
 import dm.jale.async.Mapper;
+import dm.jale.async.Statement;
 import dm.jale.config.BuildConfig;
 import dm.jale.log.Logger;
 import dm.jale.util.ConstantConditions;
@@ -45,10 +45,10 @@ class TryIfStatementHandler<V, R> extends AsyncStatementHandler<V, R> implements
 
   private final Logger mLogger;
 
-  private final Mapper<? super V, ? extends AsyncStatement<R>> mMapper;
+  private final Mapper<? super V, ? extends Statement<R>> mMapper;
 
   TryIfStatementHandler(@NotNull final Mapper<? super V, ? extends Closeable> closeable,
-      @NotNull final Mapper<? super V, ? extends AsyncStatement<R>> mapper,
+      @NotNull final Mapper<? super V, ? extends Statement<R>> mapper,
       @Nullable final String loggerName) {
     mCloseable = ConstantConditions.notNull("closeable", closeable);
     mMapper = ConstantConditions.notNull("mapper", mapper);
@@ -56,7 +56,7 @@ class TryIfStatementHandler<V, R> extends AsyncStatementHandler<V, R> implements
   }
 
   @Override
-  void value(final V value, @NotNull final AsyncEvaluation<R> evaluation) throws Exception {
+  void value(final V value, @NotNull final Evaluation<R> evaluation) throws Exception {
     mMapper.apply(value).whenDone(new Action() {
 
       public void perform() throws Exception {
@@ -75,7 +75,7 @@ class TryIfStatementHandler<V, R> extends AsyncStatementHandler<V, R> implements
     private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
 
     private HandlerProxy(final Mapper<? super V, ? extends Closeable> closeable,
-        final Mapper<? super V, ? extends AsyncStatement<R>> mapper, final String loggerName) {
+        final Mapper<? super V, ? extends Statement<R>> mapper, final String loggerName) {
       super(proxy(closeable), proxy(mapper), loggerName);
     }
 
@@ -85,7 +85,7 @@ class TryIfStatementHandler<V, R> extends AsyncStatementHandler<V, R> implements
       try {
         final Object[] args = deserializeArgs();
         return new TryIfStatementHandler<V, R>((Mapper<? super V, ? extends Closeable>) args[0],
-            (Mapper<? super V, ? extends AsyncStatement<R>>) args[1], (String) args[2]);
+            (Mapper<? super V, ? extends Statement<R>>) args[1], (String) args[2]);
 
       } catch (final Throwable t) {
         throw new InvalidObjectException(t.getMessage());

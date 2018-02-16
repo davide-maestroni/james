@@ -20,8 +20,8 @@ import org.jetbrains.annotations.NotNull;
 
 import java.util.ArrayList;
 
-import dm.jale.async.AsyncLoop.YieldOutputs;
-import dm.jale.async.AsyncLoop.Yielder;
+import dm.jale.async.Loop.YieldOutputs;
+import dm.jale.async.Loop.Yielder;
 
 /**
  * Created by davide-maestroni on 02/05/2018.

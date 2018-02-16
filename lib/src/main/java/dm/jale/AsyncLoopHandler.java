@@ -19,7 +19,7 @@ package dm.jale;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
-import dm.jale.async.AsyncEvaluations;
+import dm.jale.async.EvaluationCollection;
 
 /**
  * Created by davide-maestroni on 02/01/2018.
@@ -27,23 +27,24 @@ import dm.jale.async.AsyncEvaluations;
 class AsyncLoopHandler<V, R> {
 
   void addFailure(@NotNull final Throwable failure,
-      @NotNull final AsyncEvaluations<R> evaluations) throws Exception {
+      @NotNull final EvaluationCollection<R> evaluations) throws Exception {
     evaluations.addFailure(failure).set();
   }
 
   void addFailures(@Nullable final Iterable<? extends Throwable> failures,
-      @NotNull final AsyncEvaluations<R> evaluations) throws Exception {
+      @NotNull final EvaluationCollection<R> evaluations) throws Exception {
     evaluations.addFailures(failures).set();
   }
 
   @SuppressWarnings("unchecked")
-  void addValue(final V value, @NotNull final AsyncEvaluations<R> evaluations) throws Exception {
+  void addValue(final V value, @NotNull final EvaluationCollection<R> evaluations) throws
+      Exception {
     evaluations.addValue((R) value).set();
   }
 
   @SuppressWarnings("unchecked")
   void addValues(@Nullable final Iterable<? extends V> values,
-      @NotNull final AsyncEvaluations<R> evaluations) throws Exception {
+      @NotNull final EvaluationCollection<R> evaluations) throws Exception {
     evaluations.addValues((Iterable<R>) values).set();
   }
 
@@ -52,7 +53,7 @@ class AsyncLoopHandler<V, R> {
     return this;
   }
 
-  void set(@NotNull final AsyncEvaluations<R> evaluations) throws Exception {
+  void set(@NotNull final EvaluationCollection<R> evaluations) throws Exception {
     evaluations.set();
   }
 }

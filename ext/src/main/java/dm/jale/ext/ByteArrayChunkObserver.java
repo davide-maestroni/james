@@ -19,7 +19,7 @@ package dm.jale.ext;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
-import dm.jale.async.AsyncEvaluations;
+import dm.jale.async.EvaluationCollection;
 import dm.jale.ext.io.AllocationType;
 import dm.jale.ext.io.Chunk;
 import dm.jale.ext.io.ChunkOutputStream;
@@ -39,7 +39,7 @@ class ByteArrayChunkObserver extends ChunkObserver {
     mBuffer = ConstantConditions.notNull("buffer", buffer);
   }
 
-  public void accept(final AsyncEvaluations<Chunk> evaluations) throws Exception {
+  public void accept(final EvaluationCollection<Chunk> evaluations) throws Exception {
     final ChunkOutputStream outputStream = newStream(evaluations);
     try {
       outputStream.write(mBuffer);

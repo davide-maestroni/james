@@ -19,7 +19,7 @@ package dm.jale.ext;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
-import dm.jale.async.AsyncEvaluations;
+import dm.jale.async.EvaluationCollection;
 import dm.jale.async.Observer;
 import dm.jale.ext.io.AllocationType;
 import dm.jale.ext.io.Chunk;
@@ -29,7 +29,7 @@ import dm.jale.util.ConstantConditions;
 /**
  * Created by davide-maestroni on 02/16/2018.
  */
-abstract class ChunkObserver implements Observer<AsyncEvaluations<Chunk>> {
+abstract class ChunkObserver implements Observer<EvaluationCollection<Chunk>> {
 
   private final AllocationType mAllocationType;
 
@@ -49,7 +49,7 @@ abstract class ChunkObserver implements Observer<AsyncEvaluations<Chunk>> {
   }
 
   @NotNull
-  protected ChunkOutputStream newStream(@NotNull final AsyncEvaluations<Chunk> evaluations) {
+  protected ChunkOutputStream newStream(@NotNull final EvaluationCollection<Chunk> evaluations) {
     if (mCoreSize != null) {
       return new ChunkOutputStream(evaluations, mAllocationType, mCoreSize);
     }

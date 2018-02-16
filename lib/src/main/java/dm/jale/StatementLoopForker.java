@@ -25,11 +25,11 @@ import java.util.ArrayList;
 import java.util.List;
 
 import dm.jale.StatementLoopForker.ForkerStack;
-import dm.jale.async.AsyncEvaluation;
-import dm.jale.async.AsyncEvaluations;
-import dm.jale.async.AsyncLoop;
-import dm.jale.async.AsyncStatement;
-import dm.jale.async.AsyncStatement.Forker;
+import dm.jale.async.Evaluation;
+import dm.jale.async.EvaluationCollection;
+import dm.jale.async.Loop;
+import dm.jale.async.Statement;
+import dm.jale.async.Statement.Forker;
 import dm.jale.config.BuildConfig;
 import dm.jale.util.ConstantConditions;
 import dm.jale.util.SerializableProxy;
@@ -38,27 +38,24 @@ import dm.jale.util.SerializableProxy;
  * Created by davide-maestroni on 02/05/2018.
  */
 class StatementLoopForker<S, V>
-    implements Forker<ForkerStack<S, V>, V, AsyncEvaluations<V>, AsyncLoop<V>>, Serializable {
+    implements Forker<ForkerStack<S, V>, V, EvaluationCollection<V>, Loop<V>>, Serializable {
 
   private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
 
-  private final Forker<S, Iterable<V>, AsyncEvaluation<Iterable<V>>, AsyncStatement<Iterable<V>>>
-      mForker;
+  private final Forker<S, Iterable<V>, Evaluation<Iterable<V>>, Statement<Iterable<V>>> mForker;
 
   @SuppressWarnings("unchecked")
   StatementLoopForker(
-      @NotNull final Forker<S, ? super Iterable<V>, ? super AsyncEvaluation<Iterable<V>>, ? super
-          AsyncStatement<Iterable<V>>> forker) {
+      @NotNull final Forker<S, ? super Iterable<V>, ? super Evaluation<Iterable<V>>, ? super
+          Statement<Iterable<V>>> forker) {
     mForker =
-        (Forker<S, Iterable<V>, AsyncEvaluation<Iterable<V>>, AsyncStatement<Iterable<V>>>)
-            ConstantConditions
+        (Forker<S, Iterable<V>, Evaluation<Iterable<V>>, Statement<Iterable<V>>>) ConstantConditions
             .notNull("forker", forker);
   }
 
-  public ForkerStack<S, V> done(final ForkerStack<S, V> stack,
-      @NotNull final AsyncLoop<V> async) throws Exception {
-    final Forker<S, Iterable<V>, AsyncEvaluation<Iterable<V>>, AsyncStatement<Iterable<V>>> forker =
-        mForker;
+  public ForkerStack<S, V> done(final ForkerStack<S, V> stack, @NotNull final Loop<V> async) throws
+      Exception {
+    final Forker<S, Iterable<V>, Evaluation<Iterable<V>>, Statement<Iterable<V>>> forker = mForker;
     final List<V> values = stack.getValues();
     if (values != null) {
       stack.setStack(forker.value(stack.getStack(), stack.getValues(), async));
@@ -68,9 +65,9 @@ class StatementLoopForker<S, V>
   }
 
   public ForkerStack<S, V> evaluation(final ForkerStack<S, V> stack,
-      @NotNull final AsyncEvaluations<V> evaluation, @NotNull final AsyncLoop<V> async) throws
+      @NotNull final EvaluationCollection<V> evaluation, @NotNull final Loop<V> async) throws
       Exception {
-    return stack.withStack(mForker.evaluation(stack.getStack(), new AsyncEvaluation<Iterable<V>>() {
+    return stack.withStack(mForker.evaluation(stack.getStack(), new Evaluation<Iterable<V>>() {
 
       public void fail(@NotNull final Throwable failure) {
         evaluation.addFailure(failure).set();
@@ -83,7 +80,7 @@ class StatementLoopForker<S, V>
   }
 
   public ForkerStack<S, V> failure(final ForkerStack<S, V> stack, @NotNull final Throwable failure,
-      @NotNull final AsyncLoop<V> async) throws Exception {
+      @NotNull final Loop<V> async) throws Exception {
     if (stack.getValues() == null) {
       return stack;
     }
@@ -91,12 +88,12 @@ class StatementLoopForker<S, V>
     return stack.withStack(mForker.failure(stack.getStack(), failure, async)).withValues(null);
   }
 
-  public ForkerStack<S, V> init(@NotNull final AsyncLoop<V> async) throws Exception {
+  public ForkerStack<S, V> init(@NotNull final Loop<V> async) throws Exception {
     return new ForkerStack<S, V>().withStack(mForker.init(async)).withValues(new ArrayList<V>());
   }
 
   public ForkerStack<S, V> value(final ForkerStack<S, V> stack, final V value,
-      @NotNull final AsyncLoop<V> async) throws Exception {
+      @NotNull final Loop<V> async) throws Exception {
     final List<V> values = stack.getValues();
     if (values != null) {
       values.add(value);
@@ -150,8 +147,7 @@ class StatementLoopForker<S, V>
     private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
 
     private ForkerProxy(
-        final Forker<S, Iterable<V>, AsyncEvaluation<Iterable<V>>, AsyncStatement<Iterable<V>>>
-            forker) {
+        final Forker<S, Iterable<V>, Evaluation<Iterable<V>>, Statement<Iterable<V>>> forker) {
       super(proxy(forker));
     }
 
@@ -161,8 +157,7 @@ class StatementLoopForker<S, V>
       try {
         final Object[] args = deserializeArgs();
         return new StatementLoopForker<S, V>(
-            (Forker<S, Iterable<V>, AsyncEvaluation<Iterable<V>>, AsyncStatement<Iterable<V>>>)
-                args[0]);
+            (Forker<S, Iterable<V>, Evaluation<Iterable<V>>, Statement<Iterable<V>>>) args[0]);
 
       } catch (final Throwable t) {
         throw new InvalidObjectException(t.getMessage());

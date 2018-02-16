@@ -25,7 +25,7 @@ import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.Arrays;
 
-import dm.jale.async.AsyncEvaluations;
+import dm.jale.async.EvaluationCollection;
 import dm.jale.async.Mapper;
 import dm.jale.config.BuildConfig;
 import dm.jale.util.ConstantConditions;
@@ -56,7 +56,7 @@ class ElseLoopLoopHandler<V> extends AsyncLoopHandler<V, V> implements Serializa
   @Override
   @SuppressWarnings("unchecked")
   void addFailure(@NotNull final Throwable failure,
-      @NotNull final AsyncEvaluations<V> evaluations) throws Exception {
+      @NotNull final EvaluationCollection<V> evaluations) throws Exception {
     for (final Class<?> type : mTypes) {
       if (type.isInstance(failure)) {
         evaluations.addValues(mMapper.apply(failure)).set();
@@ -69,7 +69,7 @@ class ElseLoopLoopHandler<V> extends AsyncLoopHandler<V, V> implements Serializa
 
   @Override
   void addFailures(@Nullable final Iterable<? extends Throwable> failures,
-      @NotNull final AsyncEvaluations<V> evaluations) throws Exception {
+      @NotNull final EvaluationCollection<V> evaluations) throws Exception {
     if (failures == null) {
       return;
     }

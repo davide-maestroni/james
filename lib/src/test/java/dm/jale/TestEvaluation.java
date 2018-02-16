@@ -18,16 +18,16 @@ package dm.jale;
 
 import org.jetbrains.annotations.NotNull;
 
-import dm.jale.async.AsyncEvaluation;
-import dm.jale.async.AsyncState;
+import dm.jale.async.Evaluation;
+import dm.jale.async.EvaluationState;
 import dm.jale.async.SimpleState;
 
 /**
  * Created by davide-maestroni on 01/30/2018.
  */
-class TestEvaluation<V> implements AsyncEvaluation<V> {
+class TestEvaluation<V> implements Evaluation<V> {
 
-  private AsyncState<V> mState;
+  private EvaluationState<V> mState;
 
   public void fail(@NotNull final Throwable failure) {
     mState = SimpleState.ofFailure(failure);
@@ -37,7 +37,7 @@ class TestEvaluation<V> implements AsyncEvaluation<V> {
     mState = SimpleState.ofValue(value);
   }
 
-  public AsyncState<V> getState() {
+  public EvaluationState<V> getState() {
     return mState;
   }
 }

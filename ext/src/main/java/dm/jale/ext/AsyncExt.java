@@ -26,20 +26,20 @@ import java.util.List;
 import java.util.concurrent.Executor;
 
 import dm.jale.Async;
-import dm.jale.async.AsyncEvaluation;
-import dm.jale.async.AsyncEvaluations;
-import dm.jale.async.AsyncLoop;
-import dm.jale.async.AsyncState;
-import dm.jale.async.AsyncStatement;
-import dm.jale.async.AsyncStatement.Forker;
 import dm.jale.async.CombinationCompleter;
 import dm.jale.async.CombinationSettler;
 import dm.jale.async.CombinationUpdater;
 import dm.jale.async.Combiner;
+import dm.jale.async.Evaluation;
+import dm.jale.async.EvaluationCollection;
+import dm.jale.async.EvaluationState;
+import dm.jale.async.Loop;
 import dm.jale.async.Mapper;
 import dm.jale.async.Observer;
 import dm.jale.async.Provider;
 import dm.jale.async.Settler;
+import dm.jale.async.Statement;
+import dm.jale.async.Statement.Forker;
 import dm.jale.async.Updater;
 import dm.jale.ext.backoff.Backoffer;
 import dm.jale.ext.backoff.PendingEvaluations;
@@ -68,13 +68,13 @@ public class AsyncExt extends Async {
   }
 
   @NotNull
-  public static <S, V> Forker<?, V, AsyncEvaluations<V>, AsyncLoop<V>> onBackoffed(
+  public static <S, V> Forker<?, V, EvaluationCollection<V>, Loop<V>> onBackoffed(
       @NotNull final Executor executor, @NotNull final Backoffer<S, V> backoffer) {
     return Async.buffered(new BackoffForker<S, V>(executor, backoffer));
   }
 
   @NotNull
-  public static <S, V> Forker<?, V, AsyncEvaluations<V>, AsyncLoop<V>> onBackoffed(
+  public static <S, V> Forker<?, V, EvaluationCollection<V>, Loop<V>> onBackoffed(
       @NotNull final Executor executor, @Nullable final Provider<S> init,
       @Nullable final Updater<S, ? super V, ? super PendingEvaluations<V>> value,
       @Nullable final Updater<S, ? super Throwable, ? super PendingEvaluations<V>> failure,
@@ -83,14 +83,14 @@ public class AsyncExt extends Async {
   }
 
   @NotNull
-  public <V> AsyncStatement<List<V>> allOf(
-      @NotNull final Iterable<? extends AsyncStatement<? extends V>> statements) {
+  public <V> Statement<List<V>> allOf(
+      @NotNull final Iterable<? extends Statement<? extends V>> statements) {
     return statementOf(AllOfCombiner.<V>instance(), statements);
   }
 
   @NotNull
-  public <V> AsyncStatement<V> anyOf(
-      @NotNull final Iterable<? extends AsyncStatement<? extends V>> statements) {
+  public <V> Statement<V> anyOf(
+      @NotNull final Iterable<? extends Statement<? extends V>> statements) {
     return statementOf(AnyOfCombiner.<V>instance(), statements);
   }
 
@@ -102,13 +102,13 @@ public class AsyncExt extends Async {
 
   @NotNull
   @Override
-  public <V> AsyncStatement<V> failure(@NotNull final Throwable failure) {
+  public <V> Statement<V> failure(@NotNull final Throwable failure) {
     return mAsync.failure(failure);
   }
 
   @NotNull
   @Override
-  public <V> AsyncLoop<V> failures(@NotNull final Iterable<? extends Throwable> failures) {
+  public <V> Loop<V> failures(@NotNull final Iterable<? extends Throwable> failures) {
     return mAsync.failures(failures);
   }
 
@@ -120,72 +120,70 @@ public class AsyncExt extends Async {
 
   @NotNull
   @Override
-  public <V> AsyncLoop<V> loop(@NotNull final AsyncStatement<? extends Iterable<V>> statement) {
+  public <V> Loop<V> loop(@NotNull final Statement<? extends Iterable<V>> statement) {
     return mAsync.loop(statement);
   }
 
   @NotNull
   @Override
-  public <V> AsyncLoop<V> loop(@NotNull final Observer<AsyncEvaluations<V>> observer) {
+  public <V> Loop<V> loop(@NotNull final Observer<EvaluationCollection<V>> observer) {
     return mAsync.loop(observer);
   }
 
   @NotNull
   @Override
-  public <S, V, R> AsyncLoop<R> loopOf(
-      @NotNull final Combiner<S, ? super V, ? super AsyncEvaluations<R>, AsyncLoop<V>> combiner,
-      @NotNull final Iterable<? extends AsyncLoop<? extends V>> asyncLoops) {
+  public <S, V, R> Loop<R> loopOf(
+      @NotNull final Combiner<S, ? super V, ? super EvaluationCollection<R>, Loop<V>> combiner,
+      @NotNull final Iterable<? extends Loop<? extends V>> asyncLoops) {
     return mAsync.loopOf(combiner, asyncLoops);
   }
 
   @NotNull
   @Override
-  public <S, V, R> AsyncLoop<R> loopOf(@Nullable final Mapper<? super List<AsyncLoop<V>>, S> init,
-      @Nullable final CombinationUpdater<S, ? super V, ? super AsyncEvaluations<? extends R>,
-          AsyncLoop<V>> value,
-      @Nullable final CombinationUpdater<S, ? super Throwable, ? super AsyncEvaluations<? extends
-          R>, AsyncLoop<V>> failure,
-      @Nullable final CombinationCompleter<S, ? super AsyncEvaluations<? extends R>,
-          AsyncLoop<V>> done,
-      @Nullable final CombinationSettler<S, ? super AsyncEvaluations<? extends R>, AsyncLoop<V>>
+  public <S, V, R> Loop<R> loopOf(@Nullable final Mapper<? super List<Loop<V>>, S> init,
+      @Nullable final CombinationUpdater<S, ? super V, ? super EvaluationCollection<? extends R>,
+          Loop<V>> value,
+      @Nullable final CombinationUpdater<S, ? super Throwable, ? super EvaluationCollection<?
+          extends R>, Loop<V>> failure,
+      @Nullable final CombinationCompleter<S, ? super EvaluationCollection<? extends R>, Loop<V>>
+          done,
+      @Nullable final CombinationSettler<S, ? super EvaluationCollection<? extends R>, Loop<V>>
           settle,
-      @NotNull final Iterable<? extends AsyncLoop<? extends V>> asyncLoops) {
+      @NotNull final Iterable<? extends Loop<? extends V>> asyncLoops) {
     return mAsync.loopOf(init, value, failure, done, settle, asyncLoops);
   }
 
   @NotNull
   @Override
-  public <V> AsyncLoop<V> loopOnce(@NotNull final AsyncStatement<? extends V> statement) {
+  public <V> Loop<V> loopOnce(@NotNull final Statement<? extends V> statement) {
     return mAsync.loopOnce(statement);
   }
 
   @NotNull
   @Override
-  public <V> AsyncStatement<V> statement(@NotNull final Observer<AsyncEvaluation<V>> observer) {
+  public <V> Statement<V> statement(@NotNull final Observer<Evaluation<V>> observer) {
     return mAsync.statement(observer);
   }
 
   @NotNull
   @Override
-  public <S, V, R> AsyncStatement<R> statementOf(
-      @NotNull final Combiner<S, ? super V, ? super AsyncEvaluation<R>, AsyncStatement<V>> combiner,
-      @NotNull final Iterable<? extends AsyncStatement<? extends V>> statements) {
+  public <S, V, R> Statement<R> statementOf(
+      @NotNull final Combiner<S, ? super V, ? super Evaluation<R>, Statement<V>> combiner,
+      @NotNull final Iterable<? extends Statement<? extends V>> statements) {
     return mAsync.statementOf(combiner, statements);
   }
 
   @NotNull
   @Override
-  public <S, V, R> AsyncStatement<R> statementOf(
-      @Nullable final Mapper<? super List<AsyncStatement<V>>, S> init,
-      @Nullable final CombinationUpdater<S, ? super V, ? super AsyncEvaluation<? extends R>,
-          AsyncStatement<V>> value,
-      @Nullable final CombinationUpdater<S, ? super Throwable, ? super AsyncEvaluation<? extends
-          R>, AsyncStatement<V>> failure,
-      @Nullable final CombinationCompleter<S, ? super AsyncEvaluation<? extends R>,
-          AsyncStatement<V>> done,
-      @Nullable final CombinationSettler<S, ? super AsyncEvaluation<? extends R>,
-          AsyncStatement<V>> settle,
-      @NotNull final Iterable<? extends AsyncStatement<? extends V>> statements) {
+  public <S, V, R> Statement<R> statementOf(
+      @Nullable final Mapper<? super List<Statement<V>>, S> init,
+      @Nullable final CombinationUpdater<S, ? super V, ? super Evaluation<? extends R>,
+          Statement<V>> value,
+      @Nullable final CombinationUpdater<S, ? super Throwable, ? super Evaluation<? extends R>,
+          Statement<V>> failure,
+      @Nullable final CombinationCompleter<S, ? super Evaluation<? extends R>, Statement<V>> done,
+      @Nullable final CombinationSettler<S, ? super Evaluation<? extends R>, Statement<V>> settle,
+      @NotNull final Iterable<? extends Statement<? extends V>> statements) {
     return mAsync.statementOf(init, value, failure, done, settle, statements);
   }
 
@@ -197,213 +195,212 @@ public class AsyncExt extends Async {
 
   @NotNull
   @Override
-  public <V> AsyncStatement<V> value(final V value) {
+  public <V> Statement<V> value(final V value) {
     return mAsync.value(value);
   }
 
   @NotNull
   @Override
-  public <V> AsyncLoop<V> values(@NotNull final Iterable<? extends V> values) {
+  public <V> Loop<V> values(@NotNull final Iterable<? extends V> values) {
     return mAsync.values(values);
   }
 
   @NotNull
-  public AsyncLoop<Chunk> inChunks(@NotNull final InputStream inputStream) {
+  public Loop<Chunk> inChunks(@NotNull final InputStream inputStream) {
     return inChunks(inputStream, null);
   }
 
   @NotNull
-  public AsyncLoop<Chunk> inChunks(@NotNull final InputStream inputStream,
+  public Loop<Chunk> inChunks(@NotNull final InputStream inputStream,
       @Nullable final AllocationType allocationType) {
     return loop(new InputStreamChunkObserver(inputStream, allocationType, null, null, null));
   }
 
   @NotNull
-  public AsyncLoop<Chunk> inChunks(@NotNull final InputStream inputStream,
+  public Loop<Chunk> inChunks(@NotNull final InputStream inputStream,
       @Nullable final AllocationType allocationType, final int coreSize) {
     dm.jale.util.ConstantConditions.positive("coreSize", coreSize);
     return loop(new InputStreamChunkObserver(inputStream, allocationType, coreSize, null, null));
   }
 
   @NotNull
-  public AsyncLoop<Chunk> inChunks(@NotNull final InputStream inputStream,
+  public Loop<Chunk> inChunks(@NotNull final InputStream inputStream,
       @Nullable final AllocationType allocationType, final int bufferSize, final int poolSize) {
     return loop(
         new InputStreamChunkObserver(inputStream, allocationType, null, bufferSize, poolSize));
   }
 
   @NotNull
-  public AsyncLoop<Chunk> inChunks(@NotNull final ReadableByteChannel channel) {
+  public Loop<Chunk> inChunks(@NotNull final ReadableByteChannel channel) {
     return inChunks(channel, null);
   }
 
   @NotNull
-  public AsyncLoop<Chunk> inChunks(@NotNull final ReadableByteChannel channel,
+  public Loop<Chunk> inChunks(@NotNull final ReadableByteChannel channel,
       @Nullable final AllocationType allocationType) {
     return loop(new ChannelChunkObserver(channel, allocationType, null, null, null));
   }
 
   @NotNull
-  public AsyncLoop<Chunk> inChunks(@NotNull final ReadableByteChannel channel,
+  public Loop<Chunk> inChunks(@NotNull final ReadableByteChannel channel,
       @Nullable final AllocationType allocationType, final int coreSize) {
     return loop(new ChannelChunkObserver(channel, allocationType, coreSize, null, null));
   }
 
   @NotNull
-  public AsyncLoop<Chunk> inChunks(@NotNull final ReadableByteChannel channel,
+  public Loop<Chunk> inChunks(@NotNull final ReadableByteChannel channel,
       @Nullable final AllocationType allocationType, final int bufferSize, final int poolSize) {
     return loop(new ChannelChunkObserver(channel, allocationType, null, bufferSize, poolSize));
   }
 
   @NotNull
-  public AsyncLoop<Chunk> inChunks(@NotNull final ByteBuffer buffer) {
+  public Loop<Chunk> inChunks(@NotNull final ByteBuffer buffer) {
     return inChunks(buffer, null);
   }
 
   @NotNull
-  public AsyncLoop<Chunk> inChunks(@NotNull final ByteBuffer buffer,
+  public Loop<Chunk> inChunks(@NotNull final ByteBuffer buffer,
       @Nullable final AllocationType allocationType) {
     return loop(new ByteBufferChunkObserver(buffer, allocationType, null, null, null));
   }
 
   @NotNull
-  public AsyncLoop<Chunk> inChunks(@NotNull final ByteBuffer buffer,
+  public Loop<Chunk> inChunks(@NotNull final ByteBuffer buffer,
       @Nullable final AllocationType allocationType, final int coreSize) {
     return loop(new ByteBufferChunkObserver(buffer, allocationType, coreSize, null, null));
   }
 
   @NotNull
-  public AsyncLoop<Chunk> inChunks(@NotNull final ByteBuffer buffer,
+  public Loop<Chunk> inChunks(@NotNull final ByteBuffer buffer,
       @Nullable final AllocationType allocationType, final int bufferSize, final int poolSize) {
     return loop(new ByteBufferChunkObserver(buffer, allocationType, null, bufferSize, poolSize));
   }
 
   @NotNull
-  public AsyncLoop<Chunk> inChunks(@NotNull final byte[] buffer) {
+  public Loop<Chunk> inChunks(@NotNull final byte[] buffer) {
     return inChunks(buffer, null);
   }
 
   @NotNull
-  public AsyncLoop<Chunk> inChunks(@NotNull final byte[] buffer,
+  public Loop<Chunk> inChunks(@NotNull final byte[] buffer,
       @Nullable final AllocationType allocationType) {
     return loop(new ByteArrayChunkObserver(buffer, allocationType, null, null, null));
   }
 
   @NotNull
-  public AsyncLoop<Chunk> inChunks(@NotNull final byte[] buffer,
+  public Loop<Chunk> inChunks(@NotNull final byte[] buffer,
       @Nullable final AllocationType allocationType, final int coreSize) {
     return loop(new ByteArrayChunkObserver(buffer, allocationType, coreSize, null, null));
   }
 
   @NotNull
-  public AsyncLoop<Chunk> inChunks(@NotNull final byte[] buffer,
+  public Loop<Chunk> inChunks(@NotNull final byte[] buffer,
       @Nullable final AllocationType allocationType, final int bufferSize, final int poolSize) {
     return loop(new ByteArrayChunkObserver(buffer, allocationType, null, bufferSize, poolSize));
   }
 
   @NotNull
-  public <V extends Comparable<V>> AsyncLoop<V> inRange(@NotNull final V start,
-      @NotNull final V end, @NotNull final Mapper<? super V, ? extends V> increment) {
+  public <V extends Comparable<V>> Loop<V> inRange(@NotNull final V start, @NotNull final V end,
+      @NotNull final Mapper<? super V, ? extends V> increment) {
     return loop(new InRangeComparableObserver<V>(start, end, increment, false));
   }
 
   @NotNull
-  public AsyncLoop<Integer> inRange(final int start, final int end) {
+  public Loop<Integer> inRange(final int start, final int end) {
     return inRange(start, end, (start <= end) ? 1 : -1);
   }
 
   @NotNull
-  public AsyncLoop<Integer> inRange(final int start, final int end, final int increment) {
+  public Loop<Integer> inRange(final int start, final int end, final int increment) {
     return loop(new InRangeIntegerObserver(start, end, increment, false));
   }
 
   @NotNull
-  public AsyncLoop<Long> inRange(final long start, final long end) {
+  public Loop<Long> inRange(final long start, final long end) {
     return inRange(start, end, (start <= end) ? 1 : -1);
   }
 
   @NotNull
-  public AsyncLoop<Long> inRange(final long start, final long end, final long increment) {
+  public Loop<Long> inRange(final long start, final long end, final long increment) {
     return loop(new InRangeLongObserver(start, end, increment, false));
   }
 
   @NotNull
-  public AsyncLoop<Float> inRange(final float start, final float end) {
+  public Loop<Float> inRange(final float start, final float end) {
     return inRange(start, end, (start <= end) ? 1 : -1);
   }
 
   @NotNull
-  public AsyncLoop<Float> inRange(final float start, final float end, final float increment) {
+  public Loop<Float> inRange(final float start, final float end, final float increment) {
     return loop(new InRangeFloatObserver(start, end, increment, false));
   }
 
   @NotNull
-  public AsyncLoop<Double> inRange(final double start, final double end) {
+  public Loop<Double> inRange(final double start, final double end) {
     return inRange(start, end, (start <= end) ? 1 : -1);
   }
 
   @NotNull
-  public AsyncLoop<Double> inRange(final double start, final double end, final double increment) {
+  public Loop<Double> inRange(final double start, final double end, final double increment) {
     return loop(new InRangeDoubleObserver(start, end, increment, false));
   }
 
   @NotNull
-  public <V extends Comparable<V>> AsyncLoop<V> inRangeInclusive(@NotNull final V start,
+  public <V extends Comparable<V>> Loop<V> inRangeInclusive(@NotNull final V start,
       @NotNull final V end, @NotNull final Mapper<? super V, ? extends V> increment) {
     return loop(new InRangeComparableObserver<V>(start, end, increment, true));
   }
 
   @NotNull
-  public AsyncLoop<Integer> inRangeInclusive(final int start, final int end) {
+  public Loop<Integer> inRangeInclusive(final int start, final int end) {
     return inRangeInclusive(start, end, (start <= end) ? 1 : -1);
   }
 
   @NotNull
-  public AsyncLoop<Integer> inRangeInclusive(final int start, final int end, final int increment) {
+  public Loop<Integer> inRangeInclusive(final int start, final int end, final int increment) {
     return loop(new InRangeIntegerObserver(start, end, increment, true));
   }
 
   @NotNull
-  public AsyncLoop<Long> inRangeInclusive(final long start, final long end) {
+  public Loop<Long> inRangeInclusive(final long start, final long end) {
     return inRangeInclusive(start, end, (start <= end) ? 1 : -1);
   }
 
   @NotNull
-  public AsyncLoop<Long> inRangeInclusive(final long start, final long end, final long increment) {
+  public Loop<Long> inRangeInclusive(final long start, final long end, final long increment) {
     return loop(new InRangeLongObserver(start, end, increment, true));
   }
 
   @NotNull
-  public AsyncLoop<Float> inRangeInclusive(final float start, final float end) {
+  public Loop<Float> inRangeInclusive(final float start, final float end) {
     return inRangeInclusive(start, end, (start <= end) ? 1 : -1);
   }
 
   @NotNull
-  public AsyncLoop<Float> inRangeInclusive(final float start, final float end,
-      final float increment) {
+  public Loop<Float> inRangeInclusive(final float start, final float end, final float increment) {
     return loop(new InRangeFloatObserver(start, end, increment, true));
   }
 
   @NotNull
-  public AsyncLoop<Double> inRangeInclusive(final double start, final double end) {
+  public Loop<Double> inRangeInclusive(final double start, final double end) {
     return inRangeInclusive(start, end, (start <= end) ? 1 : -1);
   }
 
   @NotNull
-  public AsyncLoop<Double> inRangeInclusive(final double start, final double end,
+  public Loop<Double> inRangeInclusive(final double start, final double end,
       final double increment) {
     return loop(new InRangeDoubleObserver(start, end, increment, true));
   }
 
   @NotNull
-  public <V> AsyncLoop<V> inSequence(@NotNull final V start, final long count,
+  public <V> Loop<V> inSequence(@NotNull final V start, final long count,
       @NotNull final Mapper<? super V, ? extends V> increment) {
     return loop(new InSequenceObserver<V>(start, count, increment));
   }
 
   @NotNull
-  public <V> AsyncStatement<List<AsyncState<V>>> statesOf(
-      @NotNull final Iterable<? extends AsyncStatement<? extends V>> statements) {
+  public <V> Statement<List<EvaluationState<V>>> statesOf(
+      @NotNull final Iterable<? extends Statement<? extends V>> statements) {
     return statementOf(StatesOfCombiner.<V>instance(), statements);
   }
 }

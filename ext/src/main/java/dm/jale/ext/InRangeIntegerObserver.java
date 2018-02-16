@@ -18,14 +18,14 @@ package dm.jale.ext;
 
 import java.io.Serializable;
 
-import dm.jale.async.AsyncEvaluations;
+import dm.jale.async.EvaluationCollection;
 import dm.jale.async.Observer;
 import dm.jale.ext.config.BuildConfig;
 
 /**
  * Created by davide-maestroni on 02/16/2018.
  */
-class InRangeIntegerObserver implements Observer<AsyncEvaluations<Integer>>, Serializable {
+class InRangeIntegerObserver implements Observer<EvaluationCollection<Integer>>, Serializable {
 
   private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
 
@@ -45,7 +45,7 @@ class InRangeIntegerObserver implements Observer<AsyncEvaluations<Integer>>, Ser
     mIsInclusive = isInclusive;
   }
 
-  public void accept(final AsyncEvaluations<Integer> evaluations) throws Exception {
+  public void accept(final EvaluationCollection<Integer> evaluations) throws Exception {
     int value = mStart;
     @SuppressWarnings("UnnecessaryLocalVariable") final int end = mEnd;
     @SuppressWarnings("UnnecessaryLocalVariable") final int increment = mIncrement;

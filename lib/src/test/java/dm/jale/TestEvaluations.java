@@ -21,25 +21,26 @@ import org.jetbrains.annotations.Nullable;
 
 import java.util.ArrayList;
 
-import dm.jale.async.AsyncEvaluations;
-import dm.jale.async.AsyncState;
+import dm.jale.async.EvaluationCollection;
+import dm.jale.async.EvaluationState;
 import dm.jale.async.SimpleState;
 
 /**
  * Created by davide-maestroni on 01/30/2018.
  */
-class TestEvaluations<V> implements AsyncEvaluations<V> {
+class TestEvaluations<V> implements EvaluationCollection<V> {
 
-  private ArrayList<AsyncState<V>> mStates = new ArrayList<AsyncState<V>>();
+  private ArrayList<EvaluationState<V>> mStates = new ArrayList<EvaluationState<V>>();
 
   @NotNull
-  public AsyncEvaluations<V> addFailure(@NotNull final Throwable failure) {
+  public EvaluationCollection<V> addFailure(@NotNull final Throwable failure) {
     mStates.add(SimpleState.<V>ofFailure(failure));
     return this;
   }
 
   @NotNull
-  public AsyncEvaluations<V> addFailures(@Nullable final Iterable<? extends Throwable> failures) {
+  public EvaluationCollection<V> addFailures(
+      @Nullable final Iterable<? extends Throwable> failures) {
     if (failures != null) {
       for (final Throwable failure : failures) {
         mStates.add(SimpleState.<V>ofFailure(failure));
@@ -50,13 +51,13 @@ class TestEvaluations<V> implements AsyncEvaluations<V> {
   }
 
   @NotNull
-  public AsyncEvaluations<V> addValue(final V value) {
+  public EvaluationCollection<V> addValue(final V value) {
     mStates.add(SimpleState.ofValue(value));
     return this;
   }
 
   @NotNull
-  public AsyncEvaluations<V> addValues(@Nullable final Iterable<? extends V> values) {
+  public EvaluationCollection<V> addValues(@Nullable final Iterable<? extends V> values) {
     if (values != null) {
       for (final V value : values) {
         mStates.add(SimpleState.ofValue(value));
@@ -69,7 +70,7 @@ class TestEvaluations<V> implements AsyncEvaluations<V> {
   public void set() {
   }
 
-  ArrayList<AsyncState<V>> getStates() {
+  ArrayList<EvaluationState<V>> getStates() {
     return mStates;
   }
 }

@@ -22,7 +22,7 @@ import java.io.InvalidObjectException;
 import java.io.ObjectStreamException;
 import java.io.Serializable;
 
-import dm.jale.async.AsyncEvaluations;
+import dm.jale.async.EvaluationCollection;
 import dm.jale.async.Mapper;
 import dm.jale.async.Observer;
 import dm.jale.ext.config.BuildConfig;
@@ -32,7 +32,7 @@ import dm.jale.util.SerializableProxy;
 /**
  * Created by davide-maestroni on 02/16/2018.
  */
-class InSequenceObserver<V> implements Observer<AsyncEvaluations<V>>, Serializable {
+class InSequenceObserver<V> implements Observer<EvaluationCollection<V>>, Serializable {
 
   private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
 
@@ -49,7 +49,7 @@ class InSequenceObserver<V> implements Observer<AsyncEvaluations<V>>, Serializab
     mIncrement = ConstantConditions.notNull("increment", increment);
   }
 
-  public void accept(final AsyncEvaluations<V> evaluations) throws Exception {
+  public void accept(final EvaluationCollection<V> evaluations) throws Exception {
     V value = mStart;
     @SuppressWarnings("UnnecessaryLocalVariable") final long count = mCount;
     @SuppressWarnings("UnnecessaryLocalVariable") final Mapper<? super V, ? extends V> increment =
