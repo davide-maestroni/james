@@ -333,7 +333,7 @@ class YieldLoopHandler<S, V, R> extends AsyncLoopHandler<V, R> implements Serial
       final EvaluationCollection<R> evaluation = mEvaluation;
       try {
         if (mFailure != null) {
-          evaluation.set();
+          mLogger.wrn("Ignoring evaluation");
           return;
         }
 

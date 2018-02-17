@@ -18,6 +18,7 @@ package dm.jale.ext;
 
 import org.jetbrains.annotations.NotNull;
 
+import java.io.ObjectStreamException;
 import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.List;
@@ -79,5 +80,10 @@ class AllOfCombiner<V> implements StatementCombiner<List<V>, V, List<V>>, Serial
     }
 
     return stack;
+  }
+
+  @NotNull
+  private Object readResolve() throws ObjectStreamException {
+    return sInstance;
   }
 }

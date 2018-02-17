@@ -742,6 +742,29 @@ class DefaultLoop<V> implements Loop<V>, Serializable {
   }
 
   @NotNull
+  public Generator<EvaluationState<V>> generateStates() {
+    return generateStates(-1, TimeUnit.MILLISECONDS);
+  }
+
+  @NotNull
+  public Generator<EvaluationState<V>> generateStates(final long timeout,
+      @NotNull final TimeUnit timeUnit) {
+    checkSupported();
+    return new StateGenerator<V>(this, timeout, timeUnit);
+  }
+
+  @NotNull
+  public Generator<V> generateValues() {
+    return generateValues(-1, TimeUnit.MILLISECONDS);
+  }
+
+  @NotNull
+  public Generator<V> generateValues(final long timeout, @NotNull final TimeUnit timeUnit) {
+    checkSupported();
+    return new ValueGenerator<V>(this, timeout, timeUnit);
+  }
+
+  @NotNull
   public List<EvaluationState<V>> getStates(final int maxCount) {
     return getStates(maxCount, -1, TimeUnit.MILLISECONDS);
   }
@@ -818,32 +841,9 @@ class DefaultLoop<V> implements Loop<V>, Serializable {
     return outputs;
   }
 
-  @NotNull
-  public AsyncGenerator<EvaluationState<V>> stateGenerator() {
-    return stateGenerator(-1, TimeUnit.MILLISECONDS);
-  }
-
-  @NotNull
-  public AsyncGenerator<EvaluationState<V>> stateGenerator(final long timeout,
-      @NotNull final TimeUnit timeUnit) {
-    checkSupported();
-    return new StateGenerator<V>(this, timeout, timeUnit);
-  }
-
   public void to(@NotNull final EvaluationCollection<? super V> evaluation) {
     checkEvaluated();
     chain(new ToEvaluationLoopHandler<V>(evaluation));
-  }
-
-  @NotNull
-  public AsyncGenerator<V> valueGenerator() {
-    return valueGenerator(-1, TimeUnit.MILLISECONDS);
-  }
-
-  @NotNull
-  public AsyncGenerator<V> valueGenerator(final long timeout, @NotNull final TimeUnit timeUnit) {
-    checkSupported();
-    return new ValueGenerator<V>(this, timeout, timeUnit);
   }
 
   @NotNull
@@ -2474,6 +2474,8 @@ class DefaultLoop<V> implements Loop<V>, Serializable {
   private static class ForkObserver<S, V> extends AsyncLoopHandler<V, V>
       implements RenewableObserver<EvaluationCollection<V>>, Serializable {
 
+    // TODO: 17/02/2018 failure back-propagation
+
     private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
 
     private final List<EvaluationCollection<V>> mEvaluations =
@@ -2483,7 +2485,7 @@ class DefaultLoop<V> implements Loop<V>, Serializable {
 
     private final Forker<S, V, EvaluationCollection<V>, Loop<V>> mForker;
 
-    private Throwable mFailure;
+    private volatile Throwable mFailure;
 
     private DefaultLoop<V> mLoop;
 
@@ -2501,19 +2503,20 @@ class DefaultLoop<V> implements Loop<V>, Serializable {
     }
 
     @Override
-    void addFailure(@NotNull final Throwable throwable,
+    void addFailure(@NotNull final Throwable failure,
         @NotNull final EvaluationCollection<V> evaluation) {
+      checkFailed();
       mExecutor.execute(new Runnable() {
 
         public void run() {
-          final Throwable failure = mFailure;
-          if (failure != null) {
-            clearEvaluations(failure);
+          final DefaultLoop<V> loop = mLoop;
+          if (mFailure != null) {
+            loop.mLogger.wrn("Ignoring failure: %s", failure);
             return;
           }
 
           try {
-            mStack = mForker.failure(mStack, throwable, mLoop);
+            mStack = mForker.failure(mStack, failure, loop);
 
           } catch (final Throwable t) {
             final Throwable throwable = RuntimeInterruptedException.wrapIfInterrupt(t);
@@ -2527,12 +2530,13 @@ class DefaultLoop<V> implements Loop<V>, Serializable {
     @Override
     void addFailures(@Nullable final Iterable<? extends Throwable> failures,
         @NotNull final EvaluationCollection<V> evaluation) {
+      checkFailed();
       mExecutor.execute(new Runnable() {
 
         public void run() {
-          final Throwable failure = mFailure;
-          if (failure != null) {
-            clearEvaluations(failure);
+          final DefaultLoop<V> loop = mLoop;
+          if (mFailure != null) {
+            loop.mLogger.wrn("Ignoring failures: %s", Iterables.toString(failures));
             return;
           }
 
@@ -2541,8 +2545,8 @@ class DefaultLoop<V> implements Loop<V>, Serializable {
               @SuppressWarnings(
                   "UnnecessaryLocalVariable") final Forker<S, V, EvaluationCollection<V>, Loop<V>>
                   forker = mForker;
-              for (final Throwable throwable : failures) {
-                mStack = forker.failure(mStack, throwable, mLoop);
+              for (final Throwable failure : failures) {
+                mStack = forker.failure(mStack, failure, loop);
               }
 
             } catch (final Throwable t) {
@@ -2557,17 +2561,18 @@ class DefaultLoop<V> implements Loop<V>, Serializable {
 
     @Override
     void addValue(final V value, @NotNull final EvaluationCollection<V> evaluation) {
+      checkFailed();
       mExecutor.execute(new Runnable() {
 
         public void run() {
-          final Throwable failure = mFailure;
-          if (failure != null) {
-            clearEvaluations(failure);
+          final DefaultLoop<V> loop = mLoop;
+          if (mFailure != null) {
+            loop.mLogger.wrn("Ignoring value: %s", value);
             return;
           }
 
           try {
-            mStack = mForker.value(mStack, value, mLoop);
+            mStack = mForker.value(mStack, value, loop);
 
           } catch (final Throwable t) {
             final Throwable throwable = RuntimeInterruptedException.wrapIfInterrupt(t);
@@ -2581,12 +2586,13 @@ class DefaultLoop<V> implements Loop<V>, Serializable {
     @Override
     void addValues(@Nullable final Iterable<? extends V> values,
         @NotNull final EvaluationCollection<V> evaluation) {
+      checkFailed();
       mExecutor.execute(new Runnable() {
 
         public void run() {
-          final Throwable failure = mFailure;
-          if (failure != null) {
-            clearEvaluations(failure);
+          final DefaultLoop<V> loop = mLoop;
+          if (mFailure != null) {
+            loop.mLogger.wrn("Ignoring values: %s", Iterables.toString(values));
             return;
           }
 
@@ -2596,7 +2602,7 @@ class DefaultLoop<V> implements Loop<V>, Serializable {
                   "UnnecessaryLocalVariable") final Forker<S, V, EvaluationCollection<V>, Loop<V>>
                   forker = mForker;
               for (final V value : values) {
-                mStack = forker.value(mStack, value, mLoop);
+                mStack = forker.value(mStack, value, loop);
               }
 
             } catch (final Throwable t) {
@@ -2616,17 +2622,18 @@ class DefaultLoop<V> implements Loop<V>, Serializable {
 
     @Override
     void set(@NotNull final EvaluationCollection<V> evaluation) {
+      checkFailed();
       mExecutor.execute(new Runnable() {
 
         public void run() {
-          final Throwable failure = mFailure;
-          if (failure != null) {
-            clearEvaluations(failure);
+          final DefaultLoop<V> loop = mLoop;
+          if (mFailure != null) {
+            loop.mLogger.wrn("Ignoring completion");
             return;
           }
 
           try {
-            mStack = mForker.done(mStack, mLoop);
+            mStack = mForker.done(mStack, loop);
 
           } catch (final Throwable t) {
             final Throwable throwable = RuntimeInterruptedException.wrapIfInterrupt(t);
@@ -2647,7 +2654,7 @@ class DefaultLoop<V> implements Loop<V>, Serializable {
         public void run() {
           final Throwable failure = mFailure;
           if (failure != null) {
-            evaluation.addFailure(failure).set();
+            Asyncs.failSafe(evaluation, failure);
             return;
           }
 
@@ -2669,10 +2676,17 @@ class DefaultLoop<V> implements Loop<V>, Serializable {
       return new ChainForkObserver<S, V>(this);
     }
 
+    private void checkFailed() {
+      final Throwable failure = mFailure;
+      if (failure != null) {
+        throw FailureException.wrap(failure);
+      }
+    }
+
     private void clearEvaluations(@NotNull final Throwable failure) {
       final List<EvaluationCollection<V>> evaluations = mEvaluations;
       for (final EvaluationCollection<V> evaluation : evaluations) {
-        evaluation.addFailure(failure).set();
+        Asyncs.failSafe(evaluation, failure);
       }
 
       evaluations.clear();
@@ -2712,11 +2726,15 @@ class DefaultLoop<V> implements Loop<V>, Serializable {
         public void run() {
           try {
             final DefaultLoop<V> loop = mLoop;
-            mStack = mForker.init(loop);
-            loop.chain(ForkObserver.this);
+            try {
+              mStack = mForker.init(loop);
+
+            } finally {
+              loop.chain(ForkObserver.this);
+            }
 
           } catch (final Throwable t) {
-            mFailure = RuntimeInterruptedException.wrapIfInterrupt(t);
+            mFailure = RuntimeInterruptedException.wrapIfInterrupt(t); // TODO: 17/02/2018 why?
           }
         }
       });
@@ -3118,7 +3136,7 @@ class DefaultLoop<V> implements Loop<V>, Serializable {
     }
   }
 
-  private static class StateGenerator<V> implements AsyncGenerator<EvaluationState<V>> {
+  private static class StateGenerator<V> implements Generator<EvaluationState<V>> {
 
     private final DefaultLoop<V> mLoop;
 
@@ -3134,12 +3152,12 @@ class DefaultLoop<V> implements Loop<V>, Serializable {
     }
 
     @NotNull
-    public AsyncIterator<EvaluationState<V>> iterator() {
+    public GeneratorIterator<EvaluationState<V>> iterator() {
       return new StateIterator<V>(mLoop.evaluate(), mTimeout, mTimeUnit);
     }
   }
 
-  private static class StateIterator<V> implements AsyncIterator<EvaluationState<V>> {
+  private static class StateIterator<V> implements GeneratorIterator<EvaluationState<V>> {
 
     private final DefaultLoop<V> mLoop;
 
@@ -3306,7 +3324,7 @@ class DefaultLoop<V> implements Loop<V>, Serializable {
     }
   }
 
-  private static class ValueGenerator<V> implements AsyncGenerator<V> {
+  private static class ValueGenerator<V> implements Generator<V> {
 
     private final DefaultLoop<V> mLoop;
 
@@ -3322,12 +3340,12 @@ class DefaultLoop<V> implements Loop<V>, Serializable {
     }
 
     @NotNull
-    public AsyncIterator<V> iterator() {
+    public GeneratorIterator<V> iterator() {
       return new ValueIterator<V>(mLoop.evaluate(), mTimeout, mTimeUnit);
     }
   }
 
-  private static class ValueIterator<V> implements AsyncIterator<V> {
+  private static class ValueIterator<V> implements GeneratorIterator<V> {
 
     private final DefaultLoop<V> mLoop;
 

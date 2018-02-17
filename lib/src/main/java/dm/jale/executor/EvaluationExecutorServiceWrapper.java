@@ -32,10 +32,11 @@ import dm.jale.util.WeakIdentityHashMap;
  * <p>
  * Created by davide-maestroni on 10/14/2014.
  */
-class OwnerExecutorServiceWrapper implements OwnerExecutor, StoppableExecutor, Serializable {
+class EvaluationExecutorServiceWrapper
+    implements EvaluationExecutor, StoppableExecutor, Serializable {
 
-  private static final WeakIdentityHashMap<ExecutorService, OwnerExecutorServiceWrapper> sOwners =
-      new WeakIdentityHashMap<ExecutorService, OwnerExecutorServiceWrapper>();
+  private static final WeakIdentityHashMap<ExecutorService, EvaluationExecutorServiceWrapper>
+      sOwners = new WeakIdentityHashMap<ExecutorService, EvaluationExecutorServiceWrapper>();
 
   private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
 
@@ -48,7 +49,7 @@ class OwnerExecutorServiceWrapper implements OwnerExecutor, StoppableExecutor, S
    *
    * @param service the executor service.
    */
-  private OwnerExecutorServiceWrapper(@NotNull final ExecutorService service) {
+  private EvaluationExecutorServiceWrapper(@NotNull final ExecutorService service) {
     mService = ConstantConditions.notNull("service", service);
   }
 
@@ -59,12 +60,12 @@ class OwnerExecutorServiceWrapper implements OwnerExecutor, StoppableExecutor, S
    * @return the executor.
    */
   @NotNull
-  static OwnerExecutorServiceWrapper of(@NotNull final ExecutorService service) {
-    OwnerExecutorServiceWrapper ownerExecutor;
+  static EvaluationExecutorServiceWrapper of(@NotNull final ExecutorService service) {
+    EvaluationExecutorServiceWrapper ownerExecutor;
     synchronized (sOwners) {
       ownerExecutor = sOwners.get(service);
       if (ownerExecutor == null) {
-        ownerExecutor = new OwnerExecutorServiceWrapper(service);
+        ownerExecutor = new EvaluationExecutorServiceWrapper(service);
         sOwners.put(service, ownerExecutor);
       }
     }

@@ -171,7 +171,7 @@ class CombinationLoopObserver<S, V, R> implements Observer<EvaluationCollection<
         public void run() {
           final CombinationState<S> state = mState;
           if (state.isFailed()) {
-            mLogger.wrn("Ignoring failures: %s", failures);
+            mLogger.wrn("Ignoring failures: %s", Iterables.toString(failures));
             return;
           }
 
@@ -244,7 +244,7 @@ class CombinationLoopObserver<S, V, R> implements Observer<EvaluationCollection<
         public void run() {
           final CombinationState<S> state = mState;
           if (state.isFailed()) {
-            mLogger.wrn("Ignoring values: %s", values);
+            mLogger.wrn("Ignoring values: %s", Iterables.toString(values));
             return;
           }
 

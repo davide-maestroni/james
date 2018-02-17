@@ -37,26 +37,28 @@ class ScheduledPoolExecutor extends ScheduledExecutorDecorator implements Serial
   private final ThreadFactory mThreadFactory;
 
   ScheduledPoolExecutor() {
-    super(OwnerScheduledExecutorServiceWrapper.of(Executors.newScheduledThreadPool(getPoolSize())));
+    super(EvaluationScheduledExecutorServiceWrapper.of(
+        Executors.newScheduledThreadPool(getPoolSize())));
     mPoolSize = Integer.MIN_VALUE;
     mThreadFactory = null;
   }
 
   ScheduledPoolExecutor(final int corePoolSize) {
-    super(OwnerScheduledExecutorServiceWrapper.of(Executors.newScheduledThreadPool(corePoolSize)));
+    super(EvaluationScheduledExecutorServiceWrapper.of(
+        Executors.newScheduledThreadPool(corePoolSize)));
     mPoolSize = corePoolSize;
     mThreadFactory = null;
   }
 
   ScheduledPoolExecutor(@NotNull final ThreadFactory threadFactory) {
-    super(OwnerScheduledExecutorServiceWrapper.of(
+    super(EvaluationScheduledExecutorServiceWrapper.of(
         Executors.newScheduledThreadPool(getPoolSize(), threadFactory)));
     mPoolSize = Integer.MIN_VALUE;
     mThreadFactory = threadFactory;
   }
 
   ScheduledPoolExecutor(final int corePoolSize, @NotNull final ThreadFactory threadFactory) {
-    super(OwnerScheduledExecutorServiceWrapper.of(
+    super(EvaluationScheduledExecutorServiceWrapper.of(
         Executors.newScheduledThreadPool(corePoolSize, threadFactory)));
     mPoolSize = corePoolSize;
     mThreadFactory = threadFactory;

@@ -31,7 +31,7 @@ import dm.jale.config.BuildConfig;
  * <p>
  * Created by davide-maestroni on 09/18/2014.
  */
-class LoopExecutor implements OwnerExecutor, Serializable {
+class LoopExecutor implements EvaluationExecutor, Serializable {
 
   private static final LoopExecutor sInstance = new LoopExecutor();
 

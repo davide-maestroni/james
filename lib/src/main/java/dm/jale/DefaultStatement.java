@@ -990,7 +990,7 @@ class DefaultStatement<V> implements Statement<V>, Serializable {
         public void run() {
           final Throwable failure = mFailure;
           if (failure != null) {
-            evaluation.fail(failure);
+            Asyncs.failSafe(evaluation, failure);
             return;
           }
 
@@ -1008,20 +1008,19 @@ class DefaultStatement<V> implements Statement<V>, Serializable {
     }
 
     @Override
-    void failure(@NotNull final Throwable throwable, @NotNull final Evaluation<V> evaluation) {
+    void failure(@NotNull final Throwable failure, @NotNull final Evaluation<V> evaluation) {
       mExecutor.execute(new Runnable() {
 
         public void run() {
-          final Throwable failure = mFailure;
-          if (failure != null) {
-            clearEvaluations(failure);
+          final DefaultStatement<V> statement = mStatement;
+          if (mFailure != null) {
+            statement.mLogger.wrn("Ignoring failure: %s", failure);
             return;
           }
 
           try {
             final Forker<S, V, Evaluation<V>, Statement<V>> forker = mForker;
-            final DefaultStatement<V> statement = mStatement;
-            final S stack = forker.failure(mStack, throwable, statement);
+            final S stack = forker.failure(mStack, failure, statement);
             mStack = forker.done(stack, statement);
 
           } catch (final Throwable t) {
@@ -1043,15 +1042,14 @@ class DefaultStatement<V> implements Statement<V>, Serializable {
       mExecutor.execute(new Runnable() {
 
         public void run() {
-          final Throwable failure = mFailure;
-          if (failure != null) {
-            clearEvaluations(failure);
+          final DefaultStatement<V> statement = mStatement;
+          if (mFailure != null) {
+            statement.mLogger.wrn("Ignoring value: %s", value);
             return;
           }
 
           try {
             final Forker<S, V, Evaluation<V>, Statement<V>> forker = mForker;
-            final DefaultStatement<V> statement = mStatement;
             final S stack = forker.value(mStack, value, statement);
             mStack = forker.done(stack, statement);
 
@@ -1117,8 +1115,12 @@ class DefaultStatement<V> implements Statement<V>, Serializable {
         public void run() {
           try {
             final DefaultStatement<V> statement = mStatement;
-            mStack = mForker.init(statement);
-            statement.chain(ForkObserver.this);
+            try {
+              mStack = mForker.init(statement);
+
+            } finally {
+              statement.chain(ForkObserver.this);
+            }
 
           } catch (final Throwable t) {
             mFailure = RuntimeInterruptedException.wrapIfInterrupt(t);

@@ -27,8 +27,8 @@ import dm.jale.async.Evaluation;
 import dm.jale.async.Statement;
 import dm.jale.async.StatementForker;
 import dm.jale.config.BuildConfig;
+import dm.jale.executor.EvaluationExecutor;
 import dm.jale.executor.ExecutorPool;
-import dm.jale.executor.OwnerExecutor;
 
 /**
  * Created by davide-maestroni on 02/12/2018.
@@ -46,7 +46,7 @@ class ExecutorStatementForker<V>
 
     private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
 
-    private final OwnerExecutor mExecutor;
+    private final EvaluationExecutor mExecutor;
 
     private InnerForker(@NotNull final Executor executor) {
       mExecutor = ExecutorPool.register(executor);

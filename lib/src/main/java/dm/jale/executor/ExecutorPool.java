@@ -170,7 +170,7 @@ public class ExecutorPool {
   @NotNull
   public static ScheduledExecutor newDynamicPoolExecutor(final int corePoolSize,
       final int maximumPoolSize, final long keepAliveTime, @NotNull final TimeUnit keepAliveUnit) {
-    return OwnerScheduledExecutorServiceWrapper.of(
+    return EvaluationScheduledExecutorServiceWrapper.of(
         new DynamicScheduledThreadPoolExecutorService(corePoolSize, maximumPoolSize, keepAliveTime,
             keepAliveUnit));
   }
@@ -199,7 +199,7 @@ public class ExecutorPool {
   public static ScheduledExecutor newDynamicPoolExecutor(final int corePoolSize,
       final int maximumPoolSize, final long keepAliveTime, @NotNull final TimeUnit keepAliveUnit,
       @NotNull final ThreadFactory threadFactory) {
-    return OwnerScheduledExecutorServiceWrapper.of(
+    return EvaluationScheduledExecutorServiceWrapper.of(
         new DynamicScheduledThreadPoolExecutorService(corePoolSize, maximumPoolSize, keepAliveTime,
             keepAliveUnit, threadFactory));
   }
@@ -251,12 +251,13 @@ public class ExecutorPool {
 
   @NotNull
   public static ScheduledExecutor register(@NotNull final ScheduledExecutor executor) {
+    // TODO: 17/02/2018 remove...
     return registerOwner(ConstantConditions.notNull("executor", executor));
   }
 
   @NotNull
-  public static OwnerExecutor register(@NotNull final Executor executor) {
-    return registerOwner(owner(executor));
+  public static EvaluationExecutor register(@NotNull final Executor executor) {
+    return registerOwner(asOwner(executor));
   }
 
   @NotNull
@@ -307,7 +308,7 @@ public class ExecutorPool {
 
   @NotNull
   public static Executor withPriority(final int priority, @NotNull final Executor executor) {
-    return PriorityExecutor.of(new ScheduledExecutorWrapper(owner(executor)), priority);
+    return PriorityExecutor.of(new ScheduledExecutorWrapper(asOwner(executor)), priority);
   }
 
   /**
@@ -331,45 +332,45 @@ public class ExecutorPool {
 
   @NotNull
   public static Executor withThrottling(final int maxExecutions, @NotNull final Executor executor) {
-    return ThrottlingExecutor.of(new ScheduledExecutorWrapper(owner(executor)), maxExecutions);
+    return ThrottlingExecutor.of(new ScheduledExecutorWrapper(asOwner(executor)), maxExecutions);
   }
 
   @NotNull
-  private static ScheduledExecutor optimizedExecutor(@NotNull final String threadName,
-      final int threadPriority) {
-    final int processors = Runtime.getRuntime().availableProcessors();
-    return OwnerScheduledExecutorServiceWrapper.ofUnstoppable(
-        new DynamicScheduledThreadPoolExecutorService(Math.max(2, processors >> 1),
-            Math.max(2, (processors << 1) - 1), 10L, TimeUnit.SECONDS,
-            new PriorityThreadFactory(threadName, threadPriority)));
-  }
-
-  @NotNull
-  private static OwnerExecutor owner(@NotNull final Executor executor) {
-    final OwnerExecutor managedExecutor;
-    if (executor instanceof OwnerExecutor) {
-      managedExecutor = (OwnerExecutor) executor;
+  private static EvaluationExecutor asOwner(@NotNull final Executor executor) {
+    final EvaluationExecutor managedExecutor;
+    if (executor instanceof EvaluationExecutor) {
+      managedExecutor = (EvaluationExecutor) executor;
 
     } else if (executor instanceof ThreadOwner) {
       managedExecutor = ThreadOwnerExecutor.of(executor);
 
     } else if (executor instanceof ScheduledExecutorService) {
       managedExecutor =
-          OwnerScheduledExecutorServiceWrapper.of((ScheduledExecutorService) executor);
+          EvaluationScheduledExecutorServiceWrapper.of((ScheduledExecutorService) executor);
 
     } else if (executor instanceof ExecutorService) {
-      managedExecutor = OwnerExecutorServiceWrapper.of(((ExecutorService) executor));
+      managedExecutor = EvaluationExecutorServiceWrapper.of(((ExecutorService) executor));
 
     } else {
-      managedExecutor = OwnerExecutorWrapper.of(executor);
+      managedExecutor = EvaluationExecutorWrapper.of(executor);
     }
 
     return managedExecutor;
   }
 
   @NotNull
-  private static <T extends OwnerExecutor> T registerOwner(@NotNull final T owner) {
-    OwnerExecutor decorated = owner;
+  private static ScheduledExecutor optimizedExecutor(@NotNull final String threadName,
+      final int threadPriority) {
+    final int processors = Runtime.getRuntime().availableProcessors();
+    return EvaluationScheduledExecutorServiceWrapper.ofUnstoppable(
+        new DynamicScheduledThreadPoolExecutorService(Math.max(2, processors >> 1),
+            Math.max(2, (processors << 1) - 1), 10L, TimeUnit.SECONDS,
+            new PriorityThreadFactory(threadName, threadPriority)));
+  }
+
+  @NotNull
+  private static <T extends EvaluationExecutor> T registerOwner(@NotNull final T owner) {
+    EvaluationExecutor decorated = owner;
     while (decorated instanceof ExecutorDecorator) {
       decorated = ((ExecutorDecorator) decorated).getDecorated();
     }
@@ -386,7 +387,7 @@ public class ExecutorPool {
     return owner;
   }
 
-  static class ThreadOwnerExecutor implements OwnerExecutor, Serializable {
+  static class ThreadOwnerExecutor implements EvaluationExecutor, Serializable {
 
     private static final WeakIdentityHashMap<Executor, ThreadOwnerExecutor> sOwners =
         new WeakIdentityHashMap<Executor, ThreadOwnerExecutor>();

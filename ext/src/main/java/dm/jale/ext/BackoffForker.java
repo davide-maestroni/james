@@ -31,7 +31,7 @@ import dm.jale.async.Loop;
 import dm.jale.async.LoopForker;
 import dm.jale.async.RuntimeInterruptedException;
 import dm.jale.executor.ExecutorPool;
-import dm.jale.executor.OwnerExecutor;
+import dm.jale.executor.EvaluationExecutor;
 import dm.jale.ext.BackoffForker.ForkerEvaluation;
 import dm.jale.ext.backoff.Backoffer;
 import dm.jale.ext.backoff.PendingEvaluation;
@@ -51,7 +51,7 @@ class BackoffForker<S, V> implements LoopForker<ForkerEvaluation<S, V>, V>, Seri
 
   private final Backoffer<S, V> mBackoffer;
 
-  private final OwnerExecutor mExecutor;
+  private final EvaluationExecutor mExecutor;
 
   BackoffForker(@NotNull final Executor executor, @NotNull final Backoffer<S, V> backoffer) {
     mExecutor = ExecutorPool.register(executor);
@@ -95,7 +95,7 @@ class BackoffForker<S, V> implements LoopForker<ForkerEvaluation<S, V>, V>, Seri
 
   static class ForkerEvaluation<S, V> implements PendingEvaluation<V> {
 
-    private final OwnerExecutor mExecutor;
+    private final EvaluationExecutor mExecutor;
 
     private final AtomicBoolean mIsSet = new AtomicBoolean(false);
 
@@ -109,7 +109,7 @@ class BackoffForker<S, V> implements LoopForker<ForkerEvaluation<S, V>, V>, Seri
 
     private S mStack;
 
-    private ForkerEvaluation(@NotNull final OwnerExecutor executor, final S stack) {
+    private ForkerEvaluation(@NotNull final EvaluationExecutor executor, final S stack) {
       mExecutor = executor;
       mStack = stack;
     }
@@ -305,7 +305,7 @@ class BackoffForker<S, V> implements LoopForker<ForkerEvaluation<S, V>, V>, Seri
     }
 
     private void checkOwner() {
-      final OwnerExecutor executor = mExecutor;
+      final EvaluationExecutor executor = mExecutor;
       if (executor.isOwnedThread()) {
         throw new IllegalStateException(
             "cannot wait on executor thread [" + Thread.currentThread() + " " + executor + "]");

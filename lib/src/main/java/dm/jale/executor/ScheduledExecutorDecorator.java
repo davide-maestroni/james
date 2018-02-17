@@ -50,7 +50,7 @@ class ScheduledExecutorDecorator implements ScheduledExecutor, ExecutorDecorator
   }
 
   @NotNull
-  public OwnerExecutor getDecorated() {
+  public EvaluationExecutor getDecorated() {
     return mExecutor;
   }
 

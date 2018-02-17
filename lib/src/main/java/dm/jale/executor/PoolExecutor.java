@@ -32,33 +32,33 @@ class PoolExecutor implements StoppableExecutor, Serializable {
 
   private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
 
-  private final OwnerExecutorServiceWrapper mExecutor;
+  private final EvaluationExecutorServiceWrapper mExecutor;
 
   private final int mNumThreads;
 
   private final ThreadFactory mThreadFactory;
 
   PoolExecutor() {
-    mExecutor = OwnerExecutorServiceWrapper.of(Executors.newCachedThreadPool());
+    mExecutor = EvaluationExecutorServiceWrapper.of(Executors.newCachedThreadPool());
     mNumThreads = Integer.MIN_VALUE;
     mThreadFactory = null;
   }
 
   PoolExecutor(final int nThreads) {
-    mExecutor = OwnerExecutorServiceWrapper.of(Executors.newFixedThreadPool(nThreads));
+    mExecutor = EvaluationExecutorServiceWrapper.of(Executors.newFixedThreadPool(nThreads));
     mNumThreads = nThreads;
     mThreadFactory = null;
   }
 
   PoolExecutor(@NotNull final ThreadFactory threadFactory) {
-    mExecutor = OwnerExecutorServiceWrapper.of(Executors.newCachedThreadPool(threadFactory));
+    mExecutor = EvaluationExecutorServiceWrapper.of(Executors.newCachedThreadPool(threadFactory));
     mNumThreads = Integer.MIN_VALUE;
     mThreadFactory = threadFactory;
   }
 
   PoolExecutor(final int nThreads, @NotNull final ThreadFactory threadFactory) {
     mExecutor =
-        OwnerExecutorServiceWrapper.of(Executors.newFixedThreadPool(nThreads, threadFactory));
+        EvaluationExecutorServiceWrapper.of(Executors.newFixedThreadPool(nThreads, threadFactory));
     mNumThreads = nThreads;
     mThreadFactory = threadFactory;
   }

@@ -32,10 +32,10 @@ import dm.jale.util.WeakIdentityHashMap;
  * <p>
  * Created by davide-maestroni on 10/14/2014.
  */
-class OwnerExecutorWrapper implements OwnerExecutor, Serializable {
+class EvaluationExecutorWrapper implements EvaluationExecutor, Serializable {
 
-  private static final WeakIdentityHashMap<Executor, OwnerExecutorWrapper> sOwners =
-      new WeakIdentityHashMap<Executor, OwnerExecutorWrapper>();
+  private static final WeakIdentityHashMap<Executor, EvaluationExecutorWrapper> sOwners =
+      new WeakIdentityHashMap<Executor, EvaluationExecutorWrapper>();
 
   private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
 
@@ -48,7 +48,7 @@ class OwnerExecutorWrapper implements OwnerExecutor, Serializable {
    *
    * @param executor the executor instance.
    */
-  private OwnerExecutorWrapper(@NotNull final Executor executor) {
+  private EvaluationExecutorWrapper(@NotNull final Executor executor) {
     mExecutor = ConstantConditions.notNull("executor", executor);
   }
 
@@ -59,12 +59,12 @@ class OwnerExecutorWrapper implements OwnerExecutor, Serializable {
    * @return the executor.
    */
   @NotNull
-  static OwnerExecutorWrapper of(@NotNull final Executor executor) {
-    OwnerExecutorWrapper ownerExecutor;
+  static EvaluationExecutorWrapper of(@NotNull final Executor executor) {
+    EvaluationExecutorWrapper ownerExecutor;
     synchronized (sOwners) {
       ownerExecutor = sOwners.get(executor);
       if (ownerExecutor == null) {
-        ownerExecutor = new OwnerExecutorWrapper(executor);
+        ownerExecutor = new EvaluationExecutorWrapper(executor);
         sOwners.put(executor, ownerExecutor);
       }
     }

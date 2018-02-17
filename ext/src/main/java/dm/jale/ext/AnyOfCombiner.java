@@ -18,6 +18,7 @@ package dm.jale.ext;
 
 import org.jetbrains.annotations.NotNull;
 
+import java.io.ObjectStreamException;
 import java.io.Serializable;
 import java.util.List;
 
@@ -82,5 +83,10 @@ class AnyOfCombiner<V> implements StatementCombiner<EvaluationState<V>, V, V>, S
     }
 
     return stack;
+  }
+
+  @NotNull
+  private Object readResolve() throws ObjectStreamException {
+    return sInstance;
   }
 }

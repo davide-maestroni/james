@@ -33,13 +33,14 @@ import dm.jale.util.WeakIdentityHashMap;
  * <p>
  * Created by davide-maestroni on 10/14/2014.
  */
-class OwnerScheduledExecutorServiceWrapper
-    implements OwnerExecutor, ScheduledExecutor, Serializable {
+class EvaluationScheduledExecutorServiceWrapper
+    implements EvaluationExecutor, ScheduledExecutor, Serializable {
 
   private static final WeakIdentityHashMap<ScheduledExecutorService,
-      OwnerScheduledExecutorServiceWrapper>
+      EvaluationScheduledExecutorServiceWrapper>
       sOwners =
-      new WeakIdentityHashMap<ScheduledExecutorService, OwnerScheduledExecutorServiceWrapper>();
+      new WeakIdentityHashMap<ScheduledExecutorService,
+          EvaluationScheduledExecutorServiceWrapper>();
 
   private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
 
@@ -52,7 +53,8 @@ class OwnerScheduledExecutorServiceWrapper
    *
    * @param service the executor service.
    */
-  private OwnerScheduledExecutorServiceWrapper(@NotNull final ScheduledExecutorService service) {
+  private EvaluationScheduledExecutorServiceWrapper(
+      @NotNull final ScheduledExecutorService service) {
     mService = ConstantConditions.notNull("service", service);
   }
 
@@ -63,12 +65,13 @@ class OwnerScheduledExecutorServiceWrapper
    * @return the executor.
    */
   @NotNull
-  static OwnerScheduledExecutorServiceWrapper of(@NotNull final ScheduledExecutorService service) {
-    OwnerScheduledExecutorServiceWrapper ownerExecutor;
+  static EvaluationScheduledExecutorServiceWrapper of(
+      @NotNull final ScheduledExecutorService service) {
+    EvaluationScheduledExecutorServiceWrapper ownerExecutor;
     synchronized (sOwners) {
       ownerExecutor = sOwners.get(service);
       if (ownerExecutor == null) {
-        ownerExecutor = new OwnerScheduledExecutorServiceWrapper(service);
+        ownerExecutor = new EvaluationScheduledExecutorServiceWrapper(service);
         sOwners.put(service, ownerExecutor);
       }
     }
@@ -85,7 +88,7 @@ class OwnerScheduledExecutorServiceWrapper
    * @return the executor.
    */
   @NotNull
-  static OwnerScheduledExecutorServiceWrapper ofUnstoppable(
+  static EvaluationScheduledExecutorServiceWrapper ofUnstoppable(
       @NotNull final ScheduledExecutorService service) {
     return new UnstoppableScheduledServiceExecutor(service);
   }
@@ -138,7 +141,7 @@ class OwnerScheduledExecutorServiceWrapper
    * executor is stopped.
    */
   private static class UnstoppableScheduledServiceExecutor
-      extends OwnerScheduledExecutorServiceWrapper {
+      extends EvaluationScheduledExecutorServiceWrapper {
 
     private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
 

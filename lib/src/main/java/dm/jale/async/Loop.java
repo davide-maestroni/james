@@ -171,6 +171,18 @@ public interface Loop<V> extends Statement<Iterable<V>>, Serializable {
   Loop<V> forkOnParallel(@NotNull Executor executor);
 
   @NotNull
+  Generator<EvaluationState<V>> generateStates();
+
+  @NotNull
+  Generator<EvaluationState<V>> generateStates(long timeout, @NotNull TimeUnit timeUnit);
+
+  @NotNull
+  Generator<V> generateValues();
+
+  @NotNull
+  Generator<V> generateValues(long timeout, @NotNull TimeUnit timeUnit);
+
+  @NotNull
   List<EvaluationState<V>> getStates(int maxCount);
 
   @NotNull
@@ -182,19 +194,7 @@ public interface Loop<V> extends Statement<Iterable<V>>, Serializable {
   @NotNull
   List<V> getValues(int maxCount, long timeout, @NotNull TimeUnit timeUnit);
 
-  @NotNull
-  AsyncGenerator<EvaluationState<V>> stateGenerator();
-
-  @NotNull
-  AsyncGenerator<EvaluationState<V>> stateGenerator(long timeout, @NotNull TimeUnit timeUnit);
-
   void to(@NotNull EvaluationCollection<? super V> evaluation);
-
-  @NotNull
-  AsyncGenerator<V> valueGenerator();
-
-  @NotNull
-  AsyncGenerator<V> valueGenerator(long timeout, @NotNull TimeUnit timeUnit);
 
   @NotNull
   <S, R> Loop<R> yield(@NotNull Yielder<S, ? super V, R> yielder);
@@ -215,13 +215,13 @@ public interface Loop<V> extends Statement<Iterable<V>>, Serializable {
       @Nullable Updater<S, ? super Throwable, ? super YieldOutputs<R>> failure,
       @Nullable Settler<S, ? super YieldOutputs<R>> done);
 
-  interface AsyncGenerator<V> extends Iterable<V> {
+  interface Generator<V> extends Iterable<V> {
 
     @NotNull
-    AsyncIterator<V> iterator();
+    GeneratorIterator<V> iterator();
   }
 
-  interface AsyncIterator<V> extends Iterator<V> {
+  interface GeneratorIterator<V> extends Iterator<V> {
 
     @NotNull
     List<V> next(int maxCount);

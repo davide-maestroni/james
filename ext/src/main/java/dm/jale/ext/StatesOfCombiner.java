@@ -18,6 +18,7 @@ package dm.jale.ext;
 
 import org.jetbrains.annotations.NotNull;
 
+import java.io.ObjectStreamException;
 import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.List;
@@ -77,5 +78,10 @@ class StatesOfCombiner<V>
       @NotNull final List<Statement<V>> asyncs, final int index) {
     stack.add(SimpleState.ofValue(value));
     return stack;
+  }
+
+  @NotNull
+  private Object readResolve() throws ObjectStreamException {
+    return sInstance;
   }
 }

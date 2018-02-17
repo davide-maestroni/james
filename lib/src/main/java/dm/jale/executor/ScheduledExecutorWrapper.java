@@ -31,9 +31,9 @@ class ScheduledExecutorWrapper implements ScheduledExecutor, ExecutorDecorator, 
 
   private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
 
-  private final OwnerExecutor mExecutor;
+  private final EvaluationExecutor mExecutor;
 
-  ScheduledExecutorWrapper(@NotNull final OwnerExecutor executor) {
+  ScheduledExecutorWrapper(@NotNull final EvaluationExecutor executor) {
     mExecutor = ConstantConditions.notNull("executor", executor);
   }
 
@@ -47,7 +47,7 @@ class ScheduledExecutorWrapper implements ScheduledExecutor, ExecutorDecorator, 
   }
 
   @NotNull
-  public OwnerExecutor getDecorated() {
+  public EvaluationExecutor getDecorated() {
     return mExecutor;
   }
 

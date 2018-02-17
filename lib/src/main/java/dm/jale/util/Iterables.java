@@ -17,6 +17,7 @@
 package dm.jale.util;
 
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 
 import java.lang.reflect.Array;
 import java.util.ArrayList;
@@ -296,7 +297,11 @@ public class Iterables {
   }
 
   @NotNull
-  public static String toString(@NotNull final Iterable<?> iterable) {
+  public static String toString(@Nullable final Iterable<?> iterable) {
+    if (iterable == null) {
+      return "null";
+    }
+
     final Iterator<?> iterator = iterable.iterator();
     if (iterator.hasNext()) {
       final StringBuilder builder = new StringBuilder();

@@ -36,7 +36,7 @@ import dm.jale.log.Logger;
  * <p>
  * Created by davide-maestroni on 05/13/2016.
  */
-class ImmediateExecutor implements OwnerExecutor, Serializable {
+class ImmediateExecutor implements EvaluationExecutor, Serializable {
 
   private static final ImmediateExecutor sInstance = new ImmediateExecutor();
 

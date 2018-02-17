@@ -51,7 +51,7 @@ import dm.jale.ext.io.Chunk;
  */
 public class AsyncExt extends Async {
 
-  // TODO: 16/02/2018 Combiners: concat(), switch(), first()
+  // TODO: 16/02/2018 Combiners: concat(), switchFrom(Loop), zip()
   // TODO: 16/02/2018 Yielders: delayFailures(), sum(), sumLong(), average(), averageLong(), min(),
   // TODO: 16/02/2018 - max(), distinct()
   // TODO: 16/02/2018 Forkers: retry(), repeat(), repeatAll(), repeatLast(), repeatFirst(),
@@ -203,6 +203,16 @@ public class AsyncExt extends Async {
   @Override
   public <V> Loop<V> values(@NotNull final Iterable<? extends V> values) {
     return mAsync.values(values);
+  }
+
+  @NotNull
+  public <V> Loop<V> first(@NotNull final Iterable<? extends Loop<? extends V>> loops) {
+    return loopOf(FirstCombiner.<V>instance(), loops);
+  }
+
+  @NotNull
+  public <V> Loop<V> firstOrEmpty(@NotNull final Iterable<? extends Loop<? extends V>> loops) {
+    return loopOf(FirstOrEmptyCombiner.<V>instance(), loops);
   }
 
   @NotNull
@@ -399,8 +409,24 @@ public class AsyncExt extends Async {
   }
 
   @NotNull
+  public <V> Loop<V> merge(@NotNull final Iterable<? extends Loop<? extends V>> loops) {
+    return loopOf(MergeCombiner.<V>instance(), loops);
+  }
+
+  @NotNull
   public <V> Statement<List<EvaluationState<V>>> statesOf(
       @NotNull final Iterable<? extends Statement<? extends V>> statements) {
     return statementOf(StatesOfCombiner.<V>instance(), statements);
+  }
+
+  @NotNull
+  public <V> Loop<V> switchBetween(@NotNull final Iterable<? extends Loop<? extends V>> loops) {
+    return loopOf(SwitchCombiner.<V>instance(), loops);
+  }
+
+  @NotNull
+  public <V> Loop<V> switchBetween(@NotNull final Loop<? extends Integer> indexes,
+      @NotNull final Iterable<? extends Loop<? extends V>> loops) {
+    return null;
   }
 }

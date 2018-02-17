@@ -33,8 +33,8 @@ import dm.jale.async.FailureException;
 import dm.jale.async.Loop;
 import dm.jale.async.LoopForker;
 import dm.jale.config.BuildConfig;
+import dm.jale.executor.EvaluationExecutor;
 import dm.jale.executor.ExecutorPool;
-import dm.jale.executor.OwnerExecutor;
 import dm.jale.log.Logger;
 
 /**
@@ -61,7 +61,7 @@ class ExecutorLoopForker<V> extends BufferedForker<Stack<V>, V, EvaluationCollec
 
     private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
 
-    private final OwnerExecutor mExecutor;
+    private final EvaluationExecutor mExecutor;
 
     private final Logger mLogger;
 
@@ -172,8 +172,7 @@ class ExecutorLoopForker<V> extends BufferedForker<Stack<V>, V, EvaluationCollec
         final EvaluationCollection<V> evaluation = stack.evaluation;
         try {
           if (stack.failure != null) {
-            mLogger.wrn("Ignoring values");
-            evaluation.set();
+            mLogger.wrn("Ignoring evaluation");
             return;
           }
 

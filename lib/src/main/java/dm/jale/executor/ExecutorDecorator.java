@@ -24,5 +24,5 @@ import org.jetbrains.annotations.NotNull;
 interface ExecutorDecorator {
 
   @NotNull
-  OwnerExecutor getDecorated();
+  EvaluationExecutor getDecorated();
 }

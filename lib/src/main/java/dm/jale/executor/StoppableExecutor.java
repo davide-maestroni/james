@@ -19,7 +19,7 @@ package dm.jale.executor;
 /**
  * Created by davide-maestroni on 02/07/2018.
  */
-public interface StoppableExecutor extends OwnerExecutor {
+public interface StoppableExecutor extends EvaluationExecutor {
 
   /**
    * Stops the executor.
