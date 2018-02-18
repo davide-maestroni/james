@@ -101,7 +101,7 @@ class ExecutorLoopBatchForker<V>
       }
     }
 
-    public Stack<V> done(final Stack<V> stack, @NotNull final Loop<V> async) {
+    public Stack<V> done(final Stack<V> stack, @NotNull final Loop<V> context) {
       checkFailed(stack);
       mExecutor.execute(new ForkerRunnable(stack) {
 
@@ -112,7 +112,7 @@ class ExecutorLoopBatchForker<V>
     }
 
     public Stack<V> evaluation(final Stack<V> stack,
-        @NotNull final EvaluationCollection<V> evaluation, @NotNull final Loop<V> async) {
+        @NotNull final EvaluationCollection<V> evaluation, @NotNull final Loop<V> context) {
       checkFailed(stack);
       if (stack.evaluation == null) {
         stack.evaluation = evaluation;
@@ -125,7 +125,7 @@ class ExecutorLoopBatchForker<V>
     }
 
     public Stack<V> failure(final Stack<V> stack, @NotNull final Throwable failure,
-        @NotNull final Loop<V> async) {
+        @NotNull final Loop<V> context) {
       checkFailed(stack);
       final AtomicLong pendingCount = stack.pendingCount;
       final ArrayList<V> values = stack.values;
@@ -152,12 +152,12 @@ class ExecutorLoopBatchForker<V>
       return stack;
     }
 
-    public Stack<V> init(@NotNull final Loop<V> async) throws Exception {
+    public Stack<V> init(@NotNull final Loop<V> context) throws Exception {
       return new Stack<V>();
     }
 
-    public Stack<V> value(final Stack<V> stack, final V value, @NotNull final Loop<V> async) throws
-        Exception {
+    public Stack<V> value(final Stack<V> stack, final V value,
+        @NotNull final Loop<V> context) throws Exception {
       checkFailed(stack);
       final AtomicLong pendingCount = stack.pendingCount;
       final ArrayList<Throwable> failures = stack.failures;

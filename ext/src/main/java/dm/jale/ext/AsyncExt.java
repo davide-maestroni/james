@@ -22,6 +22,7 @@ import org.jetbrains.annotations.Nullable;
 import java.io.InputStream;
 import java.nio.ByteBuffer;
 import java.nio.channels.ReadableByteChannel;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.Executor;
 
@@ -45,17 +46,19 @@ import dm.jale.ext.backoff.Backoffer;
 import dm.jale.ext.backoff.PendingEvaluation;
 import dm.jale.ext.io.AllocationType;
 import dm.jale.ext.io.Chunk;
+import dm.jale.util.Iterables;
 
 /**
  * Created by davide-maestroni on 02/15/2018.
  */
 public class AsyncExt extends Async {
 
-  // TODO: 16/02/2018 Combiners: concat(), switchFrom(Loop), zip()
+  // TODO: 16/02/2018 Combiners: concat(), switchLast(int, Loop),
+  // TODO: 17/02/2018 - switchFirst(int, Loop), switchNewerThan(int, Loop), zip()
   // TODO: 16/02/2018 Yielders: delayFailures(), sum(), sumLong(), average(), averageLong(), min(),
   // TODO: 16/02/2018 - max(), distinct()
-  // TODO: 16/02/2018 Forkers: retry(), repeat(), repeatAll(), repeatLast(), repeatFirst(),
-  // TODO: 16/02/2018 - repeatNewerThan()
+  // TODO: 16/02/2018 Forkers: retry(), retryAll(), repeat(), repeatAll(), repeatLast(),
+  // TODO: 16/02/2018 - repeatFirst(), repeatNewerThan(), refreshAfter(), refreshAllAfter()
 
   private final Async mAsync;
 
@@ -420,13 +423,25 @@ public class AsyncExt extends Async {
   }
 
   @NotNull
+  public <V> Loop<V> switchAll(@NotNull final Loop<? extends Integer> indexes,
+      @NotNull final Iterable<? extends Loop<? extends V>> loops) {
+    final ArrayList<Loop<?>> allLoops = new ArrayList<Loop<?>>();
+    allLoops.add(indexes);
+    Iterables.addAll((Iterable<? extends Loop<?>>) loops, allLoops);
+    return loopOf(SwitchAllCombiner.<V>instance(), allLoops);
+  }
+
+  @NotNull
   public <V> Loop<V> switchBetween(@NotNull final Iterable<? extends Loop<? extends V>> loops) {
     return loopOf(SwitchCombiner.<V>instance(), loops);
   }
 
   @NotNull
-  public <V> Loop<V> switchBetween(@NotNull final Loop<? extends Integer> indexes,
+  public <V> Loop<V> switchWhen(@NotNull final Loop<? extends Integer> indexes,
       @NotNull final Iterable<? extends Loop<? extends V>> loops) {
-    return null;
+    final ArrayList<Loop<?>> allLoops = new ArrayList<Loop<?>>();
+    allLoops.add(indexes);
+    Iterables.addAll((Iterable<? extends Loop<?>>) loops, allLoops);
+    return loopOf(SwitchWhenCombiner.<V>instance(), allLoops);
   }
 }

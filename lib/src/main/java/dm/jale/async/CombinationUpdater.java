@@ -23,8 +23,8 @@ import java.util.List;
 /**
  * Created by davide-maestroni on 02/14/2018.
  */
-public interface CombinationUpdater<S, V, R, A> {
+public interface CombinationUpdater<S, V, R, C> {
 
-  S update(S stack, V value, @NotNull R evaluation, @NotNull List<A> asyncs, int index) throws
+  S update(S stack, V value, @NotNull R evaluation, @NotNull List<C> contexts, int index) throws
       Exception;
 }

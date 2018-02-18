@@ -22,7 +22,6 @@ import org.jetbrains.annotations.Nullable;
 import java.io.InvalidObjectException;
 import java.io.ObjectStreamException;
 import java.io.Serializable;
-import java.util.Arrays;
 
 import dm.jale.async.EvaluationCollection;
 import dm.jale.async.Observer;
@@ -45,10 +44,7 @@ class ElseDoLoopHandler<V> extends AsyncLoopHandler<V, V> implements Serializabl
   ElseDoLoopHandler(@NotNull final Observer<? super Throwable> observer,
       @NotNull final Class<?>[] exceptionTypes) {
     mObserver = ConstantConditions.notNull("observer", observer);
-    mTypes = ConstantConditions.notNull("exception types", exceptionTypes);
-    if (Arrays.asList(mTypes).contains(null)) {
-      throw new NullPointerException("exception type array contains null values");
-    }
+    mTypes = ConstantConditions.notNullElements("exception types", exceptionTypes);
   }
 
   @Override

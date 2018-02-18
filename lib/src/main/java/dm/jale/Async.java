@@ -35,13 +35,11 @@ import dm.jale.async.EvaluationCollection;
 import dm.jale.async.Loop;
 import dm.jale.async.Mapper;
 import dm.jale.async.Observer;
-import dm.jale.async.RuntimeInterruptedException;
 import dm.jale.async.Statement;
 import dm.jale.async.Statement.Forker;
 import dm.jale.async.Updater;
 import dm.jale.config.BuildConfig;
 import dm.jale.util.ConstantConditions;
-import dm.jale.util.Iterables;
 import dm.jale.util.SerializableProxy;
 import dm.jale.util.Threads;
 
@@ -68,8 +66,8 @@ public class Async {
   }
 
   @NotNull
-  public static <S, V, R, A> Forker<?, V, R, A> buffered(@NotNull final Forker<S, V, R, A> forker) {
-    return new BufferedForker<S, V, R, A>(forker);
+  public static <S, V, R, C> Forker<?, V, R, C> buffered(@NotNull final Forker<S, V, R, C> forker) {
+    return new BufferedForker<S, V, R, C>(forker);
   }
 
   @NotNull
@@ -260,11 +258,8 @@ public class Async {
     private final Iterable<? extends Throwable> mFailures;
 
     private FailuresObserver(@Nullable final Iterable<? extends Throwable> failures) {
-      if ((failures != null) && Iterables.contains(failures, null)) {
-        throw new NullPointerException("failures cannot contain null objects");
-      }
-
-      mFailures = failures;
+      mFailures =
+          (failures != null) ? ConstantConditions.notNullElements("failures", failures) : null;
     }
 
     public void accept(final EvaluationCollection<V> evaluation) {
@@ -345,10 +340,11 @@ public class Async {
             }
 
             try {
-              evaluation.addFailure(RuntimeInterruptedException.wrapIfInterrupt(t)).set();
+              evaluation.addFailure(t).set();
 
             } catch (final Throwable ignored) {
               // cannot take any action
+              // TODO: 17/02/2018 log?
             }
           }
         }
@@ -494,7 +490,7 @@ public class Async {
             }
 
             try {
-              evaluation.fail(RuntimeInterruptedException.wrapIfInterrupt(t));
+              evaluation.fail(t);
 
             } catch (final Throwable ignored) {
               // cannot take any action

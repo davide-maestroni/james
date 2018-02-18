@@ -35,14 +35,6 @@ public class RuntimeInterruptedException extends FailureException {
     Thread.currentThread().interrupt();
   }
 
-  public static Throwable wrapIfInterrupt(final Throwable t) {
-    if (t instanceof InterruptedException) {
-      return new RuntimeInterruptedException((InterruptedException) t);
-    }
-
-    return t;
-  }
-
   @NotNull
   @SuppressWarnings("unchecked")
   public InterruptedException toInterruptedException() {

@@ -33,7 +33,6 @@ import dm.jale.async.FailureException;
 import dm.jale.async.Loop;
 import dm.jale.async.Loop.YieldOutputs;
 import dm.jale.async.Loop.Yielder;
-import dm.jale.async.RuntimeInterruptedException;
 import dm.jale.async.Statement;
 import dm.jale.config.BuildConfig;
 import dm.jale.log.Logger;
@@ -353,7 +352,7 @@ class YieldLoopHandler<S, V, R> extends AsyncLoopHandler<V, R> implements Serial
       } catch (final Throwable t) {
         mLogger.err(t, "Error while completing loop");
         mFailure = t;
-        failSafe(evaluation, RuntimeInterruptedException.wrapIfInterrupt(t));
+        failSafe(evaluation, t);
       }
     }
 

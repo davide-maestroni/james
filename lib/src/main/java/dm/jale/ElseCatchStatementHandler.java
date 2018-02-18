@@ -21,7 +21,6 @@ import org.jetbrains.annotations.NotNull;
 import java.io.InvalidObjectException;
 import java.io.ObjectStreamException;
 import java.io.Serializable;
-import java.util.Arrays;
 
 import dm.jale.async.Evaluation;
 import dm.jale.async.Mapper;
@@ -43,10 +42,7 @@ class ElseCatchStatementHandler<V> extends AsyncStatementHandler<V, V> implement
   ElseCatchStatementHandler(@NotNull final Mapper<? super Throwable, ? extends V> mapper,
       @NotNull final Class<?>[] exceptionTypes) {
     mMapper = ConstantConditions.notNull("mapper", mapper);
-    mTypes = ConstantConditions.notNull("exception types", exceptionTypes);
-    if (Arrays.asList(mTypes).contains(null)) {
-      throw new NullPointerException("exception type array contains null values");
-    }
+    mTypes = ConstantConditions.notNullElements("exception types", exceptionTypes);
   }
 
   @Override

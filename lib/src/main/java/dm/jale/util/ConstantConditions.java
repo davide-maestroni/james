@@ -19,6 +19,8 @@ package dm.jale.util;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
+import java.util.Collection;
+
 /**
  * Utility class for verifying constant conditions.
  * <p>
@@ -122,6 +124,49 @@ public class ConstantConditions {
     }
 
     return object;
+  }
+
+  @NotNull
+  public static <E> E[] notNullElements(final E[] array) {
+    return notNullElements("objects", array);
+  }
+
+  @NotNull
+  public static <E> E[] notNullElements(final String name, final E[] array) {
+    ConstantConditions.notNull(name, array);
+    for (final E element : array) {
+      if (element == null) {
+        throw new NullPointerException("the " + name + " array must not contain null elements");
+      }
+    }
+
+    return array;
+  }
+
+  @NotNull
+  public static <T extends Iterable> T notNullElements(final T collection) {
+    return notNullElements("objects", collection);
+  }
+
+  @NotNull
+  public static <T extends Iterable> T notNullElements(final String name, final T collection) {
+    ConstantConditions.notNull(name, collection);
+    if (collection instanceof Collection) {
+      if (((Collection<?>) collection).contains(null)) {
+        throw new NullPointerException(
+            "the " + name + " collection must not contain null elements");
+      }
+
+    } else {
+      for (final Object element : collection) {
+        if (element == null) {
+          throw new NullPointerException(
+              "the " + name + " collection must not contain null elements");
+        }
+      }
+    }
+
+    return collection;
   }
 
   /**

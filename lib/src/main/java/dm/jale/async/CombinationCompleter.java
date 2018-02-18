@@ -23,7 +23,7 @@ import java.util.List;
 /**
  * Created by davide-maestroni on 02/14/2018.
  */
-public interface CombinationCompleter<S, R, A> {
+public interface CombinationCompleter<S, R, C> {
 
-  S complete(S stack, @NotNull R evaluation, @NotNull List<A> asyncs, int index) throws Exception;
+  S complete(S stack, @NotNull R evaluation, @NotNull List<C> contexts, int index) throws Exception;
 }

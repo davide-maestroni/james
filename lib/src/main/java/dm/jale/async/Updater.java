@@ -19,7 +19,7 @@ package dm.jale.async;
 /**
  * Created by davide-maestroni on 02/07/2018.
  */
-public interface Updater<S, I, T> {
+public interface Updater<S, I, C> {
 
-  S update(S stack, I input, T state) throws Exception;
+  S update(S stack, I input, C context) throws Exception;
 }

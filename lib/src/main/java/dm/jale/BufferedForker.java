@@ -33,48 +33,48 @@ import dm.jale.util.SerializableProxy;
 /**
  * Created by davide-maestroni on 02/13/2018.
  */
-class BufferedForker<S, V, R, A> implements Forker<ForkerStack<S, V, R, A>, V, R, A>, Serializable {
+class BufferedForker<S, V, R, C> implements Forker<ForkerStack<S, V, R, C>, V, R, C>, Serializable {
 
   private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
 
-  private final Forker<S, ? super V, ? super R, ? super A> mForker;
+  private final Forker<S, ? super V, ? super R, ? super C> mForker;
 
-  BufferedForker(@NotNull final Forker<S, ? super V, ? super R, ? super A> forker) {
+  BufferedForker(@NotNull final Forker<S, ? super V, ? super R, ? super C> forker) {
     mForker = ConstantConditions.notNull("forker", forker);
   }
 
-  public ForkerStack<S, V, R, A> done(final ForkerStack<S, V, R, A> stack,
-      @NotNull final A async) throws Exception {
-    return stack.settle(async);
+  public ForkerStack<S, V, R, C> done(final ForkerStack<S, V, R, C> stack,
+      @NotNull final C context) throws Exception {
+    return stack.settle(context);
   }
 
-  public ForkerStack<S, V, R, A> evaluation(final ForkerStack<S, V, R, A> stack,
-      @NotNull final R evaluation, @NotNull final A async) throws Exception {
-    return stack.addEvaluations(evaluation, async);
+  public ForkerStack<S, V, R, C> evaluation(final ForkerStack<S, V, R, C> stack,
+      @NotNull final R evaluation, @NotNull final C context) throws Exception {
+    return stack.addEvaluations(evaluation, context);
   }
 
-  public ForkerStack<S, V, R, A> failure(final ForkerStack<S, V, R, A> stack,
-      @NotNull final Throwable failure, @NotNull final A async) throws Exception {
-    return stack.addFailure(failure, async);
+  public ForkerStack<S, V, R, C> failure(final ForkerStack<S, V, R, C> stack,
+      @NotNull final Throwable failure, @NotNull final C context) throws Exception {
+    return stack.addFailure(failure, context);
   }
 
-  public ForkerStack<S, V, R, A> init(@NotNull final A async) throws Exception {
-    return new ForkerStack<S, V, R, A>(mForker, async);
+  public ForkerStack<S, V, R, C> init(@NotNull final C context) throws Exception {
+    return new ForkerStack<S, V, R, C>(mForker, context);
   }
 
-  public ForkerStack<S, V, R, A> value(final ForkerStack<S, V, R, A> stack, final V value,
-      @NotNull final A async) throws Exception {
-    return stack.addValue(value, async);
+  public ForkerStack<S, V, R, C> value(final ForkerStack<S, V, R, C> stack, final V value,
+      @NotNull final C context) throws Exception {
+    return stack.addValue(value, context);
   }
 
   @NotNull
   private Object writeReplace() throws ObjectStreamException {
-    return new ForkerProxy<S, V, R, A>(mForker);
+    return new ForkerProxy<S, V, R, C>(mForker);
   }
 
-  static class ForkerStack<S, V, R, A> {
+  static class ForkerStack<S, V, R, C> {
 
-    private final Forker<S, ? super V, ? super R, ? super A> mForker;
+    private final Forker<S, ? super V, ? super R, ? super C> mForker;
 
     private final ArrayList<SimpleState<V>> mStates = new ArrayList<SimpleState<V>>();
 
@@ -82,15 +82,15 @@ class BufferedForker<S, V, R, A> implements Forker<ForkerStack<S, V, R, A>, V, R
 
     private S mStack;
 
-    private ForkerStack(@NotNull final Forker<S, ? super V, ? super R, ? super A> forker,
-        @NotNull final A async) throws Exception {
+    private ForkerStack(@NotNull final Forker<S, ? super V, ? super R, ? super C> forker,
+        @NotNull final C async) throws Exception {
       mForker = forker;
       mStack = forker.init(async);
     }
 
     @NotNull
-    private ForkerStack<S, V, R, A> addEvaluations(@NotNull final R evaluation,
-        @NotNull final A async) throws Exception {
+    private ForkerStack<S, V, R, C> addEvaluations(@NotNull final R evaluation,
+        @NotNull final C async) throws Exception {
       final boolean isFirst = !mHasEvaluation;
       mHasEvaluation = true;
       if (isFirst) {
@@ -118,8 +118,8 @@ class BufferedForker<S, V, R, A> implements Forker<ForkerStack<S, V, R, A>, V, R
     }
 
     @NotNull
-    private ForkerStack<S, V, R, A> addFailure(@NotNull final Throwable failure,
-        @NotNull final A async) throws Exception {
+    private ForkerStack<S, V, R, C> addFailure(@NotNull final Throwable failure,
+        @NotNull final C async) throws Exception {
       if (mHasEvaluation) {
         mStack = mForker.failure(mStack, failure, async);
 
@@ -131,7 +131,7 @@ class BufferedForker<S, V, R, A> implements Forker<ForkerStack<S, V, R, A>, V, R
     }
 
     @NotNull
-    private ForkerStack<S, V, R, A> addValue(final V value, @NotNull final A async) throws
+    private ForkerStack<S, V, R, C> addValue(final V value, @NotNull final C async) throws
         Exception {
       if (mHasEvaluation) {
         mStack = mForker.value(mStack, value, async);
@@ -144,7 +144,7 @@ class BufferedForker<S, V, R, A> implements Forker<ForkerStack<S, V, R, A>, V, R
     }
 
     @NotNull
-    private ForkerStack<S, V, R, A> settle(@NotNull final A async) throws Exception {
+    private ForkerStack<S, V, R, C> settle(@NotNull final C async) throws Exception {
       if (mHasEvaluation) {
         mStack = mForker.done(mStack, async);
 
@@ -156,11 +156,11 @@ class BufferedForker<S, V, R, A> implements Forker<ForkerStack<S, V, R, A>, V, R
     }
   }
 
-  private static class ForkerProxy<S, V, R, A> extends SerializableProxy {
+  private static class ForkerProxy<S, V, R, C> extends SerializableProxy {
 
     private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
 
-    private ForkerProxy(final Forker<S, ? super V, ? super R, ? super A> forker) {
+    private ForkerProxy(final Forker<S, ? super V, ? super R, ? super C> forker) {
       super(proxy(forker));
     }
 
@@ -169,7 +169,7 @@ class BufferedForker<S, V, R, A> implements Forker<ForkerStack<S, V, R, A>, V, R
     private Object readResolve() throws ObjectStreamException {
       try {
         final Object[] args = deserializeArgs();
-        return new BufferedForker<S, V, R, A>((Forker<S, ? super V, ? super R, ? super A>) args[0]);
+        return new BufferedForker<S, V, R, C>((Forker<S, ? super V, ? super R, ? super C>) args[0]);
 
       } catch (final Throwable t) {
         throw new InvalidObjectException(t.getMessage());

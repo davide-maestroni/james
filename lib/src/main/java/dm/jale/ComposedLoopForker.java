@@ -65,26 +65,26 @@ class ComposedLoopForker<S, V> implements LoopForker<S, V>, Serializable {
         (evaluation != null) ? evaluation : DefaultEvaluationUpdater.sInstance);
   }
 
-  public S done(final S stack, @NotNull final Loop<V> async) throws Exception {
-    return mDone.complete(stack, async);
+  public S done(final S stack, @NotNull final Loop<V> context) throws Exception {
+    return mDone.complete(stack, context);
   }
 
   public S evaluation(final S stack, @NotNull final EvaluationCollection<V> evaluation,
-      @NotNull final Loop<V> async) throws Exception {
-    return mEvaluation.update(stack, evaluation, async);
+      @NotNull final Loop<V> context) throws Exception {
+    return mEvaluation.update(stack, evaluation, context);
   }
 
   public S failure(final S stack, @NotNull final Throwable failure,
-      @NotNull final Loop<V> async) throws Exception {
-    return mFailure.update(stack, failure, async);
+      @NotNull final Loop<V> context) throws Exception {
+    return mFailure.update(stack, failure, context);
   }
 
-  public S init(@NotNull final Loop<V> async) throws Exception {
-    return mInit.apply(async);
+  public S init(@NotNull final Loop<V> context) throws Exception {
+    return mInit.apply(context);
   }
 
-  public S value(final S stack, final V value, @NotNull final Loop<V> async) throws Exception {
-    return mValue.update(stack, value, async);
+  public S value(final S stack, final V value, @NotNull final Loop<V> context) throws Exception {
+    return mValue.update(stack, value, context);
   }
 
   @NotNull

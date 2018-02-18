@@ -35,8 +35,14 @@ public abstract class SimpleState<V> implements EvaluationState<V>, Serializable
 
   @NotNull
   @SuppressWarnings("unchecked")
-  public static <V> SimpleState<V> canceled() {
-    return (SimpleState<V>) CanceledState.sInstance;
+  public static <V> SimpleState<V> cancelled() {
+    return new FailureState<V>(new CancellationException("cancelled state"));
+  }
+
+  @NotNull
+  @SuppressWarnings("unchecked")
+  public static <V> SimpleState<V> evaluating() {
+    return (SimpleState<V>) EvaluatingState.sInstance;
   }
 
   @NotNull
@@ -51,31 +57,25 @@ public abstract class SimpleState<V> implements EvaluationState<V>, Serializable
 
   @NotNull
   @SuppressWarnings("unchecked")
-  public static <V> SimpleState<V> pending() {
-    return (SimpleState<V>) PendingState.sInstance;
-  }
-
-  @NotNull
-  @SuppressWarnings("unchecked")
   public static <V> SimpleState<V> settled() {
     return (SimpleState<V>) SettledState.sInstance;
   }
 
   public abstract void addTo(@NotNull EvaluationCollection<? super V> evaluation);
 
-  private static class CanceledState<V> extends SimpleState<V> {
+  private static class EvaluatingState<V> extends SimpleState<V> {
 
-    private static final CanceledState<?> sInstance = new CanceledState<Object>();
+    private static final EvaluatingState<?> sInstance = new EvaluatingState<Object>();
 
     private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
 
     public void addTo(@NotNull final EvaluationCollection<? super V> evaluation) {
-      evaluation.addFailure(new CancellationException());
+      ConstantConditions.unsupported();
     }
 
     @NotNull
     public Throwable failure() {
-      throw new IllegalStateException();
+      throw new IllegalStateException("invalid state: Evaluating");
     }
 
     @NotNull
@@ -84,7 +84,7 @@ public abstract class SimpleState<V> implements EvaluationState<V>, Serializable
     }
 
     public boolean isCancelled() {
-      return true;
+      return false;
     }
 
     public boolean isFailed() {
@@ -100,11 +100,11 @@ public abstract class SimpleState<V> implements EvaluationState<V>, Serializable
     }
 
     public void to(@NotNull final Evaluation<? super V> evaluation) {
-      evaluation.fail(new CancellationException());
+      ConstantConditions.unsupported();
     }
 
     public V value() {
-      throw new IllegalStateException();
+      throw new IllegalStateException("invalid state: Evaluating");
     }
   }
 
@@ -148,52 +148,7 @@ public abstract class SimpleState<V> implements EvaluationState<V>, Serializable
     }
 
     public V value() {
-      throw new IllegalStateException();
-    }
-  }
-
-  private static class PendingState<V> extends SimpleState<V> {
-
-    private static final PendingState<?> sInstance = new PendingState<Object>();
-
-    private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
-
-    @NotNull
-    private Object readResolve() throws ObjectStreamException {
-      return sInstance;
-    }
-
-    public void addTo(@NotNull final EvaluationCollection<? super V> evaluation) {
-      ConstantConditions.unsupported();
-    }
-
-    @NotNull
-    public Throwable failure() {
-      throw new IllegalStateException();
-    }
-
-    public boolean isCancelled() {
-      return false;
-    }
-
-    public boolean isFailed() {
-      return false;
-    }
-
-    public boolean isEvaluating() {
-      return true;
-    }
-
-    public boolean isSet() {
-      return false;
-    }
-
-    public void to(@NotNull final Evaluation<? super V> evaluation) {
-      ConstantConditions.unsupported();
-    }
-
-    public V value() {
-      throw new IllegalStateException();
+      throw new IllegalStateException("invalid state: Failed");
     }
   }
 
@@ -214,7 +169,7 @@ public abstract class SimpleState<V> implements EvaluationState<V>, Serializable
 
     @NotNull
     public Throwable failure() {
-      throw new IllegalStateException();
+      throw new IllegalStateException("invalid state: Settled");
     }
 
     public boolean isCancelled() {
@@ -238,7 +193,7 @@ public abstract class SimpleState<V> implements EvaluationState<V>, Serializable
     }
 
     public V value() {
-      throw new IllegalStateException();
+      throw new IllegalStateException("invalid state: Settled");
     }
   }
 
@@ -258,7 +213,7 @@ public abstract class SimpleState<V> implements EvaluationState<V>, Serializable
 
     @NotNull
     public Throwable failure() {
-      throw new IllegalStateException();
+      throw new IllegalStateException("invalid state: Set");
     }
 
     public boolean isCancelled() {

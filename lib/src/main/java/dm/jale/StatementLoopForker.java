@@ -53,19 +53,19 @@ class StatementLoopForker<S, V>
             .notNull("forker", forker);
   }
 
-  public ForkerStack<S, V> done(final ForkerStack<S, V> stack, @NotNull final Loop<V> async) throws
-      Exception {
+  public ForkerStack<S, V> done(final ForkerStack<S, V> stack,
+      @NotNull final Loop<V> context) throws Exception {
     final Forker<S, Iterable<V>, Evaluation<Iterable<V>>, Statement<Iterable<V>>> forker = mForker;
     final List<V> values = stack.getValues();
     if (values != null) {
-      stack.setStack(forker.value(stack.getStack(), stack.getValues(), async));
+      stack.setStack(forker.value(stack.getStack(), stack.getValues(), context));
     }
 
-    return stack.withStack(forker.done(stack.getStack(), async));
+    return stack.withStack(forker.done(stack.getStack(), context));
   }
 
   public ForkerStack<S, V> evaluation(final ForkerStack<S, V> stack,
-      @NotNull final EvaluationCollection<V> evaluation, @NotNull final Loop<V> async) throws
+      @NotNull final EvaluationCollection<V> evaluation, @NotNull final Loop<V> context) throws
       Exception {
     return stack.withStack(mForker.evaluation(stack.getStack(), new Evaluation<Iterable<V>>() {
 
@@ -76,24 +76,24 @@ class StatementLoopForker<S, V>
       public void set(final Iterable<V> value) {
         evaluation.addValues(value).set();
       }
-    }, async));
+    }, context));
   }
 
   public ForkerStack<S, V> failure(final ForkerStack<S, V> stack, @NotNull final Throwable failure,
-      @NotNull final Loop<V> async) throws Exception {
+      @NotNull final Loop<V> context) throws Exception {
     if (stack.getValues() == null) {
       return stack;
     }
 
-    return stack.withStack(mForker.failure(stack.getStack(), failure, async)).withValues(null);
+    return stack.withStack(mForker.failure(stack.getStack(), failure, context)).withValues(null);
   }
 
-  public ForkerStack<S, V> init(@NotNull final Loop<V> async) throws Exception {
-    return new ForkerStack<S, V>().withStack(mForker.init(async)).withValues(new ArrayList<V>());
+  public ForkerStack<S, V> init(@NotNull final Loop<V> context) throws Exception {
+    return new ForkerStack<S, V>().withStack(mForker.init(context)).withValues(new ArrayList<V>());
   }
 
   public ForkerStack<S, V> value(final ForkerStack<S, V> stack, final V value,
-      @NotNull final Loop<V> async) throws Exception {
+      @NotNull final Loop<V> context) throws Exception {
     final List<V> values = stack.getValues();
     if (values != null) {
       values.add(value);

@@ -19,7 +19,7 @@ package dm.jale.async;
 /**
  * Created by davide-maestroni on 02/07/2018.
  */
-public interface Settler<S, T> {
+public interface Settler<S, C> {
 
-  void complete(S stack, T state) throws Exception;
+  void complete(S stack, C context) throws Exception;
 }

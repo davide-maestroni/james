@@ -30,7 +30,6 @@ import dm.jale.async.Combiner;
 import dm.jale.async.Evaluation;
 import dm.jale.async.FailureException;
 import dm.jale.async.Observer;
-import dm.jale.async.RuntimeInterruptedException;
 import dm.jale.async.Statement;
 import dm.jale.config.BuildConfig;
 import dm.jale.log.Logger;
@@ -60,8 +59,10 @@ class CombinationStatementObserver<S, V, R> implements Observer<Evaluation<R>>, 
       @NotNull final Combiner<S, ? super V, ? super Evaluation<R>, Statement<V>> combiner,
       @NotNull final Iterable<? extends Statement<? extends V>> statements,
       @NotNull final String loggerName) {
+    final List<? extends Statement<? extends V>> statementList =
+        Iterables.toList(ConstantConditions.notNullElements("statements", statements));
     mCombiner = ConstantConditions.notNull("combiner", combiner);
-    mStatementList = Collections.unmodifiableList(Iterables.toList(statements));
+    mStatementList = Collections.unmodifiableList(statementList);
     mExecutor = withThrottling(1, immediateExecutor());
     mLogger = Logger.newLogger(this, loggerName);
   }
@@ -91,7 +92,7 @@ class CombinationStatementObserver<S, V, R> implements Observer<Evaluation<R>>, 
     } catch (final Throwable t) {
       mLogger.err(t, "Error while initializing statements combination");
       state.setFailed(t);
-      Asyncs.failSafe(evaluation, RuntimeInterruptedException.wrapIfInterrupt(t));
+      Asyncs.failSafe(evaluation, t);
     }
   }
 
@@ -161,7 +162,7 @@ class CombinationStatementObserver<S, V, R> implements Observer<Evaluation<R>>, 
           } catch (final Throwable t) {
             mLogger.err(t, "Error while processing failure: %s", failure);
             state.setFailed(t);
-            Asyncs.failSafe(evaluation, RuntimeInterruptedException.wrapIfInterrupt(t));
+            Asyncs.failSafe(evaluation, t);
           }
         }
       });
@@ -198,7 +199,7 @@ class CombinationStatementObserver<S, V, R> implements Observer<Evaluation<R>>, 
           } catch (final Throwable t) {
             mLogger.err(t, "Error while processing value: %s", value);
             state.setFailed(t);
-            Asyncs.failSafe(evaluation, RuntimeInterruptedException.wrapIfInterrupt(t));
+            Asyncs.failSafe(evaluation, t);
           }
         }
       });

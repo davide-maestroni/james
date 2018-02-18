@@ -47,12 +47,12 @@ class AllOfCombiner<V> implements StatementCombiner<List<V>, V, List<V>>, Serial
   }
 
   public List<V> done(final List<V> stack, @NotNull final Evaluation<List<V>> evaluation,
-      @NotNull final List<Statement<V>> asyncs, final int index) {
+      @NotNull final List<Statement<V>> contexts, final int index) {
     return stack;
   }
 
   public List<V> failure(final List<V> stack, final Throwable failure,
-      @NotNull final Evaluation<List<V>> evaluation, @NotNull final List<Statement<V>> asyncs,
+      @NotNull final Evaluation<List<V>> evaluation, @NotNull final List<Statement<V>> contexts,
       final int index) {
     if (stack != null) {
       evaluation.fail(failure);
@@ -61,19 +61,19 @@ class AllOfCombiner<V> implements StatementCombiner<List<V>, V, List<V>>, Serial
     return null;
   }
 
-  public List<V> init(@NotNull final List<Statement<V>> asyncs) {
+  public List<V> init(@NotNull final List<Statement<V>> contexts) {
     return new ArrayList<V>();
   }
 
   public void settle(final List<V> stack, @NotNull final Evaluation<List<V>> evaluation,
-      @NotNull final List<Statement<V>> asyncs) {
+      @NotNull final List<Statement<V>> contexts) {
     if (stack != null) {
       evaluation.set(stack);
     }
   }
 
   public List<V> value(final List<V> stack, final V value,
-      @NotNull final Evaluation<List<V>> evaluation, @NotNull final List<Statement<V>> asyncs,
+      @NotNull final Evaluation<List<V>> evaluation, @NotNull final List<Statement<V>> contexts,
       final int index) {
     if (stack != null) {
       stack.add(value);

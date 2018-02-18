@@ -22,7 +22,6 @@ import java.io.InvalidObjectException;
 import java.io.ObjectStreamException;
 import java.io.Serializable;
 import java.util.ArrayList;
-import java.util.Arrays;
 
 import dm.jale.async.Loop.YieldOutputs;
 import dm.jale.async.Mapper;
@@ -46,10 +45,7 @@ class ElseIfYielder<V> extends CollectionYielder<V> implements Serializable {
       @NotNull final Mapper<? super Throwable, ? extends Statement<? extends Iterable<V>>> mapper,
       @NotNull final Class<?>[] exceptionTypes) {
     mMapper = ConstantConditions.notNull("mapper", mapper);
-    mTypes = ConstantConditions.notNull("exception types", exceptionTypes);
-    if (Arrays.asList(mTypes).contains(null)) {
-      throw new NullPointerException("exception type array contains null values");
-    }
+    mTypes = ConstantConditions.notNullElements("exception types", exceptionTypes);
   }
 
   @Override

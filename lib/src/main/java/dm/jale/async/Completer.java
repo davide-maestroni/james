@@ -19,7 +19,7 @@ package dm.jale.async;
 /**
  * Created by davide-maestroni on 02/07/2018.
  */
-public interface Completer<S, T> {
+public interface Completer<S, C> {
 
-  S complete(S stack, T state) throws Exception;
+  S complete(S stack, C context) throws Exception;
 }

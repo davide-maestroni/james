@@ -71,6 +71,6 @@ class ToEvaluationLoopHandler<V> extends AsyncLoopHandler<V, Void> implements Se
 
   @NotNull
   private Object writeReplace() throws ObjectStreamException {
-    throw new NotSerializableException();
+    throw new NotSerializableException("this object is not serializable");
   }
 }

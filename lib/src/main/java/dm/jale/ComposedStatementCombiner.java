@@ -77,27 +77,27 @@ class ComposedStatementCombiner<S, V, R>
   }
 
   public S done(final S stack, @NotNull final Evaluation<R> evaluation,
-      @NotNull final List<Statement<V>> asyncs, final int index) throws Exception {
-    return mDone.complete(stack, evaluation, asyncs, index);
+      @NotNull final List<Statement<V>> contexts, final int index) throws Exception {
+    return mDone.complete(stack, evaluation, contexts, index);
   }
 
   public S failure(final S stack, final Throwable failure, @NotNull final Evaluation<R> evaluation,
-      @NotNull final List<Statement<V>> asyncs, final int index) throws Exception {
-    return mFailure.update(stack, failure, evaluation, asyncs, index);
+      @NotNull final List<Statement<V>> contexts, final int index) throws Exception {
+    return mFailure.update(stack, failure, evaluation, contexts, index);
   }
 
-  public S init(@NotNull final List<Statement<V>> asyncs) throws Exception {
-    return mInit.apply(asyncs);
+  public S init(@NotNull final List<Statement<V>> contexts) throws Exception {
+    return mInit.apply(contexts);
   }
 
   public void settle(final S stack, @NotNull final Evaluation<R> evaluation,
-      @NotNull final List<Statement<V>> asyncs) throws Exception {
-    mSettle.settle(stack, evaluation, asyncs);
+      @NotNull final List<Statement<V>> contexts) throws Exception {
+    mSettle.settle(stack, evaluation, contexts);
   }
 
   public S value(final S stack, final V value, @NotNull final Evaluation<R> evaluation,
-      @NotNull final List<Statement<V>> asyncs, final int index) throws Exception {
-    return mValue.update(stack, value, evaluation, asyncs, index);
+      @NotNull final List<Statement<V>> contexts, final int index) throws Exception {
+    return mValue.update(stack, value, evaluation, contexts, index);
   }
 
   @NotNull

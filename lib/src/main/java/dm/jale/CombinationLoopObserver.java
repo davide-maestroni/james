@@ -32,7 +32,6 @@ import dm.jale.async.EvaluationCollection;
 import dm.jale.async.FailureException;
 import dm.jale.async.Loop;
 import dm.jale.async.Observer;
-import dm.jale.async.RuntimeInterruptedException;
 import dm.jale.config.BuildConfig;
 import dm.jale.log.Logger;
 import dm.jale.util.ConstantConditions;
@@ -61,8 +60,10 @@ class CombinationLoopObserver<S, V, R> implements Observer<EvaluationCollection<
       @NotNull final Combiner<S, ? super V, ? super EvaluationCollection<R>, Loop<V>> combiner,
       @NotNull final Iterable<? extends Loop<? extends V>> loops,
       @NotNull final String loggerName) {
+    final List<? extends Loop<? extends V>> loopList =
+        Iterables.toList(ConstantConditions.notNullElements("loops", loops));
     mCombiner = ConstantConditions.notNull("combiner", combiner);
-    mLoopList = Collections.unmodifiableList(Iterables.toList(loops));
+    mLoopList = Collections.unmodifiableList(loopList);
     mExecutor = withThrottling(1, immediateExecutor());
     mLogger = Logger.newLogger(this, loggerName);
   }
@@ -91,7 +92,7 @@ class CombinationLoopObserver<S, V, R> implements Observer<EvaluationCollection<
     } catch (final Throwable t) {
       mLogger.err(t, "Error while initializing statements combination");
       state.setFailed(t);
-      Asyncs.failSafe(evaluation, RuntimeInterruptedException.wrapIfInterrupt(t));
+      Asyncs.failSafe(evaluation, t);
     }
   }
 
@@ -155,7 +156,7 @@ class CombinationLoopObserver<S, V, R> implements Observer<EvaluationCollection<
           } catch (final Throwable t) {
             mLogger.err(t, "Error while processing failure: %s", failure);
             state.setFailed(t);
-            Asyncs.failSafe(evaluation, RuntimeInterruptedException.wrapIfInterrupt(t));
+            Asyncs.failSafe(evaluation, t);
           }
         }
       });
@@ -196,7 +197,7 @@ class CombinationLoopObserver<S, V, R> implements Observer<EvaluationCollection<
             } catch (final Throwable t) {
               mLogger.err(t, "Error while processing failures: %s", failures);
               state.setFailed(t);
-              Asyncs.failSafe(evaluation, RuntimeInterruptedException.wrapIfInterrupt(t));
+              Asyncs.failSafe(evaluation, t);
             }
           }
         }
@@ -229,7 +230,7 @@ class CombinationLoopObserver<S, V, R> implements Observer<EvaluationCollection<
           } catch (final Throwable t) {
             mLogger.err(t, "Error while processing value: %s", value);
             state.setFailed(t);
-            Asyncs.failSafe(evaluation, RuntimeInterruptedException.wrapIfInterrupt(t));
+            Asyncs.failSafe(evaluation, t);
           }
         }
       });
@@ -269,7 +270,7 @@ class CombinationLoopObserver<S, V, R> implements Observer<EvaluationCollection<
             } catch (final Throwable t) {
               mLogger.err(t, "Error while processing values: %s", values);
               state.setFailed(t);
-              Asyncs.failSafe(evaluation, RuntimeInterruptedException.wrapIfInterrupt(t));
+              Asyncs.failSafe(evaluation, t);
             }
           }
         }
@@ -307,7 +308,7 @@ class CombinationLoopObserver<S, V, R> implements Observer<EvaluationCollection<
           } catch (final Throwable t) {
             mLogger.err(t, "Error while completing loop");
             state.setFailed(t);
-            Asyncs.failSafe(evaluation, RuntimeInterruptedException.wrapIfInterrupt(t));
+            Asyncs.failSafe(evaluation, t);
           }
         }
       });

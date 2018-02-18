@@ -46,12 +46,12 @@ class SwitchCombiner<V> implements LoopCombiner<Boolean[], V, V>, Serializable {
   }
 
   public Boolean[] done(final Boolean[] stack, @NotNull final EvaluationCollection<V> evaluation,
-      @NotNull final List<Loop<V>> asyncs, final int index) {
+      @NotNull final List<Loop<V>> contexts, final int index) {
     return stack;
   }
 
   public Boolean[] failure(final Boolean[] stack, final Throwable failure,
-      @NotNull final EvaluationCollection<V> evaluation, @NotNull final List<Loop<V>> asyncs,
+      @NotNull final EvaluationCollection<V> evaluation, @NotNull final List<Loop<V>> contexts,
       final int index) {
     changeOwnership(stack, index);
     if (stack[index]) {
@@ -61,17 +61,17 @@ class SwitchCombiner<V> implements LoopCombiner<Boolean[], V, V>, Serializable {
     return stack;
   }
 
-  public Boolean[] init(@NotNull final List<Loop<V>> asyncs) {
-    return new Boolean[asyncs.size()];
+  public Boolean[] init(@NotNull final List<Loop<V>> contexts) {
+    return new Boolean[contexts.size()];
   }
 
   public void settle(final Boolean[] stack, @NotNull final EvaluationCollection<V> evaluation,
-      @NotNull final List<Loop<V>> asyncs) {
+      @NotNull final List<Loop<V>> contexts) {
     evaluation.set();
   }
 
   public Boolean[] value(final Boolean[] stack, final V value,
-      @NotNull final EvaluationCollection<V> evaluation, @NotNull final List<Loop<V>> asyncs,
+      @NotNull final EvaluationCollection<V> evaluation, @NotNull final List<Loop<V>> contexts,
       final int index) {
     changeOwnership(stack, index);
     if (stack[index]) {

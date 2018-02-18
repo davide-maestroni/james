@@ -63,13 +63,13 @@ public class AsyncTest {
                    new Forker<ForkStack<String>, String, Evaluation<String>, Statement<String>>() {
 
                      public ForkStack<String> done(final ForkStack<String> stack,
-                         @NotNull final Statement<String> async) {
+                         @NotNull final Statement<String> context) {
                        return stack;
                      }
 
                      public ForkStack<String> evaluation(final ForkStack<String> stack,
                          @NotNull final Evaluation<String> evaluation,
-                         @NotNull final Statement<String> async) {
+                         @NotNull final Statement<String> context) {
                        final EvaluationState<String> state = stack.state;
                        if (state == null) {
                          stack.evaluation.add(evaluation);
@@ -82,7 +82,7 @@ public class AsyncTest {
 
                        } else {
                          if (stack.forked == null) {
-                           stack.forked = async.evaluate().fork(this);
+                           stack.forked = context.evaluate().fork(this);
                          }
 
                          stack.forked.to(evaluation);
@@ -92,7 +92,8 @@ public class AsyncTest {
                      }
 
                      public ForkStack<String> failure(final ForkStack<String> stack,
-                         @NotNull final Throwable failure, @NotNull final Statement<String> async) {
+                         @NotNull final Throwable failure,
+                         @NotNull final Statement<String> context) {
                        stack.state = SimpleState.ofFailure(failure);
                        for (final Evaluation<String> evaluation : stack.evaluation) {
                          evaluation.fail(failure);
@@ -102,12 +103,12 @@ public class AsyncTest {
                        return stack;
                      }
 
-                     public ForkStack<String> init(@NotNull final Statement<String> async) {
+                     public ForkStack<String> init(@NotNull final Statement<String> context) {
                        return new ForkStack<String>();
                      }
 
                      public ForkStack<String> value(final ForkStack<String> stack,
-                         final String value, @NotNull final Statement<String> async) {
+                         final String value, @NotNull final Statement<String> context) {
                        stack.timestamp = System.currentTimeMillis();
                        stack.state = SimpleState.ofValue(value);
                        for (final Evaluation<String> evaluation : stack.evaluation) {

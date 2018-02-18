@@ -30,8 +30,8 @@ import dm.jale.async.EvaluationCollection;
 import dm.jale.async.Loop;
 import dm.jale.async.LoopForker;
 import dm.jale.async.RuntimeInterruptedException;
-import dm.jale.executor.ExecutorPool;
 import dm.jale.executor.EvaluationExecutor;
+import dm.jale.executor.ExecutorPool;
 import dm.jale.ext.BackoffForker.ForkerEvaluation;
 import dm.jale.ext.backoff.Backoffer;
 import dm.jale.ext.backoff.PendingEvaluation;
@@ -59,13 +59,13 @@ class BackoffForker<S, V> implements LoopForker<ForkerEvaluation<S, V>, V>, Seri
   }
 
   public ForkerEvaluation<S, V> done(final ForkerEvaluation<S, V> stack,
-      @NotNull final Loop<V> async) throws Exception {
+      @NotNull final Loop<V> context) throws Exception {
     mBackoffer.done(stack.getStack(), stack);
     return stack.withStack(null);
   }
 
   public ForkerEvaluation<S, V> evaluation(final ForkerEvaluation<S, V> stack,
-      @NotNull final EvaluationCollection<V> evaluation, @NotNull final Loop<V> async) throws
+      @NotNull final EvaluationCollection<V> evaluation, @NotNull final Loop<V> context) throws
       Exception {
     if (!stack.setEvaluations(evaluation)) {
       evaluation.addFailure(new IllegalStateException("the loop cannot be chained")).set();
@@ -75,16 +75,16 @@ class BackoffForker<S, V> implements LoopForker<ForkerEvaluation<S, V>, V>, Seri
   }
 
   public ForkerEvaluation<S, V> failure(final ForkerEvaluation<S, V> stack,
-      @NotNull final Throwable failure, @NotNull final Loop<V> async) throws Exception {
+      @NotNull final Throwable failure, @NotNull final Loop<V> context) throws Exception {
     return stack.withStack(mBackoffer.failure(stack.getStack(), failure, stack));
   }
 
-  public ForkerEvaluation<S, V> init(@NotNull final Loop<V> async) throws Exception {
+  public ForkerEvaluation<S, V> init(@NotNull final Loop<V> context) throws Exception {
     return new ForkerEvaluation<S, V>(mExecutor, mBackoffer.init());
   }
 
   public ForkerEvaluation<S, V> value(final ForkerEvaluation<S, V> stack, final V value,
-      @NotNull final Loop<V> async) throws Exception {
+      @NotNull final Loop<V> context) throws Exception {
     return stack.withStack(mBackoffer.value(stack.getStack(), value, stack));
   }
 
@@ -146,10 +146,7 @@ class BackoffForker<S, V> implements LoopForker<ForkerEvaluation<S, V>, V>, Seri
         return this;
       }
 
-      if (Iterables.contains(failures, null)) {
-        throw new NullPointerException("failures cannot contain null objects");
-      }
-
+      ConstantConditions.notNullElements("failures", failures);
       final EvaluationCollection<V> evaluation = mEvaluation;
       final int size = Iterables.size(failures);
       synchronized (mMutex) {

@@ -541,7 +541,9 @@ public class ExecutorPool {
 
     private PriorityThreadFactory(@NotNull final String name, final int priority) {
       if ((priority < Thread.MIN_PRIORITY) || (priority > Thread.MAX_PRIORITY)) {
-        throw new IllegalArgumentException();
+        throw new IllegalArgumentException(
+            "priority level must be in the range [" + Thread.MIN_PRIORITY + ", "
+                + Thread.MAX_PRIORITY + "]");
       }
 
       mName = name;

@@ -23,17 +23,17 @@ import java.util.List;
 /**
  * Created by davide-maestroni on 02/14/2018.
  */
-public interface Combiner<S, V, R, A> {
+public interface Combiner<S, V, R, C> {
 
-  S done(S stack, @NotNull R evaluation, @NotNull List<A> asyncs, int index) throws Exception;
+  S done(S stack, @NotNull R evaluation, @NotNull List<C> contexts, int index) throws Exception;
 
-  S failure(S stack, Throwable failure, @NotNull R evaluation, @NotNull List<A> asyncs,
+  S failure(S stack, Throwable failure, @NotNull R evaluation, @NotNull List<C> contexts,
       int index) throws Exception;
 
-  S init(@NotNull List<A> asyncs) throws Exception;
+  S init(@NotNull List<C> contexts) throws Exception;
 
-  void settle(S stack, @NotNull R evaluation, @NotNull List<A> asyncs) throws Exception;
+  void settle(S stack, @NotNull R evaluation, @NotNull List<C> contexts) throws Exception;
 
-  S value(S stack, V value, @NotNull R evaluation, @NotNull List<A> asyncs, int index) throws
+  S value(S stack, V value, @NotNull R evaluation, @NotNull List<C> contexts, int index) throws
       Exception;
 }

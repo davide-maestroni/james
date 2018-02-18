@@ -108,7 +108,7 @@ class DefaultStatement<V> implements Statement<V>, Serializable {
       observer.accept(head);
 
     } catch (final Throwable t) {
-      head.failSafe(RuntimeInterruptedException.wrapIfInterrupt(t));
+      head.failSafe(t);
     }
   }
 
@@ -130,7 +130,7 @@ class DefaultStatement<V> implements Statement<V>, Serializable {
       observer.accept(head);
 
     } catch (final Throwable t) {
-      head.failSafe(RuntimeInterruptedException.wrapIfInterrupt(t));
+      head.failSafe(t);
     }
   }
 
@@ -157,7 +157,7 @@ class DefaultStatement<V> implements Statement<V>, Serializable {
       observer.accept(head);
 
     } catch (final Throwable t) {
-      head.failSafe(RuntimeInterruptedException.wrapIfInterrupt(t));
+      head.failSafe(t);
     }
   }
 
@@ -194,7 +194,7 @@ class DefaultStatement<V> implements Statement<V>, Serializable {
       observer.accept(head);
 
     } catch (final Throwable t) {
-      head.failSafe(RuntimeInterruptedException.wrapIfInterrupt(t));
+      head.failSafe(t);
     }
   }
 
@@ -216,7 +216,7 @@ class DefaultStatement<V> implements Statement<V>, Serializable {
     }
 
     StatementChain<?, ?> chain = mHead;
-    final CancellationException exception = new CancellationException();
+    final CancellationException exception = new CancellationException("statement is cancelled");
     if (mayInterruptIfRunning && (observer instanceof InterruptibleObserver)) {
       if (chain.cancel(exception)) {
         ((InterruptibleObserver<?>) observer).interrupt();
@@ -760,7 +760,7 @@ class DefaultStatement<V> implements Statement<V>, Serializable {
 
       } catch (final Throwable t) {
         getLogger().err(t, "Error while processing failure with reason: %s", failure);
-        next.failSafe(RuntimeInterruptedException.wrapIfInterrupt(t));
+        next.failSafe(t);
       }
     }
 
@@ -775,7 +775,7 @@ class DefaultStatement<V> implements Statement<V>, Serializable {
 
       } catch (final Throwable t) {
         getLogger().err(t, "Error while processing value: %s", value);
-        next.failSafe(RuntimeInterruptedException.wrapIfInterrupt(t));
+        next.failSafe(t);
       }
     }
   }
@@ -999,9 +999,8 @@ class DefaultStatement<V> implements Statement<V>, Serializable {
             mStack = mForker.evaluation(mStack, evaluation, mStatement);
 
           } catch (final Throwable t) {
-            final Throwable throwable = RuntimeInterruptedException.wrapIfInterrupt(t);
-            mFailure = throwable;
-            clearEvaluations(throwable);
+            mFailure = t;
+            clearEvaluations(t);
           }
         }
       });
@@ -1024,9 +1023,8 @@ class DefaultStatement<V> implements Statement<V>, Serializable {
             mStack = forker.done(stack, statement);
 
           } catch (final Throwable t) {
-            final Throwable throwable = RuntimeInterruptedException.wrapIfInterrupt(t);
-            mFailure = throwable;
-            clearEvaluations(throwable);
+            mFailure = t;
+            clearEvaluations(t);
           }
         }
       });
@@ -1054,9 +1052,8 @@ class DefaultStatement<V> implements Statement<V>, Serializable {
             mStack = forker.done(stack, statement);
 
           } catch (final Throwable t) {
-            final Throwable throwable = RuntimeInterruptedException.wrapIfInterrupt(t);
-            mFailure = throwable;
-            clearEvaluations(throwable);
+            mFailure = t;
+            clearEvaluations(t);
           }
         }
       });
@@ -1123,7 +1120,7 @@ class DefaultStatement<V> implements Statement<V>, Serializable {
             }
 
           } catch (final Throwable t) {
-            mFailure = RuntimeInterruptedException.wrapIfInterrupt(t);
+            mFailure = t;
           }
         }
       });

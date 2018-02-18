@@ -138,7 +138,7 @@ class DefaultLoop<V> implements Loop<V>, Serializable {
       observer.accept(head);
 
     } catch (final Throwable t) {
-      head.failSafe(RuntimeInterruptedException.wrapIfInterrupt(t));
+      head.failSafe(t);
     }
   }
 
@@ -160,7 +160,7 @@ class DefaultLoop<V> implements Loop<V>, Serializable {
       observer.accept(head);
 
     } catch (final Throwable t) {
-      head.failSafe(RuntimeInterruptedException.wrapIfInterrupt(t));
+      head.failSafe(t);
     }
   }
 
@@ -187,7 +187,7 @@ class DefaultLoop<V> implements Loop<V>, Serializable {
       observer.accept(head);
 
     } catch (final Throwable t) {
-      head.failSafe(RuntimeInterruptedException.wrapIfInterrupt(t));
+      head.failSafe(t);
     }
   }
 
@@ -209,7 +209,7 @@ class DefaultLoop<V> implements Loop<V>, Serializable {
         observer.accept(head);
 
       } catch (final Throwable t) {
-        head.failSafe(RuntimeInterruptedException.wrapIfInterrupt(t));
+        head.failSafe(t);
       }
     }
   }
@@ -285,7 +285,7 @@ class DefaultLoop<V> implements Loop<V>, Serializable {
     }
 
     LoopChain<?, ?> chain = mHead;
-    final CancellationException exception = new CancellationException();
+    final CancellationException exception = new CancellationException("loop is cancelled");
     if (mayInterruptIfRunning && (observer instanceof InterruptibleObserver)) {
       if (chain.cancel(exception)) {
         ((InterruptibleObserver<?>) observer).interrupt();
@@ -1403,7 +1403,7 @@ class DefaultLoop<V> implements Loop<V>, Serializable {
 
       } catch (final Throwable t) {
         getLogger().err(t, "Error while processing failure with reason: %s", failure);
-        innerFailSafe(next, RuntimeInterruptedException.wrapIfInterrupt(t));
+        innerFailSafe(next, t);
       }
     }
 
@@ -1419,7 +1419,7 @@ class DefaultLoop<V> implements Loop<V>, Serializable {
 
       } catch (final Throwable t) {
         getLogger().err(t, "Error while processing value: %s", value);
-        innerFailSafe(next, RuntimeInterruptedException.wrapIfInterrupt(t));
+        innerFailSafe(next, t);
       }
     }
 
@@ -1435,7 +1435,7 @@ class DefaultLoop<V> implements Loop<V>, Serializable {
 
       } catch (final Throwable t) {
         getLogger().err(t, "Error while processing values: %s", Iterables.toString(values));
-        innerFailSafe(next, RuntimeInterruptedException.wrapIfInterrupt(t));
+        innerFailSafe(next, t);
       }
     }
 
@@ -1458,7 +1458,7 @@ class DefaultLoop<V> implements Loop<V>, Serializable {
 
       } catch (final Throwable t) {
         getLogger().err(t, "Error while processing value: %s", Iterables.toString(failures));
-        innerFailSafe(next, RuntimeInterruptedException.wrapIfInterrupt(t));
+        innerFailSafe(next, t);
       }
     }
 
@@ -1473,7 +1473,7 @@ class DefaultLoop<V> implements Loop<V>, Serializable {
 
       } catch (final Throwable t) {
         getLogger().err(t, "Error while completing loop");
-        innerFailSafe(next, RuntimeInterruptedException.wrapIfInterrupt(t));
+        innerFailSafe(next, t);
       }
     }
   }
@@ -1632,7 +1632,7 @@ class DefaultLoop<V> implements Loop<V>, Serializable {
 
       } catch (final Throwable t) {
         getLogger().err(t, "Error while processing failure with reason: %s", failure);
-        innerFailSafe(next, RuntimeInterruptedException.wrapIfInterrupt(t));
+        innerFailSafe(next, t);
       }
     }
 
@@ -1648,7 +1648,7 @@ class DefaultLoop<V> implements Loop<V>, Serializable {
 
       } catch (final Throwable t) {
         getLogger().err(t, "Error while processing value: %s", value);
-        innerFailSafe(next, RuntimeInterruptedException.wrapIfInterrupt(t));
+        innerFailSafe(next, t);
       }
     }
 
@@ -1664,7 +1664,7 @@ class DefaultLoop<V> implements Loop<V>, Serializable {
 
       } catch (final Throwable t) {
         getLogger().err(t, "Error while processing values: %s", Iterables.toString(values));
-        innerFailSafe(next, RuntimeInterruptedException.wrapIfInterrupt(t));
+        innerFailSafe(next, t);
       }
     }
 
@@ -1687,7 +1687,7 @@ class DefaultLoop<V> implements Loop<V>, Serializable {
 
       } catch (final Throwable t) {
         getLogger().err(t, "Error while processing failures: %s", Iterables.toString(failures));
-        innerFailSafe(next, RuntimeInterruptedException.wrapIfInterrupt(t));
+        innerFailSafe(next, t);
       }
     }
 
@@ -1702,7 +1702,7 @@ class DefaultLoop<V> implements Loop<V>, Serializable {
 
       } catch (final Throwable t) {
         getLogger().err(t, "Error while completing loop");
-        innerFailSafe(next, RuntimeInterruptedException.wrapIfInterrupt(t));
+        innerFailSafe(next, t);
       }
     }
   }
@@ -1795,7 +1795,7 @@ class DefaultLoop<V> implements Loop<V>, Serializable {
 
       } catch (final Throwable t) {
         getLogger().err(t, "Error while processing failure with reason: %s", failure);
-        innerFailSafe(next, RuntimeInterruptedException.wrapIfInterrupt(t));
+        innerFailSafe(next, t);
       }
     }
 
@@ -1811,7 +1811,7 @@ class DefaultLoop<V> implements Loop<V>, Serializable {
 
       } catch (final Throwable t) {
         getLogger().err(t, "Error while processing value: %s", value);
-        innerFailSafe(next, RuntimeInterruptedException.wrapIfInterrupt(t));
+        innerFailSafe(next, t);
       }
     }
 
@@ -1830,7 +1830,7 @@ class DefaultLoop<V> implements Loop<V>, Serializable {
 
         } catch (final Throwable t) {
           getLogger().err(t, "Error while processing value: %s", value);
-          innerFailSafe(next, RuntimeInterruptedException.wrapIfInterrupt(t));
+          innerFailSafe(next, t);
           break;
         }
       }
@@ -1858,7 +1858,7 @@ class DefaultLoop<V> implements Loop<V>, Serializable {
 
         } catch (final Throwable t) {
           getLogger().err(t, "Error while processing failure with reason: %s", failure);
-          innerFailSafe(next, RuntimeInterruptedException.wrapIfInterrupt(t));
+          innerFailSafe(next, t);
           break;
         }
       }
@@ -1988,7 +1988,7 @@ class DefaultLoop<V> implements Loop<V>, Serializable {
 
       } catch (final Throwable t) {
         getLogger().err(t, "Error while processing failure with reason: %s", failure);
-        innerFailSafe(next, RuntimeInterruptedException.wrapIfInterrupt(t));
+        innerFailSafe(next, t);
       }
     }
 
@@ -2004,7 +2004,7 @@ class DefaultLoop<V> implements Loop<V>, Serializable {
 
       } catch (final Throwable t) {
         getLogger().err(t, "Error while processing value: %s", value);
-        innerFailSafe(next, RuntimeInterruptedException.wrapIfInterrupt(t));
+        innerFailSafe(next, t);
       }
     }
 
@@ -2022,7 +2022,7 @@ class DefaultLoop<V> implements Loop<V>, Serializable {
 
         } catch (final Throwable t) {
           getLogger().err(t, "Error while processing value: %s", value);
-          innerFailSafe(next, RuntimeInterruptedException.wrapIfInterrupt(t));
+          innerFailSafe(next, t);
           break;
         }
       }
@@ -2049,7 +2049,7 @@ class DefaultLoop<V> implements Loop<V>, Serializable {
 
         } catch (final Throwable t) {
           getLogger().err(t, "Error while processing value: %s", failure);
-          innerFailSafe(next, RuntimeInterruptedException.wrapIfInterrupt(t));
+          innerFailSafe(next, t);
           break;
         }
       }
@@ -2168,7 +2168,7 @@ class DefaultLoop<V> implements Loop<V>, Serializable {
 
       } catch (final Throwable t) {
         getLogger().err(t, "Error while processing failure with reason: %s", failure);
-        innerFailSafe(next, RuntimeInterruptedException.wrapIfInterrupt(t));
+        innerFailSafe(next, t);
       }
     }
 
@@ -2184,7 +2184,7 @@ class DefaultLoop<V> implements Loop<V>, Serializable {
 
       } catch (final Throwable t) {
         getLogger().err(t, "Error while processing value: %s", value);
-        innerFailSafe(next, RuntimeInterruptedException.wrapIfInterrupt(t));
+        innerFailSafe(next, t);
       }
     }
 
@@ -2203,7 +2203,7 @@ class DefaultLoop<V> implements Loop<V>, Serializable {
 
         } catch (final Throwable t) {
           getLogger().err(t, "Error while processing value: %s", value);
-          innerFailSafe(next, RuntimeInterruptedException.wrapIfInterrupt(t));
+          innerFailSafe(next, t);
           break;
         }
       }
@@ -2231,7 +2231,7 @@ class DefaultLoop<V> implements Loop<V>, Serializable {
 
         } catch (final Throwable t) {
           getLogger().err(t, "Error while processing failure with reason: %s", failure);
-          innerFailSafe(next, RuntimeInterruptedException.wrapIfInterrupt(t));
+          innerFailSafe(next, t);
           break;
         }
       }
@@ -2398,7 +2398,7 @@ class DefaultLoop<V> implements Loop<V>, Serializable {
 
       } catch (final Throwable t) {
         getLogger().err(t, "Error while processing failure with reason: %s", failure);
-        innerFailSafe(next, RuntimeInterruptedException.wrapIfInterrupt(t));
+        innerFailSafe(next, t);
       }
     }
 
@@ -2414,7 +2414,7 @@ class DefaultLoop<V> implements Loop<V>, Serializable {
 
       } catch (final Throwable t) {
         getLogger().err(t, "Error while processing value: %s", value);
-        innerFailSafe(next, RuntimeInterruptedException.wrapIfInterrupt(t));
+        innerFailSafe(next, t);
       }
     }
 
@@ -2432,7 +2432,7 @@ class DefaultLoop<V> implements Loop<V>, Serializable {
 
         } catch (final Throwable t) {
           getLogger().err(t, "Error while processing value: %s", value);
-          innerFailSafe(next, RuntimeInterruptedException.wrapIfInterrupt(t));
+          innerFailSafe(next, t);
           break;
         }
       }
@@ -2459,7 +2459,7 @@ class DefaultLoop<V> implements Loop<V>, Serializable {
 
         } catch (final Throwable t) {
           getLogger().err(t, "Error while processing failure with reason: %s", failure);
-          innerFailSafe(next, RuntimeInterruptedException.wrapIfInterrupt(t));
+          innerFailSafe(next, t);
           break;
         }
       }
@@ -2519,9 +2519,8 @@ class DefaultLoop<V> implements Loop<V>, Serializable {
             mStack = mForker.failure(mStack, failure, loop);
 
           } catch (final Throwable t) {
-            final Throwable throwable = RuntimeInterruptedException.wrapIfInterrupt(t);
-            mFailure = throwable;
-            clearEvaluations(throwable);
+            mFailure = t;
+            clearEvaluations(t);
           }
         }
       });
@@ -2550,9 +2549,8 @@ class DefaultLoop<V> implements Loop<V>, Serializable {
               }
 
             } catch (final Throwable t) {
-              final Throwable throwable = RuntimeInterruptedException.wrapIfInterrupt(t);
-              mFailure = throwable;
-              clearEvaluations(throwable);
+              mFailure = t;
+              clearEvaluations(t);
             }
           }
         }
@@ -2575,9 +2573,8 @@ class DefaultLoop<V> implements Loop<V>, Serializable {
             mStack = mForker.value(mStack, value, loop);
 
           } catch (final Throwable t) {
-            final Throwable throwable = RuntimeInterruptedException.wrapIfInterrupt(t);
-            mFailure = throwable;
-            clearEvaluations(throwable);
+            mFailure = t;
+            clearEvaluations(t);
           }
         }
       });
@@ -2606,9 +2603,8 @@ class DefaultLoop<V> implements Loop<V>, Serializable {
               }
 
             } catch (final Throwable t) {
-              final Throwable throwable = RuntimeInterruptedException.wrapIfInterrupt(t);
-              mFailure = throwable;
-              clearEvaluations(throwable);
+              mFailure = t;
+              clearEvaluations(t);
             }
           }
         }
@@ -2636,9 +2632,8 @@ class DefaultLoop<V> implements Loop<V>, Serializable {
             mStack = mForker.done(mStack, loop);
 
           } catch (final Throwable t) {
-            final Throwable throwable = RuntimeInterruptedException.wrapIfInterrupt(t);
-            mFailure = throwable;
-            clearEvaluations(throwable);
+            mFailure = t;
+            clearEvaluations(t);
           }
         }
       });
@@ -2663,9 +2658,8 @@ class DefaultLoop<V> implements Loop<V>, Serializable {
             mStack = mForker.evaluation(mStack, evaluation, mLoop);
 
           } catch (final Throwable t) {
-            final Throwable throwable = RuntimeInterruptedException.wrapIfInterrupt(t);
-            mFailure = throwable;
-            clearEvaluations(throwable);
+            mFailure = t;
+            clearEvaluations(t);
           }
         }
       });
@@ -2734,7 +2728,7 @@ class DefaultLoop<V> implements Loop<V>, Serializable {
             }
 
           } catch (final Throwable t) {
-            mFailure = RuntimeInterruptedException.wrapIfInterrupt(t); // TODO: 17/02/2018 why?
+            mFailure = t;
           }
         }
       });
@@ -3050,11 +3044,7 @@ class DefaultLoop<V> implements Loop<V>, Serializable {
       if (command != null) {
         command.run();
         if (failures != null) {
-          if (Iterables.contains(failures, null)) {
-            throw new NullPointerException("failures cannot contain null objects");
-          }
-
-          addFailures(mNext, failures);
+          addFailures(mNext, ConstantConditions.notNullElements("failures", failures));
         }
       }
 

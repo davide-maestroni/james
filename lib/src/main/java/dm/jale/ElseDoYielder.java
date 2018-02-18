@@ -22,7 +22,6 @@ import java.io.InvalidObjectException;
 import java.io.ObjectStreamException;
 import java.io.Serializable;
 import java.util.ArrayList;
-import java.util.Arrays;
 
 import dm.jale.async.Loop.YieldOutputs;
 import dm.jale.async.Observer;
@@ -44,10 +43,7 @@ class ElseDoYielder<V> extends CollectionYielder<V> implements Serializable {
   ElseDoYielder(@NotNull final Observer<? super Throwable> observer,
       @NotNull final Class<?>[] exceptionTypes) {
     mObserver = ConstantConditions.notNull("observer", observer);
-    mTypes = ConstantConditions.notNull("exception types", exceptionTypes);
-    if (Arrays.asList(mTypes).contains(null)) {
-      throw new NullPointerException("exception type array contains null values");
-    }
+    mTypes = ConstantConditions.notNullElements("exception types", exceptionTypes);
   }
 
   @Override

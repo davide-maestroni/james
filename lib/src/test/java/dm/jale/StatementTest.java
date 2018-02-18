@@ -96,12 +96,13 @@ public class StatementTest {
     return statement.fork(
         Async.buffered(new Forker<Evaluation<V>, V, Evaluation<V>, Statement<V>>() {
 
-          public Evaluation<V> done(final Evaluation<V> stack, @NotNull final Statement<V> async) {
+          public Evaluation<V> done(final Evaluation<V> stack,
+              @NotNull final Statement<V> context) {
             return stack;
           }
 
           public Evaluation<V> evaluation(final Evaluation<V> stack,
-              @NotNull final Evaluation<V> evaluation, @NotNull final Statement<V> async) {
+              @NotNull final Evaluation<V> evaluation, @NotNull final Statement<V> context) {
             if (stack != null) {
               evaluation.fail(new IllegalStateException());
 
@@ -113,17 +114,17 @@ public class StatementTest {
           }
 
           public Evaluation<V> failure(final Evaluation<V> stack, @NotNull final Throwable failure,
-              @NotNull final Statement<V> async) {
+              @NotNull final Statement<V> context) {
             stack.fail(failure);
             return stack;
           }
 
-          public Evaluation<V> init(@NotNull final Statement<V> async) {
+          public Evaluation<V> init(@NotNull final Statement<V> context) {
             return null;
           }
 
           public Evaluation<V> value(final Evaluation<V> stack, final V value,
-              @NotNull final Statement<V> async) {
+              @NotNull final Statement<V> context) {
             stack.set(value);
             return stack;
           }

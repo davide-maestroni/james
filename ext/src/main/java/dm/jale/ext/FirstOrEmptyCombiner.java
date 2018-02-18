@@ -46,7 +46,7 @@ class FirstOrEmptyCombiner<V> implements LoopCombiner<Integer, V, V>, Serializab
   }
 
   public Integer done(final Integer stack, @NotNull final EvaluationCollection<V> evaluation,
-      @NotNull final List<Loop<V>> asyncs, final int index) {
+      @NotNull final List<Loop<V>> contexts, final int index) {
     if ((stack == null) || (stack == index)) {
       evaluation.set();
       return index;
@@ -56,7 +56,7 @@ class FirstOrEmptyCombiner<V> implements LoopCombiner<Integer, V, V>, Serializab
   }
 
   public Integer failure(final Integer stack, final Throwable failure,
-      @NotNull final EvaluationCollection<V> evaluation, @NotNull final List<Loop<V>> asyncs,
+      @NotNull final EvaluationCollection<V> evaluation, @NotNull final List<Loop<V>> contexts,
       final int index) {
     if ((stack == null) || (stack == index)) {
       evaluation.addFailure(failure);
@@ -66,19 +66,19 @@ class FirstOrEmptyCombiner<V> implements LoopCombiner<Integer, V, V>, Serializab
     return stack;
   }
 
-  public Integer init(@NotNull final List<Loop<V>> asyncs) {
+  public Integer init(@NotNull final List<Loop<V>> contexts) {
     return null;
   }
 
   public void settle(final Integer stack, @NotNull final EvaluationCollection<V> evaluation,
-      @NotNull final List<Loop<V>> asyncs) {
+      @NotNull final List<Loop<V>> contexts) {
     if (stack == null) {
       evaluation.set();
     }
   }
 
   public Integer value(final Integer stack, final V value,
-      @NotNull final EvaluationCollection<V> evaluation, @NotNull final List<Loop<V>> asyncs,
+      @NotNull final EvaluationCollection<V> evaluation, @NotNull final List<Loop<V>> contexts,
       final int index) {
     if ((stack == null) || (stack == index)) {
       evaluation.addValue(value);

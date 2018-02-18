@@ -48,13 +48,13 @@ class AnyOfCombiner<V> implements StatementCombiner<EvaluationState<V>, V, V>, S
   }
 
   public EvaluationState<V> done(final EvaluationState<V> stack,
-      @NotNull final Evaluation<V> evaluation, @NotNull final List<Statement<V>> asyncs,
+      @NotNull final Evaluation<V> evaluation, @NotNull final List<Statement<V>> contexts,
       final int index) {
     return stack;
   }
 
   public EvaluationState<V> failure(final EvaluationState<V> stack, final Throwable failure,
-      @NotNull final Evaluation<V> evaluation, @NotNull final List<Statement<V>> asyncs,
+      @NotNull final Evaluation<V> evaluation, @NotNull final List<Statement<V>> contexts,
       final int index) {
     if (stack == null) {
       return SimpleState.ofFailure(failure);
@@ -63,19 +63,19 @@ class AnyOfCombiner<V> implements StatementCombiner<EvaluationState<V>, V, V>, S
     return stack;
   }
 
-  public EvaluationState<V> init(@NotNull final List<Statement<V>> asyncs) {
+  public EvaluationState<V> init(@NotNull final List<Statement<V>> contexts) {
     return null;
   }
 
   public void settle(final EvaluationState<V> stack, @NotNull final Evaluation<V> evaluation,
-      @NotNull final List<Statement<V>> asyncs) throws Exception {
+      @NotNull final List<Statement<V>> contexts) throws Exception {
     if (stack.isFailed()) {
       stack.to(evaluation);
     }
   }
 
   public EvaluationState<V> value(final EvaluationState<V> stack, final V value,
-      @NotNull final Evaluation<V> evaluation, @NotNull final List<Statement<V>> asyncs,
+      @NotNull final Evaluation<V> evaluation, @NotNull final List<Statement<V>> contexts,
       final int index) {
     if ((stack == null) || stack.isFailed()) {
       evaluation.set(value);

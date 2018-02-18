@@ -52,30 +52,30 @@ class StatesOfCombiner<V>
 
   public List<EvaluationState<V>> done(final List<EvaluationState<V>> stack,
       @NotNull final Evaluation<List<EvaluationState<V>>> evaluation,
-      @NotNull final List<Statement<V>> asyncs, final int index) {
+      @NotNull final List<Statement<V>> contexts, final int index) {
     return stack;
   }
 
   public List<EvaluationState<V>> failure(final List<EvaluationState<V>> stack,
       final Throwable failure, @NotNull final Evaluation<List<EvaluationState<V>>> evaluation,
-      @NotNull final List<Statement<V>> asyncs, final int index) {
+      @NotNull final List<Statement<V>> contexts, final int index) {
     stack.add(SimpleState.<V>ofFailure(failure));
     return stack;
   }
 
-  public List<EvaluationState<V>> init(@NotNull final List<Statement<V>> asyncs) {
+  public List<EvaluationState<V>> init(@NotNull final List<Statement<V>> contexts) {
     return new ArrayList<EvaluationState<V>>();
   }
 
   public void settle(final List<EvaluationState<V>> stack,
       @NotNull final Evaluation<List<EvaluationState<V>>> evaluation,
-      @NotNull final List<Statement<V>> asyncs) {
+      @NotNull final List<Statement<V>> contexts) {
     evaluation.set(stack);
   }
 
   public List<EvaluationState<V>> value(final List<EvaluationState<V>> stack, final V value,
       @NotNull final Evaluation<List<EvaluationState<V>>> evaluation,
-      @NotNull final List<Statement<V>> asyncs, final int index) {
+      @NotNull final List<Statement<V>> contexts, final int index) {
     stack.add(SimpleState.ofValue(value));
     return stack;
   }

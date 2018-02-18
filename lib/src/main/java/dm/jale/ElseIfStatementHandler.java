@@ -17,12 +17,10 @@
 package dm.jale;
 
 import org.jetbrains.annotations.NotNull;
-import org.jetbrains.annotations.Nullable;
 
 import java.io.InvalidObjectException;
 import java.io.ObjectStreamException;
 import java.io.Serializable;
-import java.util.Arrays;
 
 import dm.jale.async.Evaluation;
 import dm.jale.async.Mapper;
@@ -44,12 +42,9 @@ class ElseIfStatementHandler<V> extends AsyncStatementHandler<V, V> implements S
 
   ElseIfStatementHandler(
       @NotNull final Mapper<? super Throwable, ? extends Statement<? extends V>> mapper,
-      @Nullable final Class<?>[] exceptionTypes) {
+      @NotNull final Class<?>[] exceptionTypes) {
     mMapper = ConstantConditions.notNull("mapper", mapper);
-    mTypes = ConstantConditions.notNull("exception types", exceptionTypes);
-    if (Arrays.asList(mTypes).contains(null)) {
-      throw new NullPointerException("exception type array contains null values");
-    }
+    mTypes = ConstantConditions.notNullElements("exception types", exceptionTypes);
   }
 
   @Override

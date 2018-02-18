@@ -46,28 +46,28 @@ class MergeCombiner<V> implements LoopCombiner<Void, V, V>, Serializable {
   }
 
   public Void done(final Void stack, @NotNull final EvaluationCollection<V> evaluation,
-      @NotNull final List<Loop<V>> asyncs, final int index) {
+      @NotNull final List<Loop<V>> contexts, final int index) {
     return null;
   }
 
   public Void failure(final Void stack, final Throwable failure,
-      @NotNull final EvaluationCollection<V> evaluation, @NotNull final List<Loop<V>> asyncs,
+      @NotNull final EvaluationCollection<V> evaluation, @NotNull final List<Loop<V>> contexts,
       final int index) {
     evaluation.addFailure(failure);
     return null;
   }
 
-  public Void init(@NotNull final List<Loop<V>> asyncs) {
+  public Void init(@NotNull final List<Loop<V>> contexts) {
     return null;
   }
 
   public void settle(final Void stack, @NotNull final EvaluationCollection<V> evaluation,
-      @NotNull final List<Loop<V>> asyncs) {
+      @NotNull final List<Loop<V>> contexts) {
     evaluation.set();
   }
 
   public Void value(final Void stack, final V value,
-      @NotNull final EvaluationCollection<V> evaluation, @NotNull final List<Loop<V>> asyncs,
+      @NotNull final EvaluationCollection<V> evaluation, @NotNull final List<Loop<V>> contexts,
       final int index) {
     evaluation.addValue(value);
     return null;

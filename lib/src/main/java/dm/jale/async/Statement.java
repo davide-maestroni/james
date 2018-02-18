@@ -104,16 +104,16 @@ public interface Statement<V> extends EvaluationState<V>, Future<V>, Serializabl
   @NotNull
   Statement<V> whenDone(@NotNull Action action);
 
-  interface Forker<S, V, R, A> {
+  interface Forker<S, V, R, C> {
 
-    S done(S stack, @NotNull A async) throws Exception;
+    S done(S stack, @NotNull C context) throws Exception;
 
-    S evaluation(S stack, @NotNull R evaluation, @NotNull A async) throws Exception;
+    S evaluation(S stack, @NotNull R evaluation, @NotNull C context) throws Exception;
 
-    S failure(S stack, @NotNull Throwable failure, @NotNull A async) throws Exception;
+    S failure(S stack, @NotNull Throwable failure, @NotNull C context) throws Exception;
 
-    S init(@NotNull A async) throws Exception;
+    S init(@NotNull C context) throws Exception;
 
-    S value(S stack, V value, @NotNull A async) throws Exception;
+    S value(S stack, V value, @NotNull C context) throws Exception;
   }
 }
