@@ -26,10 +26,12 @@ import java.util.concurrent.Executor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 
+import dm.jale.Async;
 import dm.jale.async.EvaluationCollection;
 import dm.jale.async.Loop;
 import dm.jale.async.LoopForker;
 import dm.jale.async.RuntimeInterruptedException;
+import dm.jale.async.Statement.Forker;
 import dm.jale.executor.EvaluationExecutor;
 import dm.jale.executor.ExecutorPool;
 import dm.jale.ext.BackoffForker.ForkerEvaluation;
@@ -53,9 +55,16 @@ class BackoffForker<S, V> implements LoopForker<ForkerEvaluation<S, V>, V>, Seri
 
   private final EvaluationExecutor mExecutor;
 
-  BackoffForker(@NotNull final Executor executor, @NotNull final Backoffer<S, V> backoffer) {
-    mExecutor = ExecutorPool.register(executor);
+  private BackoffForker(@NotNull final Executor executor,
+      @NotNull final Backoffer<S, V> backoffer) {
     mBackoffer = ConstantConditions.notNull("backoffer", backoffer);
+    mExecutor = ExecutorPool.register(executor);
+  }
+
+  @NotNull
+  static <S, V> Forker<?, V, EvaluationCollection<V>, Loop<V>> newForker(
+      @NotNull final Executor executor, @NotNull final Backoffer<S, V> backoffer) {
+    return Async.buffered(new BackoffForker<S, V>(executor, backoffer));
   }
 
   public ForkerEvaluation<S, V> done(final ForkerEvaluation<S, V> stack,

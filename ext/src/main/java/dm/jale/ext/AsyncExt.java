@@ -25,6 +25,7 @@ import java.nio.channels.ReadableByteChannel;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.Executor;
+import java.util.concurrent.TimeUnit;
 
 import dm.jale.Async;
 import dm.jale.async.CombinationCompleter;
@@ -53,8 +54,7 @@ import dm.jale.util.Iterables;
  */
 public class AsyncExt extends Async {
 
-  // TODO: 16/02/2018 Combiners: concat(), switchLast(int, Loop),
-  // TODO: 17/02/2018 - switchFirst(int, Loop), switchNewerThan(int, Loop), zip()
+  // TODO: 16/02/2018 Combiners: concat(), zip()
   // TODO: 16/02/2018 Yielders: delayFailures(), sum(), sumLong(), average(), averageLong(), min(),
   // TODO: 16/02/2018 - max(), distinct()
   // TODO: 16/02/2018 Forkers: retry(), retryAll(), repeat(), repeatAll(), repeatLast(),
@@ -73,7 +73,7 @@ public class AsyncExt extends Async {
   @NotNull
   public static <S, V> Forker<?, V, EvaluationCollection<V>, Loop<V>> onBackoffed(
       @NotNull final Executor executor, @NotNull final Backoffer<S, V> backoffer) {
-    return Async.buffered(new BackoffForker<S, V>(executor, backoffer));
+    return BackoffForker.newForker(executor, backoffer);
   }
 
   @NotNull
@@ -434,6 +434,34 @@ public class AsyncExt extends Async {
   @NotNull
   public <V> Loop<V> switchBetween(@NotNull final Iterable<? extends Loop<? extends V>> loops) {
     return loopOf(SwitchCombiner.<V>instance(), loops);
+  }
+
+  @NotNull
+  public <V> Loop<V> switchFirst(final int maxCount, @NotNull final Loop<? extends Integer> indexes,
+      @NotNull final Iterable<? extends Loop<? extends V>> loops) {
+    final ArrayList<Loop<?>> allLoops = new ArrayList<Loop<?>>();
+    allLoops.add(indexes);
+    Iterables.addAll((Iterable<? extends Loop<?>>) loops, allLoops);
+    return loopOf(new SwitchFirstCombiner<V>(maxCount), allLoops);
+  }
+
+  @NotNull
+  public <V> Loop<V> switchLast(final int maxCount, @NotNull final Loop<? extends Integer> indexes,
+      @NotNull final Iterable<? extends Loop<? extends V>> loops) {
+    final ArrayList<Loop<?>> allLoops = new ArrayList<Loop<?>>();
+    allLoops.add(indexes);
+    Iterables.addAll((Iterable<? extends Loop<?>>) loops, allLoops);
+    return loopOf(new SwitchLastCombiner<V>(maxCount), allLoops);
+  }
+
+  @NotNull
+  public <V> Loop<V> switchSince(final long timeout, @NotNull final TimeUnit timeUnit,
+      @NotNull final Loop<? extends Integer> indexes,
+      @NotNull final Iterable<? extends Loop<? extends V>> loops) {
+    final ArrayList<Loop<?>> allLoops = new ArrayList<Loop<?>>();
+    allLoops.add(indexes);
+    Iterables.addAll((Iterable<? extends Loop<?>>) loops, allLoops);
+    return loopOf(new SwitchSinceCombiner<V>(timeout, timeUnit), allLoops);
   }
 
   @NotNull

@@ -18,34 +18,33 @@ package dm.jale.ext;
 
 import org.jetbrains.annotations.NotNull;
 
-import java.io.ObjectStreamException;
 import java.io.Serializable;
-import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.TimeUnit;
 
 import dm.jale.async.EvaluationCollection;
 import dm.jale.async.Loop;
 import dm.jale.async.LoopCombiner;
-import dm.jale.async.SimpleState;
-import dm.jale.ext.SwitchAllCombiner.CombinerStack;
+import dm.jale.ext.SwitchSinceCombiner.CombinerStack;
+import dm.jale.ext.async.TimedState;
 import dm.jale.ext.config.BuildConfig;
+import dm.jale.util.ConstantConditions;
+import dm.jale.util.DoubleQueue;
 
 /**
  * Created by davide-maestroni on 02/16/2018.
  */
-class SwitchAllCombiner<V> implements LoopCombiner<CombinerStack<V>, Object, V>, Serializable {
-
-  private static final SwitchAllCombiner<?> sInstance = new SwitchAllCombiner<Object>();
+class SwitchSinceCombiner<V> implements LoopCombiner<CombinerStack<V>, Object, V>, Serializable {
 
   private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
 
-  private SwitchAllCombiner() {
-  }
+  private final TimeUnit mTimeUnit;
 
-  @NotNull
-  @SuppressWarnings("unchecked")
-  static <V> SwitchAllCombiner<V> instance() {
-    return (SwitchAllCombiner<V>) sInstance;
+  private final long mTimeout;
+
+  SwitchSinceCombiner(final long timeout, @NotNull final TimeUnit timeUnit) {
+    mTimeUnit = ConstantConditions.notNull("timeUnit", timeUnit);
+    mTimeout = timeout;
   }
 
   public CombinerStack<V> done(final CombinerStack<V> stack,
@@ -63,8 +62,8 @@ class SwitchAllCombiner<V> implements LoopCombiner<CombinerStack<V>, Object, V>,
     } else {
       final Integer stackIndex = stack.index;
       if ((stackIndex != null) && (stackIndex == index)) {
-        final ArrayList<SimpleState<V>> states = stack.states[index - 1];
-        for (final SimpleState<V> state : states) {
+        final DoubleQueue<TimedState<V>> states = stack.states[index - 1];
+        for (final TimedState<V> state : states) {
           state.addTo(evaluation);
         }
 
@@ -72,7 +71,8 @@ class SwitchAllCombiner<V> implements LoopCombiner<CombinerStack<V>, Object, V>,
         evaluation.addFailure(failure);
 
       } else {
-        stack.states[index - 1].add(SimpleState.<V>ofFailure(failure));
+        stack.states[index - 1].add(TimedState.<V>ofFailure(failure));
+        purgeStates(stack);
       }
     }
 
@@ -99,8 +99,8 @@ class SwitchAllCombiner<V> implements LoopCombiner<CombinerStack<V>, Object, V>,
     } else {
       final Integer stackIndex = stack.index;
       if ((stackIndex != null) && (stackIndex == index)) {
-        final ArrayList<SimpleState<V>> states = stack.states[index - 1];
-        for (final SimpleState<V> state : states) {
+        final DoubleQueue<TimedState<V>> states = stack.states[index - 1];
+        for (final TimedState<V> state : states) {
           state.addTo(evaluation);
         }
 
@@ -108,29 +108,46 @@ class SwitchAllCombiner<V> implements LoopCombiner<CombinerStack<V>, Object, V>,
         evaluation.addValue((V) value);
 
       } else {
-        stack.states[index - 1].add(SimpleState.ofValue((V) value));
+        stack.states[index - 1].add(TimedState.ofValue((V) value));
+        purgeStates(stack);
       }
     }
 
     return stack;
   }
 
-  @NotNull
-  private Object readResolve() throws ObjectStreamException {
-    return sInstance;
+  private void purgeStates(@NotNull final CombinerStack<V> stack) {
+    final long timeout = mTimeout;
+    if (timeout < 0) {
+      return;
+    }
+
+    final DoubleQueue<TimedState<V>>[] states = stack.states;
+    if (timeout == 0) {
+      for (final DoubleQueue<TimedState<V>> state : states) {
+        state.clear();
+      }
+    }
+
+    final long expireTime = System.currentTimeMillis() - mTimeUnit.toMillis(timeout);
+    for (final DoubleQueue<TimedState<V>> state : states) {
+      while (state.peekFirst().timestamp() <= expireTime) {
+        state.removeFirst();
+      }
+    }
   }
 
   static class CombinerStack<V> {
 
-    private final ArrayList<SimpleState<V>>[] states;
+    private final DoubleQueue<TimedState<V>>[] states;
 
     private Integer index;
 
     @SuppressWarnings("unchecked")
     private CombinerStack(final int size) {
-      states = new ArrayList[size];
+      states = new DoubleQueue[size];
       for (int i = 0; i < size; ++i) {
-        states[i] = new ArrayList<SimpleState<V>>();
+        states[i] = new DoubleQueue<TimedState<V>>();
       }
     }
   }
