@@ -23,6 +23,7 @@ import java.io.InputStream;
 import java.nio.ByteBuffer;
 import java.nio.channels.ReadableByteChannel;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 import java.util.concurrent.Executor;
 import java.util.concurrent.TimeUnit;
@@ -36,6 +37,7 @@ import dm.jale.async.JoinSettler;
 import dm.jale.async.JoinUpdater;
 import dm.jale.async.Joiner;
 import dm.jale.async.Loop;
+import dm.jale.async.Loop.Yielder;
 import dm.jale.async.Mapper;
 import dm.jale.async.Observer;
 import dm.jale.async.Provider;
@@ -43,6 +45,7 @@ import dm.jale.async.Settler;
 import dm.jale.async.Statement;
 import dm.jale.async.Statement.Forker;
 import dm.jale.async.Updater;
+import dm.jale.ext.async.Tester;
 import dm.jale.ext.backoff.Backoffer;
 import dm.jale.ext.backoff.PendingEvaluation;
 import dm.jale.ext.io.AllocationType;
@@ -54,11 +57,10 @@ import dm.jale.util.Iterables;
  */
 public class AsyncExt extends Async {
 
-  // TODO: 16/02/2018 Combiners: zip()
-  // TODO: 16/02/2018 Yielders: delayFailures(), sum(), sumLong(), average(), averageLong(), min(),
-  // TODO: 16/02/2018 - max(), distinct()
+  // TODO: 16/02/2018 Yielders: delayFailures(), distinct(), unique(),
+  // TODO: 16/02/2018 - inspect() => toStates, inspectTimed()
   // TODO: 16/02/2018 Forkers: retry(), retryAll(), repeat(), repeatAll(), repeatLast(),
-  // TODO: 16/02/2018 - repeatFirst(), repeatNewerThan(), refreshAfter(), refreshAllAfter()
+  // TODO: 16/02/2018 - repeatFirst(), repeatSince(), refreshAfter(), refreshAllAfter()
 
   private final Async mAsync;
 
@@ -68,6 +70,31 @@ public class AsyncExt extends Async {
 
   private AsyncExt(@NotNull final Async async) {
     mAsync = async;
+  }
+
+  @NotNull
+  public static Yielder<?, Number, Float> average() {
+    return averageFloat();
+  }
+
+  @NotNull
+  public static Yielder<?, Number, Double> averageDouble() {
+    return AverageDoubleYielder.instance();
+  }
+
+  @NotNull
+  public static Yielder<?, Number, Float> averageFloat() {
+    return AverageFloatYielder.instance();
+  }
+
+  @NotNull
+  public static Yielder<?, Number, Integer> averageInteger() {
+    return AverageIntegerYielder.instance();
+  }
+
+  @NotNull
+  public static Yielder<?, Number, Long> averageLong() {
+    return AverageLongYielder.instance();
   }
 
   @NotNull
@@ -83,6 +110,31 @@ public class AsyncExt extends Async {
       @Nullable final Updater<S, ? super Throwable, ? super PendingEvaluation<V>> failure,
       @Nullable final Settler<S, ? super PendingEvaluation<V>> done) {
     return onBackoffed(executor, new ComposedBackoffer<S, V>(init, value, failure, done));
+  }
+
+  @NotNull
+  public static Yielder<?, Number, Integer> sum() {
+    return sumInteger();
+  }
+
+  @NotNull
+  public static Yielder<?, Number, Double> sumDouble() {
+    return SumDoubleYielder.instance();
+  }
+
+  @NotNull
+  public static Yielder<?, Number, Float> sumFloat() {
+    return SumFloatYielder.instance();
+  }
+
+  @NotNull
+  public static Yielder<?, Number, Integer> sumInteger() {
+    return SumIntegerYielder.instance();
+  }
+
+  @NotNull
+  public static Yielder<?, Number, Long> sumLong() {
+    return SumLongYielder.instance();
   }
 
   @NotNull
@@ -209,6 +261,11 @@ public class AsyncExt extends Async {
   @Override
   public <V> Loop<V> values(@NotNull final Iterable<? extends V> values) {
     return mAsync.values(values);
+  }
+
+  @NotNull
+  public <V> Yielder<?, V, V> filter(@NotNull final Tester<V> tester) {
+    return new FilterYielder<V>(tester);
   }
 
   @NotNull
@@ -427,8 +484,28 @@ public class AsyncExt extends Async {
   }
 
   @NotNull
+  public <V extends Comparable<V>> Yielder<?, V, V> max() {
+    return MaxYielder.instance();
+  }
+
+  @NotNull
+  public <V> Yielder<?, V, V> maxBy(@NotNull final Comparator<? super V> comparator) {
+    return new MaxByYielder<V>(comparator);
+  }
+
+  @NotNull
   public <V> Loop<V> merge(@NotNull final Iterable<? extends Loop<? extends V>> loops) {
     return loopOf(MergeJoiner.<V>instance(), loops);
+  }
+
+  @NotNull
+  public <V extends Comparable<V>> Yielder<?, V, V> min() {
+    return MinYielder.instance();
+  }
+
+  @NotNull
+  public <V> Yielder<?, V, V> minBy(@NotNull final Comparator<? super V> comparator) {
+    return new MinByYielder<V>(comparator);
   }
 
   @NotNull
@@ -492,5 +569,21 @@ public class AsyncExt extends Async {
     allLoops.add(indexes);
     Iterables.addAll((Iterable<? extends Loop<?>>) loops, allLoops);
     return loopOf(SwitchWhenJoiner.<V>instance(), allLoops);
+  }
+
+  @NotNull
+  public <V> Loop<List<V>> zip(@NotNull final Iterable<? extends Loop<? extends V>> loops) {
+    return loopOf(ZipJoiner.<V>instance(), loops);
+  }
+
+  @NotNull
+  public <V> Loop<List<V>> zip(final V filler,
+      @NotNull final Iterable<? extends Loop<? extends V>> loops) {
+    return loopOf(new ZipFillJoiner<V>(filler), loops);
+  }
+
+  @NotNull
+  public <V> Loop<List<V>> zipStrict(@NotNull final Iterable<? extends Loop<? extends V>> loops) {
+    return loopOf(ZipStrictJoiner.<V>instance(), loops);
   }
 }

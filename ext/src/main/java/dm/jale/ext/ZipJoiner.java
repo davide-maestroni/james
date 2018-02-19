@@ -26,77 +26,83 @@ import java.util.List;
 import dm.jale.async.EvaluationCollection;
 import dm.jale.async.Loop;
 import dm.jale.async.LoopJoiner;
-import dm.jale.async.SimpleState;
-import dm.jale.ext.ConcatJoiner.JoinerStack;
+import dm.jale.ext.ZipJoiner.JoinerStack;
 import dm.jale.ext.config.BuildConfig;
+import dm.jale.util.DoubleQueue;
 
 /**
  * Created by davide-maestroni on 02/16/2018.
  */
-class ConcatJoiner<V> implements LoopJoiner<JoinerStack<V>, V, V>, Serializable {
+class ZipJoiner<V> implements LoopJoiner<JoinerStack<V>, V, List<V>>, Serializable {
 
-  private static final ConcatJoiner<?> sInstance = new ConcatJoiner<Object>();
+  private static final ZipJoiner<?> sInstance = new ZipJoiner<Object>();
 
   private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
 
-  private ConcatJoiner() {
+  private ZipJoiner() {
   }
 
   @NotNull
   @SuppressWarnings("unchecked")
-  static <V> ConcatJoiner<V> instance() {
-    return (ConcatJoiner<V>) sInstance;
+  static <V> ZipJoiner<V> instance() {
+    return (ZipJoiner<V>) sInstance;
   }
 
   public JoinerStack<V> done(final JoinerStack<V> stack,
-      @NotNull final EvaluationCollection<V> evaluation, @NotNull final List<Loop<V>> contexts,
-      final int index) {
-    if (stack.index == index) {
-      final int nextIndex = stack.index++;
-      if (nextIndex < stack.states.length) {
-        final ArrayList<SimpleState<V>> states = stack.states[nextIndex];
-        for (final SimpleState<V> state : states) {
-          state.addTo(evaluation);
-        }
-
-        states.clear();
-      }
-    }
-
+      @NotNull final EvaluationCollection<List<V>> evaluation,
+      @NotNull final List<Loop<V>> contexts, final int index) {
     return stack;
   }
 
   public JoinerStack<V> failure(final JoinerStack<V> stack, final Throwable failure,
-      @NotNull final EvaluationCollection<V> evaluation, @NotNull final List<Loop<V>> contexts,
-      final int index) {
-    if (stack.index == index) {
-      evaluation.addFailure(failure);
-
-    } else {
-      stack.states[index - 1].add(SimpleState.<V>ofFailure(failure));
+      @NotNull final EvaluationCollection<List<V>> evaluation,
+      @NotNull final List<Loop<V>> contexts, final int index) {
+    if (stack.failure == null) {
+      stack.failure = failure;
+      evaluation.addFailure(failure).set();
     }
 
     return stack;
   }
 
   public JoinerStack<V> init(@NotNull final List<Loop<V>> contexts) {
-    return new JoinerStack<V>(contexts.size() - 1);
+    return new JoinerStack<V>(contexts.size());
   }
 
-  public void settle(final JoinerStack<V> stack, @NotNull final EvaluationCollection<V> evaluation,
+  public void settle(final JoinerStack<V> stack,
+      @NotNull final EvaluationCollection<List<V>> evaluation,
       @NotNull final List<Loop<V>> contexts) {
-    evaluation.set();
+    if (stack.failure == null) {
+      evaluation.set();
+    }
   }
 
   @SuppressWarnings("unchecked")
   public JoinerStack<V> value(final JoinerStack<V> stack, final V value,
-      @NotNull final EvaluationCollection<V> evaluation, @NotNull final List<Loop<V>> contexts,
-      final int index) {
-    if (stack.index == index) {
-      evaluation.addValue(value);
+      @NotNull final EvaluationCollection<List<V>> evaluation,
+      @NotNull final List<Loop<V>> contexts, final int index) {
+    if (stack.failure == null) {
+      final DoubleQueue<V>[] states = stack.states;
+      final int length = states.length;
+      boolean canAdd = true;
+      for (int i = 0; i < length; ++i) {
+        if ((i != index) && states[i].isEmpty()) {
+          canAdd = false;
+          break;
+        }
+      }
 
-    } else {
-      stack.states[index - 1].add(SimpleState.ofValue(value));
+      if (canAdd) {
+        final ArrayList<V> values = new ArrayList<V>();
+        for (int i = 0; i < length; ++i) {
+          values.add((i != index) ? states[i].removeFirst() : value);
+        }
+
+        evaluation.addValue(values);
+
+      } else {
+        states[index].add(value);
+      }
     }
 
     return stack;
@@ -109,15 +115,15 @@ class ConcatJoiner<V> implements LoopJoiner<JoinerStack<V>, V, V>, Serializable 
 
   static class JoinerStack<V> {
 
-    private final ArrayList<SimpleState<V>>[] states;
+    private final DoubleQueue<V>[] states;
 
-    private int index;
+    private Throwable failure;
 
     @SuppressWarnings("unchecked")
     private JoinerStack(final int size) {
-      states = new ArrayList[size];
+      states = new DoubleQueue[size];
       for (int i = 0; i < size; ++i) {
-        states[i] = new ArrayList<SimpleState<V>>();
+        states[i] = new DoubleQueue<V>();
       }
     }
   }

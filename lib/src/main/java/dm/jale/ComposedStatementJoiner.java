@@ -100,38 +100,7 @@ class ComposedStatementJoiner<S, V, R>
 
   @NotNull
   private Object writeReplace() throws ObjectStreamException {
-    return new CombinerProxy<S, V, R>(mInit, mValue, mFailure, mDone, mSettle);
-  }
-
-  private static class CombinerProxy<S, V, R> extends SerializableProxy {
-
-    private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
-
-    private CombinerProxy(final Mapper<? super List<Statement<V>>, S> init,
-        final JoinUpdater<S, ? super V, ? super Evaluation<? extends R>, Statement<V>> value,
-        final JoinUpdater<S, ? super Throwable, ? super Evaluation<? extends R>, Statement<V>>
-            failure,
-        final JoinCompleter<S, ? super Evaluation<? extends R>, Statement<V>> done,
-        final JoinSettler<S, ? super Evaluation<? extends R>, Statement<V>> settle) {
-      super(proxy(init), proxy(value), proxy(failure), proxy(done), proxy(settle));
-    }
-
-    @NotNull
-    @SuppressWarnings("unchecked")
-    private Object readResolve() throws ObjectStreamException {
-      try {
-        final Object[] args = deserializeArgs();
-        return new ComposedStatementJoiner<S, V, R>((Mapper<? super List<Statement<V>>, S>) args[0],
-            (JoinUpdater<S, ? super V, ? super Evaluation<? extends R>, Statement<V>>) args[1],
-            (JoinUpdater<S, ? super Throwable, ? super Evaluation<? extends R>, Statement<V>>)
-                args[2],
-            (JoinCompleter<S, ? super Evaluation<? extends R>, Statement<V>>) args[3],
-            (JoinSettler<S, ? super Evaluation<? extends R>, Statement<V>>) args[4]);
-
-      } catch (final Throwable t) {
-        throw new InvalidObjectException(t.getMessage());
-      }
-    }
+    return new JoinerProxy<S, V, R>(mInit, mValue, mFailure, mDone, mSettle);
   }
 
   private static class DefaultCompleter<S, V, R>
@@ -204,6 +173,37 @@ class ComposedStatementJoiner<S, V, R>
     @NotNull
     private Object readResolve() throws ObjectStreamException {
       return sInstance;
+    }
+  }
+
+  private static class JoinerProxy<S, V, R> extends SerializableProxy {
+
+    private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
+
+    private JoinerProxy(final Mapper<? super List<Statement<V>>, S> init,
+        final JoinUpdater<S, ? super V, ? super Evaluation<? extends R>, Statement<V>> value,
+        final JoinUpdater<S, ? super Throwable, ? super Evaluation<? extends R>, Statement<V>>
+            failure,
+        final JoinCompleter<S, ? super Evaluation<? extends R>, Statement<V>> done,
+        final JoinSettler<S, ? super Evaluation<? extends R>, Statement<V>> settle) {
+      super(proxy(init), proxy(value), proxy(failure), proxy(done), proxy(settle));
+    }
+
+    @NotNull
+    @SuppressWarnings("unchecked")
+    private Object readResolve() throws ObjectStreamException {
+      try {
+        final Object[] args = deserializeArgs();
+        return new ComposedStatementJoiner<S, V, R>((Mapper<? super List<Statement<V>>, S>) args[0],
+            (JoinUpdater<S, ? super V, ? super Evaluation<? extends R>, Statement<V>>) args[1],
+            (JoinUpdater<S, ? super Throwable, ? super Evaluation<? extends R>, Statement<V>>)
+                args[2],
+            (JoinCompleter<S, ? super Evaluation<? extends R>, Statement<V>>) args[3],
+            (JoinSettler<S, ? super Evaluation<? extends R>, Statement<V>>) args[4]);
+
+      } catch (final Throwable t) {
+        throw new InvalidObjectException(t.getMessage());
+      }
     }
   }
 }

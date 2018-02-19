@@ -26,14 +26,14 @@ import dm.jale.async.EvaluationCollection;
 import dm.jale.async.Loop;
 import dm.jale.async.LoopJoiner;
 import dm.jale.async.SimpleState;
-import dm.jale.ext.SwitchFirstJoiner.CombinerStack;
+import dm.jale.ext.SwitchFirstJoiner.JoinerStack;
 import dm.jale.ext.config.BuildConfig;
 import dm.jale.util.ConstantConditions;
 
 /**
  * Created by davide-maestroni on 02/16/2018.
  */
-class SwitchFirstJoiner<V> implements LoopJoiner<CombinerStack<V>, Object, V>, Serializable {
+class SwitchFirstJoiner<V> implements LoopJoiner<JoinerStack<V>, Object, V>, Serializable {
 
   private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
 
@@ -43,13 +43,13 @@ class SwitchFirstJoiner<V> implements LoopJoiner<CombinerStack<V>, Object, V>, S
     mMaxCount = ConstantConditions.positive("maxCount", maxCount);
   }
 
-  public CombinerStack<V> done(final CombinerStack<V> stack,
+  public JoinerStack<V> done(final JoinerStack<V> stack,
       @NotNull final EvaluationCollection<V> evaluation, @NotNull final List<Loop<Object>> contexts,
       final int index) {
     return stack;
   }
 
-  public CombinerStack<V> failure(final CombinerStack<V> stack, final Throwable failure,
+  public JoinerStack<V> failure(final JoinerStack<V> stack, final Throwable failure,
       @NotNull final EvaluationCollection<V> evaluation, @NotNull final List<Loop<Object>> contexts,
       final int index) {
     if (index == 0) {
@@ -77,18 +77,17 @@ class SwitchFirstJoiner<V> implements LoopJoiner<CombinerStack<V>, Object, V>, S
     return stack;
   }
 
-  public CombinerStack<V> init(@NotNull final List<Loop<Object>> contexts) {
-    return new CombinerStack<V>(contexts.size() - 1);
+  public JoinerStack<V> init(@NotNull final List<Loop<Object>> contexts) {
+    return new JoinerStack<V>(contexts.size() - 1);
   }
 
-  public void settle(final CombinerStack<V> stack,
-      @NotNull final EvaluationCollection<V> evaluation,
+  public void settle(final JoinerStack<V> stack, @NotNull final EvaluationCollection<V> evaluation,
       @NotNull final List<Loop<Object>> contexts) {
     evaluation.set();
   }
 
   @SuppressWarnings("unchecked")
-  public CombinerStack<V> value(final CombinerStack<V> stack, final Object value,
+  public JoinerStack<V> value(final JoinerStack<V> stack, final Object value,
       @NotNull final EvaluationCollection<V> evaluation, @NotNull final List<Loop<Object>> contexts,
       final int index) {
     if (index == 0) {
@@ -116,14 +115,14 @@ class SwitchFirstJoiner<V> implements LoopJoiner<CombinerStack<V>, Object, V>, S
     return stack;
   }
 
-  static class CombinerStack<V> {
+  static class JoinerStack<V> {
 
     private final ArrayList<SimpleState<V>>[] states;
 
     private Integer index;
 
     @SuppressWarnings("unchecked")
-    private CombinerStack(final int size) {
+    private JoinerStack(final int size) {
       states = new ArrayList[size];
       for (int i = 0; i < size; ++i) {
         states[i] = new ArrayList<SimpleState<V>>();
