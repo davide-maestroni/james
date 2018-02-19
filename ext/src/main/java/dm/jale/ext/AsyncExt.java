@@ -46,6 +46,7 @@ import dm.jale.async.Statement;
 import dm.jale.async.Statement.Forker;
 import dm.jale.async.Updater;
 import dm.jale.ext.async.Tester;
+import dm.jale.ext.async.TimedState;
 import dm.jale.ext.backoff.Backoffer;
 import dm.jale.ext.backoff.PendingEvaluation;
 import dm.jale.ext.io.AllocationType;
@@ -57,8 +58,6 @@ import dm.jale.util.Iterables;
  */
 public class AsyncExt extends Async {
 
-  // TODO: 16/02/2018 Yielders: delayFailures(), distinct(), unique(),
-  // TODO: 16/02/2018 - inspect() => toStates, inspectTimed()
   // TODO: 16/02/2018 Forkers: retry(), retryAll(), repeat(), repeatAll(), repeatLast(),
   // TODO: 16/02/2018 - repeatFirst(), repeatSince(), refreshAfter(), refreshAllAfter()
 
@@ -152,6 +151,16 @@ public class AsyncExt extends Async {
   @NotNull
   public <V> Loop<V> concat(@NotNull final Iterable<? extends Loop<? extends V>> loops) {
     return loopOf(ConcatJoiner.<V>instance(), loops);
+  }
+
+  @NotNull
+  public <V> Yielder<?, V, V> delayedFailures() {
+    return DelayedFailuresYielder.instance();
+  }
+
+  @NotNull
+  public <V> Yielder<?, V, V> distinct() {
+    return DistinctYielder.instance();
   }
 
   @NotNull
@@ -261,6 +270,16 @@ public class AsyncExt extends Async {
   @Override
   public <V> Loop<V> values(@NotNull final Iterable<? extends V> values) {
     return mAsync.values(values);
+  }
+
+  @NotNull
+  public <V> Yielder<?, V, EvaluationState<V>> evaluationStates() {
+    return StatesYielder.instance();
+  }
+
+  @NotNull
+  public <V> Yielder<?, V, TimedState<V>> evaluationStatesTimed() {
+    return TimedStatesYielder.instance();
   }
 
   @NotNull
@@ -569,6 +588,11 @@ public class AsyncExt extends Async {
     allLoops.add(indexes);
     Iterables.addAll((Iterable<? extends Loop<?>>) loops, allLoops);
     return loopOf(SwitchWhenJoiner.<V>instance(), allLoops);
+  }
+
+  @NotNull
+  public <V> Yielder<?, V, V> unique() {
+    return UniqueYielder.instance();
   }
 
   @NotNull
