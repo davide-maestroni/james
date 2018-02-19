@@ -24,11 +24,11 @@ import java.io.ObjectStreamException;
 import java.io.Serializable;
 import java.util.List;
 
-import dm.jale.async.CombinationCompleter;
-import dm.jale.async.CombinationSettler;
-import dm.jale.async.CombinationUpdater;
-import dm.jale.async.Combiner;
 import dm.jale.async.Evaluation;
+import dm.jale.async.JoinCompleter;
+import dm.jale.async.JoinSettler;
+import dm.jale.async.JoinUpdater;
+import dm.jale.async.Joiner;
 import dm.jale.async.Mapper;
 import dm.jale.async.Statement;
 import dm.jale.config.BuildConfig;
@@ -37,43 +37,41 @@ import dm.jale.util.SerializableProxy;
 /**
  * Created by davide-maestroni on 02/14/2018.
  */
-class ComposedStatementCombiner<S, V, R>
-    implements Combiner<S, V, Evaluation<R>, Statement<V>>, Serializable {
+class ComposedStatementJoiner<S, V, R>
+    implements Joiner<S, V, Evaluation<R>, Statement<V>>, Serializable {
 
   private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
 
-  private final CombinationCompleter<S, ? super Evaluation<? extends R>, Statement<V>> mDone;
+  private final JoinCompleter<S, ? super Evaluation<? extends R>, Statement<V>> mDone;
 
-  private final CombinationUpdater<S, ? super Throwable, ? super Evaluation<? extends R>,
-      Statement<V>>
+  private final JoinUpdater<S, ? super Throwable, ? super Evaluation<? extends R>, Statement<V>>
       mFailure;
 
   private final Mapper<? super List<Statement<V>>, S> mInit;
 
-  private final CombinationSettler<S, ? super Evaluation<? extends R>, Statement<V>> mSettle;
+  private final JoinSettler<S, ? super Evaluation<? extends R>, Statement<V>> mSettle;
 
-  private final CombinationUpdater<S, ? super V, ? super Evaluation<? extends R>, Statement<V>>
-      mValue;
+  private final JoinUpdater<S, ? super V, ? super Evaluation<? extends R>, Statement<V>> mValue;
 
   @SuppressWarnings("unchecked")
-  ComposedStatementCombiner(@Nullable final Mapper<? super List<Statement<V>>, S> init,
-      @Nullable final CombinationUpdater<S, ? super V, ? super Evaluation<? extends R>,
-          Statement<V>> value,
-      @Nullable final CombinationUpdater<S, ? super Throwable, ? super Evaluation<? extends R>,
+  ComposedStatementJoiner(@Nullable final Mapper<? super List<Statement<V>>, S> init,
+      @Nullable final JoinUpdater<S, ? super V, ? super Evaluation<? extends R>, Statement<V>>
+          value,
+      @Nullable final JoinUpdater<S, ? super Throwable, ? super Evaluation<? extends R>,
           Statement<V>> failure,
-      @Nullable final CombinationCompleter<S, ? super Evaluation<? extends R>, Statement<V>> done,
-      @Nullable final CombinationSettler<S, ? super Evaluation<? extends R>, Statement<V>> settle) {
+      @Nullable final JoinCompleter<S, ? super Evaluation<? extends R>, Statement<V>> done,
+      @Nullable final JoinSettler<S, ? super Evaluation<? extends R>, Statement<V>> settle) {
     mInit = (Mapper<? super List<Statement<V>>, S>) ((init != null) ? init : DefaultInit.sInstance);
-    mValue = (CombinationUpdater<S, ? super V, ? super Evaluation<? extends R>, Statement<V>>) (
-        (value != null) ? value : DefaultUpdater.sInstance);
-    mFailure =
-        (CombinationUpdater<S, ? super Throwable, ? super Evaluation<? extends R>, Statement<V>>) (
-            (failure != null) ? failure : DefaultUpdater.sInstance);
-    mDone = (CombinationCompleter<S, ? super Evaluation<? extends R>, Statement<V>>) ((done != null)
-        ? done : DefaultCompleter.sInstance);
+    mValue =
+        (JoinUpdater<S, ? super V, ? super Evaluation<? extends R>, Statement<V>>) ((value != null)
+            ? value : DefaultUpdater.sInstance);
+    mFailure = (JoinUpdater<S, ? super Throwable, ? super Evaluation<? extends R>, Statement<V>>) (
+        (failure != null) ? failure : DefaultUpdater.sInstance);
+    mDone = (JoinCompleter<S, ? super Evaluation<? extends R>, Statement<V>>) ((done != null) ? done
+        : DefaultCompleter.sInstance);
     mSettle =
-        (CombinationSettler<S, ? super Evaluation<? extends R>, Statement<V>>) ((settle != null)
-            ? settle : DefaultSettler.sInstance);
+        (JoinSettler<S, ? super Evaluation<? extends R>, Statement<V>>) ((settle != null) ? settle
+            : DefaultSettler.sInstance);
   }
 
   public S done(final S stack, @NotNull final Evaluation<R> evaluation,
@@ -110,11 +108,11 @@ class ComposedStatementCombiner<S, V, R>
     private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
 
     private CombinerProxy(final Mapper<? super List<Statement<V>>, S> init,
-        final CombinationUpdater<S, ? super V, ? super Evaluation<? extends R>, Statement<V>> value,
-        final CombinationUpdater<S, ? super Throwable, ? super Evaluation<? extends R>,
-            Statement<V>> failure,
-        final CombinationCompleter<S, ? super Evaluation<? extends R>, Statement<V>> done,
-        final CombinationSettler<S, ? super Evaluation<? extends R>, Statement<V>> settle) {
+        final JoinUpdater<S, ? super V, ? super Evaluation<? extends R>, Statement<V>> value,
+        final JoinUpdater<S, ? super Throwable, ? super Evaluation<? extends R>, Statement<V>>
+            failure,
+        final JoinCompleter<S, ? super Evaluation<? extends R>, Statement<V>> done,
+        final JoinSettler<S, ? super Evaluation<? extends R>, Statement<V>> settle) {
       super(proxy(init), proxy(value), proxy(failure), proxy(done), proxy(settle));
     }
 
@@ -123,14 +121,12 @@ class ComposedStatementCombiner<S, V, R>
     private Object readResolve() throws ObjectStreamException {
       try {
         final Object[] args = deserializeArgs();
-        return new ComposedStatementCombiner<S, V, R>(
-            (Mapper<? super List<Statement<V>>, S>) args[0],
-            (CombinationUpdater<S, ? super V, ? super Evaluation<? extends R>, Statement<V>>)
-                args[1],
-            (CombinationUpdater<S, ? super Throwable, ? super Evaluation<? extends R>,
-                Statement<V>>) args[2],
-            (CombinationCompleter<S, ? super Evaluation<? extends R>, Statement<V>>) args[3],
-            (CombinationSettler<S, ? super Evaluation<? extends R>, Statement<V>>) args[4]);
+        return new ComposedStatementJoiner<S, V, R>((Mapper<? super List<Statement<V>>, S>) args[0],
+            (JoinUpdater<S, ? super V, ? super Evaluation<? extends R>, Statement<V>>) args[1],
+            (JoinUpdater<S, ? super Throwable, ? super Evaluation<? extends R>, Statement<V>>)
+                args[2],
+            (JoinCompleter<S, ? super Evaluation<? extends R>, Statement<V>>) args[3],
+            (JoinSettler<S, ? super Evaluation<? extends R>, Statement<V>>) args[4]);
 
       } catch (final Throwable t) {
         throw new InvalidObjectException(t.getMessage());
@@ -139,7 +135,7 @@ class ComposedStatementCombiner<S, V, R>
   }
 
   private static class DefaultCompleter<S, V, R>
-      implements CombinationCompleter<S, Evaluation<? extends R>, Statement<V>>, Serializable {
+      implements JoinCompleter<S, Evaluation<? extends R>, Statement<V>>, Serializable {
 
     private static final DefaultCompleter<?, ?, ?> sInstance =
         new DefaultCompleter<Object, Object, Object>();
@@ -174,7 +170,7 @@ class ComposedStatementCombiner<S, V, R>
   }
 
   private static class DefaultSettler<S, V, R>
-      implements CombinationSettler<S, Evaluation<? extends R>, Statement<V>>, Serializable {
+      implements JoinSettler<S, Evaluation<? extends R>, Statement<V>>, Serializable {
 
     private static final DefaultSettler<?, ?, ?> sInstance =
         new DefaultSettler<Object, Object, Object>();
@@ -193,7 +189,7 @@ class ComposedStatementCombiner<S, V, R>
   }
 
   private static class DefaultUpdater<S, V, I, R>
-      implements CombinationUpdater<S, I, Evaluation<? extends R>, Statement<V>>, Serializable {
+      implements JoinUpdater<S, I, Evaluation<? extends R>, Statement<V>>, Serializable {
 
     private static final DefaultUpdater<?, ?, ?, ?> sInstance =
         new DefaultUpdater<Object, Object, Object, Object>();

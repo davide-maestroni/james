@@ -23,7 +23,7 @@ import java.util.List;
 /**
  * Created by davide-maestroni on 02/14/2018.
  */
-public interface CombinationSettler<S, R, C> {
+public interface JoinCompleter<S, R, C> {
 
-  void settle(S stack, @NotNull R evaluation, @NotNull List<C> contexts) throws Exception;
+  S complete(S stack, @NotNull R evaluation, @NotNull List<C> contexts, int index) throws Exception;
 }

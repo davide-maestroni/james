@@ -28,13 +28,13 @@ import java.util.concurrent.Executor;
 import java.util.concurrent.TimeUnit;
 
 import dm.jale.Async;
-import dm.jale.async.CombinationCompleter;
-import dm.jale.async.CombinationSettler;
-import dm.jale.async.CombinationUpdater;
-import dm.jale.async.Combiner;
 import dm.jale.async.Evaluation;
 import dm.jale.async.EvaluationCollection;
 import dm.jale.async.EvaluationState;
+import dm.jale.async.JoinCompleter;
+import dm.jale.async.JoinSettler;
+import dm.jale.async.JoinUpdater;
+import dm.jale.async.Joiner;
 import dm.jale.async.Loop;
 import dm.jale.async.Mapper;
 import dm.jale.async.Observer;
@@ -54,7 +54,7 @@ import dm.jale.util.Iterables;
  */
 public class AsyncExt extends Async {
 
-  // TODO: 16/02/2018 Combiners: concat(), zip()
+  // TODO: 16/02/2018 Combiners: zip()
   // TODO: 16/02/2018 Yielders: delayFailures(), sum(), sumLong(), average(), averageLong(), min(),
   // TODO: 16/02/2018 - max(), distinct()
   // TODO: 16/02/2018 Forkers: retry(), retryAll(), repeat(), repeatAll(), repeatLast(),
@@ -88,13 +88,18 @@ public class AsyncExt extends Async {
   @NotNull
   public <V> Statement<List<V>> allOf(
       @NotNull final Iterable<? extends Statement<? extends V>> statements) {
-    return statementOf(AllOfCombiner.<V>instance(), statements);
+    return statementOf(AllOfJoiner.<V>instance(), statements);
   }
 
   @NotNull
   public <V> Statement<V> anyOf(
       @NotNull final Iterable<? extends Statement<? extends V>> statements) {
-    return statementOf(AnyOfCombiner.<V>instance(), statements);
+    return statementOf(AnyOfJoiner.<V>instance(), statements);
+  }
+
+  @NotNull
+  public <V> Loop<V> concat(@NotNull final Iterable<? extends Loop<? extends V>> loops) {
+    return loopOf(ConcatJoiner.<V>instance(), loops);
   }
 
   @NotNull
@@ -136,22 +141,20 @@ public class AsyncExt extends Async {
   @NotNull
   @Override
   public <S, V, R> Loop<R> loopOf(
-      @NotNull final Combiner<S, ? super V, ? super EvaluationCollection<R>, Loop<V>> combiner,
+      @NotNull final Joiner<S, ? super V, ? super EvaluationCollection<R>, Loop<V>> joiner,
       @NotNull final Iterable<? extends Loop<? extends V>> asyncLoops) {
-    return mAsync.loopOf(combiner, asyncLoops);
+    return mAsync.loopOf(joiner, asyncLoops);
   }
 
   @NotNull
   @Override
   public <S, V, R> Loop<R> loopOf(@Nullable final Mapper<? super List<Loop<V>>, S> init,
-      @Nullable final CombinationUpdater<S, ? super V, ? super EvaluationCollection<? extends R>,
+      @Nullable final JoinUpdater<S, ? super V, ? super EvaluationCollection<? extends R>,
           Loop<V>> value,
-      @Nullable final CombinationUpdater<S, ? super Throwable, ? super EvaluationCollection<?
-          extends R>, Loop<V>> failure,
-      @Nullable final CombinationCompleter<S, ? super EvaluationCollection<? extends R>, Loop<V>>
-          done,
-      @Nullable final CombinationSettler<S, ? super EvaluationCollection<? extends R>, Loop<V>>
-          settle,
+      @Nullable final JoinUpdater<S, ? super Throwable, ? super EvaluationCollection<? extends
+          R>, Loop<V>> failure,
+      @Nullable final JoinCompleter<S, ? super EvaluationCollection<? extends R>, Loop<V>> done,
+      @Nullable final JoinSettler<S, ? super EvaluationCollection<? extends R>, Loop<V>> settle,
       @NotNull final Iterable<? extends Loop<? extends V>> asyncLoops) {
     return mAsync.loopOf(init, value, failure, done, settle, asyncLoops);
   }
@@ -171,21 +174,21 @@ public class AsyncExt extends Async {
   @NotNull
   @Override
   public <S, V, R> Statement<R> statementOf(
-      @NotNull final Combiner<S, ? super V, ? super Evaluation<R>, Statement<V>> combiner,
+      @NotNull final Joiner<S, ? super V, ? super Evaluation<R>, Statement<V>> joiner,
       @NotNull final Iterable<? extends Statement<? extends V>> statements) {
-    return mAsync.statementOf(combiner, statements);
+    return mAsync.statementOf(joiner, statements);
   }
 
   @NotNull
   @Override
   public <S, V, R> Statement<R> statementOf(
       @Nullable final Mapper<? super List<Statement<V>>, S> init,
-      @Nullable final CombinationUpdater<S, ? super V, ? super Evaluation<? extends R>,
-          Statement<V>> value,
-      @Nullable final CombinationUpdater<S, ? super Throwable, ? super Evaluation<? extends R>,
+      @Nullable final JoinUpdater<S, ? super V, ? super Evaluation<? extends R>, Statement<V>>
+          value,
+      @Nullable final JoinUpdater<S, ? super Throwable, ? super Evaluation<? extends R>,
           Statement<V>> failure,
-      @Nullable final CombinationCompleter<S, ? super Evaluation<? extends R>, Statement<V>> done,
-      @Nullable final CombinationSettler<S, ? super Evaluation<? extends R>, Statement<V>> settle,
+      @Nullable final JoinCompleter<S, ? super Evaluation<? extends R>, Statement<V>> done,
+      @Nullable final JoinSettler<S, ? super Evaluation<? extends R>, Statement<V>> settle,
       @NotNull final Iterable<? extends Statement<? extends V>> statements) {
     return mAsync.statementOf(init, value, failure, done, settle, statements);
   }
@@ -210,12 +213,24 @@ public class AsyncExt extends Async {
 
   @NotNull
   public <V> Loop<V> first(@NotNull final Iterable<? extends Loop<? extends V>> loops) {
-    return loopOf(FirstCombiner.<V>instance(), loops);
+    return loopOf(FirstJoiner.<V>instance(), loops);
+  }
+
+  @NotNull
+  public <V> Loop<V> firstOnly(final boolean mayInterruptIfRunning,
+      @NotNull final Iterable<? extends Loop<? extends V>> loops) {
+    return loopOf(new FirstOnlyJoiner<V>(mayInterruptIfRunning), loops);
   }
 
   @NotNull
   public <V> Loop<V> firstOrEmpty(@NotNull final Iterable<? extends Loop<? extends V>> loops) {
-    return loopOf(FirstOrEmptyCombiner.<V>instance(), loops);
+    return loopOf(FirstOrEmptyJoiner.<V>instance(), loops);
+  }
+
+  @NotNull
+  public <V> Loop<V> firstOrEmptyOnly(final boolean mayInterruptIfRunning,
+      @NotNull final Iterable<? extends Loop<? extends V>> loops) {
+    return loopOf(new FirstOrEmptyOnlyJoiner<V>(mayInterruptIfRunning), loops);
   }
 
   @NotNull
@@ -413,13 +428,13 @@ public class AsyncExt extends Async {
 
   @NotNull
   public <V> Loop<V> merge(@NotNull final Iterable<? extends Loop<? extends V>> loops) {
-    return loopOf(MergeCombiner.<V>instance(), loops);
+    return loopOf(MergeJoiner.<V>instance(), loops);
   }
 
   @NotNull
   public <V> Statement<List<EvaluationState<V>>> statesOf(
       @NotNull final Iterable<? extends Statement<? extends V>> statements) {
-    return statementOf(StatesOfCombiner.<V>instance(), statements);
+    return statementOf(StatesOfJoiner.<V>instance(), statements);
   }
 
   @NotNull
@@ -428,12 +443,12 @@ public class AsyncExt extends Async {
     final ArrayList<Loop<?>> allLoops = new ArrayList<Loop<?>>();
     allLoops.add(indexes);
     Iterables.addAll((Iterable<? extends Loop<?>>) loops, allLoops);
-    return loopOf(SwitchAllCombiner.<V>instance(), allLoops);
+    return loopOf(SwitchAllJoiner.<V>instance(), allLoops);
   }
 
   @NotNull
   public <V> Loop<V> switchBetween(@NotNull final Iterable<? extends Loop<? extends V>> loops) {
-    return loopOf(SwitchCombiner.<V>instance(), loops);
+    return loopOf(SwitchJoiner.<V>instance(), loops);
   }
 
   @NotNull
@@ -442,7 +457,7 @@ public class AsyncExt extends Async {
     final ArrayList<Loop<?>> allLoops = new ArrayList<Loop<?>>();
     allLoops.add(indexes);
     Iterables.addAll((Iterable<? extends Loop<?>>) loops, allLoops);
-    return loopOf(new SwitchFirstCombiner<V>(maxCount), allLoops);
+    return loopOf(new SwitchFirstJoiner<V>(maxCount), allLoops);
   }
 
   @NotNull
@@ -451,7 +466,13 @@ public class AsyncExt extends Async {
     final ArrayList<Loop<?>> allLoops = new ArrayList<Loop<?>>();
     allLoops.add(indexes);
     Iterables.addAll((Iterable<? extends Loop<?>>) loops, allLoops);
-    return loopOf(new SwitchLastCombiner<V>(maxCount), allLoops);
+    return loopOf(new SwitchLastJoiner<V>(maxCount), allLoops);
+  }
+
+  @NotNull
+  public <V> Loop<V> switchOnly(final boolean mayInterruptIfRunning,
+      @NotNull final Iterable<? extends Loop<? extends V>> loops) {
+    return loopOf(new SwitchOnlyJoiner<V>(mayInterruptIfRunning), loops);
   }
 
   @NotNull
@@ -461,7 +482,7 @@ public class AsyncExt extends Async {
     final ArrayList<Loop<?>> allLoops = new ArrayList<Loop<?>>();
     allLoops.add(indexes);
     Iterables.addAll((Iterable<? extends Loop<?>>) loops, allLoops);
-    return loopOf(new SwitchSinceCombiner<V>(timeout, timeUnit), allLoops);
+    return loopOf(new SwitchSinceJoiner<V>(timeout, timeUnit), allLoops);
   }
 
   @NotNull
@@ -470,6 +491,6 @@ public class AsyncExt extends Async {
     final ArrayList<Loop<?>> allLoops = new ArrayList<Loop<?>>();
     allLoops.add(indexes);
     Iterables.addAll((Iterable<? extends Loop<?>>) loops, allLoops);
-    return loopOf(SwitchWhenCombiner.<V>instance(), allLoops);
+    return loopOf(SwitchWhenJoiner.<V>instance(), allLoops);
   }
 }

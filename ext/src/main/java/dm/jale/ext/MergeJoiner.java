@@ -24,74 +24,53 @@ import java.util.List;
 
 import dm.jale.async.EvaluationCollection;
 import dm.jale.async.Loop;
-import dm.jale.async.LoopCombiner;
+import dm.jale.async.LoopJoiner;
 import dm.jale.ext.config.BuildConfig;
 
 /**
  * Created by davide-maestroni on 02/16/2018.
  */
-class SwitchCombiner<V> implements LoopCombiner<Boolean[], V, V>, Serializable {
+class MergeJoiner<V> implements LoopJoiner<Void, V, V>, Serializable {
 
-  private static final SwitchCombiner<?> sInstance = new SwitchCombiner<Object>();
+  private static final MergeJoiner<?> sInstance = new MergeJoiner<Object>();
 
   private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
 
-  private SwitchCombiner() {
+  private MergeJoiner() {
   }
 
   @NotNull
   @SuppressWarnings("unchecked")
-  static <V> SwitchCombiner<V> instance() {
-    return (SwitchCombiner<V>) sInstance;
+  static <V> MergeJoiner<V> instance() {
+    return (MergeJoiner<V>) sInstance;
   }
 
-  public Boolean[] done(final Boolean[] stack, @NotNull final EvaluationCollection<V> evaluation,
+  public Void done(final Void stack, @NotNull final EvaluationCollection<V> evaluation,
       @NotNull final List<Loop<V>> contexts, final int index) {
-    return stack;
+    return null;
   }
 
-  public Boolean[] failure(final Boolean[] stack, final Throwable failure,
+  public Void failure(final Void stack, final Throwable failure,
       @NotNull final EvaluationCollection<V> evaluation, @NotNull final List<Loop<V>> contexts,
       final int index) {
-    changeOwnership(stack, index);
-    if (stack[index]) {
-      evaluation.addFailure(failure);
-    }
-
-    return stack;
+    evaluation.addFailure(failure);
+    return null;
   }
 
-  public Boolean[] init(@NotNull final List<Loop<V>> contexts) {
-    return new Boolean[contexts.size()];
+  public Void init(@NotNull final List<Loop<V>> contexts) {
+    return null;
   }
 
-  public void settle(final Boolean[] stack, @NotNull final EvaluationCollection<V> evaluation,
+  public void settle(final Void stack, @NotNull final EvaluationCollection<V> evaluation,
       @NotNull final List<Loop<V>> contexts) {
     evaluation.set();
   }
 
-  public Boolean[] value(final Boolean[] stack, final V value,
+  public Void value(final Void stack, final V value,
       @NotNull final EvaluationCollection<V> evaluation, @NotNull final List<Loop<V>> contexts,
       final int index) {
-    changeOwnership(stack, index);
-    if (stack[index]) {
-      evaluation.addValue(value);
-    }
-
-    return stack;
-  }
-
-  private void changeOwnership(final Boolean[] stack, final int index) {
-    if (stack[index] == null) {
-      for (int i = 0; i < stack.length; i++) {
-        if (Boolean.TRUE.equals(stack[i])) {
-          stack[i] = Boolean.FALSE;
-          break;
-        }
-      }
-
-      stack[index] = Boolean.TRUE;
-    }
+    evaluation.addValue(value);
+    return null;
   }
 
   @NotNull

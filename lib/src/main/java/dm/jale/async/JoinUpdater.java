@@ -23,7 +23,7 @@ import java.util.List;
 /**
  * Created by davide-maestroni on 02/14/2018.
  */
-public interface CombinationUpdater<S, V, R, C> {
+public interface JoinUpdater<S, V, R, C> {
 
   S update(S stack, V value, @NotNull R evaluation, @NotNull List<C> contexts, int index) throws
       Exception;

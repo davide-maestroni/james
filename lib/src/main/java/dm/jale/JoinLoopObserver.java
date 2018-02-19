@@ -27,9 +27,9 @@ import java.util.List;
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.Executor;
 
-import dm.jale.async.Combiner;
 import dm.jale.async.EvaluationCollection;
 import dm.jale.async.FailureException;
+import dm.jale.async.Joiner;
 import dm.jale.async.Loop;
 import dm.jale.async.Observer;
 import dm.jale.config.BuildConfig;
@@ -44,25 +44,25 @@ import static dm.jale.executor.ExecutorPool.withThrottling;
 /**
  * Created by davide-maestroni on 02/14/2018.
  */
-class CombinationLoopObserver<S, V, R> implements Observer<EvaluationCollection<R>>, Serializable {
+class JoinLoopObserver<S, V, R> implements Observer<EvaluationCollection<R>>, Serializable {
 
   private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
 
-  private final Combiner<S, ? super V, ? super EvaluationCollection<R>, Loop<V>> mCombiner;
-
   private final Executor mExecutor;
+
+  private final Joiner<S, ? super V, ? super EvaluationCollection<R>, Loop<V>> mJoiner;
 
   private final Logger mLogger;
 
   private final List<Loop<? extends V>> mLoopList;
 
-  CombinationLoopObserver(
-      @NotNull final Combiner<S, ? super V, ? super EvaluationCollection<R>, Loop<V>> combiner,
+  JoinLoopObserver(
+      @NotNull final Joiner<S, ? super V, ? super EvaluationCollection<R>, Loop<V>> joiner,
       @NotNull final Iterable<? extends Loop<? extends V>> loops,
       @NotNull final String loggerName) {
     final List<? extends Loop<? extends V>> loopList =
         Iterables.toList(ConstantConditions.notNullElements("loops", loops));
-    mCombiner = ConstantConditions.notNull("combiner", combiner);
+    mJoiner = ConstantConditions.notNull("joiner", joiner);
     mLoopList = Collections.unmodifiableList(loopList);
     mExecutor = withThrottling(1, immediateExecutor());
     mLogger = Logger.newLogger(this, loggerName);
@@ -73,15 +73,16 @@ class CombinationLoopObserver<S, V, R> implements Observer<EvaluationCollection<
     int i = 0;
     @SuppressWarnings("UnnecessaryLocalVariable") final Logger logger = mLogger;
     @SuppressWarnings("UnnecessaryLocalVariable") final Executor executor = mExecutor;
-    final Combiner<S, ? super V, ? super EvaluationCollection<R>, Loop<V>> combiner = mCombiner;
+    final Joiner<S, ? super V, ? super EvaluationCollection<R>, Loop<V>> joiner = mJoiner;
     final List<? extends Loop<? extends V>> loops = mLoopList;
-    final CombinationState<S> state = new CombinationState<S>(loops.size());
+    final JoinState<S> state = new JoinState<S>(loops.size());
     try {
-      state.set(combiner.init((List<Loop<V>>) loops));
+      state.set(joiner.init((List<Loop<V>>) loops));
       for (final Loop<? extends V> loop : loops) {
         final int index = i++;
-        loop.to(new EvaluationCollectionCombination<S, V, R>(state, combiner, executor, evaluation,
-            loops, index, logger));
+        loop.to(
+            new JoinEvaluationCollection<S, V, R>(state, joiner, executor, evaluation, loops, index,
+                logger));
       }
 
     } catch (final CancellationException e) {
@@ -90,7 +91,7 @@ class CombinationLoopObserver<S, V, R> implements Observer<EvaluationCollection<
       Asyncs.failSafe(evaluation, e);
 
     } catch (final Throwable t) {
-      mLogger.err(t, "Error while initializing statements combination");
+      mLogger.err(t, "Error while initializing statements joining");
       state.setFailed(t);
       Asyncs.failSafe(evaluation, t);
     }
@@ -98,12 +99,10 @@ class CombinationLoopObserver<S, V, R> implements Observer<EvaluationCollection<
 
   @NotNull
   private Object writeReplace() throws ObjectStreamException {
-    return new ObserverProxy<S, V, R>(mCombiner, mLoopList, mLogger.getName());
+    return new ObserverProxy<S, V, R>(mJoiner, mLoopList, mLogger.getName());
   }
 
-  private static class EvaluationCollectionCombination<S, V, R> implements EvaluationCollection<V> {
-
-    private final Combiner<S, ? super V, ? super EvaluationCollection<R>, Loop<V>> mCombiner;
+  private static class JoinEvaluationCollection<S, V, R> implements EvaluationCollection<V> {
 
     private final EvaluationCollection<R> mEvaluation;
 
@@ -111,19 +110,21 @@ class CombinationLoopObserver<S, V, R> implements Observer<EvaluationCollection<
 
     private final int mIndex;
 
+    private final Joiner<S, ? super V, ? super EvaluationCollection<R>, Loop<V>> mJoiner;
+
     private final Logger mLogger;
 
     private final List<? extends Loop<? extends V>> mLoops;
 
-    private final CombinationState<S> mState;
+    private final JoinState<S> mState;
 
-    private EvaluationCollectionCombination(@NotNull final CombinationState<S> state,
-        @NotNull final Combiner<S, ? super V, ? super EvaluationCollection<R>, Loop<V>> combiner,
+    private JoinEvaluationCollection(@NotNull final JoinState<S> state,
+        @NotNull final Joiner<S, ? super V, ? super EvaluationCollection<R>, Loop<V>> joiner,
         @NotNull final Executor executor, @NotNull final EvaluationCollection<R> evaluation,
         @NotNull final List<? extends Loop<? extends V>> loops, final int index,
         @NotNull final Logger logger) {
       mState = state;
-      mCombiner = combiner;
+      mJoiner = joiner;
       mExecutor = executor;
       mEvaluation = evaluation;
       mLoops = loops;
@@ -137,7 +138,7 @@ class CombinationLoopObserver<S, V, R> implements Observer<EvaluationCollection<
       mExecutor.execute(new Runnable() {
 
         public void run() {
-          final CombinationState<S> state = mState;
+          final JoinState<S> state = mState;
           if (state.isFailed()) {
             mLogger.wrn("Ignoring failure: %s", failure);
             return;
@@ -146,7 +147,7 @@ class CombinationLoopObserver<S, V, R> implements Observer<EvaluationCollection<
           final EvaluationCollection<R> evaluation = mEvaluation;
           try {
             @SuppressWarnings("unchecked") final List<Loop<V>> loops = (List<Loop<V>>) mLoops;
-            state.set(mCombiner.failure(state.get(), failure, evaluation, loops, mIndex));
+            state.set(mJoiner.failure(state.get(), failure, evaluation, loops, mIndex));
 
           } catch (final CancellationException e) {
             mLogger.wrn(e, "Loop has been cancelled");
@@ -170,7 +171,7 @@ class CombinationLoopObserver<S, V, R> implements Observer<EvaluationCollection<
       mExecutor.execute(new Runnable() {
 
         public void run() {
-          final CombinationState<S> state = mState;
+          final JoinState<S> state = mState;
           if (state.isFailed()) {
             mLogger.wrn("Ignoring failures: %s", Iterables.toString(failures));
             return;
@@ -181,12 +182,12 @@ class CombinationLoopObserver<S, V, R> implements Observer<EvaluationCollection<
             try {
               @SuppressWarnings("UnnecessaryLocalVariable") final int index = mIndex;
               @SuppressWarnings(
-                  "UnnecessaryLocalVariable") final Combiner<S, ? super V, ? super
+                  "UnnecessaryLocalVariable") final Joiner<S, ? super V, ? super
                   EvaluationCollection<R>, Loop<V>>
-                  combiner = mCombiner;
+                  joiner = mJoiner;
               @SuppressWarnings("unchecked") final List<Loop<V>> loops = (List<Loop<V>>) mLoops;
               for (final Throwable failure : failures) {
-                state.set(combiner.failure(state.get(), failure, evaluation, loops, index));
+                state.set(joiner.failure(state.get(), failure, evaluation, loops, index));
               }
 
             } catch (final CancellationException e) {
@@ -211,7 +212,7 @@ class CombinationLoopObserver<S, V, R> implements Observer<EvaluationCollection<
       mExecutor.execute(new Runnable() {
 
         public void run() {
-          final CombinationState<S> state = mState;
+          final JoinState<S> state = mState;
           if (state.isFailed()) {
             mLogger.wrn("Ignoring value: %s", value);
             return;
@@ -220,7 +221,7 @@ class CombinationLoopObserver<S, V, R> implements Observer<EvaluationCollection<
           final EvaluationCollection<R> evaluation = mEvaluation;
           try {
             @SuppressWarnings("unchecked") final List<Loop<V>> loops = (List<Loop<V>>) mLoops;
-            state.set(mCombiner.value(state.get(), value, evaluation, loops, mIndex));
+            state.set(mJoiner.value(state.get(), value, evaluation, loops, mIndex));
 
           } catch (final CancellationException e) {
             mLogger.wrn(e, "Loop has been cancelled");
@@ -243,7 +244,7 @@ class CombinationLoopObserver<S, V, R> implements Observer<EvaluationCollection<
       mExecutor.execute(new Runnable() {
 
         public void run() {
-          final CombinationState<S> state = mState;
+          final JoinState<S> state = mState;
           if (state.isFailed()) {
             mLogger.wrn("Ignoring values: %s", Iterables.toString(values));
             return;
@@ -254,12 +255,12 @@ class CombinationLoopObserver<S, V, R> implements Observer<EvaluationCollection<
             try {
               @SuppressWarnings("UnnecessaryLocalVariable") final int index = mIndex;
               @SuppressWarnings(
-                  "UnnecessaryLocalVariable") final Combiner<S, ? super V, ? super
+                  "UnnecessaryLocalVariable") final Joiner<S, ? super V, ? super
                   EvaluationCollection<R>, Loop<V>>
-                  combiner = mCombiner;
+                  joiner = mJoiner;
               @SuppressWarnings("unchecked") final List<Loop<V>> loops = (List<Loop<V>>) mLoops;
               for (final V value : values) {
-                state.set(combiner.value(state.get(), value, evaluation, loops, index));
+                state.set(joiner.value(state.get(), value, evaluation, loops, index));
               }
 
             } catch (final CancellationException e) {
@@ -283,7 +284,7 @@ class CombinationLoopObserver<S, V, R> implements Observer<EvaluationCollection<
       mExecutor.execute(new Runnable() {
 
         public void run() {
-          final CombinationState<S> state = mState;
+          final JoinState<S> state = mState;
           if (state.isFailed()) {
             mLogger.wrn("Ignoring completion");
             return;
@@ -292,12 +293,11 @@ class CombinationLoopObserver<S, V, R> implements Observer<EvaluationCollection<
           final EvaluationCollection<R> evaluation = mEvaluation;
           try {
             @SuppressWarnings("UnnecessaryLocalVariable") final int index = mIndex;
-            final Combiner<S, ? super V, ? super EvaluationCollection<R>, Loop<V>> combiner =
-                mCombiner;
+            final Joiner<S, ? super V, ? super EvaluationCollection<R>, Loop<V>> joiner = mJoiner;
             @SuppressWarnings("unchecked") final List<Loop<V>> loops = (List<Loop<V>>) mLoops;
-            state.set(combiner.done(state.get(), evaluation, loops, index));
+            state.set(joiner.done(state.get(), evaluation, loops, index));
             if (state.set()) {
-              combiner.settle(state.get(), evaluation, loops);
+              joiner.settle(state.get(), evaluation, loops);
             }
 
           } catch (final CancellationException e) {
@@ -315,7 +315,7 @@ class CombinationLoopObserver<S, V, R> implements Observer<EvaluationCollection<
     }
 
     private void checkFailed() {
-      final CombinationState<S> state = mState;
+      final JoinState<S> state = mState;
       if (state.isFailed()) {
         throw FailureException.wrap(state.getFailure());
       }
@@ -327,9 +327,9 @@ class CombinationLoopObserver<S, V, R> implements Observer<EvaluationCollection<
     private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
 
     private ObserverProxy(
-        final Combiner<S, ? super V, ? super EvaluationCollection<R>, Loop<V>> combiner,
+        final Joiner<S, ? super V, ? super EvaluationCollection<R>, Loop<V>> joiner,
         final Iterable<? extends Loop<? extends V>> loops, final String loggerName) {
-      super(proxy(combiner), loops, loggerName);
+      super(proxy(joiner), loops, loggerName);
     }
 
     @NotNull
@@ -337,8 +337,8 @@ class CombinationLoopObserver<S, V, R> implements Observer<EvaluationCollection<
     private Object readResolve() throws ObjectStreamException {
       try {
         final Object[] args = deserializeArgs();
-        return new CombinationLoopObserver<S, V, R>(
-            (Combiner<S, ? super V, ? super EvaluationCollection<R>, Loop<V>>) args[0],
+        return new JoinLoopObserver<S, V, R>(
+            (Joiner<S, ? super V, ? super EvaluationCollection<R>, Loop<V>>) args[0],
             (Iterable<? extends Loop<? extends V>>) args[1], (String) args[2]);
 
       } catch (final Throwable t) {

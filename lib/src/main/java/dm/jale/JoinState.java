@@ -14,26 +14,50 @@
  * limitations under the License.
  */
 
-package dm.jale.async;
+package dm.jale;
 
 import org.jetbrains.annotations.NotNull;
 
-import java.util.List;
+import dm.jale.util.ConstantConditions;
 
 /**
  * Created by davide-maestroni on 02/14/2018.
  */
-public interface Combiner<S, V, R, C> {
+class JoinState<S> {
 
-  S done(S stack, @NotNull R evaluation, @NotNull List<C> contexts, int index) throws Exception;
+  private final int mCount;
 
-  S failure(S stack, Throwable failure, @NotNull R evaluation, @NotNull List<C> contexts,
-      int index) throws Exception;
+  private volatile Throwable mFailure;
 
-  S init(@NotNull List<C> contexts) throws Exception;
+  private int mSet;
 
-  void settle(S stack, @NotNull R evaluation, @NotNull List<C> contexts) throws Exception;
+  private S mState;
 
-  S value(S stack, V value, @NotNull R evaluation, @NotNull List<C> contexts, int index) throws
-      Exception;
+  JoinState(final int count) {
+    mCount = count;
+  }
+
+  S get() {
+    return mState;
+  }
+
+  Throwable getFailure() {
+    return mFailure;
+  }
+
+  boolean isFailed() {
+    return (mFailure != null);
+  }
+
+  void setFailed(@NotNull final Throwable failure) {
+    mFailure = ConstantConditions.notNull("failure", failure);
+  }
+
+  boolean set() {
+    return (++mSet >= mCount);
+  }
+
+  void set(final S state) {
+    mState = state;
+  }
 }

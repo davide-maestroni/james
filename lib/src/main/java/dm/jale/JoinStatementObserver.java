@@ -26,9 +26,9 @@ import java.util.List;
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.Executor;
 
-import dm.jale.async.Combiner;
 import dm.jale.async.Evaluation;
 import dm.jale.async.FailureException;
+import dm.jale.async.Joiner;
 import dm.jale.async.Observer;
 import dm.jale.async.Statement;
 import dm.jale.config.BuildConfig;
@@ -43,25 +43,25 @@ import static dm.jale.executor.ExecutorPool.withThrottling;
 /**
  * Created by davide-maestroni on 02/14/2018.
  */
-class CombinationStatementObserver<S, V, R> implements Observer<Evaluation<R>>, Serializable {
+class JoinStatementObserver<S, V, R> implements Observer<Evaluation<R>>, Serializable {
 
   private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
 
-  private final Combiner<S, ? super V, ? super Evaluation<R>, Statement<V>> mCombiner;
-
   private final Executor mExecutor;
+
+  private final Joiner<S, ? super V, ? super Evaluation<R>, Statement<V>> mJoiner;
 
   private final Logger mLogger;
 
   private final List<Statement<? extends V>> mStatementList;
 
-  CombinationStatementObserver(
-      @NotNull final Combiner<S, ? super V, ? super Evaluation<R>, Statement<V>> combiner,
+  JoinStatementObserver(
+      @NotNull final Joiner<S, ? super V, ? super Evaluation<R>, Statement<V>> joiner,
       @NotNull final Iterable<? extends Statement<? extends V>> statements,
       @NotNull final String loggerName) {
     final List<? extends Statement<? extends V>> statementList =
         Iterables.toList(ConstantConditions.notNullElements("statements", statements));
-    mCombiner = ConstantConditions.notNull("combiner", combiner);
+    mJoiner = ConstantConditions.notNull("joiner", joiner);
     mStatementList = Collections.unmodifiableList(statementList);
     mExecutor = withThrottling(1, immediateExecutor());
     mLogger = Logger.newLogger(this, loggerName);
@@ -72,16 +72,16 @@ class CombinationStatementObserver<S, V, R> implements Observer<Evaluation<R>>, 
     int i = 0;
     @SuppressWarnings("UnnecessaryLocalVariable") final Logger logger = mLogger;
     @SuppressWarnings("UnnecessaryLocalVariable") final Executor executor = mExecutor;
-    final Combiner<S, ? super V, ? super Evaluation<R>, Statement<V>> combiner = mCombiner;
+    final Joiner<S, ? super V, ? super Evaluation<R>, Statement<V>> joiner = mJoiner;
     final List<? extends Statement<? extends V>> statements = mStatementList;
-    final CombinationState<S> state = new CombinationState<S>(statements.size());
+    final JoinState<S> state = new JoinState<S>(statements.size());
     try {
-      state.set(combiner.init((List<Statement<V>>) statements));
+      state.set(joiner.init((List<Statement<V>>) statements));
       for (final Statement<? extends V> statement : statements) {
         final int index = i++;
         statement.to(
-            new EvaluationCombination<S, V, R>(state, combiner, executor, evaluation, statements,
-                index, logger));
+            new JoinEvaluation<S, V, R>(state, joiner, executor, evaluation, statements, index,
+                logger));
       }
 
     } catch (final CancellationException e) {
@@ -90,7 +90,7 @@ class CombinationStatementObserver<S, V, R> implements Observer<Evaluation<R>>, 
       Asyncs.failSafe(evaluation, e);
 
     } catch (final Throwable t) {
-      mLogger.err(t, "Error while initializing statements combination");
+      mLogger.err(t, "Error while initializing statements joining");
       state.setFailed(t);
       Asyncs.failSafe(evaluation, t);
     }
@@ -98,12 +98,10 @@ class CombinationStatementObserver<S, V, R> implements Observer<Evaluation<R>>, 
 
   @NotNull
   private Object writeReplace() throws ObjectStreamException {
-    return new ObserverProxy<S, V, R>(mCombiner, mStatementList, mLogger.getName());
+    return new ObserverProxy<S, V, R>(mJoiner, mStatementList, mLogger.getName());
   }
 
-  private static class EvaluationCombination<S, V, R> implements Evaluation<V> {
-
-    private final Combiner<S, ? super V, ? super Evaluation<R>, Statement<V>> mCombiner;
+  private static class JoinEvaluation<S, V, R> implements Evaluation<V> {
 
     private final Evaluation<R> mEvaluation;
 
@@ -111,19 +109,21 @@ class CombinationStatementObserver<S, V, R> implements Observer<Evaluation<R>>, 
 
     private final int mIndex;
 
+    private final Joiner<S, ? super V, ? super Evaluation<R>, Statement<V>> mJoiner;
+
     private final Logger mLogger;
 
-    private final CombinationState<S> mState;
+    private final JoinState<S> mState;
 
     private final List<? extends Statement<? extends V>> mStatements;
 
-    private EvaluationCombination(@NotNull final CombinationState<S> state,
-        @NotNull final Combiner<S, ? super V, ? super Evaluation<R>, Statement<V>> combiner,
+    private JoinEvaluation(@NotNull final JoinState<S> state,
+        @NotNull final Joiner<S, ? super V, ? super Evaluation<R>, Statement<V>> joiner,
         @NotNull final Executor executor, final Evaluation<R> evaluation,
         @NotNull final List<? extends Statement<? extends V>> statements, final int index,
         @NotNull final Logger logger) {
       mState = state;
-      mCombiner = combiner;
+      mJoiner = joiner;
       mExecutor = executor;
       mEvaluation = evaluation;
       mStatements = statements;
@@ -136,7 +136,7 @@ class CombinationStatementObserver<S, V, R> implements Observer<Evaluation<R>>, 
       mExecutor.execute(new Runnable() {
 
         public void run() {
-          final CombinationState<S> state = mState;
+          final JoinState<S> state = mState;
           if (state.isFailed()) {
             mLogger.wrn("Ignoring failure: %s", failure);
             return;
@@ -145,13 +145,13 @@ class CombinationStatementObserver<S, V, R> implements Observer<Evaluation<R>>, 
           final Evaluation<R> evaluation = mEvaluation;
           try {
             final int index = mIndex;
-            final Combiner<S, ? super V, ? super Evaluation<R>, Statement<V>> combiner = mCombiner;
+            final Joiner<S, ? super V, ? super Evaluation<R>, Statement<V>> joiner = mJoiner;
             @SuppressWarnings("unchecked") final List<Statement<V>> statements =
                 (List<Statement<V>>) mStatements;
-            state.set(combiner.failure(state.get(), failure, evaluation, statements, index));
-            state.set(combiner.done(state.get(), evaluation, statements, index));
+            state.set(joiner.failure(state.get(), failure, evaluation, statements, index));
+            state.set(joiner.done(state.get(), evaluation, statements, index));
             if (state.set()) {
-              combiner.settle(state.get(), evaluation, statements);
+              joiner.settle(state.get(), evaluation, statements);
             }
 
           } catch (final CancellationException e) {
@@ -173,7 +173,7 @@ class CombinationStatementObserver<S, V, R> implements Observer<Evaluation<R>>, 
       mExecutor.execute(new Runnable() {
 
         public void run() {
-          final CombinationState<S> state = mState;
+          final JoinState<S> state = mState;
           if (state.isFailed()) {
             mLogger.wrn("Ignoring value: %s", value);
             return;
@@ -182,13 +182,13 @@ class CombinationStatementObserver<S, V, R> implements Observer<Evaluation<R>>, 
           final Evaluation<R> evaluation = mEvaluation;
           try {
             final int index = mIndex;
-            final Combiner<S, ? super V, ? super Evaluation<R>, Statement<V>> combiner = mCombiner;
+            final Joiner<S, ? super V, ? super Evaluation<R>, Statement<V>> joiner = mJoiner;
             @SuppressWarnings("unchecked") final List<Statement<V>> statements =
                 (List<Statement<V>>) mStatements;
-            state.set(combiner.value(state.get(), value, evaluation, statements, index));
-            state.set(combiner.done(state.get(), evaluation, statements, index));
+            state.set(joiner.value(state.get(), value, evaluation, statements, index));
+            state.set(joiner.done(state.get(), evaluation, statements, index));
             if (state.set()) {
-              combiner.settle(state.get(), evaluation, statements);
+              joiner.settle(state.get(), evaluation, statements);
             }
 
           } catch (final CancellationException e) {
@@ -206,7 +206,7 @@ class CombinationStatementObserver<S, V, R> implements Observer<Evaluation<R>>, 
     }
 
     private void checkFailed() {
-      final CombinationState<S> state = mState;
+      final JoinState<S> state = mState;
       if (state.isFailed()) {
         throw FailureException.wrap(state.getFailure());
       }
@@ -217,10 +217,9 @@ class CombinationStatementObserver<S, V, R> implements Observer<Evaluation<R>>, 
 
     private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
 
-    private ObserverProxy(
-        final Combiner<S, ? super V, ? super Evaluation<R>, Statement<V>> combiner,
+    private ObserverProxy(final Joiner<S, ? super V, ? super Evaluation<R>, Statement<V>> joiner,
         final Iterable<? extends Statement<? extends V>> statements, final String loggerName) {
-      super(proxy(combiner), statements, loggerName);
+      super(proxy(joiner), statements, loggerName);
     }
 
     @NotNull
@@ -228,8 +227,8 @@ class CombinationStatementObserver<S, V, R> implements Observer<Evaluation<R>>, 
     private Object readResolve() throws ObjectStreamException {
       try {
         final Object[] args = deserializeArgs();
-        return new CombinationStatementObserver<S, V, R>(
-            (Combiner<S, ? super V, ? super Evaluation<R>, Statement<V>>) args[0],
+        return new JoinStatementObserver<S, V, R>(
+            (Joiner<S, ? super V, ? super Evaluation<R>, Statement<V>>) args[0],
             (Iterable<? extends Statement<? extends V>>) args[1], (String) args[2]);
 
       } catch (final Throwable t) {

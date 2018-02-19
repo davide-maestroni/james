@@ -18,78 +18,75 @@ package dm.jale.ext;
 
 import org.jetbrains.annotations.NotNull;
 
-import java.io.ObjectStreamException;
 import java.io.Serializable;
 import java.util.List;
 
 import dm.jale.async.EvaluationCollection;
 import dm.jale.async.Loop;
-import dm.jale.async.LoopCombiner;
+import dm.jale.async.LoopJoiner;
 import dm.jale.ext.config.BuildConfig;
 
 /**
  * Created by davide-maestroni on 02/16/2018.
  */
-class FirstOrEmptyCombiner<V> implements LoopCombiner<Integer, V, V>, Serializable {
-
-  private static final FirstOrEmptyCombiner<?> sInstance = new FirstOrEmptyCombiner<Object>();
+class SwitchOnlyJoiner<V> implements LoopJoiner<Boolean[], V, V>, Serializable {
 
   private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
 
-  private FirstOrEmptyCombiner() {
+  private final boolean mMayInterruptIfRunning;
+
+  SwitchOnlyJoiner(final boolean mayInterruptIfRunning) {
+    mMayInterruptIfRunning = mayInterruptIfRunning;
   }
 
-  @NotNull
-  @SuppressWarnings("unchecked")
-  static <V> FirstOrEmptyCombiner<V> instance() {
-    return (FirstOrEmptyCombiner<V>) sInstance;
-  }
-
-  public Integer done(final Integer stack, @NotNull final EvaluationCollection<V> evaluation,
+  public Boolean[] done(final Boolean[] stack, @NotNull final EvaluationCollection<V> evaluation,
       @NotNull final List<Loop<V>> contexts, final int index) {
-    if ((stack == null) || (stack == index)) {
-      evaluation.set();
-      return index;
-    }
-
     return stack;
   }
 
-  public Integer failure(final Integer stack, final Throwable failure,
+  public Boolean[] failure(final Boolean[] stack, final Throwable failure,
       @NotNull final EvaluationCollection<V> evaluation, @NotNull final List<Loop<V>> contexts,
       final int index) {
-    if ((stack == null) || (stack == index)) {
+    changeOwnership(stack, contexts, index);
+    if (stack[index]) {
       evaluation.addFailure(failure);
-      return index;
     }
 
     return stack;
   }
 
-  public Integer init(@NotNull final List<Loop<V>> contexts) {
-    return null;
+  public Boolean[] init(@NotNull final List<Loop<V>> contexts) {
+    return new Boolean[contexts.size()];
   }
 
-  public void settle(final Integer stack, @NotNull final EvaluationCollection<V> evaluation,
+  public void settle(final Boolean[] stack, @NotNull final EvaluationCollection<V> evaluation,
       @NotNull final List<Loop<V>> contexts) {
-    if (stack == null) {
-      evaluation.set();
-    }
+    evaluation.set();
   }
 
-  public Integer value(final Integer stack, final V value,
+  public Boolean[] value(final Boolean[] stack, final V value,
       @NotNull final EvaluationCollection<V> evaluation, @NotNull final List<Loop<V>> contexts,
       final int index) {
-    if ((stack == null) || (stack == index)) {
+    changeOwnership(stack, contexts, index);
+    if (stack[index]) {
       evaluation.addValue(value);
-      return index;
     }
 
     return stack;
   }
 
-  @NotNull
-  private Object readResolve() throws ObjectStreamException {
-    return sInstance;
+  private void changeOwnership(final Boolean[] stack, @NotNull final List<Loop<V>> contexts,
+      final int index) {
+    if (stack[index] == null) {
+      for (int i = 0; i < stack.length; i++) {
+        if (Boolean.TRUE.equals(stack[i])) {
+          stack[i] = Boolean.FALSE;
+          contexts.get(i).cancel(mMayInterruptIfRunning);
+          break;
+        }
+      }
+
+      stack[index] = Boolean.TRUE;
+    }
   }
 }

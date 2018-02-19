@@ -49,7 +49,7 @@ abstract class ChunkObserver implements Observer<EvaluationCollection<Chunk>> {
   }
 
   @NotNull
-  protected ChunkOutputStream newStream(@NotNull final EvaluationCollection<Chunk> evaluation) {
+  ChunkOutputStream newStream(@NotNull final EvaluationCollection<Chunk> evaluation) {
     if (mCoreSize != null) {
       return new ChunkOutputStream(evaluation, mAllocationType, mCoreSize);
     }

@@ -24,7 +24,7 @@ import java.util.concurrent.CancellationException;
 import dm.jale.async.Evaluation;
 import dm.jale.async.EvaluationCollection;
 import dm.jale.async.EvaluationState;
-import dm.jale.config.BuildConfig;
+import dm.jale.ext.config.BuildConfig;
 import dm.jale.util.ConstantConditions;
 
 /**

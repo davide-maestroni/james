@@ -24,11 +24,11 @@ import java.io.ObjectStreamException;
 import java.io.Serializable;
 import java.util.List;
 
-import dm.jale.async.CombinationCompleter;
-import dm.jale.async.CombinationSettler;
-import dm.jale.async.CombinationUpdater;
-import dm.jale.async.Combiner;
 import dm.jale.async.EvaluationCollection;
+import dm.jale.async.JoinCompleter;
+import dm.jale.async.JoinSettler;
+import dm.jale.async.JoinUpdater;
+import dm.jale.async.Joiner;
 import dm.jale.async.Loop;
 import dm.jale.async.Mapper;
 import dm.jale.config.BuildConfig;
@@ -37,46 +37,42 @@ import dm.jale.util.SerializableProxy;
 /**
  * Created by davide-maestroni on 02/14/2018.
  */
-class ComposedLoopCombiner<S, V, R>
-    implements Combiner<S, V, EvaluationCollection<R>, Loop<V>>, Serializable {
+class ComposedLoopJoiner<S, V, R>
+    implements Joiner<S, V, EvaluationCollection<R>, Loop<V>>, Serializable {
 
   private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
 
-  private final CombinationCompleter<S, ? super EvaluationCollection<? extends R>, Loop<V>> mDone;
+  private final JoinCompleter<S, ? super EvaluationCollection<? extends R>, Loop<V>> mDone;
 
-  private final CombinationUpdater<S, ? super Throwable, ? super EvaluationCollection<? extends
-      R>, Loop<V>>
+  private final JoinUpdater<S, ? super Throwable, ? super EvaluationCollection<? extends R>,
+      Loop<V>>
       mFailure;
 
   private final Mapper<? super List<Loop<V>>, S> mInit;
 
-  private final CombinationSettler<S, ? super EvaluationCollection<? extends R>, Loop<V>> mSettle;
+  private final JoinSettler<S, ? super EvaluationCollection<? extends R>, Loop<V>> mSettle;
 
-  private final CombinationUpdater<S, ? super V, ? super EvaluationCollection<? extends R>, Loop<V>>
+  private final JoinUpdater<S, ? super V, ? super EvaluationCollection<? extends R>, Loop<V>>
       mValue;
 
   @SuppressWarnings("unchecked")
-  ComposedLoopCombiner(@Nullable final Mapper<? super List<Loop<V>>, S> init,
-      @Nullable final CombinationUpdater<S, ? super V, ? super EvaluationCollection<? extends R>,
+  ComposedLoopJoiner(@Nullable final Mapper<? super List<Loop<V>>, S> init,
+      @Nullable final JoinUpdater<S, ? super V, ? super EvaluationCollection<? extends R>,
           Loop<V>> value,
-      @Nullable final CombinationUpdater<S, ? super Throwable, ? super EvaluationCollection<?
-          extends R>, Loop<V>> failure,
-      @Nullable final CombinationCompleter<S, ? super EvaluationCollection<? extends R>, Loop<V>>
-          done,
-      @Nullable final CombinationSettler<S, ? super EvaluationCollection<? extends R>, Loop<V>>
-          settle) {
+      @Nullable final JoinUpdater<S, ? super Throwable, ? super EvaluationCollection<? extends
+          R>, Loop<V>> failure,
+      @Nullable final JoinCompleter<S, ? super EvaluationCollection<? extends R>, Loop<V>> done,
+      @Nullable final JoinSettler<S, ? super EvaluationCollection<? extends R>, Loop<V>> settle) {
     mInit = (Mapper<? super List<Loop<V>>, S>) ((init != null) ? init : DefaultInit.sInstance);
-    mValue =
-        (CombinationUpdater<S, ? super V, ? super EvaluationCollection<? extends R>, Loop<V>>) (
-            (value != null) ? value : DefaultUpdater.sInstance);
+    mValue = (JoinUpdater<S, ? super V, ? super EvaluationCollection<? extends R>, Loop<V>>) (
+        (value != null) ? value : DefaultUpdater.sInstance);
     mFailure =
-        (CombinationUpdater<S, ? super Throwable, ? super EvaluationCollection<? extends R>,
-            Loop<V>>) (
+        (JoinUpdater<S, ? super Throwable, ? super EvaluationCollection<? extends R>, Loop<V>>) (
             (failure != null) ? failure : DefaultUpdater.sInstance);
-    mDone = (CombinationCompleter<S, ? super EvaluationCollection<? extends R>, Loop<V>>) (
-        (done != null) ? done : DefaultCompleter.sInstance);
-    mSettle = (CombinationSettler<S, ? super EvaluationCollection<? extends R>, Loop<V>>) (
-        (settle != null) ? settle : DefaultSettler.sInstance);
+    mDone = (JoinCompleter<S, ? super EvaluationCollection<? extends R>, Loop<V>>) ((done != null)
+        ? done : DefaultCompleter.sInstance);
+    mSettle = (JoinSettler<S, ? super EvaluationCollection<? extends R>, Loop<V>>) ((settle != null)
+        ? settle : DefaultSettler.sInstance);
   }
 
   public S done(final S stack, @NotNull final EvaluationCollection<R> evaluation,
@@ -114,12 +110,11 @@ class ComposedLoopCombiner<S, V, R>
     private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
 
     private CombinerProxy(final Mapper<? super List<Loop<V>>, S> init,
-        final CombinationUpdater<S, ? super V, ? super EvaluationCollection<? extends R>,
-            Loop<V>> value,
-        final CombinationUpdater<S, ? super Throwable, ? super EvaluationCollection<? extends R>,
+        final JoinUpdater<S, ? super V, ? super EvaluationCollection<? extends R>, Loop<V>> value,
+        final JoinUpdater<S, ? super Throwable, ? super EvaluationCollection<? extends R>,
             Loop<V>> failure,
-        final CombinationCompleter<S, ? super EvaluationCollection<? extends R>, Loop<V>> done,
-        final CombinationSettler<S, ? super EvaluationCollection<? extends R>, Loop<V>> settle) {
+        final JoinCompleter<S, ? super EvaluationCollection<? extends R>, Loop<V>> done,
+        final JoinSettler<S, ? super EvaluationCollection<? extends R>, Loop<V>> settle) {
       super(proxy(init), proxy(value), proxy(failure), proxy(done), proxy(settle));
     }
 
@@ -128,13 +123,12 @@ class ComposedLoopCombiner<S, V, R>
     private Object readResolve() throws ObjectStreamException {
       try {
         final Object[] args = deserializeArgs();
-        return new ComposedLoopCombiner<S, V, R>((Mapper<? super List<Loop<V>>, S>) args[0],
-            (CombinationUpdater<S, ? super V, ? super EvaluationCollection<? extends R>,
-                Loop<V>>) args[1],
-            (CombinationUpdater<S, ? super Throwable, ? super EvaluationCollection<? extends R>,
+        return new ComposedLoopJoiner<S, V, R>((Mapper<? super List<Loop<V>>, S>) args[0],
+            (JoinUpdater<S, ? super V, ? super EvaluationCollection<? extends R>, Loop<V>>) args[1],
+            (JoinUpdater<S, ? super Throwable, ? super EvaluationCollection<? extends R>,
                 Loop<V>>) args[2],
-            (CombinationCompleter<S, ? super EvaluationCollection<? extends R>, Loop<V>>) args[3],
-            (CombinationSettler<S, ? super EvaluationCollection<? extends R>, Loop<V>>) args[4]);
+            (JoinCompleter<S, ? super EvaluationCollection<? extends R>, Loop<V>>) args[3],
+            (JoinSettler<S, ? super EvaluationCollection<? extends R>, Loop<V>>) args[4]);
 
       } catch (final Throwable t) {
         throw new InvalidObjectException(t.getMessage());
@@ -143,7 +137,7 @@ class ComposedLoopCombiner<S, V, R>
   }
 
   private static class DefaultCompleter<S, V, R>
-      implements CombinationCompleter<S, EvaluationCollection<? extends R>, Loop<V>>, Serializable {
+      implements JoinCompleter<S, EvaluationCollection<? extends R>, Loop<V>>, Serializable {
 
     private static final DefaultCompleter<?, ?, ?> sInstance =
         new DefaultCompleter<Object, Object, Object>();
@@ -178,7 +172,7 @@ class ComposedLoopCombiner<S, V, R>
   }
 
   private static class DefaultSettler<S, V, R>
-      implements CombinationSettler<S, EvaluationCollection<? extends R>, Loop<V>>, Serializable {
+      implements JoinSettler<S, EvaluationCollection<? extends R>, Loop<V>>, Serializable {
 
     private static final DefaultSettler<?, ?, ?> sInstance =
         new DefaultSettler<Object, Object, Object>();
@@ -197,8 +191,7 @@ class ComposedLoopCombiner<S, V, R>
   }
 
   private static class DefaultUpdater<S, V, I, R>
-      implements CombinationUpdater<S, I, EvaluationCollection<? extends R>, Loop<V>>,
-      Serializable {
+      implements JoinUpdater<S, I, EvaluationCollection<? extends R>, Loop<V>>, Serializable {
 
     private static final DefaultUpdater<?, ?, ?, ?> sInstance =
         new DefaultUpdater<Object, Object, Object, Object>();

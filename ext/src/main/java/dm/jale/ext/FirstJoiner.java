@@ -24,53 +24,68 @@ import java.util.List;
 
 import dm.jale.async.EvaluationCollection;
 import dm.jale.async.Loop;
-import dm.jale.async.LoopCombiner;
+import dm.jale.async.LoopJoiner;
 import dm.jale.ext.config.BuildConfig;
 
 /**
  * Created by davide-maestroni on 02/16/2018.
  */
-class MergeCombiner<V> implements LoopCombiner<Void, V, V>, Serializable {
+class FirstJoiner<V> implements LoopJoiner<Integer, V, V>, Serializable {
 
-  private static final MergeCombiner<?> sInstance = new MergeCombiner<Object>();
+  private static final FirstJoiner<?> sInstance = new FirstJoiner<Object>();
 
   private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
 
-  private MergeCombiner() {
+  private FirstJoiner() {
   }
 
   @NotNull
   @SuppressWarnings("unchecked")
-  static <V> MergeCombiner<V> instance() {
-    return (MergeCombiner<V>) sInstance;
+  static <V> FirstJoiner<V> instance() {
+    return (FirstJoiner<V>) sInstance;
   }
 
-  public Void done(final Void stack, @NotNull final EvaluationCollection<V> evaluation,
+  public Integer done(final Integer stack, @NotNull final EvaluationCollection<V> evaluation,
       @NotNull final List<Loop<V>> contexts, final int index) {
-    return null;
+    if ((stack != null) && (stack == index)) {
+      evaluation.set();
+      return index;
+    }
+
+    return stack;
   }
 
-  public Void failure(final Void stack, final Throwable failure,
+  public Integer failure(final Integer stack, final Throwable failure,
       @NotNull final EvaluationCollection<V> evaluation, @NotNull final List<Loop<V>> contexts,
       final int index) {
-    evaluation.addFailure(failure);
+    if ((stack == null) || (stack == index)) {
+      evaluation.addFailure(failure);
+      return index;
+    }
+
+    return stack;
+  }
+
+  public Integer init(@NotNull final List<Loop<V>> contexts) {
     return null;
   }
 
-  public Void init(@NotNull final List<Loop<V>> contexts) {
-    return null;
-  }
-
-  public void settle(final Void stack, @NotNull final EvaluationCollection<V> evaluation,
+  public void settle(final Integer stack, @NotNull final EvaluationCollection<V> evaluation,
       @NotNull final List<Loop<V>> contexts) {
-    evaluation.set();
+    if (stack == null) {
+      evaluation.set();
+    }
   }
 
-  public Void value(final Void stack, final V value,
+  public Integer value(final Integer stack, final V value,
       @NotNull final EvaluationCollection<V> evaluation, @NotNull final List<Loop<V>> contexts,
       final int index) {
-    evaluation.addValue(value);
-    return null;
+    if ((stack == null) || (stack == index)) {
+      evaluation.addValue(value);
+      return index;
+    }
+
+    return stack;
   }
 
   @NotNull

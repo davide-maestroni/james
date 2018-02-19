@@ -27,27 +27,27 @@ import dm.jale.async.Evaluation;
 import dm.jale.async.EvaluationState;
 import dm.jale.async.SimpleState;
 import dm.jale.async.Statement;
-import dm.jale.async.StatementCombiner;
+import dm.jale.async.StatementJoiner;
 import dm.jale.ext.config.BuildConfig;
 
 /**
  * Created by davide-maestroni on 02/16/2018.
  */
-class StatesOfCombiner<V>
-    implements StatementCombiner<List<EvaluationState<V>>, V, List<EvaluationState<V>>>,
+class StatesOfJoiner<V>
+    implements StatementJoiner<List<EvaluationState<V>>, V, List<EvaluationState<V>>>,
     Serializable {
 
-  private static final StatesOfCombiner<?> sInstance = new StatesOfCombiner<Object>();
+  private static final StatesOfJoiner<?> sInstance = new StatesOfJoiner<Object>();
 
   private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
 
-  private StatesOfCombiner() {
+  private StatesOfJoiner() {
   }
 
   @NotNull
   @SuppressWarnings("unchecked")
-  static <V> StatesOfCombiner<V> instance() {
-    return (StatesOfCombiner<V>) sInstance;
+  static <V> StatesOfJoiner<V> instance() {
+    return (StatesOfJoiner<V>) sInstance;
   }
 
   public List<EvaluationState<V>> done(final List<EvaluationState<V>> stack,

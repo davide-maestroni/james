@@ -24,65 +24,63 @@ import java.util.List;
 
 import dm.jale.async.EvaluationCollection;
 import dm.jale.async.Loop;
-import dm.jale.async.LoopCombiner;
+import dm.jale.async.LoopJoiner;
 import dm.jale.ext.config.BuildConfig;
 
 /**
  * Created by davide-maestroni on 02/16/2018.
  */
-class FirstCombiner<V> implements LoopCombiner<Integer, V, V>, Serializable {
+class SwitchWhenJoiner<V> implements LoopJoiner<Integer, Object, V>, Serializable {
 
-  private static final FirstCombiner<?> sInstance = new FirstCombiner<Object>();
+  private static final SwitchWhenJoiner<?> sInstance = new SwitchWhenJoiner<Object>();
 
   private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
 
-  private FirstCombiner() {
+  private SwitchWhenJoiner() {
   }
 
   @NotNull
   @SuppressWarnings("unchecked")
-  static <V> FirstCombiner<V> instance() {
-    return (FirstCombiner<V>) sInstance;
+  static <V> SwitchWhenJoiner<V> instance() {
+    return (SwitchWhenJoiner<V>) sInstance;
   }
 
   public Integer done(final Integer stack, @NotNull final EvaluationCollection<V> evaluation,
-      @NotNull final List<Loop<V>> contexts, final int index) {
-    if ((stack != null) && (stack == index)) {
-      evaluation.set();
-      return index;
-    }
-
+      @NotNull final List<Loop<Object>> contexts, final int index) {
     return stack;
   }
 
   public Integer failure(final Integer stack, final Throwable failure,
-      @NotNull final EvaluationCollection<V> evaluation, @NotNull final List<Loop<V>> contexts,
+      @NotNull final EvaluationCollection<V> evaluation, @NotNull final List<Loop<Object>> contexts,
       final int index) {
-    if ((stack == null) || (stack == index)) {
+    if (index == 0) {
+      return null;
+
+    } else if ((stack != null) && (stack == index)) {
       evaluation.addFailure(failure);
-      return index;
     }
 
     return stack;
   }
 
-  public Integer init(@NotNull final List<Loop<V>> contexts) {
+  public Integer init(@NotNull final List<Loop<Object>> contexts) {
     return null;
   }
 
   public void settle(final Integer stack, @NotNull final EvaluationCollection<V> evaluation,
-      @NotNull final List<Loop<V>> contexts) {
-    if (stack == null) {
-      evaluation.set();
-    }
+      @NotNull final List<Loop<Object>> contexts) {
+    evaluation.set();
   }
 
-  public Integer value(final Integer stack, final V value,
-      @NotNull final EvaluationCollection<V> evaluation, @NotNull final List<Loop<V>> contexts,
+  @SuppressWarnings("unchecked")
+  public Integer value(final Integer stack, final Object value,
+      @NotNull final EvaluationCollection<V> evaluation, @NotNull final List<Loop<Object>> contexts,
       final int index) {
-    if ((stack == null) || (stack == index)) {
-      evaluation.addValue(value);
-      return index;
+    if (index == 0) {
+      return (Integer) value + 1;
+
+    } else if ((stack != null) && (stack == index)) {
+      evaluation.addValue((V) value);
     }
 
     return stack;

@@ -25,25 +25,25 @@ import java.util.List;
 
 import dm.jale.async.Evaluation;
 import dm.jale.async.Statement;
-import dm.jale.async.StatementCombiner;
+import dm.jale.async.StatementJoiner;
 import dm.jale.ext.config.BuildConfig;
 
 /**
  * Created by davide-maestroni on 02/16/2018.
  */
-class AllOfCombiner<V> implements StatementCombiner<List<V>, V, List<V>>, Serializable {
+class AllOfJoiner<V> implements StatementJoiner<List<V>, V, List<V>>, Serializable {
 
-  private static final AllOfCombiner<?> sInstance = new AllOfCombiner<Object>();
+  private static final AllOfJoiner<?> sInstance = new AllOfJoiner<Object>();
 
   private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
 
-  private AllOfCombiner() {
+  private AllOfJoiner() {
   }
 
   @NotNull
   @SuppressWarnings("unchecked")
-  static <V> AllOfCombiner<V> instance() {
-    return (AllOfCombiner<V>) sInstance;
+  static <V> AllOfJoiner<V> instance() {
+    return (AllOfJoiner<V>) sInstance;
   }
 
   public List<V> done(final List<V> stack, @NotNull final Evaluation<List<V>> evaluation,

@@ -19,7 +19,10 @@ package dm.jale.ext;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
+import java.io.Serializable;
+
 import dm.jale.async.EvaluationCollection;
+import dm.jale.ext.config.BuildConfig;
 import dm.jale.ext.io.AllocationType;
 import dm.jale.ext.io.Chunk;
 import dm.jale.ext.io.ChunkOutputStream;
@@ -28,7 +31,9 @@ import dm.jale.util.ConstantConditions;
 /**
  * Created by davide-maestroni on 02/15/2018.
  */
-class ByteArrayChunkObserver extends ChunkObserver {
+class ByteArrayChunkObserver extends ChunkObserver implements Serializable {
+
+  private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
 
   private final byte[] mBuffer;
 

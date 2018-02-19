@@ -25,13 +25,13 @@ import java.io.Serializable;
 import java.util.List;
 import java.util.concurrent.Executor;
 
-import dm.jale.async.CombinationCompleter;
-import dm.jale.async.CombinationSettler;
-import dm.jale.async.CombinationUpdater;
-import dm.jale.async.Combiner;
 import dm.jale.async.Completer;
 import dm.jale.async.Evaluation;
 import dm.jale.async.EvaluationCollection;
+import dm.jale.async.JoinCompleter;
+import dm.jale.async.JoinSettler;
+import dm.jale.async.JoinUpdater;
+import dm.jale.async.Joiner;
 import dm.jale.async.Loop;
 import dm.jale.async.Mapper;
 import dm.jale.async.Observer;
@@ -133,23 +133,21 @@ public class Async {
 
   @NotNull
   public <S, V, R> Loop<R> loopOf(
-      @NotNull final Combiner<S, ? super V, ? super EvaluationCollection<R>, Loop<V>> combiner,
+      @NotNull final Joiner<S, ? super V, ? super EvaluationCollection<R>, Loop<V>> joiner,
       @NotNull final Iterable<? extends Loop<? extends V>> loops) {
-    return loop(new CombinationLoopObserver<S, V, R>(combiner, loops, loopLoggerName()));
+    return loop(new JoinLoopObserver<S, V, R>(joiner, loops, loopLoggerName()));
   }
 
   @NotNull
   public <S, V, R> Loop<R> loopOf(@Nullable final Mapper<? super List<Loop<V>>, S> init,
-      @Nullable final CombinationUpdater<S, ? super V, ? super EvaluationCollection<? extends R>,
+      @Nullable final JoinUpdater<S, ? super V, ? super EvaluationCollection<? extends R>,
           Loop<V>> value,
-      @Nullable final CombinationUpdater<S, ? super Throwable, ? super EvaluationCollection<?
-          extends R>, Loop<V>> failure,
-      @Nullable final CombinationCompleter<S, ? super EvaluationCollection<? extends R>, Loop<V>>
-          done,
-      @Nullable final CombinationSettler<S, ? super EvaluationCollection<? extends R>, Loop<V>>
-          settle,
+      @Nullable final JoinUpdater<S, ? super Throwable, ? super EvaluationCollection<? extends
+          R>, Loop<V>> failure,
+      @Nullable final JoinCompleter<S, ? super EvaluationCollection<? extends R>, Loop<V>> done,
+      @Nullable final JoinSettler<S, ? super EvaluationCollection<? extends R>, Loop<V>> settle,
       @NotNull final Iterable<? extends Loop<? extends V>> loops) {
-    return loopOf(new ComposedLoopCombiner<S, V, R>(init, value, failure, done, settle), loops);
+    return loopOf(new ComposedLoopJoiner<S, V, R>(init, value, failure, done, settle), loops);
   }
 
   @NotNull
@@ -168,23 +166,22 @@ public class Async {
 
   @NotNull
   public <S, V, R> Statement<R> statementOf(
-      @NotNull final Combiner<S, ? super V, ? super Evaluation<R>, Statement<V>> combiner,
+      @NotNull final Joiner<S, ? super V, ? super Evaluation<R>, Statement<V>> joiner,
       @NotNull final Iterable<? extends Statement<? extends V>> statements) {
-    return statement(
-        new CombinationStatementObserver<S, V, R>(combiner, statements, statementLoggerName()));
+    return statement(new JoinStatementObserver<S, V, R>(joiner, statements, statementLoggerName()));
   }
 
   @NotNull
   public <S, V, R> Statement<R> statementOf(
       @Nullable final Mapper<? super List<Statement<V>>, S> init,
-      @Nullable final CombinationUpdater<S, ? super V, ? super Evaluation<? extends R>,
-          Statement<V>> value,
-      @Nullable final CombinationUpdater<S, ? super Throwable, ? super Evaluation<? extends R>,
+      @Nullable final JoinUpdater<S, ? super V, ? super Evaluation<? extends R>, Statement<V>>
+          value,
+      @Nullable final JoinUpdater<S, ? super Throwable, ? super Evaluation<? extends R>,
           Statement<V>> failure,
-      @Nullable final CombinationCompleter<S, ? super Evaluation<? extends R>, Statement<V>> done,
-      @Nullable final CombinationSettler<S, ? super Evaluation<? extends R>, Statement<V>> settle,
+      @Nullable final JoinCompleter<S, ? super Evaluation<? extends R>, Statement<V>> done,
+      @Nullable final JoinSettler<S, ? super Evaluation<? extends R>, Statement<V>> settle,
       @NotNull final Iterable<? extends Statement<? extends V>> statements) {
-    return statementOf(new ComposedStatementCombiner<S, V, R>(init, value, failure, done, settle),
+    return statementOf(new ComposedStatementJoiner<S, V, R>(init, value, failure, done, settle),
         statements);
   }
 

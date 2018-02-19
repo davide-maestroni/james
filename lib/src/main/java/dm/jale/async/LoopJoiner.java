@@ -19,6 +19,6 @@ package dm.jale.async;
 /**
  * Created by davide-maestroni on 02/15/2018.
  */
-public interface StatementCombiner<S, V, R> extends Combiner<S, V, Evaluation<R>, Statement<V>> {
+public interface LoopJoiner<S, V, R> extends Joiner<S, V, EvaluationCollection<R>, Loop<V>> {
 
 }

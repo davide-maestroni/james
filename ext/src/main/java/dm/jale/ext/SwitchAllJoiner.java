@@ -18,29 +18,34 @@ package dm.jale.ext;
 
 import org.jetbrains.annotations.NotNull;
 
+import java.io.ObjectStreamException;
 import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.List;
 
 import dm.jale.async.EvaluationCollection;
 import dm.jale.async.Loop;
-import dm.jale.async.LoopCombiner;
+import dm.jale.async.LoopJoiner;
 import dm.jale.async.SimpleState;
-import dm.jale.ext.SwitchFirstCombiner.CombinerStack;
+import dm.jale.ext.SwitchAllJoiner.CombinerStack;
 import dm.jale.ext.config.BuildConfig;
-import dm.jale.util.ConstantConditions;
 
 /**
  * Created by davide-maestroni on 02/16/2018.
  */
-class SwitchFirstCombiner<V> implements LoopCombiner<CombinerStack<V>, Object, V>, Serializable {
+class SwitchAllJoiner<V> implements LoopJoiner<CombinerStack<V>, Object, V>, Serializable {
+
+  private static final SwitchAllJoiner<?> sInstance = new SwitchAllJoiner<Object>();
 
   private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
 
-  private final int mMaxCount;
+  private SwitchAllJoiner() {
+  }
 
-  SwitchFirstCombiner(final int maxCount) {
-    mMaxCount = ConstantConditions.positive("maxCount", maxCount);
+  @NotNull
+  @SuppressWarnings("unchecked")
+  static <V> SwitchAllJoiner<V> instance() {
+    return (SwitchAllJoiner<V>) sInstance;
   }
 
   public CombinerStack<V> done(final CombinerStack<V> stack,
@@ -67,10 +72,7 @@ class SwitchFirstCombiner<V> implements LoopCombiner<CombinerStack<V>, Object, V
         evaluation.addFailure(failure);
 
       } else {
-        final ArrayList<SimpleState<V>> stateList = stack.states[index - 1];
-        if (stateList.size() < mMaxCount) {
-          stateList.add(SimpleState.<V>ofFailure(failure));
-        }
+        stack.states[index - 1].add(SimpleState.<V>ofFailure(failure));
       }
     }
 
@@ -106,14 +108,16 @@ class SwitchFirstCombiner<V> implements LoopCombiner<CombinerStack<V>, Object, V
         evaluation.addValue((V) value);
 
       } else {
-        final ArrayList<SimpleState<V>> stateList = stack.states[index - 1];
-        if (stateList.size() < mMaxCount) {
-          stateList.add(SimpleState.ofValue((V) value));
-        }
+        stack.states[index - 1].add(SimpleState.ofValue((V) value));
       }
     }
 
     return stack;
+  }
+
+  @NotNull
+  private Object readResolve() throws ObjectStreamException {
+    return sInstance;
   }
 
   static class CombinerStack<V> {
