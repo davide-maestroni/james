@@ -112,6 +112,11 @@ public class AsyncExt extends Async {
   }
 
   @NotNull
+  public static <V> Forker<?, V, Evaluation<V>, Statement<V>> retry(final int maxCount) {
+    return RetryForker.newForker(maxCount);
+  }
+
+  @NotNull
   public static Yielder<?, Number, Integer> sum() {
     return sumInteger();
   }
