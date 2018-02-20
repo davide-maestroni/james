@@ -31,8 +31,7 @@ import dm.jale.util.SerializableProxy;
 /**
  * Created by davide-maestroni on 02/01/2018.
  */
-class ThenLoopStatementHandler<V, R> extends AsyncStatementLoopHandler<V, R>
-    implements Serializable {
+class ThenLoopStatementHandler<V, R> extends StatementLoopHandler<V, R> implements Serializable {
 
   private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
 

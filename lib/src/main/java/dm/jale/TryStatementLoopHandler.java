@@ -35,19 +35,18 @@ import dm.jale.util.SerializableProxy;
 /**
  * Created by davide-maestroni on 02/01/2018.
  */
-class TryStatementLoopHandler<V, R> extends AsyncStatementLoopHandler<V, R>
-    implements Serializable {
+class TryStatementLoopHandler<V, R> extends StatementLoopHandler<V, R> implements Serializable {
 
   private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
 
   private final Mapper<? super V, ? extends Closeable> mCloseable;
 
-  private final AsyncStatementLoopHandler<V, R> mHandler;
+  private final StatementLoopHandler<V, R> mHandler;
 
   private final Logger mLogger;
 
   TryStatementLoopHandler(@NotNull final Mapper<? super V, ? extends Closeable> closeable,
-      @NotNull final AsyncStatementLoopHandler<V, R> handler, @Nullable final String loggerName) {
+      @NotNull final StatementLoopHandler<V, R> handler, @Nullable final String loggerName) {
     mCloseable = ConstantConditions.notNull("closeable", closeable);
     mHandler = ConstantConditions.notNull("handler", handler);
     mLogger = Logger.newLogger(this, loggerName, Locale.ENGLISH);
@@ -74,7 +73,7 @@ class TryStatementLoopHandler<V, R> extends AsyncStatementLoopHandler<V, R>
     private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
 
     private HandlerProxy(final Mapper<? super V, ? extends Closeable> closeable,
-        final AsyncStatementLoopHandler<V, R> handler, final String loggerName) {
+        final StatementLoopHandler<V, R> handler, final String loggerName) {
       super(proxy(closeable), handler, loggerName);
     }
 
@@ -84,7 +83,7 @@ class TryStatementLoopHandler<V, R> extends AsyncStatementLoopHandler<V, R>
       try {
         final Object[] args = deserializeArgs();
         return new TryStatementLoopHandler<V, R>((Mapper<? super V, ? extends Closeable>) args[0],
-            (AsyncStatementLoopHandler<V, R>) args[1], (String) args[2]);
+            (StatementLoopHandler<V, R>) args[1], (String) args[2]);
 
       } catch (final Throwable t) {
         throw new InvalidObjectException(t.getMessage());

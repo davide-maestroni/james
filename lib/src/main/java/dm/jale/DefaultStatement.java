@@ -23,6 +23,7 @@ import java.io.Closeable;
 import java.io.InvalidObjectException;
 import java.io.ObjectStreamException;
 import java.io.Serializable;
+import java.lang.ref.WeakReference;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
@@ -51,22 +52,13 @@ import dm.jale.util.SerializableProxy;
 import dm.jale.util.TimeUnits;
 import dm.jale.util.TimeUnits.Condition;
 
-import static dm.jale.executor.ExecutorPool.immediateExecutor;
+import static dm.jale.executor.ExecutorPool.loopExecutor;
 import static dm.jale.executor.ExecutorPool.withThrottling;
 
 /**
  * Created by davide-maestroni on 01/12/2018.
  */
 class DefaultStatement<V> implements Statement<V>, Serializable {
-
-  private static final Evaluation<?> VOID_EVALUATION = new Evaluation<Object>() {
-
-    public void fail(@NotNull final Throwable failure) {
-    }
-
-    public void set(final Object value) {
-    }
-  };
 
   private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
 
@@ -281,9 +273,8 @@ class DefaultStatement<V> implements Statement<V>, Serializable {
     }
   }
 
-  @SuppressWarnings("unchecked")
   public void consume() {
-    to((Evaluation<? super V>) VOID_EVALUATION);
+    chain(new ChainConsume<V>());
   }
 
   @NotNull
@@ -526,21 +517,8 @@ class DefaultStatement<V> implements Statement<V>, Serializable {
   }
 
   public void to(@NotNull final Evaluation<? super V> evaluation) {
-    ConstantConditions.notNull("evaluation", evaluation);
     checkEvaluated();
-    then(new Mapper<V, Void>() {
-
-      public Void apply(final V value) {
-        evaluation.set(value);
-        return null;
-      }
-    }).elseCatch(new Mapper<Throwable, Void>() {
-
-      public Void apply(final Throwable failure) {
-        evaluation.fail(failure);
-        return null;
-      }
-    });
+    chain(new ToEvaluationStatementHandler<V>(evaluation)).consume();
   }
 
   @SuppressWarnings("unchecked")
@@ -555,7 +533,7 @@ class DefaultStatement<V> implements Statement<V>, Serializable {
   }
 
   @NotNull
-  private <R> Statement<R> chain(@NotNull final AsyncStatementHandler<V, R> handler) {
+  private <R> Statement<R> chain(@NotNull final StatementHandler<V, R> handler) {
     return chain(new ChainHandler<V, R>(handler));
   }
 
@@ -657,6 +635,39 @@ class DefaultStatement<V> implements Statement<V>, Serializable {
     return new StatementProxy(mObserver, mIsEvaluated, mLogger.getName(), chains);
   }
 
+  private static class ChainConsume<V> extends StatementChain<V, Object> {
+
+    private volatile WeakReference<StatementChain<Object, ?>> mNext =
+        new WeakReference<StatementChain<Object, ?>>(null);
+
+    @NotNull
+    StatementChain<V, Object> copy() {
+      return new ChainConsume<V>();
+    }
+
+    private void complete() {
+      final StatementChain<Object, ?> next = mNext.get();
+      if (next != null) {
+        next.set(null);
+      }
+    }
+
+    void fail(final StatementChain<Object, ?> next, final Throwable failure) {
+      getLogger().dbg("Consuming failure: %s", failure);
+      complete();
+    }
+
+    void set(final StatementChain<Object, ?> next, final V value) {
+      getLogger().dbg("Consuming value: %s", value);
+      complete();
+    }
+
+    @Override
+    void setNext(@NotNull final StatementChain<Object, ?> next) {
+      mNext = new WeakReference<StatementChain<Object, ?>>(next);
+    }
+  }
+
   private static class ChainForkObserver<S, V>
       implements RenewableObserver<Evaluation<V>>, Serializable {
 
@@ -712,15 +723,10 @@ class DefaultStatement<V> implements Statement<V>, Serializable {
 
     private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
 
-    private final AsyncStatementHandler<V, R> mHandler;
+    private final StatementHandler<V, R> mHandler;
 
-    ChainHandler(@NotNull final AsyncStatementHandler<V, R> handler) {
+    ChainHandler(@NotNull final StatementHandler<V, R> handler) {
       mHandler = handler;
-    }
-
-    @NotNull
-    StatementChain<V, R> copy() {
-      return new ChainHandler<V, R>(mHandler.renew());
     }
 
     @NotNull
@@ -732,9 +738,9 @@ class DefaultStatement<V> implements Statement<V>, Serializable {
 
       private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
 
-      private final AsyncStatementHandler<V, R> mHandler;
+      private final StatementHandler<V, R> mHandler;
 
-      private ChainProxy(@NotNull final AsyncStatementHandler<V, R> handler) {
+      private ChainProxy(@NotNull final StatementHandler<V, R> handler) {
         mHandler = handler;
       }
 
@@ -747,6 +753,11 @@ class DefaultStatement<V> implements Statement<V>, Serializable {
           throw new InvalidObjectException(t.getMessage());
         }
       }
+    }
+
+    @NotNull
+    StatementChain<V, R> copy() {
+      return new ChainHandler<V, R>(mHandler.renew());
     }
 
     void fail(final StatementChain<R, ?> next, final Throwable failure) {
@@ -869,7 +880,7 @@ class DefaultStatement<V> implements Statement<V>, Serializable {
       @Nullable
       @Override
       Runnable chain(@NotNull final StatementChain<?, ?> chain) {
-        getLogger().dbg("Binding statement [%s => %s]", StatementState.Failed,
+        getLogger().dbg("Chaining statement [%s => %s]", StatementState.Failed,
             StatementState.Evaluating);
         final Throwable exception = mException;
         mException = null;
@@ -954,7 +965,7 @@ class DefaultStatement<V> implements Statement<V>, Serializable {
     }
   }
 
-  private static class ForkObserver<S, V> extends AsyncStatementHandler<V, V>
+  private static class ForkObserver<S, V> extends StatementHandler<V, V>
       implements RenewableObserver<Evaluation<V>>, Serializable {
 
     private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
@@ -976,7 +987,7 @@ class DefaultStatement<V> implements Statement<V>, Serializable {
         @NotNull final Forker<S, ? super V, ? super Evaluation<V>, ? super Statement<V>> forker) {
       mForker =
           (Forker<S, V, Evaluation<V>, Statement<V>>) ConstantConditions.notNull("forker", forker);
-      mExecutor = withThrottling(1, immediateExecutor());
+      mExecutor = withThrottling(1, loopExecutor());
       mStatement = statement;
     }
 
@@ -1135,6 +1146,17 @@ class DefaultStatement<V> implements Statement<V>, Serializable {
 
     private volatile StatementChain<R, ?> mNext;
 
+    public final void fail(@NotNull final Throwable failure) {
+      ConstantConditions.notNull("failure", failure);
+      mInnerState.fail(failure);
+      fail(mNext, failure);
+    }
+
+    public final void set(final V value) {
+      mInnerState.set();
+      set(mNext, value);
+    }
+
     boolean cancel(@NotNull final Throwable exception) {
       if (mInnerState.failSafe(exception)) {
         fail(mNext, exception);
@@ -1243,17 +1265,6 @@ class DefaultStatement<V> implements Statement<V>, Serializable {
       void fail(@NotNull final Throwable failure) {
         throwException();
       }
-    }
-
-    public final void fail(@NotNull final Throwable failure) {
-      ConstantConditions.notNull("failure", failure);
-      mInnerState.fail(failure);
-      fail(mNext, failure);
-    }
-
-    public final void set(final V value) {
-      mInnerState.set();
-      set(mNext, value);
     }
   }
 

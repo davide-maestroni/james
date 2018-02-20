@@ -23,6 +23,7 @@ import java.io.Closeable;
 import java.io.InvalidObjectException;
 import java.io.ObjectStreamException;
 import java.io.Serializable;
+import java.lang.ref.WeakReference;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
@@ -62,42 +63,13 @@ import dm.jale.util.SerializableProxy;
 import dm.jale.util.TimeUnits;
 import dm.jale.util.TimeUnits.Condition;
 
-import static dm.jale.executor.ExecutorPool.immediateExecutor;
+import static dm.jale.executor.ExecutorPool.loopExecutor;
 import static dm.jale.executor.ExecutorPool.withThrottling;
 
 /**
  * Created by davide-maestroni on 02/01/2018.
  */
 class DefaultLoop<V> implements Loop<V>, Serializable {
-
-  private static final EvaluationCollection<?> VOID_EVALUATIONS =
-      new EvaluationCollection<Object>() {
-
-        @NotNull
-        public EvaluationCollection<Object> addFailure(@NotNull final Throwable failure) {
-          return this;
-        }
-
-        @NotNull
-        public EvaluationCollection<Object> addFailures(
-            @Nullable final Iterable<? extends Throwable> failures) {
-          return this;
-        }
-
-        @NotNull
-        public EvaluationCollection<Object> addValue(final Object value) {
-          return this;
-        }
-
-        @NotNull
-        public EvaluationCollection<Object> addValues(
-            @Nullable final Iterable<? extends Object> values) {
-          return this;
-        }
-
-        public void set() {
-        }
-      };
 
   private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
 
@@ -220,7 +192,7 @@ class DefaultLoop<V> implements Loop<V>, Serializable {
       @NotNull final NestedQueue<SimpleState<V>> queue, @NotNull final LoopChain<V, ?> chain) {
     boolean isValue;
     SimpleState<V> state;
-    ArrayList<?> inputs = null;
+    ArrayList<?> outputs = null;
     synchronized (mutex) {
       if (queue.isEmpty()) {
         return;
@@ -229,31 +201,31 @@ class DefaultLoop<V> implements Loop<V>, Serializable {
       state = queue.removeFirst();
       isValue = state.isSet();
       if (isValue) {
-        inputs = new ArrayList<V>();
+        outputs = new ArrayList<V>();
       }
     }
 
     while (state != null) {
       if (isValue) {
         if (state.isSet()) {
-          ((ArrayList<V>) inputs).add(state.value());
+          ((ArrayList<V>) outputs).add(state.value());
 
         } else {
-          chain.addValues((Iterable<V>) inputs);
+          chain.addValues((Iterable<V>) outputs);
           final ArrayList<Throwable> failures = new ArrayList<Throwable>();
           failures.add(state.failure());
-          inputs = failures;
+          outputs = failures;
         }
 
       } else {
         if (state.isFailed()) {
-          ((ArrayList<Throwable>) inputs).add(state.failure());
+          ((ArrayList<Throwable>) outputs).add(state.failure());
 
         } else {
-          chain.addFailures((Iterable<Throwable>) inputs);
+          chain.addFailures((Iterable<Throwable>) outputs);
           final ArrayList<V> values = new ArrayList<V>();
           values.add(state.value());
-          inputs = values;
+          outputs = values;
         }
       }
 
@@ -350,9 +322,8 @@ class DefaultLoop<V> implements Loop<V>, Serializable {
     }
   }
 
-  @SuppressWarnings("unchecked")
   public void consume() {
-    to((EvaluationCollection<V>) VOID_EVALUATIONS);
+    chain(new ChainConsume<V>());
   }
 
   public boolean getDone() {
@@ -843,7 +814,7 @@ class DefaultLoop<V> implements Loop<V>, Serializable {
 
   public void to(@NotNull final EvaluationCollection<? super V> evaluation) {
     checkEvaluated();
-    chain(new ToEvaluationLoopHandler<V>(evaluation));
+    chain(new ToEvaluationLoopHandler<V>(evaluation)).consume();
   }
 
   @NotNull
@@ -926,7 +897,7 @@ class DefaultLoop<V> implements Loop<V>, Serializable {
         evaluation.fail(failure);
         return null;
       }
-    });
+    }).consume();
   }
 
   @SuppressWarnings("unchecked")
@@ -941,17 +912,17 @@ class DefaultLoop<V> implements Loop<V>, Serializable {
   }
 
   @NotNull
-  private <R> Loop<R> chain(@NotNull final AsyncStatementHandler<V, R> handler) {
+  private <R> Loop<R> chain(@NotNull final StatementHandler<V, R> handler) {
     return chain(new ChainStatementHandler<V, R>(handler));
   }
 
   @NotNull
-  private <R> Loop<R> chain(@NotNull final AsyncStatementLoopHandler<V, R> handler) {
+  private <R> Loop<R> chain(@NotNull final StatementLoopHandler<V, R> handler) {
     return chain(new ChainStatementLoopHandler<V, R>(handler));
   }
 
   @NotNull
-  private <R> Loop<R> chain(@NotNull final AsyncLoopHandler<V, R> handler) {
+  private <R> Loop<R> chain(@NotNull final LoopHandler<V, R> handler) {
     return chain(new ChainLoopHandler<V, R>(handler));
   }
 
@@ -977,6 +948,7 @@ class DefaultLoop<V> implements Loop<V>, Serializable {
       } else {
         chain.setLogger(logger);
         chaining = ((ChainHead<V>) head).chain(chain);
+        mState = StatementState.Chained;
         mChain = chain;
         mMutex.notifyAll();
       }
@@ -994,17 +966,17 @@ class DefaultLoop<V> implements Loop<V>, Serializable {
   }
 
   @NotNull
-  private <R> Loop<R> chainOrdered(@NotNull final AsyncLoopHandler<V, R> handler) {
+  private <R> Loop<R> chainOrdered(@NotNull final LoopHandler<V, R> handler) {
     return chain(new ChainLoopHandlerOrdered<V, R>(handler));
   }
 
   @NotNull
-  private <R> Loop<R> chainOrdered(@NotNull final AsyncStatementHandler<V, R> handler) {
+  private <R> Loop<R> chainOrdered(@NotNull final StatementHandler<V, R> handler) {
     return chain(new ChainStatementHandlerOrdered<V, R>(handler));
   }
 
   @NotNull
-  private <R> Loop<R> chainOrdered(@NotNull final AsyncStatementLoopHandler<V, R> handler) {
+  private <R> Loop<R> chainOrdered(@NotNull final StatementLoopHandler<V, R> handler) {
     return chain(new ChainStatementLoopHandlerOrdered<V, R>(handler));
   }
 
@@ -1074,6 +1046,57 @@ class DefaultLoop<V> implements Loop<V>, Serializable {
     return new LoopProxy(mObserver, mIsEvaluated, mLogger.getName(), chains);
   }
 
+  private static class ChainConsume<V> extends LoopChain<V, Object> {
+
+    private volatile WeakReference<LoopChain<Object, ?>> mNext =
+        new WeakReference<LoopChain<Object, ?>>(null);
+
+    @Override
+    void addFailure(final LoopChain<Object, ?> next, @NotNull final Throwable failure) {
+      getLogger().dbg("Consuming failure: %s", failure);
+    }
+
+    private void complete() {
+      final LoopChain<Object, ?> next = mNext.get();
+      if (next != null) {
+        next.set();
+      }
+    }
+
+    @Override
+    void setNext(@NotNull final LoopChain<Object, ?> next) {
+      mNext = new WeakReference<LoopChain<Object, ?>>(next);
+    }
+
+    @Override
+    void addFailures(final LoopChain<Object, ?> next,
+        @NotNull final Iterable<? extends Throwable> failures) {
+      getLogger().dbg("Consuming failures: %s", Iterables.toString(failures));
+    }
+
+    @Override
+    void addValue(final LoopChain<Object, ?> next, final V value) {
+      getLogger().dbg("Consuming value: %s", value);
+    }
+
+    @Override
+    void addValues(final LoopChain<Object, ?> next, @NotNull final Iterable<? extends V> values) {
+      getLogger().dbg("Consuming values: %s", Iterables.toString(values));
+    }
+
+    @NotNull
+    @Override
+    LoopChain<V, Object> copy() {
+      return new ChainConsume<V>();
+    }
+
+    @Override
+    void set(final LoopChain<Object, ?> next) {
+      getLogger().dbg("Consuming completion");
+      complete();
+    }
+  }
+
   private static class ChainForkObserver<S, V>
       implements RenewableObserver<EvaluationCollection<V>>, Serializable {
 
@@ -1135,16 +1158,11 @@ class DefaultLoop<V> implements Loop<V>, Serializable {
 
     private DoubleQueue<SimpleState<V>> mStates = new DoubleQueue<SimpleState<V>>();
 
-    @Override
-    void addFailure(final LoopChain<V, ?> next, @NotNull final Throwable failure) {
-      next.addFailure(failure);
-    }
-
     @Nullable
     Runnable chain(final LoopChain<V, ?> chain) {
-      final Runnable binding = mInnerState.chain(chain);
-      mState = StatementState.Chained;
-      return binding;
+      final Runnable chaining = mInnerState.chain(chain);
+      mState = StatementState.Evaluating;
+      return chaining;
     }
 
     @NotNull
@@ -1248,7 +1266,7 @@ class DefaultLoop<V> implements Loop<V>, Serializable {
       @Nullable
       @Override
       Runnable chain(final LoopChain<V, ?> chain) {
-        getLogger().dbg("Binding loop [%s => %s]", StatementState.Set, StatementState.Chained);
+        getLogger().dbg("Chaining loop [%s => %s]", StatementState.Set, StatementState.Evaluating);
         mInnerState = new StateEvaluating();
         chain.prepend(consumeStates());
         return new Runnable() {
@@ -1268,6 +1286,11 @@ class DefaultLoop<V> implements Loop<V>, Serializable {
       boolean isSet() {
         return true;
       }
+    }
+
+    @Override
+    void addFailure(final LoopChain<V, ?> next, @NotNull final Throwable failure) {
+      next.addFailure(failure);
     }
 
     @Override
@@ -1304,11 +1327,11 @@ class DefaultLoop<V> implements Loop<V>, Serializable {
 
     private final ChainEvaluationCollection mEvaluation = new ChainEvaluationCollection();
 
-    private final AsyncLoopHandler<V, R> mHandler;
+    private final LoopHandler<V, R> mHandler;
 
     private final AtomicLong mPendingCount = new AtomicLong(1);
 
-    private ChainLoopHandler(@Nullable final AsyncLoopHandler<V, R> handler) {
+    private ChainLoopHandler(@Nullable final LoopHandler<V, R> handler) {
       mHandler = ConstantConditions.notNull("handler", handler);
     }
 
@@ -1334,9 +1357,9 @@ class DefaultLoop<V> implements Loop<V>, Serializable {
 
       private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
 
-      private final AsyncLoopHandler<V, R> mHandler;
+      private final LoopHandler<V, R> mHandler;
 
-      private ChainProxy(final AsyncLoopHandler<V, R> handler) {
+      private ChainProxy(final LoopHandler<V, R> handler) {
         mHandler = handler;
       }
 
@@ -1356,14 +1379,14 @@ class DefaultLoop<V> implements Loop<V>, Serializable {
       private volatile LoopChain<R, ?> mNext;
 
       @NotNull
-      ChainEvaluationCollection withNext(final LoopChain<R, ?> next) {
-        mNext = next;
+      public EvaluationCollection<R> addFailure(@NotNull final Throwable failure) {
+        mNext.addFailure(failure);
         return this;
       }
 
       @NotNull
-      public EvaluationCollection<R> addFailure(@NotNull final Throwable failure) {
-        mNext.addFailure(failure);
+      ChainEvaluationCollection withNext(final LoopChain<R, ?> next) {
+        mNext = next;
         return this;
       }
 
@@ -1483,7 +1506,7 @@ class DefaultLoop<V> implements Loop<V>, Serializable {
 
     private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
 
-    private final AsyncLoopHandler<V, R> mHandler;
+    private final LoopHandler<V, R> mHandler;
 
     private final Object mMutex = new Object();
 
@@ -1491,7 +1514,7 @@ class DefaultLoop<V> implements Loop<V>, Serializable {
 
     private final NestedQueue<SimpleState<R>> mQueue = new NestedQueue<SimpleState<R>>();
 
-    private ChainLoopHandlerOrdered(@Nullable final AsyncLoopHandler<V, R> handler) {
+    private ChainLoopHandlerOrdered(@Nullable final LoopHandler<V, R> handler) {
       mHandler = ConstantConditions.notNull("handler", handler);
     }
 
@@ -1525,9 +1548,9 @@ class DefaultLoop<V> implements Loop<V>, Serializable {
 
       private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
 
-      private final AsyncLoopHandler<V, R> mHandler;
+      private final LoopHandler<V, R> mHandler;
 
-      private ChainProxy(final AsyncLoopHandler<V, R> handler) {
+      private ChainProxy(final LoopHandler<V, R> handler) {
         mHandler = handler;
       }
 
@@ -1713,11 +1736,11 @@ class DefaultLoop<V> implements Loop<V>, Serializable {
 
     private final ChainEvaluation mEvaluation = new ChainEvaluation();
 
-    private final AsyncStatementHandler<V, R> mHandler;
+    private final StatementHandler<V, R> mHandler;
 
     private final AtomicLong mPendingCount = new AtomicLong(1);
 
-    private ChainStatementHandler(@Nullable final AsyncStatementHandler<V, R> handler) {
+    private ChainStatementHandler(@Nullable final StatementHandler<V, R> handler) {
       mHandler = ConstantConditions.notNull("handler", handler);
     }
 
@@ -1743,9 +1766,9 @@ class DefaultLoop<V> implements Loop<V>, Serializable {
 
       private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
 
-      private final AsyncStatementHandler<V, R> mHandler;
+      private final StatementHandler<V, R> mHandler;
 
-      private ChainProxy(final AsyncStatementHandler<V, R> handler) {
+      private ChainProxy(final StatementHandler<V, R> handler) {
         mHandler = handler;
       }
 
@@ -1875,7 +1898,7 @@ class DefaultLoop<V> implements Loop<V>, Serializable {
 
     private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
 
-    private final AsyncStatementHandler<V, R> mHandler;
+    private final StatementHandler<V, R> mHandler;
 
     private final Object mMutex = new Object();
 
@@ -1883,7 +1906,7 @@ class DefaultLoop<V> implements Loop<V>, Serializable {
 
     private final NestedQueue<SimpleState<R>> mQueue = new NestedQueue<SimpleState<R>>();
 
-    private ChainStatementHandlerOrdered(@Nullable final AsyncStatementHandler<V, R> handler) {
+    private ChainStatementHandlerOrdered(@Nullable final StatementHandler<V, R> handler) {
       mHandler = ConstantConditions.notNull("handler", handler);
     }
 
@@ -1926,9 +1949,9 @@ class DefaultLoop<V> implements Loop<V>, Serializable {
 
       private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
 
-      private final AsyncStatementHandler<V, R> mHandler;
+      private final StatementHandler<V, R> mHandler;
 
-      private ChainProxy(final AsyncStatementHandler<V, R> handler) {
+      private ChainProxy(final StatementHandler<V, R> handler) {
         mHandler = handler;
       }
 
@@ -2069,11 +2092,11 @@ class DefaultLoop<V> implements Loop<V>, Serializable {
 
     private final ChainEvaluationCollection mEvaluation = new ChainEvaluationCollection();
 
-    private final AsyncStatementLoopHandler<V, R> mHandler;
+    private final StatementLoopHandler<V, R> mHandler;
 
     private final AtomicLong mPendingCount = new AtomicLong(1);
 
-    private ChainStatementLoopHandler(@Nullable final AsyncStatementLoopHandler<V, R> handler) {
+    private ChainStatementLoopHandler(@Nullable final StatementLoopHandler<V, R> handler) {
       mHandler = ConstantConditions.notNull("handler", handler);
     }
 
@@ -2099,9 +2122,9 @@ class DefaultLoop<V> implements Loop<V>, Serializable {
 
       private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
 
-      private final AsyncStatementLoopHandler<V, R> mHandler;
+      private final StatementLoopHandler<V, R> mHandler;
 
-      private ChainProxy(final AsyncStatementLoopHandler<V, R> handler) {
+      private ChainProxy(final StatementLoopHandler<V, R> handler) {
         mHandler = handler;
       }
 
@@ -2248,7 +2271,7 @@ class DefaultLoop<V> implements Loop<V>, Serializable {
 
     private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
 
-    private final AsyncStatementLoopHandler<V, R> mHandler;
+    private final StatementLoopHandler<V, R> mHandler;
 
     private final Object mMutex = new Object();
 
@@ -2256,8 +2279,7 @@ class DefaultLoop<V> implements Loop<V>, Serializable {
 
     private final NestedQueue<SimpleState<R>> mQueue = new NestedQueue<SimpleState<R>>();
 
-    private ChainStatementLoopHandlerOrdered(
-        @Nullable final AsyncStatementLoopHandler<V, R> handler) {
+    private ChainStatementLoopHandlerOrdered(@Nullable final StatementLoopHandler<V, R> handler) {
       mHandler = ConstantConditions.notNull("handler", handler);
     }
 
@@ -2291,9 +2313,9 @@ class DefaultLoop<V> implements Loop<V>, Serializable {
 
       private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
 
-      private final AsyncStatementLoopHandler<V, R> mHandler;
+      private final StatementLoopHandler<V, R> mHandler;
 
-      private ChainProxy(final AsyncStatementLoopHandler<V, R> handler) {
+      private ChainProxy(final StatementLoopHandler<V, R> handler) {
         mHandler = handler;
       }
 
@@ -2471,7 +2493,7 @@ class DefaultLoop<V> implements Loop<V>, Serializable {
     }
   }
 
-  private static class ForkObserver<S, V> extends AsyncLoopHandler<V, V>
+  private static class ForkObserver<S, V> extends LoopHandler<V, V>
       implements RenewableObserver<EvaluationCollection<V>>, Serializable {
 
     // TODO: 17/02/2018 failure back-propagation
@@ -2498,7 +2520,7 @@ class DefaultLoop<V> implements Loop<V>, Serializable {
       mForker =
           (Forker<S, V, EvaluationCollection<V>, Loop<V>>) ConstantConditions.notNull("forker",
               forker);
-      mExecutor = withThrottling(1, immediateExecutor());
+      mExecutor = withThrottling(1, loopExecutor());
       mLoop = loop;
     }
 
@@ -2768,9 +2790,9 @@ class DefaultLoop<V> implements Loop<V>, Serializable {
     abstract void addFailures(LoopChain<R, ?> next,
         @NotNull Iterable<? extends Throwable> failures);
 
-    abstract void addValue(LoopChain<R, ?> next, V input);
+    abstract void addValue(LoopChain<R, ?> next, V value);
 
-    abstract void addValues(LoopChain<R, ?> next, @NotNull Iterable<? extends V> inputs);
+    abstract void addValues(LoopChain<R, ?> next, @NotNull Iterable<? extends V> values);
 
     boolean cancel(@NotNull final Throwable exception) {
       final Runnable command;

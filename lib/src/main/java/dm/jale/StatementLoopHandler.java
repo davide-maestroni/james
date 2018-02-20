@@ -16,19 +16,27 @@
 
 package dm.jale;
 
+import org.jetbrains.annotations.NotNull;
+
+import dm.jale.async.EvaluationCollection;
+
 /**
- * Created by davide-maestroni on 02/01/2018.
+ * Created by davide-maestroni on 01/14/2018.
  */
-enum StatementState {
-  Evaluating(false), Set(true), Failed(true), Chained(false);
+class StatementLoopHandler<V, R> {
 
-  private final boolean mIsDone;
-
-  StatementState(final boolean isDone) {
-    mIsDone = isDone;
+  void failure(@NotNull final Throwable failure,
+      @NotNull final EvaluationCollection<R> evaluation) throws Exception {
+    evaluation.addFailure(failure).set();
   }
 
-  public boolean isDone() {
-    return mIsDone;
+  @NotNull
+  StatementLoopHandler<V, R> renew() {
+    return this;
+  }
+
+  @SuppressWarnings("unchecked")
+  void value(final V value, @NotNull final EvaluationCollection<R> evaluation) throws Exception {
+    evaluation.addValue((R) value).set();
   }
 }

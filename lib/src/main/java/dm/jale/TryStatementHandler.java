@@ -35,18 +35,18 @@ import dm.jale.util.SerializableProxy;
 /**
  * Created by davide-maestroni on 02/01/2018.
  */
-class TryStatementHandler<V, R> extends AsyncStatementHandler<V, R> implements Serializable {
+class TryStatementHandler<V, R> extends StatementHandler<V, R> implements Serializable {
 
   private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
 
   private final Mapper<? super V, ? extends Closeable> mCloseable;
 
-  private final AsyncStatementHandler<V, R> mHandler;
+  private final StatementHandler<V, R> mHandler;
 
   private final Logger mLogger;
 
   TryStatementHandler(@NotNull final Mapper<? super V, ? extends Closeable> closeable,
-      @NotNull final AsyncStatementHandler<V, R> handler, @Nullable final String loggerName) {
+      @NotNull final StatementHandler<V, R> handler, @Nullable final String loggerName) {
     mCloseable = ConstantConditions.notNull("closeable", closeable);
     mHandler = ConstantConditions.notNull("handler", handler);
     mLogger = Logger.newLogger(this, loggerName, Locale.ENGLISH);
@@ -73,7 +73,7 @@ class TryStatementHandler<V, R> extends AsyncStatementHandler<V, R> implements S
     private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
 
     private HandlerProxy(final Mapper<? super V, ? extends Closeable> closeable,
-        final AsyncStatementHandler<V, R> handler, final String loggerName) {
+        final StatementHandler<V, R> handler, final String loggerName) {
       super(proxy(closeable), handler, loggerName);
     }
 
@@ -83,7 +83,7 @@ class TryStatementHandler<V, R> extends AsyncStatementHandler<V, R> implements S
       try {
         final Object[] args = deserializeArgs();
         return new TryStatementHandler<V, R>((Mapper<? super V, ? extends Closeable>) args[0],
-            (AsyncStatementHandler<V, R>) args[1], (String) args[2]);
+            (StatementHandler<V, R>) args[1], (String) args[2]);
 
       } catch (final Throwable t) {
         throw new InvalidObjectException(t.getMessage());

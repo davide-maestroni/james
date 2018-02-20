@@ -23,7 +23,7 @@ import dm.jale.async.Evaluation;
 /**
  * Created by davide-maestroni on 01/14/2018.
  */
-class AsyncStatementHandler<V, R> {
+class StatementHandler<V, R> {
 
   void failure(@NotNull final Throwable failure, @NotNull final Evaluation<R> evaluation) throws
       Exception {
@@ -31,7 +31,7 @@ class AsyncStatementHandler<V, R> {
   }
 
   @NotNull
-  AsyncStatementHandler<V, R> renew() {
+  StatementHandler<V, R> renew() {
     return this;
   }
 

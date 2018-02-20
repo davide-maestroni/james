@@ -17,26 +17,42 @@
 package dm.jale;
 
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 
 import dm.jale.async.EvaluationCollection;
 
 /**
- * Created by davide-maestroni on 01/14/2018.
+ * Created by davide-maestroni on 02/01/2018.
  */
-class AsyncStatementLoopHandler<V, R> {
+class LoopHandler<V, R> {
 
-  void failure(@NotNull final Throwable failure,
+  void addFailure(@NotNull final Throwable failure,
       @NotNull final EvaluationCollection<R> evaluation) throws Exception {
     evaluation.addFailure(failure).set();
   }
 
-  @NotNull
-  AsyncStatementLoopHandler<V, R> renew() {
-    return this;
+  void addFailures(@Nullable final Iterable<? extends Throwable> failures,
+      @NotNull final EvaluationCollection<R> evaluation) throws Exception {
+    evaluation.addFailures(failures).set();
   }
 
   @SuppressWarnings("unchecked")
-  void value(final V value, @NotNull final EvaluationCollection<R> evaluation) throws Exception {
+  void addValue(final V value, @NotNull final EvaluationCollection<R> evaluation) throws Exception {
     evaluation.addValue((R) value).set();
+  }
+
+  @SuppressWarnings("unchecked")
+  void addValues(@Nullable final Iterable<? extends V> values,
+      @NotNull final EvaluationCollection<R> evaluation) throws Exception {
+    evaluation.addValues((Iterable<R>) values).set();
+  }
+
+  @NotNull
+  LoopHandler<V, R> renew() {
+    return this;
+  }
+
+  void set(@NotNull final EvaluationCollection<R> evaluation) throws Exception {
+    evaluation.set();
   }
 }

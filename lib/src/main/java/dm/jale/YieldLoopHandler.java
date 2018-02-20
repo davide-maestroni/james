@@ -45,7 +45,7 @@ import static dm.jale.executor.ExecutorPool.withThrottling;
 /**
  * Created by davide-maestroni on 02/05/2018.
  */
-class YieldLoopHandler<S, V, R> extends AsyncLoopHandler<V, R> implements Serializable {
+class YieldLoopHandler<S, V, R> extends LoopHandler<V, R> implements Serializable {
 
   private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
 
@@ -139,7 +139,7 @@ class YieldLoopHandler<S, V, R> extends AsyncLoopHandler<V, R> implements Serial
 
   @NotNull
   @Override
-  AsyncLoopHandler<V, R> renew() {
+  LoopHandler<V, R> renew() {
     return new YieldLoopHandler<S, V, R>(mYielder, mLogger.getName());
   }
 

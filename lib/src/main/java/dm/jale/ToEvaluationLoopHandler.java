@@ -30,7 +30,7 @@ import dm.jale.util.ConstantConditions;
 /**
  * Created by davide-maestroni on 02/05/2018.
  */
-class ToEvaluationLoopHandler<V> extends AsyncLoopHandler<V, Void> implements Serializable {
+class ToEvaluationLoopHandler<V> extends LoopHandler<V, Void> implements Serializable {
 
   private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
 
@@ -43,30 +43,66 @@ class ToEvaluationLoopHandler<V> extends AsyncLoopHandler<V, Void> implements Se
 
   @Override
   void addFailure(@NotNull final Throwable failure,
-      @NotNull final EvaluationCollection<Void> evaluation) {
-    mEvaluation.addFailure(failure);
+      @NotNull final EvaluationCollection<Void> evaluation) throws Exception {
+    try {
+      mEvaluation.addFailure(failure);
+
+    } catch (final Exception e) {
+      evaluation.set();
+      throw e;
+    }
   }
 
   @Override
   void addFailures(@Nullable final Iterable<? extends Throwable> failures,
-      @NotNull final EvaluationCollection<Void> evaluation) {
-    mEvaluation.addFailures(failures);
+      @NotNull final EvaluationCollection<Void> evaluation) throws Exception {
+    try {
+      mEvaluation.addFailures(failures);
+
+    } catch (final Exception e) {
+      evaluation.set();
+      throw e;
+    }
   }
 
   @Override
-  void addValue(final V value, @NotNull final EvaluationCollection<Void> evaluation) {
-    mEvaluation.addValue(value);
+  void addValue(final V value, @NotNull final EvaluationCollection<Void> evaluation) throws
+      Exception {
+    try {
+      mEvaluation.addValue(value);
+
+    } catch (final Exception e) {
+      evaluation.set();
+      throw e;
+    }
   }
 
   @Override
   void addValues(@Nullable final Iterable<? extends V> values,
-      @NotNull final EvaluationCollection<Void> evaluation) {
-    mEvaluation.addValues(values);
+      @NotNull final EvaluationCollection<Void> evaluation) throws Exception {
+    try {
+      mEvaluation.addValues(values);
+
+    } catch (final Exception e) {
+      evaluation.set();
+      throw e;
+    }
+  }
+
+  @NotNull
+  @Override
+  LoopHandler<V, Void> renew() {
+    return ConstantConditions.unsupported();
   }
 
   @Override
   void set(@NotNull final EvaluationCollection<Void> evaluation) {
-    mEvaluation.set();
+    try {
+      mEvaluation.set();
+
+    } finally {
+      evaluation.set();
+    }
   }
 
   @NotNull
