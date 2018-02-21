@@ -26,11 +26,11 @@ import java.io.Serializable;
 import java.lang.ref.WeakReference;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Locale;
 import java.util.NoSuchElementException;
 import java.util.concurrent.CancellationException;
-import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executor;
 import java.util.concurrent.TimeUnit;
@@ -73,8 +73,6 @@ class DefaultLoop<V> implements Loop<V>, Serializable {
 
   private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
 
-  private final CopyOnWriteArrayList<Loop<?>> mForked = new CopyOnWriteArrayList<Loop<?>>();
-
   private final ChainHead<?> mHead;
 
   private final boolean mIsEvaluated;
@@ -90,6 +88,8 @@ class DefaultLoop<V> implements Loop<V>, Serializable {
   private final LoopChain<?, V> mTail;
 
   private LoopChain<V, ?> mChain;
+
+  private ArrayList<WeakReference<Loop<?>>> mForked = new ArrayList<WeakReference<Loop<?>>>();
 
   private StatementState mState = StatementState.Evaluating;
 
@@ -239,6 +239,7 @@ class DefaultLoop<V> implements Loop<V>, Serializable {
     }
   }
 
+  @SuppressWarnings("unchecked")
   public boolean cancel(final boolean mayInterruptIfRunning) {
     final Observer<? extends EvaluationCollection<?>> observer = mObserver;
     if (mIsFork) {
@@ -247,8 +248,13 @@ class DefaultLoop<V> implements Loop<V>, Serializable {
       }
 
       boolean isCancelled = false;
-      for (final Loop<?> forked : mForked) {
-        if (forked.cancel(mayInterruptIfRunning)) {
+      final Iterator<WeakReference<Loop<?>>> iterator = mForked.iterator();
+      while (iterator.hasNext()) {
+        final Statement<?> statement = iterator.next().get();
+        if (statement == null) {
+          iterator.remove();
+
+        } else if (statement.cancel(mayInterruptIfRunning)) {
           isCancelled = true;
         }
       }
@@ -257,6 +263,10 @@ class DefaultLoop<V> implements Loop<V>, Serializable {
     }
 
     LoopChain<?, ?> chain = mHead;
+    if (observer instanceof ChainForkObserver) {
+      ((ChainForkObserver) observer).cancel(chain);
+    }
+
     final CancellationException exception = new CancellationException("loop is cancelled");
     if (mayInterruptIfRunning && (observer instanceof InterruptibleObserver)) {
       if (chain.cancel(exception)) {
@@ -937,7 +947,23 @@ class DefaultLoop<V> implements Loop<V>, Serializable {
       final Loop<R> forked =
           new DefaultLoop<V>(((ForkObserver<?, V>) observer).newObserver(), mIsEvaluated,
               mLogger).chain(chain);
-      mForked.add(forked);
+      synchronized (mMutex) {
+        final ArrayList<WeakReference<Loop<?>>> newForked = new ArrayList<WeakReference<Loop<?>>>();
+        final Iterator<WeakReference<Loop<?>>> iterator = mForked.iterator();
+        while (iterator.hasNext()) {
+          final WeakReference<Loop<?>> next = iterator.next();
+          if (next.get() == null) {
+            iterator.remove();
+
+          } else {
+            newForked.add(next);
+          }
+        }
+
+        newForked.add(new WeakReference<Loop<?>>(forked));
+        mForked = newForked;
+      }
+
       return forked;
     }
 
@@ -1117,6 +1143,10 @@ class DefaultLoop<V> implements Loop<V>, Serializable {
       final ForkObserver<S, V> observer = mObserver.renew();
       observer.accept(null);
       return new ChainForkObserver<S, V>(observer);
+    }
+
+    void cancel(final EvaluationCollection<V> evaluation) {
+      mObserver.unchain(evaluation);
     }
 
     @NotNull
@@ -2496,11 +2526,9 @@ class DefaultLoop<V> implements Loop<V>, Serializable {
   private static class ForkObserver<S, V> extends LoopHandler<V, V>
       implements RenewableObserver<EvaluationCollection<V>>, Serializable {
 
-    // TODO: 17/02/2018 failure back-propagation
-
     private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
 
-    private final List<EvaluationCollection<V>> mEvaluations =
+    private final ArrayList<EvaluationCollection<V>> mEvaluations =
         new ArrayList<EvaluationCollection<V>>();
 
     private final Executor mExecutor;
@@ -2692,6 +2720,15 @@ class DefaultLoop<V> implements Loop<V>, Serializable {
       return new ChainForkObserver<S, V>(this);
     }
 
+    void unchain(final EvaluationCollection<V> evaluation) {
+      mExecutor.execute(new Runnable() {
+
+        public void run() {
+          mEvaluations.remove(evaluation);
+        }
+      });
+    }
+
     private void checkFailed() {
       final Throwable failure = mFailure;
       if (failure != null) {
@@ -2700,7 +2737,7 @@ class DefaultLoop<V> implements Loop<V>, Serializable {
     }
 
     private void clearEvaluations(@NotNull final Throwable failure) {
-      final List<EvaluationCollection<V>> evaluations = mEvaluations;
+      final ArrayList<EvaluationCollection<V>> evaluations = mEvaluations;
       for (final EvaluationCollection<V> evaluation : evaluations) {
         Asyncs.failSafe(evaluation, failure);
       }

@@ -48,19 +48,22 @@ import dm.jale.util.Threads;
  */
 public class Async {
 
+  // TODO: 17/02/2018 failure back-propagation
+  // TODO: 21/02/2018 jaf
+
   private final Executor mExecutor;
 
-  private final boolean mIsUnevaluated;
+  private final boolean mIsEvaluated;
 
   private final String mLoggerName;
 
   public Async() {
-    this(false, null, null);
+    this(true, null, null);
   }
 
-  private Async(final boolean isUnevaluated, @Nullable final Executor executor,
+  private Async(final boolean isEvaluated, @Nullable final Executor executor,
       @Nullable final String loggerName) {
-    mIsUnevaluated = isUnevaluated;
+    mIsEvaluated = isEvaluated;
     mExecutor = executor;
     mLoggerName = loggerName;
   }
@@ -94,7 +97,12 @@ public class Async {
 
   @NotNull
   public Async evaluateOn(@Nullable final Executor executor) {
-    return new Async(mIsUnevaluated, executor, mLoggerName);
+    return new Async(mIsEvaluated, executor, mLoggerName);
+  }
+
+  @NotNull
+  public Async evaluated(final boolean isEvaluated) {
+    return new Async(isEvaluated, mExecutor, mLoggerName);
   }
 
   @NotNull
@@ -109,13 +117,13 @@ public class Async {
 
   @NotNull
   public Async loggerName(@Nullable final String loggerName) {
-    return new Async(mIsUnevaluated, mExecutor, loggerName);
+    return new Async(mIsEvaluated, mExecutor, loggerName);
   }
 
   @NotNull
   @SuppressWarnings("unchecked")
   public <V> Loop<V> loop(@NotNull final Statement<? extends Iterable<V>> statement) {
-    if (!mIsUnevaluated && (statement instanceof Loop)) {
+    if (mIsEvaluated && (statement instanceof Loop)) {
       return (Loop<V>) statement;
     }
 
@@ -124,11 +132,11 @@ public class Async {
 
   @NotNull
   public <V> Loop<V> loop(@NotNull final Observer<EvaluationCollection<V>> observer) {
-    final boolean isUnevaluated = mIsUnevaluated;
+    final boolean isEvaluated = mIsEvaluated;
     final Observer<EvaluationCollection<V>> loopObserver = loopObserver(observer);
-    return new DefaultLoop<V>(
-        (isUnevaluated) ? new UnevaluatedObserver<V, EvaluationCollection<V>>(loopObserver)
-            : loopObserver, !isUnevaluated, loopLoggerName());
+    return new DefaultLoop<V>((isEvaluated) ? loopObserver
+        : new UnevaluatedObserver<V, EvaluationCollection<V>>(loopObserver), isEvaluated,
+        loopLoggerName());
   }
 
   @NotNull
@@ -157,11 +165,11 @@ public class Async {
 
   @NotNull
   public <V> Statement<V> statement(@NotNull final Observer<Evaluation<V>> observer) {
-    final boolean isUnevaluated = mIsUnevaluated;
+    final boolean isEvaluated = mIsEvaluated;
     final Observer<Evaluation<V>> statementObserver = statementObserver(observer);
-    return new DefaultStatement<V>(
-        (isUnevaluated) ? new UnevaluatedObserver<V, Evaluation<V>>(statementObserver)
-            : statementObserver, !isUnevaluated, statementLoggerName());
+    return new DefaultStatement<V>((isEvaluated) ? statementObserver
+        : new UnevaluatedObserver<V, Evaluation<V>>(statementObserver), isEvaluated,
+        statementLoggerName());
   }
 
   @NotNull
@@ -183,11 +191,6 @@ public class Async {
       @NotNull final Iterable<? extends Statement<? extends V>> statements) {
     return statementOf(new ComposedStatementJoiner<S, V, R>(init, value, failure, done, settle),
         statements);
-  }
-
-  @NotNull
-  public Async unevaluated() {
-    return new Async(true, mExecutor, mLoggerName);
   }
 
   @NotNull
@@ -336,13 +339,7 @@ public class Async {
               mThread = null;
             }
 
-            try {
-              evaluation.addFailure(t).set();
-
-            } catch (final Throwable ignored) {
-              // cannot take any action
-              // TODO: 17/02/2018 log?
-            }
+            Asyncs.failSafe(evaluation, t);
           }
         }
       });

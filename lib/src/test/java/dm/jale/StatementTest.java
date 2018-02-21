@@ -133,7 +133,7 @@ public class StatementTest {
 
   @Test
   public void cancelUnevaluated() {
-    final Statement<String> statement = new Async().unevaluated().value("test");
+    final Statement<String> statement = new Async().evaluated(false).value("test");
     assertThat(statement.isCancelled()).isFalse();
     assertThat(statement.isDone()).isFalse();
     assertThat(statement.cancel(false)).isTrue();
@@ -143,7 +143,7 @@ public class StatementTest {
 
   @Test
   public void cancelled() {
-    final Statement<Void> statement = new Async().unevaluated().value(null);
+    final Statement<Void> statement = new Async().evaluated(false).value(null);
     statement.cancel(false);
     assertThat(statement.isCancelled()).isTrue();
   }
@@ -555,7 +555,7 @@ public class StatementTest {
   public void evaluated() {
     final Random random = new Random();
     final Statement<Integer> statement =
-        new Async().unevaluated().statement(new Observer<Evaluation<Integer>>() {
+        new Async().evaluated(false).statement(new Observer<Evaluation<Integer>>() {
 
           public void accept(final Evaluation<Integer> evaluation) {
             evaluation.set(random.nextInt());
@@ -569,7 +569,7 @@ public class StatementTest {
   public void evaluatedEvaluate() {
     final Random random = new Random();
     final Statement<Integer> statement =
-        new Async().unevaluated().statement(new Observer<Evaluation<Integer>>() {
+        new Async().evaluated(false).statement(new Observer<Evaluation<Integer>>() {
 
           public void accept(final Evaluation<Integer> evaluation) {
             evaluation.set(random.nextInt());
@@ -595,7 +595,7 @@ public class StatementTest {
   @Test
   public void evaluatingEvaluated() {
     final Statement<String> statement = //
-        new Async().unevaluated()
+        new Async().evaluated(false)
                    .value("test")
                    .forkOn(withDelay(1, SECONDS, backgroundExecutor()))
                    .then(new Mapper<String, String>() {
@@ -625,7 +625,7 @@ public class StatementTest {
   @Test
   public void evaluatingUnevaluated() {
     final Statement<String> statement = //
-        new Async().unevaluated()
+        new Async().evaluated(false)
                    .value("test")
                    .forkOn(withDelay(1, SECONDS, backgroundExecutor()))
                    .then(new Mapper<String, String>() {
@@ -696,7 +696,7 @@ public class StatementTest {
 
   @Test(expected = IllegalStateException.class)
   public void failureInvalidStateEvaluating() {
-    final Statement<Void> statement = new Async().unevaluated().failure(new Exception());
+    final Statement<Void> statement = new Async().evaluated(false).failure(new Exception());
     assertThat(statement.failure());
   }
 
@@ -1482,7 +1482,7 @@ public class StatementTest {
 
   @Test
   public void serializeUnevaluated() throws IOException, ClassNotFoundException {
-    final Statement<String> statement = new Async().unevaluated().value("test");
+    final Statement<String> statement = new Async().evaluated(false).value("test");
     final ByteArrayOutputStream byteOutputStream = new ByteArrayOutputStream();
     final ObjectOutputStream objectOutputStream = new ObjectOutputStream(byteOutputStream);
     objectOutputStream.writeObject(statement);
@@ -1497,7 +1497,7 @@ public class StatementTest {
   @Test
   public void serializeUnevaluatedFork() throws IOException, ClassNotFoundException {
     final Statement<String> statement =
-        createStatementFork(new Async().unevaluated().value("test"));
+        createStatementFork(new Async().evaluated(false).value("test"));
     final ByteArrayOutputStream byteOutputStream = new ByteArrayOutputStream();
     final ObjectOutputStream objectOutputStream = new ObjectOutputStream(byteOutputStream);
     objectOutputStream.writeObject(statement);
@@ -1512,7 +1512,7 @@ public class StatementTest {
   @Test
   public void serializeUnevaluatedForked() throws IOException, ClassNotFoundException {
     final Statement<String> statement =
-        createStatementFork(new Async().unevaluated().value("test")).then(new ToUpper());
+        createStatementFork(new Async().evaluated(false).value("test")).then(new ToUpper());
     final ByteArrayOutputStream byteOutputStream = new ByteArrayOutputStream();
     final ObjectOutputStream objectOutputStream = new ObjectOutputStream(byteOutputStream);
     objectOutputStream.writeObject(statement);
@@ -2159,7 +2159,7 @@ public class StatementTest {
   @Test(expected = UnsupportedOperationException.class)
   public void toException() {
     final TestEvaluation<String> evaluation = new TestEvaluation<String>();
-    final Statement<String> statement = new Async().unevaluated().value("test");
+    final Statement<String> statement = new Async().evaluated(false).value("test");
     statement.to(evaluation);
   }
 
@@ -2200,7 +2200,7 @@ public class StatementTest {
 
   @Test(expected = IllegalStateException.class)
   public void valueInvalidStateEvaluating() {
-    final Statement<Void> statement = new Async().unevaluated().value(null);
+    final Statement<Void> statement = new Async().evaluated(false).value(null);
     statement.value();
   }
 

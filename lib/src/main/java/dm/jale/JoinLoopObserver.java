@@ -22,6 +22,7 @@ import org.jetbrains.annotations.Nullable;
 import java.io.InvalidObjectException;
 import java.io.ObjectStreamException;
 import java.io.Serializable;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.CancellationException;
@@ -31,7 +32,6 @@ import dm.jale.async.EvaluationCollection;
 import dm.jale.async.FailureException;
 import dm.jale.async.Joiner;
 import dm.jale.async.Loop;
-import dm.jale.async.Observer;
 import dm.jale.config.BuildConfig;
 import dm.jale.log.Logger;
 import dm.jale.util.ConstantConditions;
@@ -44,7 +44,8 @@ import static dm.jale.executor.ExecutorPool.withThrottling;
 /**
  * Created by davide-maestroni on 02/14/2018.
  */
-class JoinLoopObserver<S, V, R> implements Observer<EvaluationCollection<R>>, Serializable {
+class JoinLoopObserver<S, V, R>
+    implements RenewableObserver<EvaluationCollection<R>>, Serializable {
 
   private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
 
@@ -95,6 +96,16 @@ class JoinLoopObserver<S, V, R> implements Observer<EvaluationCollection<R>>, Se
       state.setFailed(t);
       Asyncs.failSafe(evaluation, t);
     }
+  }
+
+  @NotNull
+  public JoinLoopObserver<S, V, R> renew() {
+    final ArrayList<Loop<? extends V>> loops = new ArrayList<Loop<? extends V>>();
+    for (final Loop<? extends V> loop : mLoopList) {
+      loops.add(loop.evaluate());
+    }
+
+    return new JoinLoopObserver<S, V, R>(mJoiner, loops, mLogger.getName());
   }
 
   @NotNull

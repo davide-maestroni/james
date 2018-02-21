@@ -21,6 +21,7 @@ import org.jetbrains.annotations.NotNull;
 import java.io.InvalidObjectException;
 import java.io.ObjectStreamException;
 import java.io.Serializable;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.CancellationException;
@@ -29,7 +30,6 @@ import java.util.concurrent.Executor;
 import dm.jale.async.Evaluation;
 import dm.jale.async.FailureException;
 import dm.jale.async.Joiner;
-import dm.jale.async.Observer;
 import dm.jale.async.Statement;
 import dm.jale.config.BuildConfig;
 import dm.jale.log.Logger;
@@ -43,7 +43,7 @@ import static dm.jale.executor.ExecutorPool.withThrottling;
 /**
  * Created by davide-maestroni on 02/14/2018.
  */
-class JoinStatementObserver<S, V, R> implements Observer<Evaluation<R>>, Serializable {
+class JoinStatementObserver<S, V, R> implements RenewableObserver<Evaluation<R>>, Serializable {
 
   private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
 
@@ -94,6 +94,16 @@ class JoinStatementObserver<S, V, R> implements Observer<Evaluation<R>>, Seriali
       state.setFailed(t);
       Asyncs.failSafe(evaluation, t);
     }
+  }
+
+  @NotNull
+  public JoinStatementObserver<S, V, R> renew() {
+    final ArrayList<Statement<? extends V>> statements = new ArrayList<Statement<? extends V>>();
+    for (final Statement<? extends V> statement : mStatementList) {
+      statements.add(statement.evaluate());
+    }
+
+    return new JoinStatementObserver<S, V, R>(mJoiner, statements, mLogger.getName());
   }
 
   @NotNull

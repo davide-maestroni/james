@@ -25,10 +25,10 @@ import java.io.ObjectStreamException;
 import java.io.Serializable;
 import java.lang.ref.WeakReference;
 import java.util.ArrayList;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Locale;
 import java.util.concurrent.CancellationException;
-import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executor;
 import java.util.concurrent.TimeUnit;
@@ -62,9 +62,6 @@ class DefaultStatement<V> implements Statement<V>, Serializable {
 
   private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
 
-  private final CopyOnWriteArrayList<Statement<?>> mForked =
-      new CopyOnWriteArrayList<Statement<?>>();
-
   private final ChainHead<?> mHead;
 
   private final boolean mIsEvaluated;
@@ -80,6 +77,9 @@ class DefaultStatement<V> implements Statement<V>, Serializable {
   private final StatementChain<?, V> mTail;
 
   private StatementChain<V, ?> mChain;
+
+  private ArrayList<WeakReference<Statement<?>>> mForked =
+      new ArrayList<WeakReference<Statement<?>>>();
 
   private StatementState mState = StatementState.Evaluating;
 
@@ -190,6 +190,7 @@ class DefaultStatement<V> implements Statement<V>, Serializable {
     }
   }
 
+  @SuppressWarnings("unchecked")
   public boolean cancel(final boolean mayInterruptIfRunning) {
     final Observer<? extends Evaluation<?>> observer = mObserver;
     if (mIsFork) {
@@ -198,8 +199,13 @@ class DefaultStatement<V> implements Statement<V>, Serializable {
       }
 
       boolean isCancelled = false;
-      for (final Statement<?> forked : mForked) {
-        if (forked.cancel(mayInterruptIfRunning)) {
+      final Iterator<WeakReference<Statement<?>>> iterator = mForked.iterator();
+      while (iterator.hasNext()) {
+        final Statement<?> statement = iterator.next().get();
+        if (statement == null) {
+          iterator.remove();
+
+        } else if (statement.cancel(mayInterruptIfRunning)) {
           isCancelled = true;
         }
       }
@@ -208,6 +214,10 @@ class DefaultStatement<V> implements Statement<V>, Serializable {
     }
 
     StatementChain<?, ?> chain = mHead;
+    if (observer instanceof ChainForkObserver) {
+      ((ChainForkObserver) observer).cancel(chain);
+    }
+
     final CancellationException exception = new CancellationException("statement is cancelled");
     if (mayInterruptIfRunning && (observer instanceof InterruptibleObserver)) {
       if (chain.cancel(exception)) {
@@ -540,6 +550,7 @@ class DefaultStatement<V> implements Statement<V>, Serializable {
   @NotNull
   @SuppressWarnings("unchecked")
   private <R> Statement<R> chain(@NotNull final StatementChain<V, R> chain) {
+    // TODO: 21/02/2018 propagate
     final ChainHead<?> head = mHead;
     final Logger logger = mLogger;
     final Runnable chaining;
@@ -548,7 +559,24 @@ class DefaultStatement<V> implements Statement<V>, Serializable {
       final Statement<R> forked =
           new DefaultStatement<V>(((ForkObserver<?, V>) observer).newObserver(), mIsEvaluated,
               logger).chain(chain);
-      mForked.add(forked);
+      synchronized (mMutex) {
+        final ArrayList<WeakReference<Statement<?>>> newForked =
+            new ArrayList<WeakReference<Statement<?>>>();
+        final Iterator<WeakReference<Statement<?>>> iterator = mForked.iterator();
+        while (iterator.hasNext()) {
+          final WeakReference<Statement<?>> next = iterator.next();
+          if (next.get() == null) {
+            iterator.remove();
+
+          } else {
+            newForked.add(next);
+          }
+        }
+
+        newForked.add(new WeakReference<Statement<?>>(forked));
+        mForked = newForked;
+      }
+
       return forked;
     }
 
@@ -688,6 +716,10 @@ class DefaultStatement<V> implements Statement<V>, Serializable {
       final ForkObserver<S, V> observer = mObserver.renew();
       observer.accept(null);
       return new ChainForkObserver<S, V>(observer);
+    }
+
+    void cancel(final Evaluation<V> evaluation) {
+      mObserver.unchain(evaluation);
     }
 
     @NotNull
@@ -970,7 +1002,7 @@ class DefaultStatement<V> implements Statement<V>, Serializable {
 
     private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
 
-    private final List<Evaluation<V>> mEvaluations = new ArrayList<Evaluation<V>>();
+    private final ArrayList<Evaluation<V>> mEvaluations = new ArrayList<Evaluation<V>>();
 
     private final Executor mExecutor;
 
@@ -1019,6 +1051,7 @@ class DefaultStatement<V> implements Statement<V>, Serializable {
 
     @Override
     void failure(@NotNull final Throwable failure, @NotNull final Evaluation<V> evaluation) {
+      checkFailed();
       mExecutor.execute(new Runnable() {
 
         public void run() {
@@ -1048,6 +1081,7 @@ class DefaultStatement<V> implements Statement<V>, Serializable {
 
     @Override
     void value(final V value, @NotNull final Evaluation<V> evaluation) {
+      checkFailed();
       mExecutor.execute(new Runnable() {
 
         public void run() {
@@ -1075,8 +1109,24 @@ class DefaultStatement<V> implements Statement<V>, Serializable {
       return new ChainForkObserver<S, V>(this);
     }
 
+    void unchain(final Evaluation<V> evaluation) {
+      mExecutor.execute(new Runnable() {
+
+        public void run() {
+          mEvaluations.remove(evaluation);
+        }
+      });
+    }
+
+    private void checkFailed() {
+      final Throwable failure = mFailure;
+      if (failure != null) {
+        throw FailureException.wrap(failure);
+      }
+    }
+
     private void clearEvaluations(@NotNull final Throwable failure) {
-      final List<Evaluation<V>> evaluations = mEvaluations;
+      final ArrayList<Evaluation<V>> evaluations = mEvaluations;
       for (final Evaluation<V> evaluation : evaluations) {
         try {
           evaluation.fail(failure);

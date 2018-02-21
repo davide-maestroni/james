@@ -24,6 +24,7 @@ import java.io.ObjectStreamException;
 import java.io.Serializable;
 
 import dm.jale.async.EvaluationCollection;
+import dm.jale.async.FailureException;
 import dm.jale.config.BuildConfig;
 import dm.jale.util.ConstantConditions;
 
@@ -50,6 +51,10 @@ class ToEvaluationLoopHandler<V> extends LoopHandler<V, Void> implements Seriali
     } catch (final Exception e) {
       evaluation.set();
       throw e;
+
+    } catch (final Throwable t) {
+      evaluation.set();
+      throw FailureException.wrap(t);
     }
   }
 
@@ -62,6 +67,10 @@ class ToEvaluationLoopHandler<V> extends LoopHandler<V, Void> implements Seriali
     } catch (final Exception e) {
       evaluation.set();
       throw e;
+
+    } catch (final Throwable t) {
+      evaluation.set();
+      throw FailureException.wrap(t);
     }
   }
 
@@ -74,6 +83,10 @@ class ToEvaluationLoopHandler<V> extends LoopHandler<V, Void> implements Seriali
     } catch (final Exception e) {
       evaluation.set();
       throw e;
+
+    } catch (final Throwable t) {
+      evaluation.set();
+      throw FailureException.wrap(t);
     }
   }
 
@@ -86,6 +99,10 @@ class ToEvaluationLoopHandler<V> extends LoopHandler<V, Void> implements Seriali
     } catch (final Exception e) {
       evaluation.set();
       throw e;
+
+    } catch (final Throwable t) {
+      evaluation.set();
+      throw FailureException.wrap(t);
     }
   }
 

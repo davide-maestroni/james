@@ -45,8 +45,10 @@ import dm.jale.async.Settler;
 import dm.jale.async.Statement;
 import dm.jale.async.Statement.Forker;
 import dm.jale.async.Updater;
+import dm.jale.executor.ScheduledExecutor;
 import dm.jale.ext.async.Tester;
 import dm.jale.ext.async.TimedState;
+import dm.jale.ext.backoff.BackoffUpdater;
 import dm.jale.ext.backoff.Backoffer;
 import dm.jale.ext.backoff.PendingEvaluation;
 import dm.jale.ext.io.AllocationType;
@@ -58,8 +60,12 @@ import dm.jale.util.Iterables;
  */
 public class AsyncExt extends Async {
 
-  // TODO: 16/02/2018 Forkers: retry(), retryAll(), repeat(), repeatAll(), repeatLast(),
-  // TODO: 16/02/2018 - repeatFirst(), repeatSince(), refreshAfter(), refreshAllAfter()
+  // TODO: 21/02/2018 BatchYielder
+  // TODO: 21/02/2018 Joiners: zip(BiMapper), zip(TriMapper), zip(TetraMapper),
+  // TODO: 16/02/2018 Forkers: repeat(), repeatAll(), repeatLast(), repeatFirst(), repeatSince(),
+  // TODO: 16/02/2018 - refreshAfter(), refreshAllAfter()
+  // TODO: 20/02/2018 Backoff.apply(int count, long lastDelay) => BackoffUpdater
+  // TODO: 20/02/2018 (Backoffers): dropFirst, dropLast, wait(backoff?)
 
   private final Async mAsync;
 
@@ -114,6 +120,12 @@ public class AsyncExt extends Async {
   @NotNull
   public static <V> Forker<?, V, Evaluation<V>, Statement<V>> retry(final int maxCount) {
     return RetryForker.newForker(maxCount);
+  }
+
+  @NotNull
+  public static <S, V> Forker<?, V, Evaluation<V>, Statement<V>> retryOn(
+      @NotNull final ScheduledExecutor executor, @NotNull final BackoffUpdater<S> backoff) {
+    return RetryBackoffForker.newForker(executor, backoff);
   }
 
   @NotNull
@@ -172,6 +184,12 @@ public class AsyncExt extends Async {
   @Override
   public AsyncExt evaluateOn(@Nullable final Executor executor) {
     return new AsyncExt(mAsync.evaluateOn(executor));
+  }
+
+  @NotNull
+  @Override
+  public AsyncExt evaluated(final boolean isEvaluated) {
+    return new AsyncExt(mAsync.evaluated(isEvaluated));
   }
 
   @NotNull
@@ -257,12 +275,6 @@ public class AsyncExt extends Async {
       @Nullable final JoinSettler<S, ? super Evaluation<? extends R>, Statement<V>> settle,
       @NotNull final Iterable<? extends Statement<? extends V>> statements) {
     return mAsync.statementOf(init, value, failure, done, settle, statements);
-  }
-
-  @NotNull
-  @Override
-  public AsyncExt unevaluated() {
-    return new AsyncExt(mAsync.unevaluated());
   }
 
   @NotNull
