@@ -73,7 +73,7 @@ class DefaultLoop<V> implements Loop<V>, Serializable {
 
   private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
 
-  private final ChainHead<?> mHead;
+  private final PropagationHead<?> mHead;
 
   private final boolean mIsEvaluated;
 
@@ -85,11 +85,11 @@ class DefaultLoop<V> implements Loop<V>, Serializable {
 
   private final Observer<EvaluationCollection<?>> mObserver;
 
-  private final LoopChain<?, V> mTail;
-
-  private LoopChain<V, ?> mChain;
+  private final LoopPropagation<?, V> mTail;
 
   private ArrayList<WeakReference<Loop<?>>> mForked = new ArrayList<WeakReference<Loop<?>>>();
+
+  private LoopPropagation<V, ?> mPropagation;
 
   private StatementState mState = StatementState.Evaluating;
 
@@ -100,9 +100,9 @@ class DefaultLoop<V> implements Loop<V>, Serializable {
     mIsEvaluated = isEvaluated;
     mIsFork = false;
     mLogger = Logger.newLogger(this, loggerName, Locale.ENGLISH);
-    final ChainHead<V> head = new ChainHead<V>();
+    final PropagationHead<V> head = new PropagationHead<V>();
     head.setLogger(mLogger);
-    head.setNext(new ChainTail(head));
+    head.setNext(new PropagationTail(head));
     mMutex = head.getMutex();
     mHead = head;
     mTail = head;
@@ -122,9 +122,9 @@ class DefaultLoop<V> implements Loop<V>, Serializable {
     mIsEvaluated = isEvaluated;
     mIsFork = (observer instanceof ForkObserver);
     mLogger = logger;
-    final ChainHead<V> head = new ChainHead<V>();
+    final PropagationHead<V> head = new PropagationHead<V>();
     head.setLogger(mLogger);
-    head.setNext(new ChainTail(head));
+    head.setNext(new PropagationTail(head));
     mMutex = head.getMutex();
     mHead = head;
     mTail = head;
@@ -139,7 +139,7 @@ class DefaultLoop<V> implements Loop<V>, Serializable {
   @SuppressWarnings("unchecked")
   private DefaultLoop(@NotNull final Observer<EvaluationCollection<?>> observer,
       final boolean isEvaluated, @Nullable final String loggerName,
-      @NotNull final ChainHead<?> head, @NotNull final LoopChain<?, V> tail) {
+      @NotNull final PropagationHead<?> head, @NotNull final LoopPropagation<?, V> tail) {
     // serialization
     mObserver = observer;
     mIsEvaluated = isEvaluated;
@@ -148,11 +148,11 @@ class DefaultLoop<V> implements Loop<V>, Serializable {
     mMutex = head.getMutex();
     mHead = head;
     mTail = tail;
-    tail.setNext(new ChainTail((ChainHead<V>) head));
-    LoopChain<?, ?> chain = head;
-    while (!chain.isTail()) {
-      chain.setLogger(mLogger);
-      chain = chain.mNext;
+    tail.setNext(new PropagationTail((PropagationHead<V>) head));
+    LoopPropagation<?, ?> propagation = head;
+    while (!propagation.isTail()) {
+      propagation.setLogger(mLogger);
+      propagation = propagation.mNext;
     }
 
     try {
@@ -165,9 +165,10 @@ class DefaultLoop<V> implements Loop<V>, Serializable {
 
   @SuppressWarnings("unchecked")
   private DefaultLoop(@NotNull final Observer<EvaluationCollection<?>> observer,
-      final boolean isEvaluated, @NotNull final Logger logger, @NotNull final ChainHead<?> head,
-      @NotNull final LoopChain<?, V> tail, final boolean observe) {
-    // copy/chain
+      final boolean isEvaluated, @NotNull final Logger logger,
+      @NotNull final PropagationHead<?> head, @NotNull final LoopPropagation<?, V> tail,
+      final boolean observe) {
+    // copy/propagation
     mObserver = observer;
     mIsEvaluated = isEvaluated;
     mIsFork = (observer instanceof ForkObserver);
@@ -175,7 +176,7 @@ class DefaultLoop<V> implements Loop<V>, Serializable {
     mMutex = head.getMutex();
     mHead = head;
     mTail = tail;
-    tail.setNext(new ChainTail((ChainHead<V>) head));
+    tail.setNext(new PropagationTail((PropagationHead<V>) head));
     if (observe) {
       try {
         observer.accept(head);
@@ -189,7 +190,8 @@ class DefaultLoop<V> implements Loop<V>, Serializable {
   @SuppressWarnings(
       {"unchecked", "ConstantConditions", "SynchronizationOnLocalVariableOrMethodParameter"})
   private static <V> void addTo(@NotNull final Object mutex,
-      @NotNull final NestedQueue<SimpleState<V>> queue, @NotNull final LoopChain<V, ?> chain) {
+      @NotNull final NestedQueue<SimpleState<V>> queue,
+      @NotNull final LoopPropagation<V, ?> propagation) {
     boolean isValue;
     SimpleState<V> state;
     ArrayList<?> outputs = null;
@@ -211,7 +213,7 @@ class DefaultLoop<V> implements Loop<V>, Serializable {
           ((ArrayList<V>) outputs).add(state.value());
 
         } else {
-          chain.addValues((Iterable<V>) outputs);
+          propagation.addValues((Iterable<V>) outputs);
           final ArrayList<Throwable> failures = new ArrayList<Throwable>();
           failures.add(state.failure());
           outputs = failures;
@@ -222,7 +224,7 @@ class DefaultLoop<V> implements Loop<V>, Serializable {
           ((ArrayList<Throwable>) outputs).add(state.failure());
 
         } else {
-          chain.addFailures((Iterable<Throwable>) outputs);
+          propagation.addFailures((Iterable<Throwable>) outputs);
           final ArrayList<V> values = new ArrayList<V>();
           values.add(state.value());
           outputs = values;
@@ -262,27 +264,27 @@ class DefaultLoop<V> implements Loop<V>, Serializable {
       return isCancelled;
     }
 
-    LoopChain<?, ?> chain = mHead;
-    if (observer instanceof ChainForkObserver) {
-      ((ChainForkObserver) observer).cancel(chain);
+    LoopPropagation<?, ?> propagation = mHead;
+    if (observer instanceof PropagationForkObserver) {
+      ((PropagationForkObserver) observer).cancel(propagation);
     }
 
     final CancellationException exception = new CancellationException("loop is cancelled");
     if (mayInterruptIfRunning && (observer instanceof InterruptibleObserver)) {
-      if (chain.cancel(exception)) {
+      if (propagation.cancel(exception)) {
         ((InterruptibleObserver<?>) observer).interrupt();
         return true;
       }
 
-      chain = chain.mNext;
+      propagation = propagation.mNext;
     }
 
-    while (!chain.isTail()) {
-      if (chain.cancel(exception)) {
+    while (!propagation.isTail()) {
+      if (propagation.cancel(exception)) {
         return true;
       }
 
-      chain = chain.mNext;
+      propagation = propagation.mNext;
     }
 
     return false;
@@ -333,7 +335,7 @@ class DefaultLoop<V> implements Loop<V>, Serializable {
   }
 
   public void consume() {
-    chain(new ChainConsume<V>());
+    propagate(new PropagationConsume<V>());
   }
 
   public boolean getDone() {
@@ -343,7 +345,7 @@ class DefaultLoop<V> implements Loop<V>, Serializable {
   public boolean getDone(final long timeout, @NotNull final TimeUnit timeUnit) {
     checkSupported();
     deadLockWarning(timeout);
-    @SuppressWarnings("UnnecessaryLocalVariable") final ChainHead<?> head = mHead;
+    @SuppressWarnings("UnnecessaryLocalVariable") final PropagationHead<?> head = mHead;
     synchronized (mMutex) {
       try {
         if (TimeUnits.waitUntil(mMutex, new Condition() {
@@ -372,7 +374,7 @@ class DefaultLoop<V> implements Loop<V>, Serializable {
   public FailureException getFailure(final long timeout, @NotNull final TimeUnit timeUnit) {
     checkSupported();
     deadLockWarning(timeout);
-    final ChainHead<?> head = mHead;
+    final PropagationHead<?> head = mHead;
     synchronized (mMutex) {
       try {
         if (TimeUnits.waitUntil(mMutex, new Condition() {
@@ -402,7 +404,7 @@ class DefaultLoop<V> implements Loop<V>, Serializable {
   public Iterable<V> getValue(final long timeout, @NotNull final TimeUnit timeUnit) {
     checkSupported();
     deadLockWarning(timeout);
-    final ChainHead<?> head = mHead;
+    final PropagationHead<?> head = mHead;
     synchronized (mMutex) {
       try {
         if (TimeUnits.waitUntil(mMutex, new Condition() {
@@ -426,7 +428,7 @@ class DefaultLoop<V> implements Loop<V>, Serializable {
 
   public boolean isFinal() {
     synchronized (mMutex) {
-      return (mChain == null);
+      return (mPropagation == null);
     }
   }
 
@@ -495,21 +497,21 @@ class DefaultLoop<V> implements Loop<V>, Serializable {
   @SuppressWarnings("unchecked")
   public DefaultLoop<V> evaluate() {
     final Logger logger = mLogger;
-    final ChainHead<?> head = mHead;
-    final ChainHead<?> newHead = head.copy();
+    final PropagationHead<?> head = mHead;
+    final PropagationHead<?> newHead = head.copy();
     newHead.setLogger(logger);
-    LoopChain<?, ?> newTail = newHead;
-    LoopChain<?, ?> next = head;
+    LoopPropagation<?, ?> newTail = newHead;
+    LoopPropagation<?, ?> next = head;
     while (next != mTail) {
       next = next.mNext;
-      LoopChain<?, ?> chain = next.copy();
-      chain.setLogger(logger);
-      ((LoopChain<?, Object>) newTail).setNext((LoopChain<Object, ?>) chain);
-      newTail = chain;
+      LoopPropagation<?, ?> propagation = next.copy();
+      propagation.setLogger(logger);
+      ((LoopPropagation<?, Object>) newTail).setNext((LoopPropagation<Object, ?>) propagation);
+      newTail = propagation;
     }
 
-    return new DefaultLoop<V>(renewObserver(), true, logger, newHead, (LoopChain<?, V>) newTail,
-        true);
+    return new DefaultLoop<V>(renewObserver(), true, logger, newHead,
+        (LoopPropagation<?, V>) newTail, true);
   }
 
   @NotNull
@@ -543,34 +545,38 @@ class DefaultLoop<V> implements Loop<V>, Serializable {
   @NotNull
   public Loop<V> elseForEach(@NotNull final Mapper<? super Throwable, V> mapper,
       @Nullable Class<?>... exceptionTypes) {
-    return chain(new ElseCatchLoopHandler<V>(mapper, Asyncs.cloneExceptionTypes(exceptionTypes)));
+    return propagate(
+        new ElseCatchLoopHandler<V>(mapper, Asyncs.cloneExceptionTypes(exceptionTypes)));
   }
 
   @NotNull
   public Loop<V> elseForEachDo(@NotNull final Observer<? super Throwable> observer,
       @Nullable Class<?>... exceptionTypes) {
-    return chain(new ElseDoLoopHandler<V>(observer, Asyncs.cloneExceptionTypes(exceptionTypes)));
+    return propagate(
+        new ElseDoLoopHandler<V>(observer, Asyncs.cloneExceptionTypes(exceptionTypes)));
   }
 
   @NotNull
   public Loop<V> elseForEachIf(
       @NotNull final Mapper<? super Throwable, ? extends Statement<? extends V>> mapper,
       @Nullable Class<?>... exceptionTypes) {
-    return chain(new ElseIfStatementHandler<V>(mapper, Asyncs.cloneExceptionTypes(exceptionTypes)));
+    return propagate(
+        new ElseIfStatementHandler<V>(mapper, Asyncs.cloneExceptionTypes(exceptionTypes)));
   }
 
   @NotNull
   public Loop<V> elseForEachLoop(
       @NotNull final Mapper<? super Throwable, ? extends Iterable<? extends V>> mapper,
       @Nullable Class<?>... exceptionTypes) {
-    return chain(new ElseLoopLoopHandler<V>(mapper, Asyncs.cloneExceptionTypes(exceptionTypes)));
+    return propagate(
+        new ElseLoopLoopHandler<V>(mapper, Asyncs.cloneExceptionTypes(exceptionTypes)));
   }
 
   @NotNull
   public Loop<V> elseForEachLoopIf(
       @NotNull final Mapper<? super Throwable, ? extends Loop<? extends V>> mapper,
       @Nullable Class<?>... exceptionTypes) {
-    return chain(
+    return propagate(
         new ElseLoopIfStatementHandler<V>(mapper, Asyncs.cloneExceptionTypes(exceptionTypes)));
   }
 
@@ -578,7 +584,7 @@ class DefaultLoop<V> implements Loop<V>, Serializable {
   public Loop<V> elseForEachOrderedIf(
       @NotNull final Mapper<? super Throwable, ? extends Statement<? extends V>> mapper,
       @Nullable Class<?>... exceptionTypes) {
-    return chainOrdered(
+    return propagateOrdered(
         new ElseIfStatementHandler<V>(mapper, Asyncs.cloneExceptionTypes(exceptionTypes)));
   }
 
@@ -586,64 +592,64 @@ class DefaultLoop<V> implements Loop<V>, Serializable {
   public Loop<V> elseForEachOrderedLoopIf(
       @NotNull final Mapper<? super Throwable, ? extends Loop<? extends V>> mapper,
       @Nullable Class<?>... exceptionTypes) {
-    return chainOrdered(
+    return propagateOrdered(
         new ElseLoopIfStatementHandler<V>(mapper, Asyncs.cloneExceptionTypes(exceptionTypes)));
   }
 
   @NotNull
   public <R> Loop<R> forEach(@NotNull final Mapper<? super V, R> mapper) {
-    return chain(new ThenLoopHandler<V, R>(mapper));
+    return propagate(new ThenLoopHandler<V, R>(mapper));
   }
 
   @NotNull
   public Loop<V> forEachDo(@NotNull final Observer<? super V> observer) {
-    return chain(new ThenDoLoopHandler<V, V>(observer));
+    return propagate(new ThenDoLoopHandler<V, V>(observer));
   }
 
   @NotNull
   public Loop<V> forEachDone(@NotNull final Action action) {
-    return chain(new DoneLoopHandler<V>(action));
+    return propagate(new DoneLoopHandler<V>(action));
   }
 
   @NotNull
   public <R> Loop<R> forEachIf(@NotNull final Mapper<? super V, ? extends Statement<R>> mapper) {
-    return chain(new ThenIfStatementHandler<V, R>(mapper));
+    return propagate(new ThenIfStatementHandler<V, R>(mapper));
   }
 
   @NotNull
   public <R> Loop<R> forEachLoop(@NotNull final Mapper<? super V, ? extends Iterable<R>> mapper) {
-    return chain(new ThenLoopLoopHandler<V, R>(mapper));
+    return propagate(new ThenLoopLoopHandler<V, R>(mapper));
   }
 
   @NotNull
   public <R> Loop<R> forEachLoopIf(@NotNull final Mapper<? super V, ? extends Loop<R>> mapper) {
-    return chain(new ThenLoopIfStatementHandler<V, R>(mapper));
+    return propagate(new ThenLoopIfStatementHandler<V, R>(mapper));
   }
 
   @NotNull
   public <R> Loop<R> forEachOrderedIf(
       @NotNull final Mapper<? super V, ? extends Statement<R>> mapper) {
-    return chainOrdered(new ThenIfStatementHandler<V, R>(mapper));
+    return propagateOrdered(new ThenIfStatementHandler<V, R>(mapper));
   }
 
   @NotNull
   public <R> Loop<R> forEachOrderedLoopIf(
       @NotNull final Mapper<? super V, ? extends Loop<R>> mapper) {
-    return chainOrdered(new ThenLoopIfStatementHandler<V, R>(mapper));
+    return propagateOrdered(new ThenLoopIfStatementHandler<V, R>(mapper));
   }
 
   @NotNull
   public <R> Loop<R> forEachOrderedTryIf(
       @NotNull final Mapper<? super V, ? extends Closeable> closeable,
       @NotNull final Mapper<? super V, ? extends Statement<R>> mapper) {
-    return chainOrdered(new TryIfStatementHandler<V, R>(closeable, mapper, mLogger.getName()));
+    return propagateOrdered(new TryIfStatementHandler<V, R>(closeable, mapper, mLogger.getName()));
   }
 
   @NotNull
   public <R> Loop<R> forEachOrderedTryLoopIf(
       @NotNull final Mapper<? super V, ? extends Closeable> closeable,
       @NotNull final Mapper<? super V, ? extends Loop<R>> mapper) {
-    return chainOrdered(
+    return propagateOrdered(
         new TryStatementLoopHandler<V, R>(closeable, new ThenLoopIfStatementHandler<V, R>(mapper),
             mLogger.getName()));
   }
@@ -651,14 +657,15 @@ class DefaultLoop<V> implements Loop<V>, Serializable {
   @NotNull
   public <R> Loop<R> forEachTry(@NotNull final Mapper<? super V, ? extends Closeable> closeable,
       @NotNull final Mapper<? super V, R> mapper) {
-    return chain(new TryStatementHandler<V, R>(closeable, new ThenStatementHandler<V, R>(mapper),
-        mLogger.getName()));
+    return propagate(
+        new TryStatementHandler<V, R>(closeable, new ThenStatementHandler<V, R>(mapper),
+            mLogger.getName()));
   }
 
   @NotNull
   public Loop<V> forEachTryDo(@NotNull final Mapper<? super V, ? extends Closeable> closeable,
       @NotNull final Observer<? super V> observer) {
-    return chain(
+    return propagate(
         new TryStatementHandler<V, V>(closeable, new ThenDoStatementHandler<V, V>(observer),
             mLogger.getName()));
   }
@@ -666,13 +673,13 @@ class DefaultLoop<V> implements Loop<V>, Serializable {
   @NotNull
   public <R> Loop<R> forEachTryIf(@NotNull final Mapper<? super V, ? extends Closeable> closeable,
       @NotNull final Mapper<? super V, ? extends Statement<R>> mapper) {
-    return chain(new TryIfStatementHandler<V, R>(closeable, mapper, mLogger.getName()));
+    return propagate(new TryIfStatementHandler<V, R>(closeable, mapper, mLogger.getName()));
   }
 
   @NotNull
   public <R> Loop<R> forEachTryLoop(@NotNull final Mapper<? super V, ? extends Closeable> closeable,
       @NotNull final Mapper<? super V, ? extends Iterable<R>> mapper) {
-    return chain(
+    return propagate(
         new TryStatementLoopHandler<V, R>(closeable, new ThenLoopStatementHandler<V, R>(mapper),
             mLogger.getName()));
   }
@@ -681,7 +688,7 @@ class DefaultLoop<V> implements Loop<V>, Serializable {
   public <R> Loop<R> forEachTryLoopIf(
       @NotNull final Mapper<? super V, ? extends Closeable> closeable,
       @NotNull final Mapper<? super V, ? extends Loop<R>> mapper) {
-    return chain(
+    return propagate(
         new TryStatementLoopHandler<V, R>(closeable, new ThenLoopIfStatementHandler<V, R>(mapper),
             mLogger.getName()));
   }
@@ -755,7 +762,7 @@ class DefaultLoop<V> implements Loop<V>, Serializable {
       @NotNull final TimeUnit timeUnit) {
     checkSupported();
     deadLockWarning(timeout);
-    final ChainHead<?> head = mHead;
+    final PropagationHead<?> head = mHead;
     final ArrayList<EvaluationState<V>> outputs = new ArrayList<EvaluationState<V>>();
     synchronized (mMutex) {
       try {
@@ -767,7 +774,7 @@ class DefaultLoop<V> implements Loop<V>, Serializable {
           }
         }, timeout, timeUnit)) {
           @SuppressWarnings("unchecked") final DoubleQueue<SimpleState<V>> states =
-              ((ChainHead<V>) head).getStates();
+              ((PropagationHead<V>) head).getStates();
           while (!states.isEmpty() && (outputs.size() < maxCount)) {
             outputs.add(states.removeFirst());
           }
@@ -791,7 +798,7 @@ class DefaultLoop<V> implements Loop<V>, Serializable {
       @NotNull final TimeUnit timeUnit) {
     checkSupported();
     deadLockWarning(timeout);
-    final ChainHead<?> head = mHead;
+    final PropagationHead<?> head = mHead;
     final ArrayList<V> outputs = new ArrayList<V>();
     synchronized (mMutex) {
       try {
@@ -803,7 +810,7 @@ class DefaultLoop<V> implements Loop<V>, Serializable {
           }
         }, timeout, timeUnit)) {
           @SuppressWarnings("unchecked") final DoubleQueue<SimpleState<V>> states =
-              ((ChainHead<V>) head).getStates();
+              ((PropagationHead<V>) head).getStates();
           while (!states.isEmpty() && (outputs.size() < maxCount)) {
             final SimpleState<V> state = states.removeFirst();
             if (state.isFailed()) {
@@ -824,12 +831,12 @@ class DefaultLoop<V> implements Loop<V>, Serializable {
 
   public void to(@NotNull final EvaluationCollection<? super V> evaluation) {
     checkEvaluated();
-    chain(new ToEvaluationLoopHandler<V>(evaluation)).consume();
+    propagate(new ToEvaluationLoopHandler<V>(evaluation)).consume();
   }
 
   @NotNull
   public <S, R> Loop<R> yield(@NotNull final Yielder<S, ? super V, R> yielder) {
-    return chain(new YieldLoopHandler<S, V, R>(yielder, mLogger.getName()));
+    return propagate(new YieldLoopHandler<S, V, R>(yielder, mLogger.getName()));
   }
 
   @NotNull
@@ -843,7 +850,7 @@ class DefaultLoop<V> implements Loop<V>, Serializable {
 
   @NotNull
   public <S, R> Loop<R> yieldOrdered(@NotNull final Yielder<S, ? super V, R> yielder) {
-    return chainOrdered(new YieldLoopHandler<S, V, R>(yielder, mLogger.getName()));
+    return propagateOrdered(new YieldLoopHandler<S, V, R>(yielder, mLogger.getName()));
   }
 
   @NotNull
@@ -921,91 +928,6 @@ class DefaultLoop<V> implements Loop<V>, Serializable {
     }
   }
 
-  @NotNull
-  private <R> Loop<R> chain(@NotNull final StatementHandler<V, R> handler) {
-    return chain(new ChainStatementHandler<V, R>(handler));
-  }
-
-  @NotNull
-  private <R> Loop<R> chain(@NotNull final StatementLoopHandler<V, R> handler) {
-    return chain(new ChainStatementLoopHandler<V, R>(handler));
-  }
-
-  @NotNull
-  private <R> Loop<R> chain(@NotNull final LoopHandler<V, R> handler) {
-    return chain(new ChainLoopHandler<V, R>(handler));
-  }
-
-  @NotNull
-  @SuppressWarnings("unchecked")
-  private <R> Loop<R> chain(@NotNull final LoopChain<V, R> chain) {
-    final Logger logger = mLogger;
-    final ChainHead<?> head = mHead;
-    final Runnable chaining;
-    final Observer<? extends EvaluationCollection<?>> observer = mObserver;
-    if (mIsFork) {
-      final Loop<R> forked =
-          new DefaultLoop<V>(((ForkObserver<?, V>) observer).newObserver(), mIsEvaluated,
-              mLogger).chain(chain);
-      synchronized (mMutex) {
-        final ArrayList<WeakReference<Loop<?>>> newForked = new ArrayList<WeakReference<Loop<?>>>();
-        final Iterator<WeakReference<Loop<?>>> iterator = mForked.iterator();
-        while (iterator.hasNext()) {
-          final WeakReference<Loop<?>> next = iterator.next();
-          if (next.get() == null) {
-            iterator.remove();
-
-          } else {
-            newForked.add(next);
-          }
-        }
-
-        newForked.add(new WeakReference<Loop<?>>(forked));
-        mForked = newForked;
-      }
-
-      return forked;
-    }
-
-    synchronized (mMutex) {
-      if (mChain != null) {
-        throw new IllegalStateException("the statement is already chained");
-
-      } else {
-        chain.setLogger(logger);
-        chaining = ((ChainHead<V>) head).chain(chain);
-        mState = StatementState.Chained;
-        mChain = chain;
-        mMutex.notifyAll();
-      }
-    }
-
-    final DefaultLoop<R> loop =
-        new DefaultLoop<R>((Observer<EvaluationCollection<?>>) observer, mIsEvaluated, logger, head,
-            chain, false);
-    if (chaining != null) {
-      chaining.run();
-    }
-
-    ((LoopChain<?, Object>) mTail).setNext((LoopChain<Object, V>) chain);
-    return loop;
-  }
-
-  @NotNull
-  private <R> Loop<R> chainOrdered(@NotNull final LoopHandler<V, R> handler) {
-    return chain(new ChainLoopHandlerOrdered<V, R>(handler));
-  }
-
-  @NotNull
-  private <R> Loop<R> chainOrdered(@NotNull final StatementHandler<V, R> handler) {
-    return chain(new ChainStatementHandlerOrdered<V, R>(handler));
-  }
-
-  @NotNull
-  private <R> Loop<R> chainOrdered(@NotNull final StatementLoopHandler<V, R> handler) {
-    return chain(new ChainStatementLoopHandlerOrdered<V, R>(handler));
-  }
-
   private void checkEvaluated() {
     if (!mIsEvaluated) {
       ConstantConditions.unsupported("the loop has not been evaluated", "checkEvaluated");
@@ -1013,7 +935,7 @@ class DefaultLoop<V> implements Loop<V>, Serializable {
   }
 
   private void checkFinal() {
-    if (mChain != null) {
+    if (mPropagation != null) {
       throw new IllegalStateException("the loop is not final");
     }
   }
@@ -1037,6 +959,91 @@ class DefaultLoop<V> implements Loop<V>, Serializable {
   }
 
   @NotNull
+  private <R> Loop<R> propagate(@NotNull final StatementHandler<V, R> handler) {
+    return propagate(new PropagationStatementHandler<V, R>(handler));
+  }
+
+  @NotNull
+  private <R> Loop<R> propagate(@NotNull final StatementLoopHandler<V, R> handler) {
+    return propagate(new PropagationStatementLoopHandler<V, R>(handler));
+  }
+
+  @NotNull
+  private <R> Loop<R> propagate(@NotNull final LoopHandler<V, R> handler) {
+    return propagate(new PropagationLoopHandler<V, R>(handler));
+  }
+
+  @NotNull
+  @SuppressWarnings("unchecked")
+  private <R> Loop<R> propagate(@NotNull final LoopPropagation<V, R> propagation) {
+    final Logger logger = mLogger;
+    final PropagationHead<?> head = mHead;
+    final Runnable propagate;
+    final Observer<? extends EvaluationCollection<?>> observer = mObserver;
+    if (mIsFork) {
+      final Loop<R> forked =
+          new DefaultLoop<V>(((ForkObserver<?, V>) observer).newObserver(), mIsEvaluated,
+              mLogger).propagate(propagation);
+      synchronized (mMutex) {
+        final ArrayList<WeakReference<Loop<?>>> newForked = new ArrayList<WeakReference<Loop<?>>>();
+        final Iterator<WeakReference<Loop<?>>> iterator = mForked.iterator();
+        while (iterator.hasNext()) {
+          final WeakReference<Loop<?>> next = iterator.next();
+          if (next.get() == null) {
+            iterator.remove();
+
+          } else {
+            newForked.add(next);
+          }
+        }
+
+        newForked.add(new WeakReference<Loop<?>>(forked));
+        mForked = newForked;
+      }
+
+      return forked;
+    }
+
+    synchronized (mMutex) {
+      if (mPropagation != null) {
+        throw new IllegalStateException("the loop evaluation is already propagated");
+
+      } else {
+        propagation.setLogger(logger);
+        propagate = ((PropagationHead<V>) head).propagate(propagation);
+        mState = StatementState.Propagated;
+        mPropagation = propagation;
+        mMutex.notifyAll();
+      }
+    }
+
+    final DefaultLoop<R> loop =
+        new DefaultLoop<R>((Observer<EvaluationCollection<?>>) observer, mIsEvaluated, logger, head,
+            propagation, false);
+    if (propagate != null) {
+      propagate.run();
+    }
+
+    ((LoopPropagation<?, Object>) mTail).setNext((LoopPropagation<Object, V>) propagation);
+    return loop;
+  }
+
+  @NotNull
+  private <R> Loop<R> propagateOrdered(@NotNull final LoopHandler<V, R> handler) {
+    return propagate(new PropagationLoopHandlerOrdered<V, R>(handler));
+  }
+
+  @NotNull
+  private <R> Loop<R> propagateOrdered(@NotNull final StatementHandler<V, R> handler) {
+    return propagate(new PropagationStatementHandlerOrdered<V, R>(handler));
+  }
+
+  @NotNull
+  private <R> Loop<R> propagateOrdered(@NotNull final StatementLoopHandler<V, R> handler) {
+    return propagate(new PropagationStatementLoopHandlerOrdered<V, R>(handler));
+  }
+
+  @NotNull
   private Observer<EvaluationCollection<?>> renewObserver() {
     final Observer<EvaluationCollection<?>> observer = mObserver;
     if (observer instanceof RenewableObserver) {
@@ -1054,1473 +1061,22 @@ class DefaultLoop<V> implements Loop<V>, Serializable {
 
   @NotNull
   private Object writeReplace() throws ObjectStreamException {
-    final ArrayList<LoopChain<?, ?>> chains = new ArrayList<LoopChain<?, ?>>();
-    final ChainHead<?> head = mHead;
-    LoopChain<?, ?> chain = head;
-    while (chain != mTail) {
-      if (chain != head) {
-        chains.add(chain);
+    final ArrayList<LoopPropagation<?, ?>> propagations = new ArrayList<LoopPropagation<?, ?>>();
+    final PropagationHead<?> head = mHead;
+    LoopPropagation<?, ?> propagation = head;
+    while (propagation != mTail) {
+      if (propagation != head) {
+        propagations.add(propagation);
       }
 
-      chain = chain.mNext;
+      propagation = propagation.mNext;
     }
 
-    if (chain != head) {
-      chains.add(chain);
+    if (propagation != head) {
+      propagations.add(propagation);
     }
 
-    return new LoopProxy(mObserver, mIsEvaluated, mLogger.getName(), chains);
-  }
-
-  private static class ChainConsume<V> extends LoopChain<V, Object> {
-
-    private volatile WeakReference<LoopChain<Object, ?>> mNext =
-        new WeakReference<LoopChain<Object, ?>>(null);
-
-    @Override
-    void addFailure(final LoopChain<Object, ?> next, @NotNull final Throwable failure) {
-      getLogger().dbg("Consuming failure: %s", failure);
-    }
-
-    private void complete() {
-      final LoopChain<Object, ?> next = mNext.get();
-      if (next != null) {
-        next.set();
-      }
-    }
-
-    @Override
-    void setNext(@NotNull final LoopChain<Object, ?> next) {
-      mNext = new WeakReference<LoopChain<Object, ?>>(next);
-    }
-
-    @Override
-    void addFailures(final LoopChain<Object, ?> next,
-        @NotNull final Iterable<? extends Throwable> failures) {
-      getLogger().dbg("Consuming failures: %s", Iterables.toString(failures));
-    }
-
-    @Override
-    void addValue(final LoopChain<Object, ?> next, final V value) {
-      getLogger().dbg("Consuming value: %s", value);
-    }
-
-    @Override
-    void addValues(final LoopChain<Object, ?> next, @NotNull final Iterable<? extends V> values) {
-      getLogger().dbg("Consuming values: %s", Iterables.toString(values));
-    }
-
-    @NotNull
-    @Override
-    LoopChain<V, Object> copy() {
-      return new ChainConsume<V>();
-    }
-
-    @Override
-    void set(final LoopChain<Object, ?> next) {
-      getLogger().dbg("Consuming completion");
-      complete();
-    }
-  }
-
-  private static class ChainForkObserver<S, V>
-      implements RenewableObserver<EvaluationCollection<V>>, Serializable {
-
-    private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
-
-    private final ForkObserver<S, V> mObserver;
-
-    private ChainForkObserver(@NotNull final ForkObserver<S, V> observer) {
-      mObserver = observer;
-    }
-
-    public void accept(final EvaluationCollection<V> evaluation) {
-      mObserver.chain(evaluation);
-    }
-
-    @NotNull
-    public ChainForkObserver<S, V> renew() {
-      final ForkObserver<S, V> observer = mObserver.renew();
-      observer.accept(null);
-      return new ChainForkObserver<S, V>(observer);
-    }
-
-    void cancel(final EvaluationCollection<V> evaluation) {
-      mObserver.unchain(evaluation);
-    }
-
-    @NotNull
-    private Object writeReplace() throws ObjectStreamException {
-      return new ObserverProxy<S, V>(mObserver);
-    }
-
-    private static class ObserverProxy<S, V> implements Serializable {
-
-      private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
-
-      private final ForkObserver<S, V> mObserver;
-
-      private ObserverProxy(@NotNull final ForkObserver<S, V> observer) {
-        mObserver = observer;
-      }
-
-      @NotNull
-      private Object readResolve() throws ObjectStreamException {
-        try {
-          final ForkObserver<S, V> observer = mObserver;
-          observer.accept(null);
-          return new ChainForkObserver<S, V>(observer);
-
-        } catch (final Throwable t) {
-          throw new InvalidObjectException(t.getMessage());
-        }
-      }
-    }
-  }
-
-  private static class ChainHead<V> extends LoopChain<V, V> {
-
-    private final Object mMutex = new Object();
-
-    private StateEvaluating mInnerState = new StateEvaluating();
-
-    private StatementState mState = StatementState.Evaluating;
-
-    private DoubleQueue<SimpleState<V>> mStates = new DoubleQueue<SimpleState<V>>();
-
-    @Nullable
-    Runnable chain(final LoopChain<V, ?> chain) {
-      final Runnable chaining = mInnerState.chain(chain);
-      mState = StatementState.Evaluating;
-      return chaining;
-    }
-
-    @NotNull
-    List<SimpleState<V>> consumeStates() {
-      final ArrayList<SimpleState<V>> states = new ArrayList<SimpleState<V>>(mStates);
-      mStates.clear();
-      return states;
-    }
-
-    @Nullable
-    FailureException getFailure() {
-      for (final SimpleState<V> state : mStates) {
-        if (state.isFailed()) {
-          return FailureException.wrap(state.failure());
-        }
-      }
-
-      return null;
-    }
-
-    @NotNull
-    Object getMutex() {
-      return mMutex;
-    }
-
-    @NotNull
-    StatementState getState() {
-      return mState;
-    }
-
-    @NotNull
-    DoubleQueue<SimpleState<V>> getStates() {
-      return mStates;
-    }
-
-    @NotNull
-    List<V> getValues() {
-      final ArrayList<V> values = new ArrayList<V>();
-      for (final SimpleState<V> state : mStates) {
-        if (state.isFailed()) {
-          throw FailureException.wrap(state.failure());
-        }
-
-        values.add(state.value());
-      }
-
-      return values;
-    }
-
-    void innerAddFailure(@NotNull final Throwable failure) {
-      getLogger().dbg("Loop failed with reason [%s => %s]: %s", StatementState.Evaluating,
-          StatementState.Failed, failure);
-      final DoubleQueue<SimpleState<V>> states = mStates;
-      states.add(SimpleState.<V>ofFailure(failure));
-      mState = StatementState.Failed;
-    }
-
-    void innerAddValue(final V value) {
-      getLogger().dbg("Adding value [%s => %s]: %s", StatementState.Evaluating,
-          StatementState.Evaluating, value);
-      mStates.add(SimpleState.ofValue(value));
-    }
-
-    void innerSet() {
-      mInnerState.innerSet();
-      if (mState == StatementState.Evaluating) {
-        mState = StatementState.Set;
-      }
-    }
-
-    boolean isSet() {
-      return mInnerState.isSet();
-    }
-
-    private class StateEvaluating {
-
-      @Nullable
-      Runnable chain(final LoopChain<V, ?> chain) {
-        chain.prepend(consumeStates());
-        return null;
-      }
-
-      @NotNull
-      IllegalStateException exception(@NotNull final StatementState state) {
-        return new IllegalStateException("invalid state: " + state);
-      }
-
-      void innerSet() {
-        getLogger().dbg("Setting loop with values [%s => %s]: %s", StatementState.Evaluating,
-            StatementState.Set, mStates);
-        mInnerState = new StateSet();
-      }
-
-      boolean isSet() {
-        return false;
-      }
-    }
-
-    private class StateSet extends StateEvaluating {
-
-      @Nullable
-      @Override
-      Runnable chain(final LoopChain<V, ?> chain) {
-        getLogger().dbg("Chaining loop [%s => %s]", StatementState.Set, StatementState.Evaluating);
-        mInnerState = new StateEvaluating();
-        chain.prepend(consumeStates());
-        return new Runnable() {
-
-          public void run() {
-            chain.set();
-          }
-        };
-      }
-
-      @Override
-      void innerSet() {
-        throw exception(StatementState.Set);
-      }
-
-      @Override
-      boolean isSet() {
-        return true;
-      }
-    }
-
-    @Override
-    void addFailure(final LoopChain<V, ?> next, @NotNull final Throwable failure) {
-      next.addFailure(failure);
-    }
-
-    @Override
-    void addFailures(final LoopChain<V, ?> next,
-        @NotNull  final Iterable<? extends Throwable> failures) {
-      next.addFailures(failures);
-    }
-
-    @Override
-    void addValue(final LoopChain<V, ?> next, final V value) {
-      next.addValue(value);
-    }
-
-    @Override
-    void addValues(final LoopChain<V, ?> next, @NotNull final Iterable<? extends V> values) {
-      next.addValues(values);
-    }
-
-    @NotNull
-    @Override
-    ChainHead<V> copy() {
-      return new ChainHead<V>();
-    }
-
-    @Override
-    void set(final LoopChain<V, ?> next) {
-      next.set();
-    }
-  }
-
-  private static class ChainLoopHandler<V, R> extends LoopChain<V, R> implements Serializable {
-
-    private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
-
-    private final ChainEvaluationCollection mEvaluation = new ChainEvaluationCollection();
-
-    private final LoopHandler<V, R> mHandler;
-
-    private final AtomicLong mPendingCount = new AtomicLong(1);
-
-    private ChainLoopHandler(@Nullable final LoopHandler<V, R> handler) {
-      mHandler = ConstantConditions.notNull("handler", handler);
-    }
-
-    private void innerFailSafe(final LoopChain<R, ?> next, @NotNull final Throwable failure) {
-      mPendingCount.set(0);
-      next.failSafe(failure);
-    }
-
-    private void innerSet(final LoopChain<R, ?> next) {
-      if (mPendingCount.decrementAndGet() > 0) {
-        return;
-      }
-
-      next.set();
-    }
-
-    @NotNull
-    private Object writeReplace() throws ObjectStreamException {
-      return new ChainProxy<V, R>(mHandler);
-    }
-
-    private static class ChainProxy<V, R> implements Serializable {
-
-      private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
-
-      private final LoopHandler<V, R> mHandler;
-
-      private ChainProxy(final LoopHandler<V, R> handler) {
-        mHandler = handler;
-      }
-
-      @NotNull
-      private Object readResolve() throws ObjectStreamException {
-        try {
-          return new ChainLoopHandler<V, R>(mHandler);
-
-        } catch (final Throwable t) {
-          throw new InvalidObjectException(t.getMessage());
-        }
-      }
-    }
-
-    private class ChainEvaluationCollection implements EvaluationCollection<R> {
-
-      private volatile LoopChain<R, ?> mNext;
-
-      @NotNull
-      public EvaluationCollection<R> addFailure(@NotNull final Throwable failure) {
-        mNext.addFailure(failure);
-        return this;
-      }
-
-      @NotNull
-      ChainEvaluationCollection withNext(final LoopChain<R, ?> next) {
-        mNext = next;
-        return this;
-      }
-
-      @NotNull
-      public EvaluationCollection<R> addFailures(
-          @Nullable final Iterable<? extends Throwable> failures) {
-        mNext.addFailures(failures);
-        return this;
-      }
-
-      @NotNull
-      public EvaluationCollection<R> addValue(final R value) {
-        mNext.addValue(value);
-        return this;
-      }
-
-      @NotNull
-      public EvaluationCollection<R> addValues(@Nullable final Iterable<? extends R> values) {
-        mNext.addValues(values);
-        return this;
-      }
-
-      public void set() {
-        innerSet(mNext);
-      }
-    }
-
-    @Override
-    void addFailure(final LoopChain<R, ?> next, @NotNull final Throwable failure) {
-      mPendingCount.incrementAndGet();
-      try {
-        mHandler.addFailure(failure, mEvaluation.withNext(next));
-
-      } catch (final CancellationException e) {
-        getLogger().wrn(e, "Loop has been cancelled");
-        innerFailSafe(next, e);
-
-      } catch (final Throwable t) {
-        getLogger().err(t, "Error while processing failure with reason: %s", failure);
-        innerFailSafe(next, t);
-      }
-    }
-
-    @Override
-    void addValue(final LoopChain<R, ?> next, final V value) {
-      mPendingCount.incrementAndGet();
-      try {
-        mHandler.addValue(value, mEvaluation.withNext(next));
-
-      } catch (final CancellationException e) {
-        getLogger().wrn(e, "Loop has been cancelled");
-        innerFailSafe(next, e);
-
-      } catch (final Throwable t) {
-        getLogger().err(t, "Error while processing value: %s", value);
-        innerFailSafe(next, t);
-      }
-    }
-
-    @Override
-    void addValues(final LoopChain<R, ?> next, @NotNull final Iterable<? extends V> values) {
-      mPendingCount.incrementAndGet();
-      try {
-        mHandler.addValues(values, mEvaluation.withNext(next));
-
-      } catch (final CancellationException e) {
-        getLogger().wrn(e, "Loop has been cancelled");
-        innerFailSafe(next, e);
-
-      } catch (final Throwable t) {
-        getLogger().err(t, "Error while processing values: %s", Iterables.toString(values));
-        innerFailSafe(next, t);
-      }
-    }
-
-    @NotNull
-    @Override
-    LoopChain<V, R> copy() {
-      return new ChainLoopHandler<V, R>(mHandler.renew());
-    }
-
-    @Override
-    void addFailures(final LoopChain<R, ?> next,
-        @NotNull final Iterable<? extends Throwable> failures) {
-      mPendingCount.incrementAndGet();
-      try {
-        mHandler.addFailures(failures, mEvaluation.withNext(next));
-
-      } catch (final CancellationException e) {
-        getLogger().wrn(e, "Loop has been cancelled");
-        innerFailSafe(next, e);
-
-      } catch (final Throwable t) {
-        getLogger().err(t, "Error while processing value: %s", Iterables.toString(failures));
-        innerFailSafe(next, t);
-      }
-    }
-
-    @Override
-    void set(final LoopChain<R, ?> next) {
-      try {
-        mHandler.set(mEvaluation.withNext(next));
-
-      } catch (final CancellationException e) {
-        getLogger().wrn(e, "Loop has been cancelled");
-        innerFailSafe(next, e);
-
-      } catch (final Throwable t) {
-        getLogger().err(t, "Error while completing loop");
-        innerFailSafe(next, t);
-      }
-    }
-  }
-
-  private static class ChainLoopHandlerOrdered<V, R> extends LoopChain<V, R>
-      implements Serializable {
-
-    private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
-
-    private final LoopHandler<V, R> mHandler;
-
-    private final Object mMutex = new Object();
-
-    private final AtomicLong mPendingCount = new AtomicLong(1);
-
-    private final NestedQueue<SimpleState<R>> mQueue = new NestedQueue<SimpleState<R>>();
-
-    private ChainLoopHandlerOrdered(@Nullable final LoopHandler<V, R> handler) {
-      mHandler = ConstantConditions.notNull("handler", handler);
-    }
-
-    private void flushQueue(final LoopChain<R, ?> next) {
-      addTo(mMutex, mQueue, next);
-    }
-
-    private void innerFailSafe(final LoopChain<R, ?> next, @NotNull final Throwable failure) {
-      mPendingCount.set(0);
-      synchronized (mMutex) {
-        mQueue.clear();
-      }
-
-      next.failSafe(failure);
-    }
-
-    private void innerSet(final LoopChain<R, ?> next) {
-      if (mPendingCount.decrementAndGet() > 0) {
-        return;
-      }
-
-      next.set();
-    }
-
-    @NotNull
-    private Object writeReplace() throws ObjectStreamException {
-      return new ChainProxy<V, R>(mHandler);
-    }
-
-    private static class ChainProxy<V, R> implements Serializable {
-
-      private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
-
-      private final LoopHandler<V, R> mHandler;
-
-      private ChainProxy(final LoopHandler<V, R> handler) {
-        mHandler = handler;
-      }
-
-      @NotNull
-      private Object readResolve() throws ObjectStreamException {
-        try {
-          return new ChainLoopHandlerOrdered<V, R>(mHandler);
-
-        } catch (final Throwable t) {
-          throw new InvalidObjectException(t.getMessage());
-        }
-      }
-    }
-
-    private class ChainEvaluations implements EvaluationCollection<R> {
-
-      private final LoopChain<R, ?> mNext;
-
-      private final NestedQueue<SimpleState<R>> mQueue;
-
-      private ChainEvaluations(@NotNull final NestedQueue<SimpleState<R>> queue,
-          final LoopChain<R, ?> next) {
-        mQueue = queue;
-        mNext = next;
-      }
-
-      @NotNull
-      public EvaluationCollection<R> addFailure(@NotNull final Throwable failure) {
-        synchronized (mMutex) {
-          mQueue.add(SimpleState.<R>ofFailure(failure));
-        }
-
-        flushQueue(mNext);
-        return this;
-      }
-
-      @NotNull
-      public EvaluationCollection<R> addFailures(
-          @Nullable final Iterable<? extends Throwable> failures) {
-        if (failures != null) {
-          synchronized (mMutex) {
-            @SuppressWarnings("UnnecessaryLocalVariable") final NestedQueue<SimpleState<R>> queue =
-                mQueue;
-            for (final Throwable failure : failures) {
-              queue.add(SimpleState.<R>ofFailure(failure));
-            }
-          }
-
-          flushQueue(mNext);
-        }
-
-        return this;
-      }
-
-      @NotNull
-      public EvaluationCollection<R> addValue(final R value) {
-        synchronized (mMutex) {
-          mQueue.add(SimpleState.ofValue(value));
-        }
-
-        flushQueue(mNext);
-        return this;
-      }
-
-      @NotNull
-      public EvaluationCollection<R> addValues(@Nullable final Iterable<? extends R> values) {
-        if (values != null) {
-          synchronized (mMutex) {
-            @SuppressWarnings("UnnecessaryLocalVariable") final NestedQueue<SimpleState<R>> queue =
-                mQueue;
-            for (final R value : values) {
-              queue.add(SimpleState.ofValue(value));
-            }
-          }
-
-          flushQueue(mNext);
-        }
-
-        return this;
-      }
-
-      public void set() {
-        synchronized (mMutex) {
-          mQueue.close();
-        }
-
-        final LoopChain<R, ?> next = mNext;
-        flushQueue(next);
-        innerSet(next);
-      }
-    }
-
-    @Override
-    void addFailure(final LoopChain<R, ?> next, @NotNull final Throwable failure) {
-      mPendingCount.incrementAndGet();
-      try {
-        mHandler.addFailure(failure, new ChainEvaluations(mQueue.addNested(), next));
-
-      } catch (final CancellationException e) {
-        getLogger().wrn(e, "Loop has been cancelled");
-        innerFailSafe(next, e);
-
-      } catch (final Throwable t) {
-        getLogger().err(t, "Error while processing failure with reason: %s", failure);
-        innerFailSafe(next, t);
-      }
-    }
-
-    @Override
-    void addValue(final LoopChain<R, ?> next, final V value) {
-      mPendingCount.incrementAndGet();
-      try {
-        mHandler.addValue(value, new ChainEvaluations(mQueue.addNested(), next));
-
-      } catch (final CancellationException e) {
-        getLogger().wrn(e, "Loop has been cancelled");
-        innerFailSafe(next, e);
-
-      } catch (final Throwable t) {
-        getLogger().err(t, "Error while processing value: %s", value);
-        innerFailSafe(next, t);
-      }
-    }
-
-    @Override
-    void addValues(final LoopChain<R, ?> next, @NotNull final Iterable<? extends V> values) {
-      mPendingCount.incrementAndGet();
-      try {
-        mHandler.addValues(values, new ChainEvaluations(mQueue.addNested(), next));
-
-      } catch (final CancellationException e) {
-        getLogger().wrn(e, "Loop has been cancelled");
-        innerFailSafe(next, e);
-
-      } catch (final Throwable t) {
-        getLogger().err(t, "Error while processing values: %s", Iterables.toString(values));
-        innerFailSafe(next, t);
-      }
-    }
-
-    @NotNull
-    @Override
-    LoopChain<V, R> copy() {
-      return new ChainLoopHandlerOrdered<V, R>(mHandler.renew());
-    }
-
-    @Override
-    void addFailures(final LoopChain<R, ?> next,
-        @NotNull final Iterable<? extends Throwable> failures) {
-      mPendingCount.incrementAndGet();
-      try {
-        mHandler.addFailures(failures, new ChainEvaluations(mQueue.addNested(), next));
-
-      } catch (final CancellationException e) {
-        getLogger().wrn(e, "Loop has been cancelled");
-        innerFailSafe(next, e);
-
-      } catch (final Throwable t) {
-        getLogger().err(t, "Error while processing failures: %s", Iterables.toString(failures));
-        innerFailSafe(next, t);
-      }
-    }
-
-    @Override
-    void set(final LoopChain<R, ?> next) {
-      try {
-        mHandler.set(new ChainEvaluations(mQueue.addNested(), next));
-
-      } catch (final CancellationException e) {
-        getLogger().wrn(e, "Loop has been cancelled");
-        innerFailSafe(next, e);
-
-      } catch (final Throwable t) {
-        getLogger().err(t, "Error while completing loop");
-        innerFailSafe(next, t);
-      }
-    }
-  }
-
-  private static class ChainStatementHandler<V, R> extends LoopChain<V, R> implements Serializable {
-
-    private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
-
-    private final ChainEvaluation mEvaluation = new ChainEvaluation();
-
-    private final StatementHandler<V, R> mHandler;
-
-    private final AtomicLong mPendingCount = new AtomicLong(1);
-
-    private ChainStatementHandler(@Nullable final StatementHandler<V, R> handler) {
-      mHandler = ConstantConditions.notNull("handler", handler);
-    }
-
-    private void innerFailSafe(final LoopChain<R, ?> next, @NotNull final Throwable failure) {
-      mPendingCount.set(0);
-      next.failSafe(failure);
-    }
-
-    private void innerSet(final LoopChain<R, ?> next) {
-      if (mPendingCount.decrementAndGet() > 0) {
-        return;
-      }
-
-      next.set();
-    }
-
-    @NotNull
-    private Object writeReplace() throws ObjectStreamException {
-      return new ChainProxy<V, R>(mHandler);
-    }
-
-    private static class ChainProxy<V, R> implements Serializable {
-
-      private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
-
-      private final StatementHandler<V, R> mHandler;
-
-      private ChainProxy(final StatementHandler<V, R> handler) {
-        mHandler = handler;
-      }
-
-      @NotNull
-      private Object readResolve() throws ObjectStreamException {
-        try {
-          return new ChainStatementHandler<V, R>(mHandler);
-
-        } catch (final Throwable t) {
-          throw new InvalidObjectException(t.getMessage());
-        }
-      }
-    }
-
-    private class ChainEvaluation implements Evaluation<R> {
-
-      private volatile LoopChain<R, ?> mNext;
-
-      public void fail(@NotNull final Throwable failure) {
-        final LoopChain<R, ?> next = mNext;
-        next.addFailureSafe(failure);
-        innerSet(next);
-      }
-
-      @NotNull
-      ChainEvaluation withNext(final LoopChain<R, ?> next) {
-        mNext = next;
-        return this;
-      }
-
-      public void set(final R value) {
-        final LoopChain<R, ?> next = mNext;
-        next.addValue(value);
-        innerSet(next);
-      }
-    }
-
-    @Override
-    void addFailure(final LoopChain<R, ?> next, @NotNull final Throwable failure) {
-      mPendingCount.incrementAndGet();
-      try {
-        mHandler.failure(failure, mEvaluation.withNext(next));
-
-      } catch (final CancellationException e) {
-        getLogger().wrn(e, "Loop has been cancelled");
-        innerFailSafe(next, e);
-
-      } catch (final Throwable t) {
-        getLogger().err(t, "Error while processing failure with reason: %s", failure);
-        innerFailSafe(next, t);
-      }
-    }
-
-    @Override
-    void addValue(final LoopChain<R, ?> next, final V value) {
-      mPendingCount.incrementAndGet();
-      try {
-        mHandler.value(value, mEvaluation.withNext(next));
-
-      } catch (final CancellationException e) {
-        getLogger().wrn(e, "Loop has been cancelled");
-        innerFailSafe(next, e);
-
-      } catch (final Throwable t) {
-        getLogger().err(t, "Error while processing value: %s", value);
-        innerFailSafe(next, t);
-      }
-    }
-
-    @Override
-    void addValues(final LoopChain<R, ?> next, @NotNull final Iterable<? extends V> values) {
-      mPendingCount.addAndGet(Iterables.size(values));
-      final ChainEvaluation evaluation = mEvaluation.withNext(next);
-      for (final V value : values) {
-        try {
-          mHandler.value(value, evaluation);
-
-        } catch (final CancellationException e) {
-          getLogger().wrn(e, "Loop has been cancelled");
-          innerFailSafe(next, e);
-          break;
-
-        } catch (final Throwable t) {
-          getLogger().err(t, "Error while processing value: %s", value);
-          innerFailSafe(next, t);
-          break;
-        }
-      }
-    }
-
-    @NotNull
-    @Override
-    LoopChain<V, R> copy() {
-      return new ChainStatementHandler<V, R>(mHandler.renew());
-    }
-
-    @Override
-    void addFailures(final LoopChain<R, ?> next,
-        @NotNull final Iterable<? extends Throwable> failures) {
-      mPendingCount.addAndGet(Iterables.size(failures));
-      final ChainEvaluation evaluation = mEvaluation.withNext(next);
-      for (final Throwable failure : failures) {
-        try {
-          mHandler.failure(failure, evaluation);
-
-        } catch (final CancellationException e) {
-          getLogger().wrn(e, "Loop has been cancelled");
-          innerFailSafe(next, e);
-          break;
-
-        } catch (final Throwable t) {
-          getLogger().err(t, "Error while processing failure with reason: %s", failure);
-          innerFailSafe(next, t);
-          break;
-        }
-      }
-    }
-
-    @Override
-    void set(final LoopChain<R, ?> next) {
-      innerSet(next);
-    }
-  }
-
-  private static class ChainStatementHandlerOrdered<V, R> extends LoopChain<V, R>
-      implements Serializable {
-
-    private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
-
-    private final StatementHandler<V, R> mHandler;
-
-    private final Object mMutex = new Object();
-
-    private final AtomicLong mPendingCount = new AtomicLong(1);
-
-    private final NestedQueue<SimpleState<R>> mQueue = new NestedQueue<SimpleState<R>>();
-
-    private ChainStatementHandlerOrdered(@Nullable final StatementHandler<V, R> handler) {
-      mHandler = ConstantConditions.notNull("handler", handler);
-    }
-
-    private void flushQueue(final LoopChain<R, ?> next) {
-      addTo(mMutex, mQueue, next);
-    }
-
-    private void flushQueueSafe(final LoopChain<R, ?> next) {
-      try {
-        flushQueue(next);
-
-      } catch (final Throwable t) {
-        getLogger().wrn(t, "Suppressed failure");
-      }
-    }
-
-    private void innerFailSafe(final LoopChain<R, ?> next, @NotNull final Throwable failure) {
-      mPendingCount.set(0);
-      synchronized (mMutex) {
-        mQueue.clear();
-      }
-
-      next.failSafe(failure);
-    }
-
-    private void innerSet(final LoopChain<R, ?> next) {
-      if (mPendingCount.decrementAndGet() > 0) {
-        return;
-      }
-
-      next.set();
-    }
-
-    @NotNull
-    private Object writeReplace() throws ObjectStreamException {
-      return new ChainProxy<V, R>(mHandler);
-    }
-
-    private static class ChainProxy<V, R> implements Serializable {
-
-      private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
-
-      private final StatementHandler<V, R> mHandler;
-
-      private ChainProxy(final StatementHandler<V, R> handler) {
-        mHandler = handler;
-      }
-
-      @NotNull
-      private Object readResolve() throws ObjectStreamException {
-        try {
-          return new ChainStatementHandlerOrdered<V, R>(mHandler);
-
-        } catch (final Throwable t) {
-          throw new InvalidObjectException(t.getMessage());
-        }
-      }
-    }
-
-    private class ChainEvaluation implements Evaluation<R> {
-
-      private final LoopChain<R, ?> mNext;
-
-      private final NestedQueue<SimpleState<R>> mQueue;
-
-      private ChainEvaluation(@NotNull final NestedQueue<SimpleState<R>> queue,
-          final LoopChain<R, ?> next) {
-        mQueue = queue;
-        mNext = next;
-      }
-
-      public void fail(@NotNull final Throwable failure) {
-        synchronized (mMutex) {
-          final NestedQueue<SimpleState<R>> queue = mQueue;
-          queue.add(SimpleState.<R>ofFailure(failure));
-          queue.close();
-        }
-
-        flushQueueSafe(mNext);
-      }
-
-      public void set(final R value) {
-        synchronized (mMutex) {
-          final NestedQueue<SimpleState<R>> queue = mQueue;
-          queue.add(SimpleState.ofValue(value));
-          queue.close();
-        }
-
-        flushQueue(mNext);
-      }
-    }
-
-    @Override
-    void addFailure(final LoopChain<R, ?> next, @NotNull final Throwable failure) {
-      mPendingCount.incrementAndGet();
-      try {
-        mHandler.failure(failure, new ChainEvaluation(mQueue.addNested(), next));
-
-      } catch (final CancellationException e) {
-        getLogger().wrn(e, "Loop has been cancelled");
-        innerFailSafe(next, e);
-
-      } catch (final Throwable t) {
-        getLogger().err(t, "Error while processing failure with reason: %s", failure);
-        innerFailSafe(next, t);
-      }
-    }
-
-    @Override
-    void addValue(final LoopChain<R, ?> next, final V value) {
-      mPendingCount.incrementAndGet();
-      try {
-        mHandler.value(value, new ChainEvaluation(mQueue.addNested(), next));
-
-      } catch (final CancellationException e) {
-        getLogger().wrn(e, "Loop has been cancelled");
-        innerFailSafe(next, e);
-
-      } catch (final Throwable t) {
-        getLogger().err(t, "Error while processing value: %s", value);
-        innerFailSafe(next, t);
-      }
-    }
-
-    @Override
-    void addValues(final LoopChain<R, ?> next, @NotNull final Iterable<? extends V> values) {
-      mPendingCount.addAndGet(Iterables.size(values));
-      for (final V value : values) {
-        try {
-          mHandler.value(value, new ChainEvaluation(mQueue.addNested(), next));
-
-        } catch (final CancellationException e) {
-          getLogger().wrn(e, "Loop has been cancelled");
-          innerFailSafe(next, e);
-          break;
-
-        } catch (final Throwable t) {
-          getLogger().err(t, "Error while processing value: %s", value);
-          innerFailSafe(next, t);
-          break;
-        }
-      }
-    }
-
-    @NotNull
-    @Override
-    LoopChain<V, R> copy() {
-      return new ChainStatementHandlerOrdered<V, R>(mHandler.renew());
-    }
-
-    @Override
-    void addFailures(final LoopChain<R, ?> next,
-        @NotNull final Iterable<? extends Throwable> failures) {
-      mPendingCount.addAndGet(Iterables.size(failures));
-      for (final Throwable failure : failures) {
-        try {
-          mHandler.failure(failure, new ChainEvaluation(mQueue.addNested(), next));
-
-        } catch (final CancellationException e) {
-          getLogger().wrn(e, "Loop has been cancelled");
-          innerFailSafe(next, e);
-          break;
-
-        } catch (final Throwable t) {
-          getLogger().err(t, "Error while processing value: %s", failure);
-          innerFailSafe(next, t);
-          break;
-        }
-      }
-    }
-
-    @Override
-    void set(final LoopChain<R, ?> next) {
-      flushQueue(next);
-      innerSet(next);
-    }
-  }
-
-  private static class ChainStatementLoopHandler<V, R> extends LoopChain<V, R>
-      implements Serializable {
-
-    private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
-
-    private final ChainEvaluationCollection mEvaluation = new ChainEvaluationCollection();
-
-    private final StatementLoopHandler<V, R> mHandler;
-
-    private final AtomicLong mPendingCount = new AtomicLong(1);
-
-    private ChainStatementLoopHandler(@Nullable final StatementLoopHandler<V, R> handler) {
-      mHandler = ConstantConditions.notNull("handler", handler);
-    }
-
-    private void innerFailSafe(final LoopChain<R, ?> next, @NotNull final Throwable failure) {
-      mPendingCount.set(0);
-      next.failSafe(failure);
-    }
-
-    private void innerSet(final LoopChain<R, ?> next) {
-      if (mPendingCount.decrementAndGet() > 0) {
-        return;
-      }
-
-      next.set();
-    }
-
-    @NotNull
-    private Object writeReplace() throws ObjectStreamException {
-      return new ChainProxy<V, R>(mHandler);
-    }
-
-    private static class ChainProxy<V, R> implements Serializable {
-
-      private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
-
-      private final StatementLoopHandler<V, R> mHandler;
-
-      private ChainProxy(final StatementLoopHandler<V, R> handler) {
-        mHandler = handler;
-      }
-
-      @NotNull
-      private Object readResolve() throws ObjectStreamException {
-        try {
-          return new ChainStatementLoopHandler<V, R>(mHandler);
-
-        } catch (final Throwable t) {
-          throw new InvalidObjectException(t.getMessage());
-        }
-      }
-    }
-
-    private class ChainEvaluationCollection implements EvaluationCollection<R> {
-
-      private volatile LoopChain<R, ?> mNext;
-
-      @NotNull
-      ChainEvaluationCollection withNext(final LoopChain<R, ?> next) {
-        mNext = next;
-        return this;
-      }
-
-      @NotNull
-      public EvaluationCollection<R> addFailure(@NotNull final Throwable failure) {
-        mNext.addFailure(failure);
-        return this;
-      }
-
-      @NotNull
-      public EvaluationCollection<R> addFailures(
-          @Nullable final Iterable<? extends Throwable> failures) {
-        mNext.addFailures(failures);
-        return this;
-      }
-
-      @NotNull
-      public EvaluationCollection<R> addValue(final R value) {
-        mNext.addValue(value);
-        return this;
-      }
-
-      @NotNull
-      public EvaluationCollection<R> addValues(@Nullable final Iterable<? extends R> values) {
-        mNext.addValues(values);
-        return this;
-      }
-
-      public void set() {
-        innerSet(mNext);
-      }
-    }
-
-    @Override
-    void addFailure(final LoopChain<R, ?> next, @NotNull final Throwable failure) {
-      mPendingCount.incrementAndGet();
-      try {
-        mHandler.failure(failure, mEvaluation.withNext(next));
-
-      } catch (final CancellationException e) {
-        getLogger().wrn(e, "Loop has been cancelled");
-        innerFailSafe(next, e);
-
-      } catch (final Throwable t) {
-        getLogger().err(t, "Error while processing failure with reason: %s", failure);
-        innerFailSafe(next, t);
-      }
-    }
-
-    @Override
-    void addValue(final LoopChain<R, ?> next, final V value) {
-      mPendingCount.incrementAndGet();
-      try {
-        mHandler.value(value, mEvaluation.withNext(next));
-
-      } catch (final CancellationException e) {
-        getLogger().wrn(e, "Loop has been cancelled");
-        innerFailSafe(next, e);
-
-      } catch (final Throwable t) {
-        getLogger().err(t, "Error while processing value: %s", value);
-        innerFailSafe(next, t);
-      }
-    }
-
-    @Override
-    void addValues(final LoopChain<R, ?> next, @NotNull final Iterable<? extends V> values) {
-      mPendingCount.addAndGet(Iterables.size(values));
-      final ChainEvaluationCollection evaluation = mEvaluation.withNext(next);
-      for (final V value : values) {
-        try {
-          mHandler.value(value, evaluation);
-
-        } catch (final CancellationException e) {
-          getLogger().wrn(e, "Loop has been cancelled");
-          innerFailSafe(next, e);
-          break;
-
-        } catch (final Throwable t) {
-          getLogger().err(t, "Error while processing value: %s", value);
-          innerFailSafe(next, t);
-          break;
-        }
-      }
-    }
-
-    @NotNull
-    @Override
-    LoopChain<V, R> copy() {
-      return new ChainStatementLoopHandler<V, R>(mHandler.renew());
-    }
-
-    @Override
-    void addFailures(final LoopChain<R, ?> next,
-        @NotNull final Iterable<? extends Throwable> failures) {
-      mPendingCount.addAndGet(Iterables.size(failures));
-      final ChainEvaluationCollection evaluation = mEvaluation.withNext(next);
-      for (final Throwable failure : failures) {
-        try {
-          mHandler.failure(failure, evaluation);
-
-        } catch (final CancellationException e) {
-          getLogger().wrn(e, "Loop has been cancelled");
-          innerFailSafe(next, e);
-          break;
-
-        } catch (final Throwable t) {
-          getLogger().err(t, "Error while processing failure with reason: %s", failure);
-          innerFailSafe(next, t);
-          break;
-        }
-      }
-    }
-
-    @Override
-    void set(final LoopChain<R, ?> next) {
-      innerSet(next);
-    }
-  }
-
-  private static class ChainStatementLoopHandlerOrdered<V, R> extends LoopChain<V, R>
-      implements Serializable {
-
-    private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
-
-    private final StatementLoopHandler<V, R> mHandler;
-
-    private final Object mMutex = new Object();
-
-    private final AtomicLong mPendingCount = new AtomicLong(1);
-
-    private final NestedQueue<SimpleState<R>> mQueue = new NestedQueue<SimpleState<R>>();
-
-    private ChainStatementLoopHandlerOrdered(@Nullable final StatementLoopHandler<V, R> handler) {
-      mHandler = ConstantConditions.notNull("handler", handler);
-    }
-
-    private void flushQueue(final LoopChain<R, ?> next) {
-      addTo(mMutex, mQueue, next);
-    }
-
-    private void innerFailSafe(final LoopChain<R, ?> next, @NotNull final Throwable failure) {
-      mPendingCount.set(0);
-      synchronized (mMutex) {
-        mQueue.clear();
-      }
-
-      next.failSafe(failure);
-    }
-
-    private void innerSet(final LoopChain<R, ?> next) {
-      if (mPendingCount.decrementAndGet() > 0) {
-        return;
-      }
-
-      next.set();
-    }
-
-    @NotNull
-    private Object writeReplace() throws ObjectStreamException {
-      return new ChainProxy<V, R>(mHandler);
-    }
-
-    private static class ChainProxy<V, R> implements Serializable {
-
-      private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
-
-      private final StatementLoopHandler<V, R> mHandler;
-
-      private ChainProxy(final StatementLoopHandler<V, R> handler) {
-        mHandler = handler;
-      }
-
-      @NotNull
-      private Object readResolve() throws ObjectStreamException {
-        try {
-          return new ChainStatementLoopHandlerOrdered<V, R>(mHandler);
-
-        } catch (final Throwable t) {
-          throw new InvalidObjectException(t.getMessage());
-        }
-      }
-    }
-
-    private class ChainEvaluations implements EvaluationCollection<R> {
-
-      private final LoopChain<R, ?> mNext;
-
-      private final NestedQueue<SimpleState<R>> mQueue;
-
-      private ChainEvaluations(@NotNull final NestedQueue<SimpleState<R>> queue,
-          final LoopChain<R, ?> next) {
-        mQueue = queue;
-        mNext = next;
-      }
-
-      @NotNull
-      public EvaluationCollection<R> addFailure(@NotNull final Throwable failure) {
-        synchronized (mMutex) {
-          mQueue.add(SimpleState.<R>ofFailure(failure));
-        }
-
-        flushQueue(mNext);
-        return this;
-      }
-
-      @NotNull
-      public EvaluationCollection<R> addFailures(
-          @Nullable final Iterable<? extends Throwable> failures) {
-        if (failures != null) {
-          synchronized (mMutex) {
-            @SuppressWarnings("UnnecessaryLocalVariable") final NestedQueue<SimpleState<R>> queue =
-                mQueue;
-            for (final Throwable failure : failures) {
-              queue.add(SimpleState.<R>ofFailure(failure));
-            }
-          }
-
-          flushQueue(mNext);
-        }
-
-        return this;
-      }
-
-      @NotNull
-      public EvaluationCollection<R> addValue(final R value) {
-        synchronized (mMutex) {
-          mQueue.add(SimpleState.ofValue(value));
-        }
-
-        flushQueue(mNext);
-        return this;
-      }
-
-      @NotNull
-      public EvaluationCollection<R> addValues(@Nullable final Iterable<? extends R> values) {
-        if (values != null) {
-          synchronized (mMutex) {
-            @SuppressWarnings("UnnecessaryLocalVariable") final NestedQueue<SimpleState<R>> queue =
-                mQueue;
-            for (final R value : values) {
-              queue.add(SimpleState.ofValue(value));
-            }
-          }
-
-          flushQueue(mNext);
-        }
-
-        return this;
-      }
-
-      public void set() {
-        synchronized (mMutex) {
-          mQueue.close();
-        }
-
-        final LoopChain<R, ?> next = mNext;
-        flushQueue(next);
-        innerSet(next);
-      }
-    }
-
-    @Override
-    void addFailure(final LoopChain<R, ?> next, @NotNull final Throwable failure) {
-      mPendingCount.incrementAndGet();
-      try {
-        mHandler.failure(failure, new ChainEvaluations(mQueue.addNested(), next));
-
-      } catch (final CancellationException e) {
-        getLogger().wrn(e, "Loop has been cancelled");
-        innerFailSafe(next, e);
-
-      } catch (final Throwable t) {
-        getLogger().err(t, "Error while processing failure with reason: %s", failure);
-        innerFailSafe(next, t);
-      }
-    }
-
-    @Override
-    void addValue(final LoopChain<R, ?> next, final V value) {
-      mPendingCount.incrementAndGet();
-      try {
-        mHandler.value(value, new ChainEvaluations(mQueue.addNested(), next));
-
-      } catch (final CancellationException e) {
-        getLogger().wrn(e, "Loop has been cancelled");
-        innerFailSafe(next, e);
-
-      } catch (final Throwable t) {
-        getLogger().err(t, "Error while processing value: %s", value);
-        innerFailSafe(next, t);
-      }
-    }
-
-    @Override
-    void addValues(final LoopChain<R, ?> next, @NotNull final Iterable<? extends V> values) {
-      mPendingCount.addAndGet(Iterables.size(values));
-      for (final V value : values) {
-        try {
-          mHandler.value(value, new ChainEvaluations(mQueue.addNested(), next));
-
-        } catch (final CancellationException e) {
-          getLogger().wrn(e, "Loop has been cancelled");
-          innerFailSafe(next, e);
-          break;
-
-        } catch (final Throwable t) {
-          getLogger().err(t, "Error while processing value: %s", value);
-          innerFailSafe(next, t);
-          break;
-        }
-      }
-    }
-
-    @NotNull
-    @Override
-    LoopChain<V, R> copy() {
-      return new ChainStatementLoopHandlerOrdered<V, R>(mHandler.renew());
-    }
-
-    @Override
-    void addFailures(final LoopChain<R, ?> next,
-        @NotNull final Iterable<? extends Throwable> failures) {
-      mPendingCount.addAndGet(Iterables.size(failures));
-      for (final Throwable failure : failures) {
-        try {
-          mHandler.failure(failure, new ChainEvaluations(mQueue.addNested(), next));
-
-        } catch (final CancellationException e) {
-          getLogger().wrn(e, "Loop has been cancelled");
-          innerFailSafe(next, e);
-          break;
-
-        } catch (final Throwable t) {
-          getLogger().err(t, "Error while processing failure with reason: %s", failure);
-          innerFailSafe(next, t);
-          break;
-        }
-      }
-    }
-
-    @Override
-    void set(final LoopChain<R, ?> next) {
-      innerSet(next);
-    }
+    return new LoopProxy(mObserver, mIsEvaluated, mLogger.getName(), propagations);
   }
 
   private static class ForkObserver<S, V> extends LoopHandler<V, V>
@@ -2550,6 +1106,26 @@ class DefaultLoop<V> implements Loop<V>, Serializable {
               forker);
       mExecutor = withThrottling(1, loopExecutor());
       mLoop = loop;
+    }
+
+    public void accept(final EvaluationCollection<V> evaluation) {
+      mExecutor.execute(new Runnable() {
+
+        public void run() {
+          try {
+            final DefaultLoop<V> loop = mLoop;
+            try {
+              mStack = mForker.init(loop);
+
+            } finally {
+              loop.propagate(ForkObserver.this);
+            }
+
+          } catch (final Throwable t) {
+            mFailure = t;
+          }
+        }
+      });
     }
 
     @Override
@@ -2693,7 +1269,12 @@ class DefaultLoop<V> implements Loop<V>, Serializable {
       return mLoop.cancel(mayInterruptIfRunning);
     }
 
-    void chain(final EvaluationCollection<V> evaluation) {
+    @NotNull
+    Observer<EvaluationCollection<V>> newObserver() {
+      return new PropagationForkObserver<S, V>(this);
+    }
+
+    void propagate(final EvaluationCollection<V> evaluation) {
       mExecutor.execute(new Runnable() {
 
         public void run() {
@@ -2715,12 +1296,7 @@ class DefaultLoop<V> implements Loop<V>, Serializable {
       });
     }
 
-    @NotNull
-    Observer<EvaluationCollection<V>> newObserver() {
-      return new ChainForkObserver<S, V>(this);
-    }
-
-    void unchain(final EvaluationCollection<V> evaluation) {
+    void stopPropagation(final EvaluationCollection<V> evaluation) {
       mExecutor.execute(new Runnable() {
 
         public void run() {
@@ -2772,29 +1348,9 @@ class DefaultLoop<V> implements Loop<V>, Serializable {
         }
       }
     }
-
-    public void accept(final EvaluationCollection<V> evaluation) {
-      mExecutor.execute(new Runnable() {
-
-        public void run() {
-          try {
-            final DefaultLoop<V> loop = mLoop;
-            try {
-              mStack = mForker.init(loop);
-
-            } finally {
-              loop.chain(ForkObserver.this);
-            }
-
-          } catch (final Throwable t) {
-            mFailure = t;
-          }
-        }
-      });
-    }
   }
 
-  private static abstract class LoopChain<V, R> implements EvaluationCollection<V> {
+  private static abstract class LoopPropagation<V, R> implements EvaluationCollection<V> {
 
     private static final Runnable NO_OP = new Runnable() {
 
@@ -2808,9 +1364,25 @@ class DefaultLoop<V> implements Loop<V>, Serializable {
 
     private volatile Logger mLogger;
 
-    private volatile LoopChain<R, ?> mNext;
+    private volatile LoopPropagation<R, ?> mNext;
 
-    abstract void addFailure(LoopChain<R, ?> next, @NotNull Throwable failure);
+    @NotNull
+    public final EvaluationCollection<V> addFailure(@NotNull final Throwable failure) {
+      ConstantConditions.notNull("failure", failure);
+      final Runnable command;
+      synchronized (mMutex) {
+        command = mInnerState.add();
+      }
+
+      if (command != null) {
+        command.run();
+        addFailure(mNext, failure);
+      }
+
+      return this;
+    }
+
+    abstract void addFailure(LoopPropagation<R, ?> next, @NotNull Throwable failure);
 
     final void addFailureSafe(@NotNull final Throwable failure) {
       final Runnable command;
@@ -2824,12 +1396,12 @@ class DefaultLoop<V> implements Loop<V>, Serializable {
       }
     }
 
-    abstract void addFailures(LoopChain<R, ?> next,
+    abstract void addFailures(LoopPropagation<R, ?> next,
         @NotNull Iterable<? extends Throwable> failures);
 
-    abstract void addValue(LoopChain<R, ?> next, V value);
+    abstract void addValue(LoopPropagation<R, ?> next, V value);
 
-    abstract void addValues(LoopChain<R, ?> next, @NotNull Iterable<? extends V> values);
+    abstract void addValues(LoopPropagation<R, ?> next, @NotNull Iterable<? extends V> values);
 
     boolean cancel(@NotNull final Throwable exception) {
       final Runnable command;
@@ -2839,7 +1411,7 @@ class DefaultLoop<V> implements Loop<V>, Serializable {
 
       if (command != null) {
         command.run();
-        final LoopChain<R, ?> next = mNext;
+        final LoopPropagation<R, ?> next = mNext;
         addFailure(next, exception);
         set(next);
         return true;
@@ -2849,7 +1421,7 @@ class DefaultLoop<V> implements Loop<V>, Serializable {
     }
 
     @NotNull
-    abstract LoopChain<V, R> copy();
+    abstract LoopPropagation<V, R> copy();
 
     final void failSafe(@NotNull final Throwable failure) {
       final Runnable command;
@@ -2859,7 +1431,7 @@ class DefaultLoop<V> implements Loop<V>, Serializable {
 
       if (command != null) {
         command.run();
-        final LoopChain<R, ?> next = mNext;
+        final LoopPropagation<R, ?> next = mNext;
         addFailure(next, failure);
         set(next);
       }
@@ -2891,15 +1463,15 @@ class DefaultLoop<V> implements Loop<V>, Serializable {
 
       if (command != null) {
         command.run();
-        final LoopChain<R, ?> next = mNext;
+        final LoopPropagation<R, ?> next = mNext;
         addValue(next, value);
         set(next);
       }
     }
 
-    abstract void set(LoopChain<R, ?> next);
+    abstract void set(LoopPropagation<R, ?> next);
 
-    void setNext(@NotNull LoopChain<R, ?> next) {
+    void setNext(@NotNull LoopPropagation<R, ?> next) {
       mNext = next;
     }
 
@@ -2995,7 +1567,7 @@ class DefaultLoop<V> implements Loop<V>, Serializable {
       public void run() {
         try {
           for (final SimpleState<V> state : mStates) {
-            state.addTo(LoopChain.this);
+            state.addTo(LoopPropagation.this);
           }
 
         } catch (final CancellationException e) {
@@ -3077,22 +1649,6 @@ class DefaultLoop<V> implements Loop<V>, Serializable {
     }
 
     @NotNull
-    public final EvaluationCollection<V> addFailure(@NotNull final Throwable failure) {
-      ConstantConditions.notNull("failure", failure);
-      final Runnable command;
-      synchronized (mMutex) {
-        command = mInnerState.add();
-      }
-
-      if (command != null) {
-        command.run();
-        addFailure(mNext, failure);
-      }
-
-      return this;
-    }
-
-    @NotNull
     public EvaluationCollection<V> addFailures(
         @Nullable final Iterable<? extends Throwable> failures) {
       final Runnable command;
@@ -3160,8 +1716,8 @@ class DefaultLoop<V> implements Loop<V>, Serializable {
     private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
 
     private LoopProxy(final Observer<EvaluationCollection<?>> observer, final boolean isEvaluated,
-        final String loggerName, final List<LoopChain<?, ?>> chains) {
-      super(proxy(observer), isEvaluated, loggerName, chains);
+        final String loggerName, final List<LoopPropagation<?, ?>> propagations) {
+      super(proxy(observer), isEvaluated, loggerName, propagations);
     }
 
     @NotNull
@@ -3169,19 +1725,1478 @@ class DefaultLoop<V> implements Loop<V>, Serializable {
     private Object readResolve() throws ObjectStreamException {
       try {
         final Object[] args = deserializeArgs();
-        final ChainHead<Object> head = new ChainHead<Object>();
-        LoopChain<?, ?> tail = head;
-        for (final LoopChain<?, ?> chain : (List<LoopChain<?, ?>>) args[3]) {
-          ((LoopChain<?, Object>) tail).setNext((LoopChain<Object, ?>) chain);
-          tail = chain;
+        final PropagationHead<Object> head = new PropagationHead<Object>();
+        LoopPropagation<?, ?> tail = head;
+        for (final LoopPropagation<?, ?> propagation : (List<LoopPropagation<?, ?>>) args[3]) {
+          ((LoopPropagation<?, Object>) tail).setNext((LoopPropagation<Object, ?>) propagation);
+          tail = propagation;
         }
 
         return new DefaultLoop<Object>((Observer<EvaluationCollection<?>>) args[0],
-            (Boolean) args[1], (String) args[2], head, (LoopChain<?, Object>) tail);
+            (Boolean) args[1], (String) args[2], head, (LoopPropagation<?, Object>) tail);
 
       } catch (final Throwable t) {
         throw new InvalidObjectException(t.getMessage());
       }
+    }
+  }
+
+  private static class PropagationConsume<V> extends LoopPropagation<V, Object> {
+
+    private volatile WeakReference<LoopPropagation<Object, ?>> mNext =
+        new WeakReference<LoopPropagation<Object, ?>>(null);
+
+    @Override
+    void addFailure(final LoopPropagation<Object, ?> next, @NotNull final Throwable failure) {
+      getLogger().dbg("Consuming failure: %s", failure);
+    }
+
+    private void complete() {
+      final LoopPropagation<Object, ?> next = mNext.get();
+      if (next != null) {
+        next.set();
+      }
+    }
+
+    @Override
+    void setNext(@NotNull final LoopPropagation<Object, ?> next) {
+      mNext = new WeakReference<LoopPropagation<Object, ?>>(next);
+    }
+
+    @Override
+    void addFailures(final LoopPropagation<Object, ?> next,
+        @NotNull final Iterable<? extends Throwable> failures) {
+      getLogger().dbg("Consuming failures: %s", Iterables.toString(failures));
+    }
+
+    @Override
+    void addValue(final LoopPropagation<Object, ?> next, final V value) {
+      getLogger().dbg("Consuming value: %s", value);
+    }
+
+    @Override
+    void addValues(final LoopPropagation<Object, ?> next,
+        @NotNull final Iterable<? extends V> values) {
+      getLogger().dbg("Consuming values: %s", Iterables.toString(values));
+    }
+
+    @NotNull
+    @Override
+    LoopPropagation<V, Object> copy() {
+      return new PropagationConsume<V>();
+    }
+
+    @Override
+    void set(final LoopPropagation<Object, ?> next) {
+      getLogger().dbg("Consuming completion");
+      complete();
+    }
+  }
+
+  private static class PropagationForkObserver<S, V>
+      implements RenewableObserver<EvaluationCollection<V>>, Serializable {
+
+    private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
+
+    private final ForkObserver<S, V> mObserver;
+
+    private PropagationForkObserver(@NotNull final ForkObserver<S, V> observer) {
+      mObserver = observer;
+    }
+
+    @NotNull
+    public PropagationForkObserver<S, V> renew() {
+      final ForkObserver<S, V> observer = mObserver.renew();
+      observer.accept(null);
+      return new PropagationForkObserver<S, V>(observer);
+    }
+
+    void cancel(final EvaluationCollection<V> evaluation) {
+      mObserver.stopPropagation(evaluation);
+    }
+
+    @NotNull
+    private Object writeReplace() throws ObjectStreamException {
+      return new ObserverProxy<S, V>(mObserver);
+    }
+
+    private static class ObserverProxy<S, V> implements Serializable {
+
+      private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
+
+      private final ForkObserver<S, V> mObserver;
+
+      private ObserverProxy(@NotNull final ForkObserver<S, V> observer) {
+        mObserver = observer;
+      }
+
+      @NotNull
+      private Object readResolve() throws ObjectStreamException {
+        try {
+          final ForkObserver<S, V> observer = mObserver;
+          observer.accept(null);
+          return new PropagationForkObserver<S, V>(observer);
+
+        } catch (final Throwable t) {
+          throw new InvalidObjectException(t.getMessage());
+        }
+      }
+    }
+
+    public void accept(final EvaluationCollection<V> evaluation) {
+      mObserver.propagate(evaluation);
+    }
+
+  }
+
+  private static class PropagationHead<V> extends LoopPropagation<V, V> {
+
+    private final Object mMutex = new Object();
+
+    private StateEvaluating mInnerState = new StateEvaluating();
+
+    private StatementState mState = StatementState.Evaluating;
+
+    private DoubleQueue<SimpleState<V>> mStates = new DoubleQueue<SimpleState<V>>();
+
+    @NotNull
+    List<SimpleState<V>> consumeStates() {
+      final ArrayList<SimpleState<V>> states = new ArrayList<SimpleState<V>>(mStates);
+      mStates.clear();
+      return states;
+    }
+
+    @Nullable
+    FailureException getFailure() {
+      for (final SimpleState<V> state : mStates) {
+        if (state.isFailed()) {
+          return FailureException.wrap(state.failure());
+        }
+      }
+
+      return null;
+    }
+
+    @NotNull
+    Object getMutex() {
+      return mMutex;
+    }
+
+    @NotNull
+    StatementState getState() {
+      return mState;
+    }
+
+    @NotNull
+    DoubleQueue<SimpleState<V>> getStates() {
+      return mStates;
+    }
+
+    @NotNull
+    List<V> getValues() {
+      final ArrayList<V> values = new ArrayList<V>();
+      for (final SimpleState<V> state : mStates) {
+        if (state.isFailed()) {
+          throw FailureException.wrap(state.failure());
+        }
+
+        values.add(state.value());
+      }
+
+      return values;
+    }
+
+    void innerAddFailure(@NotNull final Throwable failure) {
+      getLogger().dbg("Loop failed with reason [%s => %s]: %s", StatementState.Evaluating,
+          StatementState.Failed, failure);
+      final DoubleQueue<SimpleState<V>> states = mStates;
+      states.add(SimpleState.<V>ofFailure(failure));
+      mState = StatementState.Failed;
+    }
+
+    void innerAddValue(final V value) {
+      getLogger().dbg("Adding value [%s => %s]: %s", StatementState.Evaluating,
+          StatementState.Evaluating, value);
+      mStates.add(SimpleState.ofValue(value));
+    }
+
+    void innerSet() {
+      mInnerState.innerSet();
+      if (mState == StatementState.Evaluating) {
+        mState = StatementState.Set;
+      }
+    }
+
+    boolean isSet() {
+      return mInnerState.isSet();
+    }
+
+    @Nullable
+    Runnable propagate(final LoopPropagation<V, ?> propagation) {
+      final Runnable propagate = mInnerState.propagation(propagation);
+      mState = StatementState.Evaluating;
+      return propagate;
+    }
+
+    private class StateEvaluating {
+
+      @NotNull
+      IllegalStateException exception(@NotNull final StatementState state) {
+        return new IllegalStateException("invalid state: " + state);
+      }
+
+      void innerSet() {
+        getLogger().dbg("Setting loop with values [%s => %s]: %s", StatementState.Evaluating,
+            StatementState.Set, mStates);
+        mInnerState = new StateSet();
+      }
+
+      boolean isSet() {
+        return false;
+      }
+
+      @Nullable
+      Runnable propagation(final LoopPropagation<V, ?> propagation) {
+        propagation.prepend(consumeStates());
+        return null;
+      }
+    }
+
+    private class StateSet extends StateEvaluating {
+
+      @Override
+      void innerSet() {
+        throw exception(StatementState.Set);
+      }
+
+      @Override
+      boolean isSet() {
+        return true;
+      }
+
+      @Nullable
+      @Override
+      Runnable propagation(final LoopPropagation<V, ?> propagation) {
+        getLogger().dbg("Propagating loop [%s => %s]", StatementState.Set,
+            StatementState.Evaluating);
+        mInnerState = new StateEvaluating();
+        propagation.prepend(consumeStates());
+        return new Runnable() {
+
+          public void run() {
+            propagation.set();
+          }
+        };
+      }
+    }
+
+    @Override
+    void addFailure(final LoopPropagation<V, ?> next, @NotNull final Throwable failure) {
+      next.addFailure(failure);
+    }
+
+    @Override
+    void addFailures(final LoopPropagation<V, ?> next,
+        @NotNull  final Iterable<? extends Throwable> failures) {
+      next.addFailures(failures);
+    }
+
+    @Override
+    void addValue(final LoopPropagation<V, ?> next, final V value) {
+      next.addValue(value);
+    }
+
+    @Override
+    void addValues(final LoopPropagation<V, ?> next, @NotNull final Iterable<? extends V> values) {
+      next.addValues(values);
+    }
+
+    @NotNull
+    @Override
+    PropagationHead<V> copy() {
+      return new PropagationHead<V>();
+    }
+
+    @Override
+    void set(final LoopPropagation<V, ?> next) {
+      next.set();
+    }
+  }
+
+  private static class PropagationLoopHandler<V, R> extends LoopPropagation<V, R>
+      implements Serializable {
+
+    private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
+
+    private final PropagationEvaluationCollection mEvaluation =
+        new PropagationEvaluationCollection();
+
+    private final LoopHandler<V, R> mHandler;
+
+    private final AtomicLong mPendingCount = new AtomicLong(1);
+
+    private PropagationLoopHandler(@Nullable final LoopHandler<V, R> handler) {
+      mHandler = ConstantConditions.notNull("handler", handler);
+    }
+
+    private void innerFailSafe(final LoopPropagation<R, ?> next, @NotNull final Throwable failure) {
+      mPendingCount.set(0);
+      next.failSafe(failure);
+    }
+
+    private void innerSet(final LoopPropagation<R, ?> next) {
+      if (mPendingCount.decrementAndGet() > 0) {
+        return;
+      }
+
+      next.set();
+    }
+
+    @NotNull
+    private Object writeReplace() throws ObjectStreamException {
+      return new PropagationProxy<V, R>(mHandler);
+    }
+
+    private static class PropagationProxy<V, R> implements Serializable {
+
+      private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
+
+      private final LoopHandler<V, R> mHandler;
+
+      private PropagationProxy(final LoopHandler<V, R> handler) {
+        mHandler = handler;
+      }
+
+      @NotNull
+      private Object readResolve() throws ObjectStreamException {
+        try {
+          return new PropagationLoopHandler<V, R>(mHandler);
+
+        } catch (final Throwable t) {
+          throw new InvalidObjectException(t.getMessage());
+        }
+      }
+    }
+
+    private class PropagationEvaluationCollection implements EvaluationCollection<R> {
+
+      private volatile LoopPropagation<R, ?> mNext;
+
+      @NotNull
+      PropagationEvaluationCollection withNext(final LoopPropagation<R, ?> next) {
+        mNext = next;
+        return this;
+      }
+
+      @NotNull
+      public EvaluationCollection<R> addFailure(@NotNull final Throwable failure) {
+        mNext.addFailure(failure);
+        return this;
+      }
+
+      @NotNull
+      public EvaluationCollection<R> addFailures(
+          @Nullable final Iterable<? extends Throwable> failures) {
+        mNext.addFailures(failures);
+        return this;
+      }
+
+      @NotNull
+      public EvaluationCollection<R> addValue(final R value) {
+        mNext.addValue(value);
+        return this;
+      }
+
+      @NotNull
+      public EvaluationCollection<R> addValues(@Nullable final Iterable<? extends R> values) {
+        mNext.addValues(values);
+        return this;
+      }
+
+      public void set() {
+        innerSet(mNext);
+      }
+    }
+
+    @Override
+    void addFailure(final LoopPropagation<R, ?> next, @NotNull final Throwable failure) {
+      mPendingCount.incrementAndGet();
+      try {
+        mHandler.addFailure(failure, mEvaluation.withNext(next));
+
+      } catch (final CancellationException e) {
+        getLogger().wrn(e, "Loop has been cancelled");
+        innerFailSafe(next, e);
+
+      } catch (final Throwable t) {
+        getLogger().err(t, "Error while processing failure with reason: %s", failure);
+        innerFailSafe(next, t);
+      }
+    }
+
+    @Override
+    void addValue(final LoopPropagation<R, ?> next, final V value) {
+      mPendingCount.incrementAndGet();
+      try {
+        mHandler.addValue(value, mEvaluation.withNext(next));
+
+      } catch (final CancellationException e) {
+        getLogger().wrn(e, "Loop has been cancelled");
+        innerFailSafe(next, e);
+
+      } catch (final Throwable t) {
+        getLogger().err(t, "Error while processing value: %s", value);
+        innerFailSafe(next, t);
+      }
+    }
+
+    @Override
+    void addValues(final LoopPropagation<R, ?> next, @NotNull final Iterable<? extends V> values) {
+      mPendingCount.incrementAndGet();
+      try {
+        mHandler.addValues(values, mEvaluation.withNext(next));
+
+      } catch (final CancellationException e) {
+        getLogger().wrn(e, "Loop has been cancelled");
+        innerFailSafe(next, e);
+
+      } catch (final Throwable t) {
+        getLogger().err(t, "Error while processing values: %s", Iterables.toString(values));
+        innerFailSafe(next, t);
+      }
+    }
+
+    @NotNull
+    @Override
+    LoopPropagation<V, R> copy() {
+      return new PropagationLoopHandler<V, R>(mHandler.renew());
+    }
+
+    @Override
+    void addFailures(final LoopPropagation<R, ?> next,
+        @NotNull final Iterable<? extends Throwable> failures) {
+      mPendingCount.incrementAndGet();
+      try {
+        mHandler.addFailures(failures, mEvaluation.withNext(next));
+
+      } catch (final CancellationException e) {
+        getLogger().wrn(e, "Loop has been cancelled");
+        innerFailSafe(next, e);
+
+      } catch (final Throwable t) {
+        getLogger().err(t, "Error while processing value: %s", Iterables.toString(failures));
+        innerFailSafe(next, t);
+      }
+    }
+
+    @Override
+    void set(final LoopPropagation<R, ?> next) {
+      try {
+        mHandler.set(mEvaluation.withNext(next));
+
+      } catch (final CancellationException e) {
+        getLogger().wrn(e, "Loop has been cancelled");
+        innerFailSafe(next, e);
+
+      } catch (final Throwable t) {
+        getLogger().err(t, "Error while completing loop");
+        innerFailSafe(next, t);
+      }
+    }
+  }
+
+  private static class PropagationLoopHandlerOrdered<V, R> extends LoopPropagation<V, R>
+      implements Serializable {
+
+    private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
+
+    private final LoopHandler<V, R> mHandler;
+
+    private final Object mMutex = new Object();
+
+    private final AtomicLong mPendingCount = new AtomicLong(1);
+
+    private final NestedQueue<SimpleState<R>> mQueue = new NestedQueue<SimpleState<R>>();
+
+    private PropagationLoopHandlerOrdered(@Nullable final LoopHandler<V, R> handler) {
+      mHandler = ConstantConditions.notNull("handler", handler);
+    }
+
+    private void flushQueue(final LoopPropagation<R, ?> next) {
+      addTo(mMutex, mQueue, next);
+    }
+
+    private void innerFailSafe(final LoopPropagation<R, ?> next, @NotNull final Throwable failure) {
+      mPendingCount.set(0);
+      synchronized (mMutex) {
+        mQueue.clear();
+      }
+
+      next.failSafe(failure);
+    }
+
+    private void innerSet(final LoopPropagation<R, ?> next) {
+      if (mPendingCount.decrementAndGet() > 0) {
+        return;
+      }
+
+      next.set();
+    }
+
+    @NotNull
+    private Object writeReplace() throws ObjectStreamException {
+      return new PropagationProxy<V, R>(mHandler);
+    }
+
+    private static class PropagationProxy<V, R> implements Serializable {
+
+      private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
+
+      private final LoopHandler<V, R> mHandler;
+
+      private PropagationProxy(final LoopHandler<V, R> handler) {
+        mHandler = handler;
+      }
+
+      @NotNull
+      private Object readResolve() throws ObjectStreamException {
+        try {
+          return new PropagationLoopHandlerOrdered<V, R>(mHandler);
+
+        } catch (final Throwable t) {
+          throw new InvalidObjectException(t.getMessage());
+        }
+      }
+    }
+
+    private class PropagationEvaluations implements EvaluationCollection<R> {
+
+      private final LoopPropagation<R, ?> mNext;
+
+      private final NestedQueue<SimpleState<R>> mQueue;
+
+      private PropagationEvaluations(@NotNull final NestedQueue<SimpleState<R>> queue,
+          final LoopPropagation<R, ?> next) {
+        mQueue = queue;
+        mNext = next;
+      }
+
+      @NotNull
+      public EvaluationCollection<R> addFailure(@NotNull final Throwable failure) {
+        synchronized (mMutex) {
+          mQueue.add(SimpleState.<R>ofFailure(failure));
+        }
+
+        flushQueue(mNext);
+        return this;
+      }
+
+      @NotNull
+      public EvaluationCollection<R> addFailures(
+          @Nullable final Iterable<? extends Throwable> failures) {
+        if (failures != null) {
+          synchronized (mMutex) {
+            @SuppressWarnings("UnnecessaryLocalVariable") final NestedQueue<SimpleState<R>> queue =
+                mQueue;
+            for (final Throwable failure : failures) {
+              queue.add(SimpleState.<R>ofFailure(failure));
+            }
+          }
+
+          flushQueue(mNext);
+        }
+
+        return this;
+      }
+
+      @NotNull
+      public EvaluationCollection<R> addValue(final R value) {
+        synchronized (mMutex) {
+          mQueue.add(SimpleState.ofValue(value));
+        }
+
+        flushQueue(mNext);
+        return this;
+      }
+
+      @NotNull
+      public EvaluationCollection<R> addValues(@Nullable final Iterable<? extends R> values) {
+        if (values != null) {
+          synchronized (mMutex) {
+            @SuppressWarnings("UnnecessaryLocalVariable") final NestedQueue<SimpleState<R>> queue =
+                mQueue;
+            for (final R value : values) {
+              queue.add(SimpleState.ofValue(value));
+            }
+          }
+
+          flushQueue(mNext);
+        }
+
+        return this;
+      }
+
+      public void set() {
+        synchronized (mMutex) {
+          mQueue.close();
+        }
+
+        final LoopPropagation<R, ?> next = mNext;
+        flushQueue(next);
+        innerSet(next);
+      }
+    }
+
+    @Override
+    void addFailure(final LoopPropagation<R, ?> next, @NotNull final Throwable failure) {
+      mPendingCount.incrementAndGet();
+      try {
+        mHandler.addFailure(failure, new PropagationEvaluations(mQueue.addNested(), next));
+
+      } catch (final CancellationException e) {
+        getLogger().wrn(e, "Loop has been cancelled");
+        innerFailSafe(next, e);
+
+      } catch (final Throwable t) {
+        getLogger().err(t, "Error while processing failure with reason: %s", failure);
+        innerFailSafe(next, t);
+      }
+    }
+
+    @Override
+    void addValue(final LoopPropagation<R, ?> next, final V value) {
+      mPendingCount.incrementAndGet();
+      try {
+        mHandler.addValue(value, new PropagationEvaluations(mQueue.addNested(), next));
+
+      } catch (final CancellationException e) {
+        getLogger().wrn(e, "Loop has been cancelled");
+        innerFailSafe(next, e);
+
+      } catch (final Throwable t) {
+        getLogger().err(t, "Error while processing value: %s", value);
+        innerFailSafe(next, t);
+      }
+    }
+
+    @Override
+    void addValues(final LoopPropagation<R, ?> next, @NotNull final Iterable<? extends V> values) {
+      mPendingCount.incrementAndGet();
+      try {
+        mHandler.addValues(values, new PropagationEvaluations(mQueue.addNested(), next));
+
+      } catch (final CancellationException e) {
+        getLogger().wrn(e, "Loop has been cancelled");
+        innerFailSafe(next, e);
+
+      } catch (final Throwable t) {
+        getLogger().err(t, "Error while processing values: %s", Iterables.toString(values));
+        innerFailSafe(next, t);
+      }
+    }
+
+    @NotNull
+    @Override
+    LoopPropagation<V, R> copy() {
+      return new PropagationLoopHandlerOrdered<V, R>(mHandler.renew());
+    }
+
+    @Override
+    void addFailures(final LoopPropagation<R, ?> next,
+        @NotNull final Iterable<? extends Throwable> failures) {
+      mPendingCount.incrementAndGet();
+      try {
+        mHandler.addFailures(failures, new PropagationEvaluations(mQueue.addNested(), next));
+
+      } catch (final CancellationException e) {
+        getLogger().wrn(e, "Loop has been cancelled");
+        innerFailSafe(next, e);
+
+      } catch (final Throwable t) {
+        getLogger().err(t, "Error while processing failures: %s", Iterables.toString(failures));
+        innerFailSafe(next, t);
+      }
+    }
+
+    @Override
+    void set(final LoopPropagation<R, ?> next) {
+      try {
+        mHandler.set(new PropagationEvaluations(mQueue.addNested(), next));
+
+      } catch (final CancellationException e) {
+        getLogger().wrn(e, "Loop has been cancelled");
+        innerFailSafe(next, e);
+
+      } catch (final Throwable t) {
+        getLogger().err(t, "Error while completing loop");
+        innerFailSafe(next, t);
+      }
+    }
+  }
+
+  private static class PropagationStatementHandler<V, R> extends LoopPropagation<V, R>
+      implements Serializable {
+
+    private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
+
+    private final PropagationEvaluation mEvaluation = new PropagationEvaluation();
+
+    private final StatementHandler<V, R> mHandler;
+
+    private final AtomicLong mPendingCount = new AtomicLong(1);
+
+    private PropagationStatementHandler(@Nullable final StatementHandler<V, R> handler) {
+      mHandler = ConstantConditions.notNull("handler", handler);
+    }
+
+    private void innerFailSafe(final LoopPropagation<R, ?> next, @NotNull final Throwable failure) {
+      mPendingCount.set(0);
+      next.failSafe(failure);
+    }
+
+    private void innerSet(final LoopPropagation<R, ?> next) {
+      if (mPendingCount.decrementAndGet() > 0) {
+        return;
+      }
+
+      next.set();
+    }
+
+    @NotNull
+    private Object writeReplace() throws ObjectStreamException {
+      return new PropagationProxy<V, R>(mHandler);
+    }
+
+    private static class PropagationProxy<V, R> implements Serializable {
+
+      private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
+
+      private final StatementHandler<V, R> mHandler;
+
+      private PropagationProxy(final StatementHandler<V, R> handler) {
+        mHandler = handler;
+      }
+
+      @NotNull
+      private Object readResolve() throws ObjectStreamException {
+        try {
+          return new PropagationStatementHandler<V, R>(mHandler);
+
+        } catch (final Throwable t) {
+          throw new InvalidObjectException(t.getMessage());
+        }
+      }
+    }
+
+    private class PropagationEvaluation implements Evaluation<R> {
+
+      private volatile LoopPropagation<R, ?> mNext;
+
+      public void fail(@NotNull final Throwable failure) {
+        final LoopPropagation<R, ?> next = mNext;
+        next.addFailureSafe(failure);
+        innerSet(next);
+      }
+
+      @NotNull
+      PropagationEvaluation withNext(final LoopPropagation<R, ?> next) {
+        mNext = next;
+        return this;
+      }
+
+      public void set(final R value) {
+        final LoopPropagation<R, ?> next = mNext;
+        next.addValue(value);
+        innerSet(next);
+      }
+    }
+
+    @Override
+    void addFailure(final LoopPropagation<R, ?> next, @NotNull final Throwable failure) {
+      mPendingCount.incrementAndGet();
+      try {
+        mHandler.failure(failure, mEvaluation.withNext(next));
+
+      } catch (final CancellationException e) {
+        getLogger().wrn(e, "Loop has been cancelled");
+        innerFailSafe(next, e);
+
+      } catch (final Throwable t) {
+        getLogger().err(t, "Error while processing failure with reason: %s", failure);
+        innerFailSafe(next, t);
+      }
+    }
+
+    @Override
+    void addValue(final LoopPropagation<R, ?> next, final V value) {
+      mPendingCount.incrementAndGet();
+      try {
+        mHandler.value(value, mEvaluation.withNext(next));
+
+      } catch (final CancellationException e) {
+        getLogger().wrn(e, "Loop has been cancelled");
+        innerFailSafe(next, e);
+
+      } catch (final Throwable t) {
+        getLogger().err(t, "Error while processing value: %s", value);
+        innerFailSafe(next, t);
+      }
+    }
+
+    @Override
+    void addValues(final LoopPropagation<R, ?> next, @NotNull final Iterable<? extends V> values) {
+      mPendingCount.addAndGet(Iterables.size(values));
+      final PropagationEvaluation evaluation = mEvaluation.withNext(next);
+      for (final V value : values) {
+        try {
+          mHandler.value(value, evaluation);
+
+        } catch (final CancellationException e) {
+          getLogger().wrn(e, "Loop has been cancelled");
+          innerFailSafe(next, e);
+          break;
+
+        } catch (final Throwable t) {
+          getLogger().err(t, "Error while processing value: %s", value);
+          innerFailSafe(next, t);
+          break;
+        }
+      }
+    }
+
+    @NotNull
+    @Override
+    LoopPropagation<V, R> copy() {
+      return new PropagationStatementHandler<V, R>(mHandler.renew());
+    }
+
+    @Override
+    void addFailures(final LoopPropagation<R, ?> next,
+        @NotNull final Iterable<? extends Throwable> failures) {
+      mPendingCount.addAndGet(Iterables.size(failures));
+      final PropagationEvaluation evaluation = mEvaluation.withNext(next);
+      for (final Throwable failure : failures) {
+        try {
+          mHandler.failure(failure, evaluation);
+
+        } catch (final CancellationException e) {
+          getLogger().wrn(e, "Loop has been cancelled");
+          innerFailSafe(next, e);
+          break;
+
+        } catch (final Throwable t) {
+          getLogger().err(t, "Error while processing failure with reason: %s", failure);
+          innerFailSafe(next, t);
+          break;
+        }
+      }
+    }
+
+    @Override
+    void set(final LoopPropagation<R, ?> next) {
+      innerSet(next);
+    }
+  }
+
+  private static class PropagationStatementHandlerOrdered<V, R> extends LoopPropagation<V, R>
+      implements Serializable {
+
+    private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
+
+    private final StatementHandler<V, R> mHandler;
+
+    private final Object mMutex = new Object();
+
+    private final AtomicLong mPendingCount = new AtomicLong(1);
+
+    private final NestedQueue<SimpleState<R>> mQueue = new NestedQueue<SimpleState<R>>();
+
+    private PropagationStatementHandlerOrdered(@Nullable final StatementHandler<V, R> handler) {
+      mHandler = ConstantConditions.notNull("handler", handler);
+    }
+
+    private void flushQueue(final LoopPropagation<R, ?> next) {
+      addTo(mMutex, mQueue, next);
+    }
+
+    private void flushQueueSafe(final LoopPropagation<R, ?> next) {
+      try {
+        flushQueue(next);
+
+      } catch (final Throwable t) {
+        getLogger().wrn(t, "Suppressed failure");
+      }
+    }
+
+    private void innerFailSafe(final LoopPropagation<R, ?> next, @NotNull final Throwable failure) {
+      mPendingCount.set(0);
+      synchronized (mMutex) {
+        mQueue.clear();
+      }
+
+      next.failSafe(failure);
+    }
+
+    private void innerSet(final LoopPropagation<R, ?> next) {
+      if (mPendingCount.decrementAndGet() > 0) {
+        return;
+      }
+
+      next.set();
+    }
+
+    @NotNull
+    private Object writeReplace() throws ObjectStreamException {
+      return new PropagationProxy<V, R>(mHandler);
+    }
+
+    private static class PropagationProxy<V, R> implements Serializable {
+
+      private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
+
+      private final StatementHandler<V, R> mHandler;
+
+      private PropagationProxy(final StatementHandler<V, R> handler) {
+        mHandler = handler;
+      }
+
+      @NotNull
+      private Object readResolve() throws ObjectStreamException {
+        try {
+          return new PropagationStatementHandlerOrdered<V, R>(mHandler);
+
+        } catch (final Throwable t) {
+          throw new InvalidObjectException(t.getMessage());
+        }
+      }
+    }
+
+    private class PropagationEvaluation implements Evaluation<R> {
+
+      private final LoopPropagation<R, ?> mNext;
+
+      private final NestedQueue<SimpleState<R>> mQueue;
+
+      private PropagationEvaluation(@NotNull final NestedQueue<SimpleState<R>> queue,
+          final LoopPropagation<R, ?> next) {
+        mQueue = queue;
+        mNext = next;
+      }
+
+      public void fail(@NotNull final Throwable failure) {
+        synchronized (mMutex) {
+          final NestedQueue<SimpleState<R>> queue = mQueue;
+          queue.add(SimpleState.<R>ofFailure(failure));
+          queue.close();
+        }
+
+        flushQueueSafe(mNext);
+      }
+
+      public void set(final R value) {
+        synchronized (mMutex) {
+          final NestedQueue<SimpleState<R>> queue = mQueue;
+          queue.add(SimpleState.ofValue(value));
+          queue.close();
+        }
+
+        flushQueue(mNext);
+      }
+    }
+
+    @Override
+    void addFailure(final LoopPropagation<R, ?> next, @NotNull final Throwable failure) {
+      mPendingCount.incrementAndGet();
+      try {
+        mHandler.failure(failure, new PropagationEvaluation(mQueue.addNested(), next));
+
+      } catch (final CancellationException e) {
+        getLogger().wrn(e, "Loop has been cancelled");
+        innerFailSafe(next, e);
+
+      } catch (final Throwable t) {
+        getLogger().err(t, "Error while processing failure with reason: %s", failure);
+        innerFailSafe(next, t);
+      }
+    }
+
+    @Override
+    void addValue(final LoopPropagation<R, ?> next, final V value) {
+      mPendingCount.incrementAndGet();
+      try {
+        mHandler.value(value, new PropagationEvaluation(mQueue.addNested(), next));
+
+      } catch (final CancellationException e) {
+        getLogger().wrn(e, "Loop has been cancelled");
+        innerFailSafe(next, e);
+
+      } catch (final Throwable t) {
+        getLogger().err(t, "Error while processing value: %s", value);
+        innerFailSafe(next, t);
+      }
+    }
+
+    @Override
+    void addValues(final LoopPropagation<R, ?> next, @NotNull final Iterable<? extends V> values) {
+      mPendingCount.addAndGet(Iterables.size(values));
+      for (final V value : values) {
+        try {
+          mHandler.value(value, new PropagationEvaluation(mQueue.addNested(), next));
+
+        } catch (final CancellationException e) {
+          getLogger().wrn(e, "Loop has been cancelled");
+          innerFailSafe(next, e);
+          break;
+
+        } catch (final Throwable t) {
+          getLogger().err(t, "Error while processing value: %s", value);
+          innerFailSafe(next, t);
+          break;
+        }
+      }
+    }
+
+    @NotNull
+    @Override
+    LoopPropagation<V, R> copy() {
+      return new PropagationStatementHandlerOrdered<V, R>(mHandler.renew());
+    }
+
+    @Override
+    void addFailures(final LoopPropagation<R, ?> next,
+        @NotNull final Iterable<? extends Throwable> failures) {
+      mPendingCount.addAndGet(Iterables.size(failures));
+      for (final Throwable failure : failures) {
+        try {
+          mHandler.failure(failure, new PropagationEvaluation(mQueue.addNested(), next));
+
+        } catch (final CancellationException e) {
+          getLogger().wrn(e, "Loop has been cancelled");
+          innerFailSafe(next, e);
+          break;
+
+        } catch (final Throwable t) {
+          getLogger().err(t, "Error while processing value: %s", failure);
+          innerFailSafe(next, t);
+          break;
+        }
+      }
+    }
+
+    @Override
+    void set(final LoopPropagation<R, ?> next) {
+      flushQueue(next);
+      innerSet(next);
+    }
+  }
+
+  private static class PropagationStatementLoopHandler<V, R> extends LoopPropagation<V, R>
+      implements Serializable {
+
+    private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
+
+    private final PropagationEvaluationCollection mEvaluation =
+        new PropagationEvaluationCollection();
+
+    private final StatementLoopHandler<V, R> mHandler;
+
+    private final AtomicLong mPendingCount = new AtomicLong(1);
+
+    private PropagationStatementLoopHandler(@Nullable final StatementLoopHandler<V, R> handler) {
+      mHandler = ConstantConditions.notNull("handler", handler);
+    }
+
+    private void innerFailSafe(final LoopPropagation<R, ?> next, @NotNull final Throwable failure) {
+      mPendingCount.set(0);
+      next.failSafe(failure);
+    }
+
+    private void innerSet(final LoopPropagation<R, ?> next) {
+      if (mPendingCount.decrementAndGet() > 0) {
+        return;
+      }
+
+      next.set();
+    }
+
+    @NotNull
+    private Object writeReplace() throws ObjectStreamException {
+      return new PropagationProxy<V, R>(mHandler);
+    }
+
+    private static class PropagationProxy<V, R> implements Serializable {
+
+      private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
+
+      private final StatementLoopHandler<V, R> mHandler;
+
+      private PropagationProxy(final StatementLoopHandler<V, R> handler) {
+        mHandler = handler;
+      }
+
+      @NotNull
+      private Object readResolve() throws ObjectStreamException {
+        try {
+          return new PropagationStatementLoopHandler<V, R>(mHandler);
+
+        } catch (final Throwable t) {
+          throw new InvalidObjectException(t.getMessage());
+        }
+      }
+    }
+
+    private class PropagationEvaluationCollection implements EvaluationCollection<R> {
+
+      private volatile LoopPropagation<R, ?> mNext;
+
+      @NotNull
+      PropagationEvaluationCollection withNext(final LoopPropagation<R, ?> next) {
+        mNext = next;
+        return this;
+      }
+
+      @NotNull
+      public EvaluationCollection<R> addFailure(@NotNull final Throwable failure) {
+        mNext.addFailure(failure);
+        return this;
+      }
+
+      @NotNull
+      public EvaluationCollection<R> addFailures(
+          @Nullable final Iterable<? extends Throwable> failures) {
+        mNext.addFailures(failures);
+        return this;
+      }
+
+      @NotNull
+      public EvaluationCollection<R> addValue(final R value) {
+        mNext.addValue(value);
+        return this;
+      }
+
+      @NotNull
+      public EvaluationCollection<R> addValues(@Nullable final Iterable<? extends R> values) {
+        mNext.addValues(values);
+        return this;
+      }
+
+      public void set() {
+        innerSet(mNext);
+      }
+    }
+
+    @Override
+    void addFailure(final LoopPropagation<R, ?> next, @NotNull final Throwable failure) {
+      mPendingCount.incrementAndGet();
+      try {
+        mHandler.failure(failure, mEvaluation.withNext(next));
+
+      } catch (final CancellationException e) {
+        getLogger().wrn(e, "Loop has been cancelled");
+        innerFailSafe(next, e);
+
+      } catch (final Throwable t) {
+        getLogger().err(t, "Error while processing failure with reason: %s", failure);
+        innerFailSafe(next, t);
+      }
+    }
+
+    @Override
+    void addValue(final LoopPropagation<R, ?> next, final V value) {
+      mPendingCount.incrementAndGet();
+      try {
+        mHandler.value(value, mEvaluation.withNext(next));
+
+      } catch (final CancellationException e) {
+        getLogger().wrn(e, "Loop has been cancelled");
+        innerFailSafe(next, e);
+
+      } catch (final Throwable t) {
+        getLogger().err(t, "Error while processing value: %s", value);
+        innerFailSafe(next, t);
+      }
+    }
+
+    @Override
+    void addValues(final LoopPropagation<R, ?> next, @NotNull final Iterable<? extends V> values) {
+      mPendingCount.addAndGet(Iterables.size(values));
+      final PropagationEvaluationCollection evaluation = mEvaluation.withNext(next);
+      for (final V value : values) {
+        try {
+          mHandler.value(value, evaluation);
+
+        } catch (final CancellationException e) {
+          getLogger().wrn(e, "Loop has been cancelled");
+          innerFailSafe(next, e);
+          break;
+
+        } catch (final Throwable t) {
+          getLogger().err(t, "Error while processing value: %s", value);
+          innerFailSafe(next, t);
+          break;
+        }
+      }
+    }
+
+    @NotNull
+    @Override
+    LoopPropagation<V, R> copy() {
+      return new PropagationStatementLoopHandler<V, R>(mHandler.renew());
+    }
+
+    @Override
+    void addFailures(final LoopPropagation<R, ?> next,
+        @NotNull final Iterable<? extends Throwable> failures) {
+      mPendingCount.addAndGet(Iterables.size(failures));
+      final PropagationEvaluationCollection evaluation = mEvaluation.withNext(next);
+      for (final Throwable failure : failures) {
+        try {
+          mHandler.failure(failure, evaluation);
+
+        } catch (final CancellationException e) {
+          getLogger().wrn(e, "Loop has been cancelled");
+          innerFailSafe(next, e);
+          break;
+
+        } catch (final Throwable t) {
+          getLogger().err(t, "Error while processing failure with reason: %s", failure);
+          innerFailSafe(next, t);
+          break;
+        }
+      }
+    }
+
+    @Override
+    void set(final LoopPropagation<R, ?> next) {
+      innerSet(next);
+    }
+  }
+
+  private static class PropagationStatementLoopHandlerOrdered<V, R> extends LoopPropagation<V, R>
+      implements Serializable {
+
+    private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
+
+    private final StatementLoopHandler<V, R> mHandler;
+
+    private final Object mMutex = new Object();
+
+    private final AtomicLong mPendingCount = new AtomicLong(1);
+
+    private final NestedQueue<SimpleState<R>> mQueue = new NestedQueue<SimpleState<R>>();
+
+    private PropagationStatementLoopHandlerOrdered(
+        @Nullable final StatementLoopHandler<V, R> handler) {
+      mHandler = ConstantConditions.notNull("handler", handler);
+    }
+
+    private void flushQueue(final LoopPropagation<R, ?> next) {
+      addTo(mMutex, mQueue, next);
+    }
+
+    private void innerFailSafe(final LoopPropagation<R, ?> next, @NotNull final Throwable failure) {
+      mPendingCount.set(0);
+      synchronized (mMutex) {
+        mQueue.clear();
+      }
+
+      next.failSafe(failure);
+    }
+
+    private void innerSet(final LoopPropagation<R, ?> next) {
+      if (mPendingCount.decrementAndGet() > 0) {
+        return;
+      }
+
+      next.set();
+    }
+
+    @NotNull
+    private Object writeReplace() throws ObjectStreamException {
+      return new PropagationProxy<V, R>(mHandler);
+    }
+
+    private static class PropagationProxy<V, R> implements Serializable {
+
+      private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
+
+      private final StatementLoopHandler<V, R> mHandler;
+
+      private PropagationProxy(final StatementLoopHandler<V, R> handler) {
+        mHandler = handler;
+      }
+
+      @NotNull
+      private Object readResolve() throws ObjectStreamException {
+        try {
+          return new PropagationStatementLoopHandlerOrdered<V, R>(mHandler);
+
+        } catch (final Throwable t) {
+          throw new InvalidObjectException(t.getMessage());
+        }
+      }
+    }
+
+    private class PropagationEvaluations implements EvaluationCollection<R> {
+
+      private final LoopPropagation<R, ?> mNext;
+
+      private final NestedQueue<SimpleState<R>> mQueue;
+
+      private PropagationEvaluations(@NotNull final NestedQueue<SimpleState<R>> queue,
+          final LoopPropagation<R, ?> next) {
+        mQueue = queue;
+        mNext = next;
+      }
+
+      @NotNull
+      public EvaluationCollection<R> addFailure(@NotNull final Throwable failure) {
+        synchronized (mMutex) {
+          mQueue.add(SimpleState.<R>ofFailure(failure));
+        }
+
+        flushQueue(mNext);
+        return this;
+      }
+
+      @NotNull
+      public EvaluationCollection<R> addFailures(
+          @Nullable final Iterable<? extends Throwable> failures) {
+        if (failures != null) {
+          synchronized (mMutex) {
+            @SuppressWarnings("UnnecessaryLocalVariable") final NestedQueue<SimpleState<R>> queue =
+                mQueue;
+            for (final Throwable failure : failures) {
+              queue.add(SimpleState.<R>ofFailure(failure));
+            }
+          }
+
+          flushQueue(mNext);
+        }
+
+        return this;
+      }
+
+      @NotNull
+      public EvaluationCollection<R> addValue(final R value) {
+        synchronized (mMutex) {
+          mQueue.add(SimpleState.ofValue(value));
+        }
+
+        flushQueue(mNext);
+        return this;
+      }
+
+      @NotNull
+      public EvaluationCollection<R> addValues(@Nullable final Iterable<? extends R> values) {
+        if (values != null) {
+          synchronized (mMutex) {
+            @SuppressWarnings("UnnecessaryLocalVariable") final NestedQueue<SimpleState<R>> queue =
+                mQueue;
+            for (final R value : values) {
+              queue.add(SimpleState.ofValue(value));
+            }
+          }
+
+          flushQueue(mNext);
+        }
+
+        return this;
+      }
+
+      public void set() {
+        synchronized (mMutex) {
+          mQueue.close();
+        }
+
+        final LoopPropagation<R, ?> next = mNext;
+        flushQueue(next);
+        innerSet(next);
+      }
+    }
+
+    @Override
+    void addFailure(final LoopPropagation<R, ?> next, @NotNull final Throwable failure) {
+      mPendingCount.incrementAndGet();
+      try {
+        mHandler.failure(failure, new PropagationEvaluations(mQueue.addNested(), next));
+
+      } catch (final CancellationException e) {
+        getLogger().wrn(e, "Loop has been cancelled");
+        innerFailSafe(next, e);
+
+      } catch (final Throwable t) {
+        getLogger().err(t, "Error while processing failure with reason: %s", failure);
+        innerFailSafe(next, t);
+      }
+    }
+
+    @Override
+    void addValue(final LoopPropagation<R, ?> next, final V value) {
+      mPendingCount.incrementAndGet();
+      try {
+        mHandler.value(value, new PropagationEvaluations(mQueue.addNested(), next));
+
+      } catch (final CancellationException e) {
+        getLogger().wrn(e, "Loop has been cancelled");
+        innerFailSafe(next, e);
+
+      } catch (final Throwable t) {
+        getLogger().err(t, "Error while processing value: %s", value);
+        innerFailSafe(next, t);
+      }
+    }
+
+    @Override
+    void addValues(final LoopPropagation<R, ?> next, @NotNull final Iterable<? extends V> values) {
+      mPendingCount.addAndGet(Iterables.size(values));
+      for (final V value : values) {
+        try {
+          mHandler.value(value, new PropagationEvaluations(mQueue.addNested(), next));
+
+        } catch (final CancellationException e) {
+          getLogger().wrn(e, "Loop has been cancelled");
+          innerFailSafe(next, e);
+          break;
+
+        } catch (final Throwable t) {
+          getLogger().err(t, "Error while processing value: %s", value);
+          innerFailSafe(next, t);
+          break;
+        }
+      }
+    }
+
+    @NotNull
+    @Override
+    LoopPropagation<V, R> copy() {
+      return new PropagationStatementLoopHandlerOrdered<V, R>(mHandler.renew());
+    }
+
+    @Override
+    void addFailures(final LoopPropagation<R, ?> next,
+        @NotNull final Iterable<? extends Throwable> failures) {
+      mPendingCount.addAndGet(Iterables.size(failures));
+      for (final Throwable failure : failures) {
+        try {
+          mHandler.failure(failure, new PropagationEvaluations(mQueue.addNested(), next));
+
+        } catch (final CancellationException e) {
+          getLogger().wrn(e, "Loop has been cancelled");
+          innerFailSafe(next, e);
+          break;
+
+        } catch (final Throwable t) {
+          getLogger().err(t, "Error while processing failure with reason: %s", failure);
+          innerFailSafe(next, t);
+          break;
+        }
+      }
+    }
+
+    @Override
+    void set(final LoopPropagation<R, ?> next) {
+      innerSet(next);
     }
   }
 
@@ -3237,7 +3252,7 @@ class DefaultLoop<V> implements Loop<V>, Serializable {
 
     public boolean hasNext() {
       final DefaultLoop<V> loop = mLoop;
-      final ChainHead<?> head = loop.mHead;
+      final PropagationHead<?> head = loop.mHead;
       final long timeout = remainingTime();
       loop.deadLockWarning(timeout);
       synchronized (loop.mMutex) {
@@ -3304,7 +3319,7 @@ class DefaultLoop<V> implements Loop<V>, Serializable {
     public int readNext(@NotNull final Collection<? super EvaluationState<V>> collection,
         final int maxCount, final long timeout, @NotNull final TimeUnit timeUnit) {
       final DefaultLoop<V> loop = mLoop;
-      final ChainHead<?> head = loop.mHead;
+      final PropagationHead<?> head = loop.mHead;
       final TimeUnit waitTimeUnit = mTimeUnit;
       final long waitTimeout = Math.min(remainingTime(),
           (timeout >= 0) ? waitTimeUnit.convert(timeout, timeUnit) : Long.MAX_VALUE);
@@ -3320,7 +3335,7 @@ class DefaultLoop<V> implements Loop<V>, Serializable {
           }, waitTimeout, waitTimeUnit)) {
             int count = 0;
             @SuppressWarnings("unchecked") final DoubleQueue<SimpleState<V>> states =
-                ((ChainHead<V>) head).getStates();
+                ((PropagationHead<V>) head).getStates();
             while (!states.isEmpty() && (count < maxCount)) {
               collection.add(states.removeFirst());
               ++count;
@@ -3339,7 +3354,7 @@ class DefaultLoop<V> implements Loop<V>, Serializable {
 
     public EvaluationState<V> next() {
       final DefaultLoop<V> loop = mLoop;
-      final ChainHead<?> head = loop.mHead;
+      final PropagationHead<?> head = loop.mHead;
       final long timeout = remainingTime();
       loop.deadLockWarning(timeout);
       synchronized (loop.mMutex) {
@@ -3352,7 +3367,7 @@ class DefaultLoop<V> implements Loop<V>, Serializable {
             }
           }, timeout, mTimeUnit)) {
             @SuppressWarnings("unchecked") final DoubleQueue<SimpleState<V>> states =
-                ((ChainHead<V>) head).getStates();
+                ((PropagationHead<V>) head).getStates();
             if (states.isEmpty()) {
               throw new NoSuchElementException();
             }
@@ -3446,7 +3461,7 @@ class DefaultLoop<V> implements Loop<V>, Serializable {
 
     public boolean hasNext() {
       final DefaultLoop<V> loop = mLoop;
-      final ChainHead<?> head = loop.mHead;
+      final PropagationHead<?> head = loop.mHead;
       final long timeout = remainingTime();
       loop.deadLockWarning(timeout);
       synchronized (loop.mMutex) {
@@ -3480,7 +3495,7 @@ class DefaultLoop<V> implements Loop<V>, Serializable {
 
     public V next() {
       final DefaultLoop<V> loop = mLoop;
-      final ChainHead<?> head = loop.mHead;
+      final PropagationHead<?> head = loop.mHead;
       final long timeout = remainingTime();
       loop.deadLockWarning(timeout);
       synchronized (loop.mMutex) {
@@ -3493,7 +3508,7 @@ class DefaultLoop<V> implements Loop<V>, Serializable {
             }
           }, timeout, mTimeUnit)) {
             @SuppressWarnings("unchecked") final DoubleQueue<SimpleState<V>> states =
-                ((ChainHead<V>) head).getStates();
+                ((PropagationHead<V>) head).getStates();
             if (states.isEmpty()) {
               throw new NoSuchElementException();
             }
@@ -3539,7 +3554,7 @@ class DefaultLoop<V> implements Loop<V>, Serializable {
     public int readNext(@NotNull final Collection<? super V> collection, final int maxCount,
         final long timeout, @NotNull final TimeUnit timeUnit) {
       final DefaultLoop<V> loop = mLoop;
-      final ChainHead<?> head = loop.mHead;
+      final PropagationHead<?> head = loop.mHead;
       final TimeUnit waitTimeUnit = mTimeUnit;
       final long waitTimeout = Math.min(remainingTime(),
           (timeout >= 0) ? waitTimeUnit.convert(timeout, timeUnit) : Long.MAX_VALUE);
@@ -3555,7 +3570,7 @@ class DefaultLoop<V> implements Loop<V>, Serializable {
           }, waitTimeout, waitTimeUnit)) {
             int count = 0;
             @SuppressWarnings("unchecked") final DoubleQueue<SimpleState<V>> states =
-                ((ChainHead<V>) head).getStates();
+                ((PropagationHead<V>) head).getStates();
             while (!states.isEmpty() && (count < maxCount)) {
               final SimpleState<V> state = states.removeFirst();
               if (state.isFailed()) {
@@ -3578,22 +3593,22 @@ class DefaultLoop<V> implements Loop<V>, Serializable {
     }
   }
 
-  private class ChainTail extends LoopChain<V, Object> {
+  private class PropagationTail extends LoopPropagation<V, Object> {
 
-    private final ChainHead<V> mHead;
+    private final PropagationHead<V> mHead;
 
-    private ChainTail(@NotNull final ChainHead<V> head) {
+    private PropagationTail(@NotNull final PropagationHead<V> head) {
       mHead = head;
       setLogger(mLogger);
     }
 
     @Override
-    void addFailure(final LoopChain<Object, ?> next, @NotNull final Throwable failure) {
-      final LoopChain<V, ?> chain;
+    void addFailure(final LoopPropagation<Object, ?> next, @NotNull final Throwable failure) {
+      final LoopPropagation<V, ?> propagation;
       synchronized (mMutex) {
         try {
           mState = StatementState.Failed;
-          if ((chain = mChain) == null) {
+          if ((propagation = mPropagation) == null) {
             mHead.innerAddFailure(failure);
             return;
           }
@@ -3603,17 +3618,17 @@ class DefaultLoop<V> implements Loop<V>, Serializable {
         }
       }
 
-      chain.addFailure(failure);
+      propagation.addFailure(failure);
     }
 
     @Override
-    void addFailures(final LoopChain<Object, ?> next,
+    void addFailures(final LoopPropagation<Object, ?> next,
         @NotNull final Iterable<? extends Throwable> failures) {
-      final LoopChain<V, ?> chain;
+      final LoopPropagation<V, ?> propagation;
       synchronized (mMutex) {
         try {
-          if ((chain = mChain) == null) {
-            @SuppressWarnings("UnnecessaryLocalVariable") final ChainHead<V> head = mHead;
+          if ((propagation = mPropagation) == null) {
+            @SuppressWarnings("UnnecessaryLocalVariable") final PropagationHead<V> head = mHead;
             for (final Throwable failure : failures) {
               head.innerAddFailure(failure);
             }
@@ -3626,19 +3641,19 @@ class DefaultLoop<V> implements Loop<V>, Serializable {
         }
       }
 
-      chain.addFailures(failures);
+      propagation.addFailures(failures);
     }
 
     @Override
-    void set(final LoopChain<Object, ?> next) {
-      final LoopChain<V, ?> chain;
+    void set(final LoopPropagation<Object, ?> next) {
+      final LoopPropagation<V, ?> propagation;
       synchronized (mMutex) {
         try {
           if (mState == StatementState.Evaluating) {
             mState = StatementState.Set;
           }
 
-          if ((chain = mChain) == null) {
+          if ((propagation = mPropagation) == null) {
             mHead.innerSet();
             return;
           }
@@ -3648,7 +3663,7 @@ class DefaultLoop<V> implements Loop<V>, Serializable {
         }
       }
 
-      chain.set();
+      propagation.set();
     }
 
     @Override
@@ -3657,11 +3672,11 @@ class DefaultLoop<V> implements Loop<V>, Serializable {
     }
 
     @Override
-    void addValue(final LoopChain<Object, ?> next, final V value) {
-      final LoopChain<V, ?> chain;
+    void addValue(final LoopPropagation<Object, ?> next, final V value) {
+      final LoopPropagation<V, ?> propagation;
       synchronized (mMutex) {
         try {
-          if ((chain = mChain) == null) {
+          if ((propagation = mPropagation) == null) {
             mHead.innerAddValue(value);
             return;
           }
@@ -3671,16 +3686,17 @@ class DefaultLoop<V> implements Loop<V>, Serializable {
         }
       }
 
-      chain.addValue(value);
+      propagation.addValue(value);
     }
 
     @Override
-    void addValues(final LoopChain<Object, ?> next, @NotNull final Iterable<? extends V> values) {
-      final LoopChain<V, ?> chain;
+    void addValues(final LoopPropagation<Object, ?> next,
+        @NotNull final Iterable<? extends V> values) {
+      final LoopPropagation<V, ?> propagation;
       synchronized (mMutex) {
         try {
-          if ((chain = mChain) == null) {
-            @SuppressWarnings("UnnecessaryLocalVariable") final ChainHead<V> head = mHead;
+          if ((propagation = mPropagation) == null) {
+            @SuppressWarnings("UnnecessaryLocalVariable") final PropagationHead<V> head = mHead;
             for (final V value : values) {
               head.innerAddValue(value);
             }
@@ -3693,12 +3709,12 @@ class DefaultLoop<V> implements Loop<V>, Serializable {
         }
       }
 
-      chain.addValues(values);
+      propagation.addValues(values);
     }
 
     @NotNull
     @Override
-    LoopChain<V, Object> copy() {
+    LoopPropagation<V, Object> copy() {
       return ConstantConditions.unsupported();
     }
   }

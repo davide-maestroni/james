@@ -118,7 +118,8 @@ class ComposedLoopForker<S, V> implements LoopForker<S, V>, Serializable {
 
     public S update(final S stack, final EvaluationCollection<V> evaluation,
         @NotNull final Loop<V> loop) {
-      evaluation.addFailure(new IllegalStateException("the loop cannot be chained")).set();
+      evaluation.addFailure(new IllegalStateException("the loop evaluation cannot be propagated"))
+                .set();
       return stack;
     }
 

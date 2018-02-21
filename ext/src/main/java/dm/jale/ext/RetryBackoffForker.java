@@ -80,7 +80,7 @@ class RetryBackoffForker<S, V> implements StatementForker<ForkerStack<S, V>, V>,
   public ForkerStack<S, V> evaluation(final ForkerStack<S, V> stack,
       @NotNull final Evaluation<V> evaluation, @NotNull final Statement<V> context) {
     if (stack.evaluation() != null) {
-      evaluation.fail(new IllegalStateException("the statement cannot be chained"));
+      evaluation.fail(new IllegalStateException("the statement evaluation cannot be propagated"));
       return stack;
     }
 

@@ -1290,7 +1290,7 @@ public class StatementTest {
   }
 
   @Test(expected = IOException.class)
-  public void serializeErrorChain() throws IOException, ClassNotFoundException {
+  public void serializeErrorPropagation() throws IOException, ClassNotFoundException {
     final Statement<String> promise = createStatement().elseCatch(new Mapper<Throwable, String>() {
 
       public String apply(final Throwable input) {

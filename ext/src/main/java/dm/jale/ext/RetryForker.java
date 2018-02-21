@@ -53,7 +53,7 @@ class RetryForker<V> implements StatementForker<Evaluation<V>, V>, Serializable 
   public Evaluation<V> evaluation(final Evaluation<V> stack,
       @NotNull final Evaluation<V> evaluation, @NotNull final Statement<V> context) {
     if (stack != null) {
-      evaluation.fail(new IllegalStateException("the statement cannot be chained"));
+      evaluation.fail(new IllegalStateException("the statement evaluation cannot be propagated"));
       return stack;
     }
 

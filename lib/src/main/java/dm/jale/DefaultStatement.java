@@ -62,7 +62,7 @@ class DefaultStatement<V> implements Statement<V>, Serializable {
 
   private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
 
-  private final ChainHead<?> mHead;
+  private final PropagationHead<?> mHead;
 
   private final boolean mIsEvaluated;
 
@@ -74,12 +74,12 @@ class DefaultStatement<V> implements Statement<V>, Serializable {
 
   private final Observer<Evaluation<?>> mObserver;
 
-  private final StatementChain<?, V> mTail;
-
-  private StatementChain<V, ?> mChain;
+  private final StatementPropagation<?, V> mTail;
 
   private ArrayList<WeakReference<Statement<?>>> mForked =
       new ArrayList<WeakReference<Statement<?>>>();
+
+  private StatementPropagation<V, ?> mPropagation;
 
   private StatementState mState = StatementState.Evaluating;
 
@@ -90,9 +90,9 @@ class DefaultStatement<V> implements Statement<V>, Serializable {
     mIsEvaluated = isEvaluated;
     mIsFork = false;
     mLogger = Logger.newLogger(this, loggerName, Locale.ENGLISH);
-    final ChainHead<V> head = new ChainHead<V>();
+    final PropagationHead<V> head = new PropagationHead<V>();
     head.setLogger(mLogger);
-    head.setNext(new ChainTail());
+    head.setNext(new PropagationTail());
     mMutex = head.getMutex();
     mHead = head;
     mTail = head;
@@ -112,9 +112,9 @@ class DefaultStatement<V> implements Statement<V>, Serializable {
     mIsEvaluated = isEvaluated;
     mIsFork = (observer instanceof ForkObserver);
     mLogger = logger;
-    final ChainHead<V> head = new ChainHead<V>();
+    final PropagationHead<V> head = new PropagationHead<V>();
     head.setLogger(mLogger);
-    head.setNext(new ChainTail());
+    head.setNext(new PropagationTail());
     mMutex = head.getMutex();
     mHead = head;
     mTail = head;
@@ -129,7 +129,7 @@ class DefaultStatement<V> implements Statement<V>, Serializable {
   @SuppressWarnings("unchecked")
   private DefaultStatement(@NotNull final Observer<Evaluation<?>> observer,
       final boolean isEvaluated, @Nullable final String loggerName,
-      @NotNull final ChainHead<?> head, @NotNull final StatementChain<?, V> tail) {
+      @NotNull final PropagationHead<?> head, @NotNull final StatementPropagation<?, V> tail) {
     // serialization
     mObserver = observer;
     mIsEvaluated = isEvaluated;
@@ -138,11 +138,11 @@ class DefaultStatement<V> implements Statement<V>, Serializable {
     mMutex = head.getMutex();
     mHead = head;
     mTail = tail;
-    tail.setNext(new ChainTail());
-    StatementChain<?, ?> chain = head;
-    while (!chain.isTail()) {
-      chain.setLogger(mLogger);
-      chain = chain.mNext;
+    tail.setNext(new PropagationTail());
+    StatementPropagation<?, ?> propagation = head;
+    while (!propagation.isTail()) {
+      propagation.setLogger(mLogger);
+      propagation = propagation.mNext;
     }
 
     try {
@@ -155,24 +155,25 @@ class DefaultStatement<V> implements Statement<V>, Serializable {
 
   @SuppressWarnings("unchecked")
   private DefaultStatement(@NotNull final Observer<Evaluation<?>> observer,
-      final boolean isEvaluated, @NotNull final Logger logger, @NotNull final ChainHead<?> head,
-      @NotNull final StatementChain<?, ?> tail, @NotNull final StatementChain<?, V> chain) {
-    // chaining
+      final boolean isEvaluated, @NotNull final Logger logger,
+      @NotNull final PropagationHead<?> head, @NotNull final StatementPropagation<?, ?> tail,
+      @NotNull final StatementPropagation<?, V> propagation) {
+    // propagation
     mObserver = observer;
     mIsEvaluated = isEvaluated;
     mIsFork = false;
     mLogger = logger;
     mMutex = head.getMutex();
     mHead = head;
-    mTail = chain;
-    chain.setNext(new ChainTail());
-    ((StatementChain<?, Object>) tail).setNext((StatementChain<Object, V>) chain);
+    mTail = propagation;
+    propagation.setNext(new PropagationTail());
+    ((StatementPropagation<?, Object>) tail).setNext((StatementPropagation<Object, V>) propagation);
   }
 
   @SuppressWarnings("unchecked")
   private DefaultStatement(@NotNull final Observer<Evaluation<?>> observer,
-      final boolean isEvaluated, @NotNull final Logger logger, @NotNull final ChainHead<?> head,
-      @NotNull final StatementChain<?, V> tail) {
+      final boolean isEvaluated, @NotNull final Logger logger,
+      @NotNull final PropagationHead<?> head, @NotNull final StatementPropagation<?, V> tail) {
     // copy
     mObserver = observer;
     mIsEvaluated = isEvaluated;
@@ -181,7 +182,7 @@ class DefaultStatement<V> implements Statement<V>, Serializable {
     mMutex = head.getMutex();
     mHead = head;
     mTail = tail;
-    tail.setNext(new ChainTail());
+    tail.setNext(new PropagationTail());
     try {
       observer.accept(head);
 
@@ -213,27 +214,27 @@ class DefaultStatement<V> implements Statement<V>, Serializable {
       return isCancelled;
     }
 
-    StatementChain<?, ?> chain = mHead;
-    if (observer instanceof ChainForkObserver) {
-      ((ChainForkObserver) observer).cancel(chain);
+    StatementPropagation<?, ?> propagation = mHead;
+    if (observer instanceof PropagationForkObserver) {
+      ((PropagationForkObserver) observer).cancel(propagation);
     }
 
     final CancellationException exception = new CancellationException("statement is cancelled");
     if (mayInterruptIfRunning && (observer instanceof InterruptibleObserver)) {
-      if (chain.cancel(exception)) {
+      if (propagation.cancel(exception)) {
         ((InterruptibleObserver<?>) observer).interrupt();
         return true;
       }
 
-      chain = chain.mNext;
+      propagation = propagation.mNext;
     }
 
-    while (!chain.isTail()) {
-      if (chain.cancel(exception)) {
+    while (!propagation.isTail()) {
+      if (propagation.cancel(exception)) {
         return true;
       }
 
-      chain = chain.mNext;
+      propagation = propagation.mNext;
     }
 
     return false;
@@ -284,20 +285,20 @@ class DefaultStatement<V> implements Statement<V>, Serializable {
   }
 
   public void consume() {
-    chain(new ChainConsume<V>());
+    propagate(new PropagationConsume<V>());
   }
 
   @NotNull
   public Statement<V> elseCatch(@NotNull final Mapper<? super Throwable, ? extends V> mapper,
       @Nullable final Class<?>[] exceptionTypes) {
-    return chain(
+    return propagate(
         new ElseCatchStatementHandler<V>(mapper, Asyncs.cloneExceptionTypes(exceptionTypes)));
   }
 
   @NotNull
   public Statement<V> elseDo(@NotNull final Observer<? super Throwable> observer,
       @Nullable final Class<?>[] exceptionTypes) {
-    return chain(
+    return propagate(
         new ElseDoStatementHandler<V>(observer, Asyncs.cloneExceptionTypes(exceptionTypes)));
   }
 
@@ -305,28 +306,30 @@ class DefaultStatement<V> implements Statement<V>, Serializable {
   public Statement<V> elseIf(
       @NotNull final Mapper<? super Throwable, ? extends Statement<? extends V>> mapper,
       @Nullable final Class<?>[] exceptionTypes) {
-    return chain(new ElseIfStatementHandler<V>(mapper, Asyncs.cloneExceptionTypes(exceptionTypes)));
+    return propagate(
+        new ElseIfStatementHandler<V>(mapper, Asyncs.cloneExceptionTypes(exceptionTypes)));
   }
 
   @NotNull
   @SuppressWarnings("unchecked")
   public DefaultStatement<V> evaluate() {
     final Logger logger = mLogger;
-    final ChainHead<?> head = mHead;
-    final ChainHead<?> newHead = head.copy();
+    final PropagationHead<?> head = mHead;
+    final PropagationHead<?> newHead = head.copy();
     newHead.setLogger(logger);
-    StatementChain<?, ?> newTail = newHead;
-    StatementChain<?, ?> next = head;
+    StatementPropagation<?, ?> newTail = newHead;
+    StatementPropagation<?, ?> next = head;
     while (next != mTail) {
       next = next.mNext;
-      StatementChain<?, ?> chain = next.copy();
-      chain.setLogger(logger);
-      ((StatementChain<?, Object>) newTail).setNext((StatementChain<Object, ?>) chain);
-      newTail = chain;
+      StatementPropagation<?, ?> propagation = next.copy();
+      propagation.setLogger(logger);
+      ((StatementPropagation<?, Object>) newTail).setNext(
+          (StatementPropagation<Object, ?>) propagation);
+      newTail = propagation;
     }
 
     return new DefaultStatement<V>(renewObserver(), true, logger, newHead,
-        (StatementChain<?, V>) newTail);
+        (StatementPropagation<?, V>) newTail);
   }
 
   @NotNull
@@ -361,7 +364,7 @@ class DefaultStatement<V> implements Statement<V>, Serializable {
   public boolean getDone(final long timeout, @NotNull final TimeUnit timeUnit) {
     checkSupported();
     deadLockWarning(timeout);
-    @SuppressWarnings("UnnecessaryLocalVariable") final ChainHead<?> head = mHead;
+    @SuppressWarnings("UnnecessaryLocalVariable") final PropagationHead<?> head = mHead;
     synchronized (mMutex) {
       try {
         if (TimeUnits.waitUntil(mMutex, new Condition() {
@@ -390,7 +393,7 @@ class DefaultStatement<V> implements Statement<V>, Serializable {
   public FailureException getFailure(final long timeout, @NotNull final TimeUnit timeUnit) {
     checkSupported();
     deadLockWarning(timeout);
-    final ChainHead<?> head = mHead;
+    final PropagationHead<?> head = mHead;
     synchronized (mMutex) {
       try {
         if (TimeUnits.waitUntil(mMutex, new Condition() {
@@ -420,7 +423,7 @@ class DefaultStatement<V> implements Statement<V>, Serializable {
   public V getValue(final long timeout, @NotNull final TimeUnit timeUnit) {
     checkSupported();
     deadLockWarning(timeout);
-    final ChainHead<?> head = mHead;
+    final PropagationHead<?> head = mHead;
     synchronized (mMutex) {
       try {
         if (TimeUnits.waitUntil(mMutex, new Condition() {
@@ -444,36 +447,37 @@ class DefaultStatement<V> implements Statement<V>, Serializable {
 
   public boolean isFinal() {
     synchronized (mMutex) {
-      return (mChain == null);
+      return (mPropagation == null);
     }
   }
 
   @NotNull
   public <R> Statement<R> then(@NotNull final Mapper<? super V, R> mapper) {
-    return chain(new ThenStatementHandler<V, R>(mapper));
+    return propagate(new ThenStatementHandler<V, R>(mapper));
   }
 
   @NotNull
   public Statement<V> thenDo(@NotNull final Observer<? super V> observer) {
-    return chain(new ThenDoStatementHandler<V, V>(observer));
+    return propagate(new ThenDoStatementHandler<V, V>(observer));
   }
 
   @NotNull
   public <R> Statement<R> thenIf(@NotNull final Mapper<? super V, ? extends Statement<R>> mapper) {
-    return chain(new ThenIfStatementHandler<V, R>(mapper));
+    return propagate(new ThenIfStatementHandler<V, R>(mapper));
   }
 
   @NotNull
   public <R> Statement<R> thenTry(@NotNull final Mapper<? super V, ? extends Closeable> closeable,
       @NotNull final Mapper<? super V, R> mapper) {
-    return chain(new TryStatementHandler<V, R>(closeable, new ThenStatementHandler<V, R>(mapper),
-        mLogger.getName()));
+    return propagate(
+        new TryStatementHandler<V, R>(closeable, new ThenStatementHandler<V, R>(mapper),
+            mLogger.getName()));
   }
 
   @NotNull
   public Statement<V> thenTryDo(@NotNull final Mapper<? super V, ? extends Closeable> closeable,
       @NotNull final Observer<? super V> observer) {
-    return chain(
+    return propagate(
         new TryStatementHandler<V, V>(closeable, new ThenDoStatementHandler<V, V>(observer),
             mLogger.getName()));
   }
@@ -481,12 +485,12 @@ class DefaultStatement<V> implements Statement<V>, Serializable {
   @NotNull
   public <R> Statement<R> thenTryIf(@NotNull final Mapper<? super V, ? extends Closeable> closeable,
       @NotNull final Mapper<? super V, ? extends Statement<R>> mapper) {
-    return chain(new TryIfStatementHandler<V, R>(closeable, mapper, mLogger.getName()));
+    return propagate(new TryIfStatementHandler<V, R>(closeable, mapper, mLogger.getName()));
   }
 
   @NotNull
   public Statement<V> whenDone(@NotNull final Action action) {
-    return chain(new DoneStatementHandler<V>(action));
+    return propagate(new DoneStatementHandler<V>(action));
   }
 
   @NotNull
@@ -528,7 +532,7 @@ class DefaultStatement<V> implements Statement<V>, Serializable {
 
   public void to(@NotNull final Evaluation<? super V> evaluation) {
     checkEvaluated();
-    chain(new ToEvaluationStatementHandler<V>(evaluation)).consume();
+    propagate(new ToEvaluationStatementHandler<V>(evaluation)).consume();
   }
 
   @SuppressWarnings("unchecked")
@@ -542,67 +546,6 @@ class DefaultStatement<V> implements Statement<V>, Serializable {
     }
   }
 
-  @NotNull
-  private <R> Statement<R> chain(@NotNull final StatementHandler<V, R> handler) {
-    return chain(new ChainHandler<V, R>(handler));
-  }
-
-  @NotNull
-  @SuppressWarnings("unchecked")
-  private <R> Statement<R> chain(@NotNull final StatementChain<V, R> chain) {
-    // TODO: 21/02/2018 propagate
-    final ChainHead<?> head = mHead;
-    final Logger logger = mLogger;
-    final Runnable chaining;
-    final Observer<? extends Evaluation<?>> observer = mObserver;
-    if (mIsFork) {
-      final Statement<R> forked =
-          new DefaultStatement<V>(((ForkObserver<?, V>) observer).newObserver(), mIsEvaluated,
-              logger).chain(chain);
-      synchronized (mMutex) {
-        final ArrayList<WeakReference<Statement<?>>> newForked =
-            new ArrayList<WeakReference<Statement<?>>>();
-        final Iterator<WeakReference<Statement<?>>> iterator = mForked.iterator();
-        while (iterator.hasNext()) {
-          final WeakReference<Statement<?>> next = iterator.next();
-          if (next.get() == null) {
-            iterator.remove();
-
-          } else {
-            newForked.add(next);
-          }
-        }
-
-        newForked.add(new WeakReference<Statement<?>>(forked));
-        mForked = newForked;
-      }
-
-      return forked;
-    }
-
-    synchronized (mMutex) {
-      if (mChain != null) {
-        throw new IllegalStateException("the statement is already chained");
-
-      } else {
-        chain.setLogger(logger);
-        chaining = head.chain(chain);
-        mState = StatementState.Chained;
-        mChain = chain;
-        mMutex.notifyAll();
-      }
-    }
-
-    final DefaultStatement<R> statement =
-        new DefaultStatement<R>((Observer<Evaluation<?>>) observer, mIsEvaluated, logger, head,
-            mTail, chain);
-    if (chaining != null) {
-      chaining.run();
-    }
-
-    return statement;
-  }
-
   private void checkEvaluated() {
     if (!mIsEvaluated) {
       ConstantConditions.unsupported("the statement has not been evaluated", "checkEvaluated");
@@ -610,7 +553,7 @@ class DefaultStatement<V> implements Statement<V>, Serializable {
   }
 
   private void checkFinal() {
-    if (mChain != null) {
+    if (mPropagation != null) {
       throw new IllegalStateException("the statement is not final");
     }
   }
@@ -634,6 +577,66 @@ class DefaultStatement<V> implements Statement<V>, Serializable {
   }
 
   @NotNull
+  private <R> Statement<R> propagate(@NotNull final StatementHandler<V, R> handler) {
+    return propagate(new PropagationHandler<V, R>(handler));
+  }
+
+  @NotNull
+  @SuppressWarnings("unchecked")
+  private <R> Statement<R> propagate(@NotNull final StatementPropagation<V, R> propagation) {
+    final PropagationHead<?> head = mHead;
+    final Logger logger = mLogger;
+    final Runnable propagate;
+    final Observer<? extends Evaluation<?>> observer = mObserver;
+    if (mIsFork) {
+      final Statement<R> forked =
+          new DefaultStatement<V>(((ForkObserver<?, V>) observer).newObserver(), mIsEvaluated,
+              logger).propagate(propagation);
+      synchronized (mMutex) {
+        final ArrayList<WeakReference<Statement<?>>> newForked =
+            new ArrayList<WeakReference<Statement<?>>>();
+        final Iterator<WeakReference<Statement<?>>> iterator = mForked.iterator();
+        while (iterator.hasNext()) {
+          final WeakReference<Statement<?>> next = iterator.next();
+          if (next.get() == null) {
+            iterator.remove();
+
+          } else {
+            newForked.add(next);
+          }
+        }
+
+        newForked.add(new WeakReference<Statement<?>>(forked));
+        mForked = newForked;
+      }
+
+      return forked;
+    }
+
+    synchronized (mMutex) {
+      if (mPropagation != null) {
+        throw new IllegalStateException("the statement evaluation is already propagated");
+
+      } else {
+        propagation.setLogger(logger);
+        propagate = head.propagate(propagation);
+        mState = StatementState.Propagated;
+        mPropagation = propagation;
+        mMutex.notifyAll();
+      }
+    }
+
+    final DefaultStatement<R> statement =
+        new DefaultStatement<R>((Observer<Evaluation<?>>) observer, mIsEvaluated, logger, head,
+            mTail, propagation);
+    if (propagate != null) {
+      propagate.run();
+    }
+
+    return statement;
+  }
+
+  @NotNull
   private Observer<Evaluation<?>> renewObserver() {
     final Observer<Evaluation<?>> observer = mObserver;
     if (observer instanceof RenewableObserver) {
@@ -645,356 +648,23 @@ class DefaultStatement<V> implements Statement<V>, Serializable {
 
   @NotNull
   private Object writeReplace() throws ObjectStreamException {
-    final ArrayList<StatementChain<?, ?>> chains = new ArrayList<StatementChain<?, ?>>();
-    final ChainHead<?> head = mHead;
-    StatementChain<?, ?> chain = head;
-    while (chain != mTail) {
-      if (chain != head) {
-        chains.add(chain);
+    final ArrayList<StatementPropagation<?, ?>> propagations =
+        new ArrayList<StatementPropagation<?, ?>>();
+    final PropagationHead<?> head = mHead;
+    StatementPropagation<?, ?> propagation = head;
+    while (propagation != mTail) {
+      if (propagation != head) {
+        propagations.add(propagation);
       }
 
-      chain = chain.mNext;
+      propagation = propagation.mNext;
     }
 
-    if (chain != head) {
-      chains.add(chain);
+    if (propagation != head) {
+      propagations.add(propagation);
     }
 
-    return new StatementProxy(mObserver, mIsEvaluated, mLogger.getName(), chains);
-  }
-
-  private static class ChainConsume<V> extends StatementChain<V, Object> {
-
-    private volatile WeakReference<StatementChain<Object, ?>> mNext =
-        new WeakReference<StatementChain<Object, ?>>(null);
-
-    @NotNull
-    StatementChain<V, Object> copy() {
-      return new ChainConsume<V>();
-    }
-
-    private void complete() {
-      final StatementChain<Object, ?> next = mNext.get();
-      if (next != null) {
-        next.set(null);
-      }
-    }
-
-    void fail(final StatementChain<Object, ?> next, final Throwable failure) {
-      getLogger().dbg("Consuming failure: %s", failure);
-      complete();
-    }
-
-    void set(final StatementChain<Object, ?> next, final V value) {
-      getLogger().dbg("Consuming value: %s", value);
-      complete();
-    }
-
-    @Override
-    void setNext(@NotNull final StatementChain<Object, ?> next) {
-      mNext = new WeakReference<StatementChain<Object, ?>>(next);
-    }
-  }
-
-  private static class ChainForkObserver<S, V>
-      implements RenewableObserver<Evaluation<V>>, Serializable {
-
-    private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
-
-    private final ForkObserver<S, V> mObserver;
-
-    private ChainForkObserver(@NotNull final ForkObserver<S, V> observer) {
-      mObserver = observer;
-    }
-
-    public void accept(final Evaluation<V> evaluation) {
-      mObserver.chain(evaluation);
-    }
-
-    @NotNull
-    public ChainForkObserver<S, V> renew() {
-      final ForkObserver<S, V> observer = mObserver.renew();
-      observer.accept(null);
-      return new ChainForkObserver<S, V>(observer);
-    }
-
-    void cancel(final Evaluation<V> evaluation) {
-      mObserver.unchain(evaluation);
-    }
-
-    @NotNull
-    private Object writeReplace() throws ObjectStreamException {
-      return new ObserverProxy<S, V>(mObserver);
-    }
-
-    private static class ObserverProxy<S, V> implements Serializable {
-
-      private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
-
-      private final ForkObserver<S, V> mObserver;
-
-      private ObserverProxy(@NotNull final ForkObserver<S, V> observer) {
-        mObserver = observer;
-      }
-
-      @NotNull
-      private Object readResolve() throws ObjectStreamException {
-        try {
-          final ForkObserver<S, V> observer = mObserver;
-          observer.accept(null);
-          return new ChainForkObserver<S, V>(observer);
-
-        } catch (final Throwable t) {
-          throw new InvalidObjectException(t.getMessage());
-        }
-      }
-    }
-  }
-
-  private static class ChainHandler<V, R> extends StatementChain<V, R> implements Serializable {
-
-    private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
-
-    private final StatementHandler<V, R> mHandler;
-
-    ChainHandler(@NotNull final StatementHandler<V, R> handler) {
-      mHandler = handler;
-    }
-
-    @NotNull
-    private Object writeReplace() throws ObjectStreamException {
-      return new ChainProxy<V, R>(mHandler);
-    }
-
-    private static class ChainProxy<V, R> implements Serializable {
-
-      private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
-
-      private final StatementHandler<V, R> mHandler;
-
-      private ChainProxy(@NotNull final StatementHandler<V, R> handler) {
-        mHandler = handler;
-      }
-
-      @NotNull
-      private Object readResolve() throws ObjectStreamException {
-        try {
-          return new ChainHandler<V, R>(mHandler);
-
-        } catch (final Throwable t) {
-          throw new InvalidObjectException(t.getMessage());
-        }
-      }
-    }
-
-    @NotNull
-    StatementChain<V, R> copy() {
-      return new ChainHandler<V, R>(mHandler.renew());
-    }
-
-    void fail(final StatementChain<R, ?> next, final Throwable failure) {
-      try {
-        getLogger().dbg("Processing failure with reason: %s", failure);
-        mHandler.failure(failure, next);
-
-      } catch (final CancellationException e) {
-        getLogger().wrn(e, "Statement has been cancelled");
-        next.failSafe(e);
-
-      } catch (final Throwable t) {
-        getLogger().err(t, "Error while processing failure with reason: %s", failure);
-        next.failSafe(t);
-      }
-    }
-
-    void set(final StatementChain<R, ?> next, final V value) {
-      try {
-        getLogger().dbg("Processing value: %s", value);
-        mHandler.value(value, next);
-
-      } catch (final CancellationException e) {
-        getLogger().wrn(e, "Statement has been cancelled");
-        next.failSafe(e);
-
-      } catch (final Throwable t) {
-        getLogger().err(t, "Error while processing value: %s", value);
-        next.failSafe(t);
-      }
-    }
-  }
-
-  private static class ChainHead<V> extends StatementChain<V, V> {
-
-    private final Object mMutex = new Object();
-
-    private Throwable mException;
-
-    private StateEvaluating mInnerState = new StateEvaluating();
-
-    private StatementState mState = StatementState.Evaluating;
-
-    private Object mValue;
-
-    @Nullable
-    Runnable chain(@NotNull final StatementChain<?, ?> chain) {
-      final Runnable chaining = mInnerState.chain(chain);
-      mState = StatementState.Evaluating;
-      return chaining;
-    }
-
-    @Nullable
-    FailureException getFailure() {
-      return mInnerState.getFailure();
-    }
-
-    @NotNull
-    Object getMutex() {
-      return mMutex;
-    }
-
-    @NotNull
-    StatementState getState() {
-      return mState;
-    }
-
-    Object getValue() {
-      return mInnerState.getValue();
-    }
-
-    void innerFail(@Nullable final Throwable failure) {
-      mInnerState.innerFail(failure);
-      mState = StatementState.Failed;
-    }
-
-    void innerSet(final Object value) {
-      mInnerState.innerSet(value);
-      mState = StatementState.Set;
-    }
-
-    private class StateEvaluating {
-
-      @Nullable
-      Runnable chain(@NotNull final StatementChain<?, ?> chain) {
-        return null;
-      }
-
-      @NotNull
-      IllegalStateException exception(@NotNull final StatementState state) {
-        return new IllegalStateException("invalid state: " + state);
-      }
-
-      @Nullable
-      FailureException getFailure() {
-        return null;
-      }
-
-      Object getValue() {
-        throw exception(StatementState.Evaluating);
-      }
-
-      void innerFail(@Nullable final Throwable failure) {
-        getLogger().dbg("Statement failing with reason [%s => %s]: %s", StatementState.Evaluating,
-            StatementState.Failed, failure);
-        mException = failure;
-        mInnerState = new StateFailed();
-      }
-
-      void innerSet(final Object value) {
-        getLogger().dbg("Setting statement value [%s => %s]: %s", StatementState.Evaluating,
-            StatementState.Set, value);
-        mValue = value;
-        mInnerState = new StateSet();
-      }
-    }
-
-    private class StateFailed extends StateEvaluating {
-
-      @Nullable
-      @Override
-      Runnable chain(@NotNull final StatementChain<?, ?> chain) {
-        getLogger().dbg("Chaining statement [%s => %s]", StatementState.Failed,
-            StatementState.Evaluating);
-        final Throwable exception = mException;
-        mException = null;
-        mInnerState = new StateEvaluating();
-        return new Runnable() {
-
-          public void run() {
-            chain.failSafe(exception);
-          }
-        };
-      }
-
-      Object getValue() {
-        throw FailureException.wrap(mException);
-      }
-
-      @Nullable
-      @Override
-      FailureException getFailure() {
-        return FailureException.wrap(mException);
-      }
-
-      @Override
-      void innerFail(@Nullable final Throwable failure) {
-        throw exception(StatementState.Failed);
-      }
-
-      @Override
-      void innerSet(final Object value) {
-        throw exception(StatementState.Failed);
-      }
-    }
-
-    private class StateSet extends StateEvaluating {
-
-      @Nullable
-      @Override
-      Runnable chain(@NotNull final StatementChain<?, ?> chain) {
-        getLogger().dbg("Chaining statement [%s => %s]", StatementState.Set,
-            StatementState.Evaluating);
-        final Object value = mValue;
-        mValue = null;
-        mInnerState = new StateEvaluating();
-        return new Runnable() {
-
-          @SuppressWarnings("unchecked")
-          public void run() {
-            ((StatementChain<Object, ?>) chain).set(value);
-          }
-        };
-      }
-
-      @Override
-      Object getValue() {
-        return mValue;
-      }
-
-      @Override
-      void innerFail(@Nullable final Throwable failure) {
-        throw exception(StatementState.Set);
-      }
-
-      @Override
-      void innerSet(final Object value) {
-        throw exception(StatementState.Set);
-      }
-    }
-
-    @NotNull
-    ChainHead<V> copy() {
-      return new ChainHead<V>();
-    }
-
-    @Override
-    public void fail(final StatementChain<V, ?> next, final Throwable failure) {
-      next.fail(failure);
-    }
-
-    @Override
-    public void set(final StatementChain<V, ?> next, final V value) {
-      next.set(value);
-    }
+    return new StatementProxy(mObserver, mIsEvaluated, mLogger.getName(), propagations);
   }
 
   private static class ForkObserver<S, V> extends StatementHandler<V, V>
@@ -1023,30 +693,28 @@ class DefaultStatement<V> implements Statement<V>, Serializable {
       mStatement = statement;
     }
 
-    boolean cancel(final boolean mayInterruptIfRunning) {
-      return mStatement.cancel(mayInterruptIfRunning);
-    }
-
-    void chain(final Evaluation<V> evaluation) {
+    public void accept(final Evaluation<V> evaluation) {
       mExecutor.execute(new Runnable() {
 
         public void run() {
-          final Throwable failure = mFailure;
-          if (failure != null) {
-            Asyncs.failSafe(evaluation, failure);
-            return;
-          }
-
-          mEvaluations.add(evaluation);
           try {
-            mStack = mForker.evaluation(mStack, evaluation, mStatement);
+            final DefaultStatement<V> statement = mStatement;
+            try {
+              mStack = mForker.init(statement);
+
+            } finally {
+              statement.propagate(ForkObserver.this);
+            }
 
           } catch (final Throwable t) {
             mFailure = t;
-            clearEvaluations(t);
           }
         }
       });
+    }
+
+    boolean cancel(final boolean mayInterruptIfRunning) {
+      return mStatement.cancel(mayInterruptIfRunning);
     }
 
     @Override
@@ -1106,10 +774,32 @@ class DefaultStatement<V> implements Statement<V>, Serializable {
 
     @NotNull
     Observer<Evaluation<V>> newObserver() {
-      return new ChainForkObserver<S, V>(this);
+      return new PropagationForkObserver<S, V>(this);
     }
 
-    void unchain(final Evaluation<V> evaluation) {
+    void propagate(final Evaluation<V> evaluation) {
+      mExecutor.execute(new Runnable() {
+
+        public void run() {
+          final Throwable failure = mFailure;
+          if (failure != null) {
+            Asyncs.failSafe(evaluation, failure);
+            return;
+          }
+
+          mEvaluations.add(evaluation);
+          try {
+            mStack = mForker.evaluation(mStack, evaluation, mStatement);
+
+          } catch (final Throwable t) {
+            mFailure = t;
+            clearEvaluations(t);
+          }
+        }
+      });
+    }
+
+    void stopPropagation(final Evaluation<V> evaluation) {
       mExecutor.execute(new Runnable() {
 
         public void run() {
@@ -1166,35 +856,351 @@ class DefaultStatement<V> implements Statement<V>, Serializable {
         }
       }
     }
+  }
 
-    public void accept(final Evaluation<V> evaluation) {
-      mExecutor.execute(new Runnable() {
+  private static class PropagationConsume<V> extends StatementPropagation<V, Object> {
 
-        public void run() {
-          try {
-            final DefaultStatement<V> statement = mStatement;
-            try {
-              mStack = mForker.init(statement);
+    private volatile WeakReference<StatementPropagation<Object, ?>> mNext =
+        new WeakReference<StatementPropagation<Object, ?>>(null);
 
-            } finally {
-              statement.chain(ForkObserver.this);
-            }
+    @NotNull
+    StatementPropagation<V, Object> copy() {
+      return new PropagationConsume<V>();
+    }
 
-          } catch (final Throwable t) {
-            mFailure = t;
-          }
-        }
-      });
+    private void complete() {
+      final StatementPropagation<Object, ?> next = mNext.get();
+      if (next != null) {
+        next.set(null);
+      }
+    }
+
+    void fail(final StatementPropagation<Object, ?> next, final Throwable failure) {
+      getLogger().dbg("Consuming failure: %s", failure);
+      complete();
+    }
+
+    void set(final StatementPropagation<Object, ?> next, final V value) {
+      getLogger().dbg("Consuming value: %s", value);
+      complete();
+    }
+
+    @Override
+    void setNext(@NotNull final StatementPropagation<Object, ?> next) {
+      mNext = new WeakReference<StatementPropagation<Object, ?>>(next);
     }
   }
 
-  private static abstract class StatementChain<V, R> implements Evaluation<V> {
+  private static class PropagationForkObserver<S, V>
+      implements RenewableObserver<Evaluation<V>>, Serializable {
+
+    private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
+
+    private final ForkObserver<S, V> mObserver;
+
+    private PropagationForkObserver(@NotNull final ForkObserver<S, V> observer) {
+      mObserver = observer;
+    }
+
+    @NotNull
+    public PropagationForkObserver<S, V> renew() {
+      final ForkObserver<S, V> observer = mObserver.renew();
+      observer.accept(null);
+      return new PropagationForkObserver<S, V>(observer);
+    }
+
+    void cancel(final Evaluation<V> evaluation) {
+      mObserver.stopPropagation(evaluation);
+    }
+
+    @NotNull
+    private Object writeReplace() throws ObjectStreamException {
+      return new ObserverProxy<S, V>(mObserver);
+    }
+
+    private static class ObserverProxy<S, V> implements Serializable {
+
+      private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
+
+      private final ForkObserver<S, V> mObserver;
+
+      private ObserverProxy(@NotNull final ForkObserver<S, V> observer) {
+        mObserver = observer;
+      }
+
+      @NotNull
+      private Object readResolve() throws ObjectStreamException {
+        try {
+          final ForkObserver<S, V> observer = mObserver;
+          observer.accept(null);
+          return new PropagationForkObserver<S, V>(observer);
+
+        } catch (final Throwable t) {
+          throw new InvalidObjectException(t.getMessage());
+        }
+      }
+    }
+
+    public void accept(final Evaluation<V> evaluation) {
+      mObserver.propagate(evaluation);
+    }
+
+  }
+
+  private static class PropagationHandler<V, R> extends StatementPropagation<V, R>
+      implements Serializable {
+
+    private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
+
+    private final StatementHandler<V, R> mHandler;
+
+    PropagationHandler(@NotNull final StatementHandler<V, R> handler) {
+      mHandler = handler;
+    }
+
+    @NotNull
+    private Object writeReplace() throws ObjectStreamException {
+      return new PropagationProxy<V, R>(mHandler);
+    }
+
+    private static class PropagationProxy<V, R> implements Serializable {
+
+      private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
+
+      private final StatementHandler<V, R> mHandler;
+
+      private PropagationProxy(@NotNull final StatementHandler<V, R> handler) {
+        mHandler = handler;
+      }
+
+      @NotNull
+      private Object readResolve() throws ObjectStreamException {
+        try {
+          return new PropagationHandler<V, R>(mHandler);
+
+        } catch (final Throwable t) {
+          throw new InvalidObjectException(t.getMessage());
+        }
+      }
+    }
+
+    @NotNull
+    StatementPropagation<V, R> copy() {
+      return new PropagationHandler<V, R>(mHandler.renew());
+    }
+
+    void fail(final StatementPropagation<R, ?> next, final Throwable failure) {
+      try {
+        getLogger().dbg("Processing failure with reason: %s", failure);
+        mHandler.failure(failure, next);
+
+      } catch (final CancellationException e) {
+        getLogger().wrn(e, "Statement has been cancelled");
+        next.failSafe(e);
+
+      } catch (final Throwable t) {
+        getLogger().err(t, "Error while processing failure with reason: %s", failure);
+        next.failSafe(t);
+      }
+    }
+
+    void set(final StatementPropagation<R, ?> next, final V value) {
+      try {
+        getLogger().dbg("Processing value: %s", value);
+        mHandler.value(value, next);
+
+      } catch (final CancellationException e) {
+        getLogger().wrn(e, "Statement has been cancelled");
+        next.failSafe(e);
+
+      } catch (final Throwable t) {
+        getLogger().err(t, "Error while processing value: %s", value);
+        next.failSafe(t);
+      }
+    }
+  }
+
+  private static class PropagationHead<V> extends StatementPropagation<V, V> {
+
+    private final Object mMutex = new Object();
+
+    private Throwable mException;
+
+    private StateEvaluating mInnerState = new StateEvaluating();
+
+    private StatementState mState = StatementState.Evaluating;
+
+    private Object mValue;
+
+    @Nullable
+    FailureException getFailure() {
+      return mInnerState.getFailure();
+    }
+
+    @NotNull
+    Object getMutex() {
+      return mMutex;
+    }
+
+    @NotNull
+    StatementState getState() {
+      return mState;
+    }
+
+    Object getValue() {
+      return mInnerState.getValue();
+    }
+
+    void innerFail(@Nullable final Throwable failure) {
+      mInnerState.innerFail(failure);
+      mState = StatementState.Failed;
+    }
+
+    void innerSet(final Object value) {
+      mInnerState.innerSet(value);
+      mState = StatementState.Set;
+    }
+
+    @Nullable
+    Runnable propagate(@NotNull final StatementPropagation<?, ?> propagation) {
+      final Runnable propagate = mInnerState.propagate(propagation);
+      mState = StatementState.Evaluating;
+      return propagate;
+    }
+
+    private class StateEvaluating {
+
+      @NotNull
+      IllegalStateException exception(@NotNull final StatementState state) {
+        return new IllegalStateException("invalid state: " + state);
+      }
+
+      @Nullable
+      FailureException getFailure() {
+        return null;
+      }
+
+      Object getValue() {
+        throw exception(StatementState.Evaluating);
+      }
+
+      void innerFail(@Nullable final Throwable failure) {
+        getLogger().dbg("Statement failing with reason [%s => %s]: %s", StatementState.Evaluating,
+            StatementState.Failed, failure);
+        mException = failure;
+        mInnerState = new StateFailed();
+      }
+
+      void innerSet(final Object value) {
+        getLogger().dbg("Setting statement value [%s => %s]: %s", StatementState.Evaluating,
+            StatementState.Set, value);
+        mValue = value;
+        mInnerState = new StateSet();
+      }
+
+      @Nullable
+      Runnable propagate(@NotNull final StatementPropagation<?, ?> propagation) {
+        return null;
+      }
+    }
+
+    private class StateFailed extends StateEvaluating {
+
+      @Nullable
+      @Override
+      FailureException getFailure() {
+        return FailureException.wrap(mException);
+      }
+
+      Object getValue() {
+        throw FailureException.wrap(mException);
+      }
+
+      @Nullable
+      @Override
+      Runnable propagate(@NotNull final StatementPropagation<?, ?> propagation) {
+        getLogger().dbg("Propagating statement [%s => %s]", StatementState.Failed,
+            StatementState.Evaluating);
+        final Throwable exception = mException;
+        mException = null;
+        mInnerState = new StateEvaluating();
+        return new Runnable() {
+
+          public void run() {
+            propagation.failSafe(exception);
+          }
+        };
+      }
+
+      @Override
+      void innerFail(@Nullable final Throwable failure) {
+        throw exception(StatementState.Failed);
+      }
+
+      @Override
+      void innerSet(final Object value) {
+        throw exception(StatementState.Failed);
+      }
+    }
+
+    private class StateSet extends StateEvaluating {
+
+      @Nullable
+      @Override
+      Runnable propagate(@NotNull final StatementPropagation<?, ?> propagation) {
+        getLogger().dbg("Propagating statement [%s => %s]", StatementState.Set,
+            StatementState.Evaluating);
+        final Object value = mValue;
+        mValue = null;
+        mInnerState = new StateEvaluating();
+        return new Runnable() {
+
+          @SuppressWarnings("unchecked")
+          public void run() {
+            ((StatementPropagation<Object, ?>) propagation).set(value);
+          }
+        };
+      }
+
+      @Override
+      Object getValue() {
+        return mValue;
+      }
+
+      @Override
+      void innerFail(@Nullable final Throwable failure) {
+        throw exception(StatementState.Set);
+      }
+
+      @Override
+      void innerSet(final Object value) {
+        throw exception(StatementState.Set);
+      }
+    }
+
+    @NotNull
+    PropagationHead<V> copy() {
+      return new PropagationHead<V>();
+    }
+
+    @Override
+    public void fail(final StatementPropagation<V, ?> next, final Throwable failure) {
+      next.fail(failure);
+    }
+
+    @Override
+    public void set(final StatementPropagation<V, ?> next, final V value) {
+      next.set(value);
+    }
+  }
+
+  private static abstract class StatementPropagation<V, R> implements Evaluation<V> {
 
     private volatile StateEvaluating mInnerState = new StateEvaluating();
 
     private Logger mLogger;
 
-    private volatile StatementChain<R, ?> mNext;
+    private volatile StatementPropagation<R, ?> mNext;
 
     public final void fail(@NotNull final Throwable failure) {
       ConstantConditions.notNull("failure", failure);
@@ -1217,9 +1223,9 @@ class DefaultStatement<V> implements Statement<V>, Serializable {
     }
 
     @NotNull
-    abstract StatementChain<V, R> copy();
+    abstract StatementPropagation<V, R> copy();
 
-    abstract void fail(StatementChain<R, ?> next, Throwable failure);
+    abstract void fail(StatementPropagation<R, ?> next, Throwable failure);
 
     final void failSafe(@NotNull final Throwable failure) {
       ConstantConditions.notNull("failure", failure);
@@ -1240,9 +1246,9 @@ class DefaultStatement<V> implements Statement<V>, Serializable {
       return false;
     }
 
-    abstract void set(StatementChain<R, ?> next, V value);
+    abstract void set(StatementPropagation<R, ?> next, V value);
 
-    void setNext(@NotNull final StatementChain<R, ?> next) {
+    void setNext(@NotNull final StatementPropagation<R, ?> next) {
       mNext = next;
     }
 
@@ -1323,8 +1329,8 @@ class DefaultStatement<V> implements Statement<V>, Serializable {
     private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
 
     private StatementProxy(final Observer<Evaluation<?>> observer, final boolean isEvaluated,
-        final String loggerName, final List<StatementChain<?, ?>> chains) {
-      super(proxy(observer), isEvaluated, loggerName, chains);
+        final String loggerName, final List<StatementPropagation<?, ?>> propagations) {
+      super(proxy(observer), isEvaluated, loggerName, propagations);
     }
 
     @NotNull
@@ -1332,15 +1338,17 @@ class DefaultStatement<V> implements Statement<V>, Serializable {
     private Object readResolve() throws ObjectStreamException {
       try {
         final Object[] args = deserializeArgs();
-        final ChainHead<Object> head = new ChainHead<Object>();
-        StatementChain<?, ?> tail = head;
-        for (final StatementChain<?, ?> chain : (List<StatementChain<?, ?>>) args[3]) {
-          ((StatementChain<?, Object>) tail).setNext((StatementChain<Object, ?>) chain);
-          tail = chain;
+        final PropagationHead<Object> head = new PropagationHead<Object>();
+        StatementPropagation<?, ?> tail = head;
+        for (final StatementPropagation<?, ?> propagation : (List<StatementPropagation<?, ?>>)
+            args[3]) {
+          ((StatementPropagation<?, Object>) tail).setNext(
+              (StatementPropagation<Object, ?>) propagation);
+          tail = propagation;
         }
 
         return new DefaultStatement<Object>((Observer<Evaluation<?>>) args[0], (Boolean) args[1],
-            (String) args[2], head, (StatementChain<?, Object>) tail);
+            (String) args[2], head, (StatementPropagation<?, Object>) tail);
 
       } catch (final Throwable t) {
         throw new InvalidObjectException(t.getMessage());
@@ -1348,15 +1356,15 @@ class DefaultStatement<V> implements Statement<V>, Serializable {
     }
   }
 
-  private class ChainTail extends StatementChain<V, Object> {
+  private class PropagationTail extends StatementPropagation<V, Object> {
 
-    private ChainTail() {
+    private PropagationTail() {
       setLogger(mLogger);
     }
 
     @NotNull
     @Override
-    StatementChain<V, Object> copy() {
+    StatementPropagation<V, Object> copy() {
       return ConstantConditions.unsupported();
     }
 
@@ -1366,11 +1374,11 @@ class DefaultStatement<V> implements Statement<V>, Serializable {
     }
 
     @Override
-    void fail(final StatementChain<Object, ?> next, final Throwable reason) {
-      final StatementChain<V, ?> chain;
+    void fail(final StatementPropagation<Object, ?> next, final Throwable reason) {
+      final StatementPropagation<V, ?> propagation;
       synchronized (mMutex) {
         try {
-          if ((chain = mChain) == null) {
+          if ((propagation = mPropagation) == null) {
             mState = StatementState.Failed;
             mHead.innerFail(reason);
             return;
@@ -1381,15 +1389,15 @@ class DefaultStatement<V> implements Statement<V>, Serializable {
         }
       }
 
-      chain.fail(reason);
+      propagation.fail(reason);
     }
 
     @Override
-    void set(final StatementChain<Object, ?> next, final V value) {
-      final StatementChain<V, ?> chain;
+    void set(final StatementPropagation<Object, ?> next, final V value) {
+      final StatementPropagation<V, ?> propagation;
       synchronized (mMutex) {
         try {
-          if ((chain = mChain) == null) {
+          if ((propagation = mPropagation) == null) {
             mState = StatementState.Set;
             mHead.innerSet(value);
             return;
@@ -1400,7 +1408,7 @@ class DefaultStatement<V> implements Statement<V>, Serializable {
         }
       }
 
-      chain.set(value);
+      propagation.set(value);
     }
   }
 }

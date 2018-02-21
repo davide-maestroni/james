@@ -20,7 +20,7 @@ package dm.jale;
  * Created by davide-maestroni on 02/01/2018.
  */
 enum StatementState {
-  Evaluating(false), Set(true), Failed(true), Chained(false);
+  Evaluating(false), Set(true), Failed(true), Propagated(false);
 
   private final boolean mIsDone;
 

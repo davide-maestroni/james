@@ -77,7 +77,8 @@ class BackoffForker<S, V> implements LoopForker<ForkerEvaluation<S, V>, V>, Seri
       @NotNull final EvaluationCollection<V> evaluation, @NotNull final Loop<V> context) throws
       Exception {
     if (!stack.setEvaluations(evaluation)) {
-      evaluation.addFailure(new IllegalStateException("the loop cannot be chained")).set();
+      evaluation.addFailure(new IllegalStateException("the loop evaluation cannot be propagated"))
+                .set();
     }
 
     return stack;

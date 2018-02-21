@@ -121,7 +121,7 @@ class ComposedStatementForker<S, V> implements StatementForker<S, V>, Serializab
 
     public S update(final S stack, final Evaluation<V> evaluation,
         @NotNull final Statement<V> statement) {
-      evaluation.fail(new IllegalStateException("the statement cannot be chained"));
+      evaluation.fail(new IllegalStateException("the statement evaluation cannot be propagated"));
       return stack;
     }
 
