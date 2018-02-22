@@ -22,8 +22,8 @@ import java.io.InvalidObjectException;
 import java.io.ObjectStreamException;
 import java.io.Serializable;
 
-import dm.jale.async.Action;
 import dm.jale.async.Evaluation;
+import dm.jale.async.Mapper;
 import dm.jale.config.BuildConfig;
 import dm.jale.util.ConstantConditions;
 import dm.jale.util.SerializableProxy;
@@ -31,40 +31,32 @@ import dm.jale.util.SerializableProxy;
 /**
  * Created by davide-maestroni on 02/01/2018.
  */
-class DoneStatementHandler<V> extends StatementHandler<V, V> implements Serializable {
+class ThenStatementExpression<V, R> extends StatementExpression<V, R> implements Serializable {
 
   private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
 
-  private final Action mAction;
+  private final Mapper<? super V, ? extends R> mMapper;
 
-  DoneStatementHandler(@NotNull final Action action) {
-    mAction = ConstantConditions.notNull("action", action);
+  ThenStatementExpression(@NotNull final Mapper<? super V, ? extends R> mapper) {
+    mMapper = ConstantConditions.notNull("mapper", mapper);
   }
 
   @Override
-  void failure(@NotNull final Throwable failure, @NotNull final Evaluation<V> evaluation) throws
-      Exception {
-    mAction.perform();
-    super.failure(failure, evaluation);
-  }
-
-  @Override
-  void value(final V value, @NotNull final Evaluation<V> evaluation) throws Exception {
-    mAction.perform();
-    super.value(value, evaluation);
+  void value(final V value, @NotNull final Evaluation<R> evaluation) throws Exception {
+    evaluation.set(mMapper.apply(value));
   }
 
   @NotNull
   private Object writeReplace() throws ObjectStreamException {
-    return new HandlerProxy<V>(mAction);
+    return new HandlerProxy<V, R>(mMapper);
   }
 
-  private static class HandlerProxy<V> extends SerializableProxy {
+  private static class HandlerProxy<V, R> extends SerializableProxy {
 
     private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
 
-    private HandlerProxy(final Action action) {
-      super(proxy(action));
+    private HandlerProxy(final Mapper<? super V, ? extends R> mapper) {
+      super(proxy(mapper));
     }
 
     @NotNull
@@ -72,7 +64,7 @@ class DoneStatementHandler<V> extends StatementHandler<V, V> implements Serializ
     private Object readResolve() throws ObjectStreamException {
       try {
         final Object[] args = deserializeArgs();
-        return new DoneStatementHandler<V>((Action) args[0]);
+        return new ThenStatementExpression<V, R>((Mapper<? super V, ? extends R>) args[0]);
 
       } catch (final Throwable t) {
         throw new InvalidObjectException(t.getMessage());

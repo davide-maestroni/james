@@ -17,88 +17,62 @@
 package dm.jale;
 
 import org.jetbrains.annotations.NotNull;
-import org.jetbrains.annotations.Nullable;
 
 import java.io.InvalidObjectException;
 import java.io.ObjectStreamException;
 import java.io.Serializable;
 
 import dm.jale.async.EvaluationCollection;
-import dm.jale.async.Observer;
+import dm.jale.async.Loop;
+import dm.jale.async.Mapper;
 import dm.jale.config.BuildConfig;
 import dm.jale.util.ConstantConditions;
-import dm.jale.util.Iterables;
 import dm.jale.util.SerializableProxy;
 
 /**
  * Created by davide-maestroni on 02/01/2018.
  */
-class ElseDoLoopHandler<V> extends LoopHandler<V, V> implements Serializable {
+class ElseLoopIfStatementExpression<V> extends StatementLoopExpression<V, V>
+    implements Serializable {
 
   private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
 
-  private final Observer<? super Throwable> mObserver;
+  private final Mapper<? super Throwable, ? extends Loop<? extends V>> mMapper;
 
   private final Class<?>[] mTypes;
 
-  ElseDoLoopHandler(@NotNull final Observer<? super Throwable> observer,
+  ElseLoopIfStatementExpression(
+      @NotNull final Mapper<? super Throwable, ? extends Loop<? extends V>> mapper,
       @NotNull final Class<?>[] exceptionTypes) {
-    mObserver = ConstantConditions.notNull("observer", observer);
+    mMapper = ConstantConditions.notNull("mapper", mapper);
     mTypes = ConstantConditions.notNullElements("exception types", exceptionTypes);
   }
 
   @Override
-  void addFailure(@NotNull final Throwable failure,
+  void failure(@NotNull final Throwable failure,
       @NotNull final EvaluationCollection<V> evaluation) throws Exception {
     for (final Class<?> type : mTypes) {
       if (type.isInstance(failure)) {
-        mObserver.accept(failure);
-        break;
+        mMapper.apply(failure).to(evaluation);
+        return;
       }
     }
 
-    super.addFailure(failure, evaluation);
-  }
-
-  @Override
-  void addFailures(@Nullable final Iterable<? extends Throwable> failures,
-      @NotNull final EvaluationCollection<V> evaluation) throws Exception {
-    if (failures == null) {
-      return;
-    }
-
-    int index = 0;
-    try {
-      @SuppressWarnings("UnnecessaryLocalVariable") final Observer<? super Throwable> observer =
-          mObserver;
-      for (final Throwable failure : failures) {
-        for (final Class<?> type : mTypes) {
-          if (type.isInstance(failure)) {
-            observer.accept(failure);
-            break;
-          }
-        }
-
-        ++index;
-      }
-
-    } finally {
-      evaluation.addFailures(Iterables.asList(failures).subList(0, index)).set();
-    }
+    super.failure(failure, evaluation);
   }
 
   @NotNull
   private Object writeReplace() throws ObjectStreamException {
-    return new HandlerProxy<V>(mObserver, mTypes);
+    return new HandlerProxy<V>(mMapper, mTypes);
   }
 
   private static class HandlerProxy<V> extends SerializableProxy {
 
     private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
 
-    private HandlerProxy(final Observer<? super Throwable> observer,
+    private HandlerProxy(final Mapper<? super Throwable, ? extends Loop<? extends V>> mapper,
         final Class<?>[] exceptionTypes) {
-      super(proxy(observer), exceptionTypes);
+      super(proxy(mapper), exceptionTypes);
     }
 
     @NotNull
@@ -106,8 +80,8 @@ class ElseDoLoopHandler<V> extends LoopHandler<V, V> implements Serializable {
     private Object readResolve() throws ObjectStreamException {
       try {
         final Object[] args = deserializeArgs();
-        return new ElseDoLoopHandler<V>((Observer<? super Throwable>) args[0],
-            (Class<?>[]) args[1]);
+        return new ElseLoopIfStatementExpression<V>(
+            (Mapper<? super Throwable, ? extends Loop<? extends V>>) args[0], (Class<?>[]) args[1]);
 
       } catch (final Throwable t) {
         throw new InvalidObjectException(t.getMessage());

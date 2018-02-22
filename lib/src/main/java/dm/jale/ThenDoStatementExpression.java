@@ -17,66 +17,47 @@
 package dm.jale;
 
 import org.jetbrains.annotations.NotNull;
-import org.jetbrains.annotations.Nullable;
 
-import java.io.Closeable;
 import java.io.InvalidObjectException;
 import java.io.ObjectStreamException;
 import java.io.Serializable;
-import java.util.Locale;
 
-import dm.jale.async.Action;
 import dm.jale.async.Evaluation;
-import dm.jale.async.Mapper;
-import dm.jale.async.Statement;
+import dm.jale.async.Observer;
 import dm.jale.config.BuildConfig;
-import dm.jale.log.Logger;
 import dm.jale.util.ConstantConditions;
 import dm.jale.util.SerializableProxy;
 
 /**
  * Created by davide-maestroni on 02/01/2018.
  */
-class TryIfStatementHandler<V, R> extends StatementHandler<V, R> implements Serializable {
+class ThenDoStatementExpression<V, R> extends StatementExpression<V, R> implements Serializable {
 
   private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
 
-  private final Mapper<? super V, ? extends Closeable> mCloseable;
+  private final Observer<? super V> mObserver;
 
-  private final Logger mLogger;
-
-  private final Mapper<? super V, ? extends Statement<R>> mMapper;
-
-  TryIfStatementHandler(@NotNull final Mapper<? super V, ? extends Closeable> closeable,
-      @NotNull final Mapper<? super V, ? extends Statement<R>> mapper,
-      @Nullable final String loggerName) {
-    mCloseable = ConstantConditions.notNull("closeable", closeable);
-    mMapper = ConstantConditions.notNull("mapper", mapper);
-    mLogger = Logger.newLogger(this, loggerName, Locale.ENGLISH);
+  ThenDoStatementExpression(@NotNull final Observer<? super V> observer) {
+    mObserver = ConstantConditions.notNull("observer", observer);
   }
 
   @Override
   void value(final V value, @NotNull final Evaluation<R> evaluation) throws Exception {
-    mMapper.apply(value).whenDone(new Action() {
-
-      public void perform() throws Exception {
-        Asyncs.close(mCloseable.apply(value), mLogger);
-      }
-    }).to(evaluation);
+    mObserver.accept(value);
+    super.value(value, evaluation);
   }
 
   @NotNull
   private Object writeReplace() throws ObjectStreamException {
-    return new HandlerProxy<V, R>(mCloseable, mMapper, mLogger.getName());
+    return new HandlerProxy<V, R>(mObserver);
   }
 
   private static class HandlerProxy<V, R> extends SerializableProxy {
 
     private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
 
-    private HandlerProxy(final Mapper<? super V, ? extends Closeable> closeable,
-        final Mapper<? super V, ? extends Statement<R>> mapper, final String loggerName) {
-      super(proxy(closeable), proxy(mapper), loggerName);
+    private HandlerProxy(final Observer<? super V> observer) {
+      super(proxy(observer));
     }
 
     @NotNull
@@ -84,8 +65,7 @@ class TryIfStatementHandler<V, R> extends StatementHandler<V, R> implements Seri
     private Object readResolve() throws ObjectStreamException {
       try {
         final Object[] args = deserializeArgs();
-        return new TryIfStatementHandler<V, R>((Mapper<? super V, ? extends Closeable>) args[0],
-            (Mapper<? super V, ? extends Statement<R>>) args[1], (String) args[2]);
+        return new ThenDoStatementExpression<V, R>((Observer<? super V>) args[0]);
 
       } catch (final Throwable t) {
         throw new InvalidObjectException(t.getMessage());

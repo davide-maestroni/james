@@ -18,25 +18,25 @@ package dm.jale;
 
 import org.jetbrains.annotations.NotNull;
 
-import dm.jale.async.EvaluationCollection;
+import dm.jale.async.Evaluation;
 
 /**
  * Created by davide-maestroni on 01/14/2018.
  */
-class StatementLoopHandler<V, R> {
+class StatementExpression<V, R> {
 
-  void failure(@NotNull final Throwable failure,
-      @NotNull final EvaluationCollection<R> evaluation) throws Exception {
-    evaluation.addFailure(failure).set();
+  void failure(@NotNull final Throwable failure, @NotNull final Evaluation<R> evaluation) throws
+      Exception {
+    evaluation.fail(failure);
   }
 
   @NotNull
-  StatementLoopHandler<V, R> renew() {
+  StatementExpression<V, R> renew() {
     return this;
   }
 
   @SuppressWarnings("unchecked")
-  void value(final V value, @NotNull final EvaluationCollection<R> evaluation) throws Exception {
-    evaluation.addValue((R) value).set();
+  void value(final V value, @NotNull final Evaluation<R> evaluation) throws Exception {
+    evaluation.set((R) value);
   }
 }

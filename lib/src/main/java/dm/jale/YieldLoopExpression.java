@@ -45,7 +45,7 @@ import static dm.jale.executor.ExecutorPool.withThrottling;
 /**
  * Created by davide-maestroni on 02/05/2018.
  */
-class YieldLoopHandler<S, V, R> extends LoopHandler<V, R> implements Serializable {
+class YieldLoopExpression<S, V, R> extends LoopExpression<V, R> implements Serializable {
 
   private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
 
@@ -63,7 +63,7 @@ class YieldLoopHandler<S, V, R> extends LoopHandler<V, R> implements Serializabl
 
   private S mStack;
 
-  YieldLoopHandler(@NotNull final Yielder<S, ? super V, R> yielder,
+  YieldLoopExpression(@NotNull final Yielder<S, ? super V, R> yielder,
       @Nullable final String loggerName) {
     mYielder = ConstantConditions.notNull("yielder", yielder);
     mExecutor = withThrottling(1, immediateExecutor());
@@ -139,8 +139,8 @@ class YieldLoopHandler<S, V, R> extends LoopHandler<V, R> implements Serializabl
 
   @NotNull
   @Override
-  LoopHandler<V, R> renew() {
-    return new YieldLoopHandler<S, V, R>(mYielder, mLogger.getName());
+  LoopExpression<V, R> renew() {
+    return new YieldLoopExpression<S, V, R>(mYielder, mLogger.getName());
   }
 
   @Override
@@ -191,7 +191,8 @@ class YieldLoopHandler<S, V, R> extends LoopHandler<V, R> implements Serializabl
     private Object readResolve() throws ObjectStreamException {
       try {
         final Object[] args = deserializeArgs();
-        return new YieldLoopHandler<S, V, R>((Yielder<S, ? super V, R>) args[0], (String) args[1]);
+        return new YieldLoopExpression<S, V, R>((Yielder<S, ? super V, R>) args[0],
+            (String) args[1]);
 
       } catch (final Throwable t) {
         throw new InvalidObjectException(t.getMessage());

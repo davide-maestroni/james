@@ -33,7 +33,7 @@ import dm.jale.util.SerializableProxy;
 /**
  * Created by davide-maestroni on 02/01/2018.
  */
-class ElseCatchLoopHandler<V> extends LoopHandler<V, V> implements Serializable {
+class ElseCatchLoopExpression<V> extends LoopExpression<V, V> implements Serializable {
 
   private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
 
@@ -41,7 +41,7 @@ class ElseCatchLoopHandler<V> extends LoopHandler<V, V> implements Serializable 
 
   private final Class<?>[] mTypes;
 
-  ElseCatchLoopHandler(@NotNull final Mapper<? super Throwable, ? extends V> mapper,
+  ElseCatchLoopExpression(@NotNull final Mapper<? super Throwable, ? extends V> mapper,
       @NotNull final Class<?>[] exceptionTypes) {
     mMapper = ConstantConditions.notNull("mapper", mapper);
     mTypes = ConstantConditions.notNullElements("exception types", exceptionTypes);
@@ -118,7 +118,7 @@ class ElseCatchLoopHandler<V> extends LoopHandler<V, V> implements Serializable 
     private Object readResolve() throws ObjectStreamException {
       try {
         final Object[] args = deserializeArgs();
-        return new ElseCatchLoopHandler<V>((Mapper<? super Throwable, ? extends V>) args[0],
+        return new ElseCatchLoopExpression<V>((Mapper<? super Throwable, ? extends V>) args[0],
             (Class<?>[]) args[1]);
 
       } catch (final Throwable t) {

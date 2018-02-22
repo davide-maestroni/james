@@ -22,10 +22,10 @@ import org.jetbrains.annotations.Nullable;
 import java.io.InvalidObjectException;
 import java.io.ObjectStreamException;
 import java.io.Serializable;
-import java.util.ArrayList;
+import java.util.Iterator;
 
+import dm.jale.async.Action;
 import dm.jale.async.EvaluationCollection;
-import dm.jale.async.Mapper;
 import dm.jale.config.BuildConfig;
 import dm.jale.util.ConstantConditions;
 import dm.jale.util.Iterables;
@@ -34,87 +34,86 @@ import dm.jale.util.SerializableProxy;
 /**
  * Created by davide-maestroni on 02/01/2018.
  */
-class ElseLoopLoopHandler<V> extends LoopHandler<V, V> implements Serializable {
+class DoneLoopExpression<V> extends LoopExpression<V, V> implements Serializable {
 
   private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
 
-  private final Mapper<? super Throwable, ? extends Iterable<? extends V>> mMapper;
+  private final Action mAction;
 
-  private final Class<?>[] mTypes;
-
-  ElseLoopLoopHandler(
-      @NotNull final Mapper<? super Throwable, ? extends Iterable<? extends V>> mapper,
-      @NotNull final Class<?>[] exceptionTypes) {
-    mMapper = ConstantConditions.notNull("mapper", mapper);
-    mTypes = ConstantConditions.notNullElements("exception types", exceptionTypes);
+  DoneLoopExpression(@NotNull final Action action) {
+    mAction = ConstantConditions.notNull("action", action);
   }
 
   @Override
-  @SuppressWarnings("unchecked")
   void addFailure(@NotNull final Throwable failure,
       @NotNull final EvaluationCollection<V> evaluation) throws Exception {
-    for (final Class<?> type : mTypes) {
-      if (type.isInstance(failure)) {
-        evaluation.addValues(mMapper.apply(failure)).set();
-        return;
-      }
-    }
-
+    mAction.perform();
     super.addFailure(failure, evaluation);
   }
 
   @Override
+  @SuppressWarnings("WhileLoopReplaceableByForEach")
   void addFailures(@Nullable final Iterable<? extends Throwable> failures,
       @NotNull final EvaluationCollection<V> evaluation) throws Exception {
     if (failures == null) {
       return;
     }
 
-    final ArrayList<V> outputs = new ArrayList<V>();
-    @SuppressWarnings("UnnecessaryLocalVariable") final Class<?>[] types = mTypes;
-    @SuppressWarnings(
-        "UnnecessaryLocalVariable") final Mapper<? super Throwable, ? extends Iterable<? extends V>>
-        mapper = mMapper;
+    int index = 0;
     try {
-      for (final Throwable failure : failures) {
-        boolean found = false;
-        for (final Class<?> type : types) {
-          if (type.isInstance(failure)) {
-            Iterables.addAll(mapper.apply(failure), outputs);
-            found = true;
-            break;
-          }
-        }
-
-        if (!found) {
-          if (outputs.isEmpty()) {
-            evaluation.addFailure(failure);
-
-          } else {
-            final ArrayList<V> values = new ArrayList<V>(outputs);
-            outputs.clear();
-            evaluation.addValues(values).addFailure(failure);
-          }
-        }
+      @SuppressWarnings("UnnecessaryLocalVariable") final Action action = mAction;
+      final Iterator<? extends Throwable> iterator = failures.iterator();
+      while (iterator.hasNext()) {
+        iterator.next();
+        action.perform();
+        ++index;
       }
 
     } finally {
-      evaluation.addValues(outputs).set();
+      evaluation.addFailures(Iterables.asList(failures).subList(0, index)).set();
+    }
+  }
+
+  @Override
+  void addValue(final V value, @NotNull final EvaluationCollection<V> evaluation) throws Exception {
+    mAction.perform();
+    super.addValue(value, evaluation);
+  }
+
+  @Override
+  @SuppressWarnings("WhileLoopReplaceableByForEach")
+  void addValues(@Nullable final Iterable<? extends V> values,
+      @NotNull final EvaluationCollection<V> evaluation) throws Exception {
+    if (values == null) {
+      return;
+    }
+
+    int index = 0;
+    try {
+      @SuppressWarnings("UnnecessaryLocalVariable") final Action action = mAction;
+      final Iterator<? extends V> iterator = values.iterator();
+      while (iterator.hasNext()) {
+        iterator.next();
+        action.perform();
+        ++index;
+      }
+
+    } finally {
+      evaluation.addValues(Iterables.asList(values).subList(0, index)).set();
     }
   }
 
   @NotNull
   private Object writeReplace() throws ObjectStreamException {
-    return new HandlerProxy<V>(mMapper, mTypes);
+    return new HandlerProxy<V>(mAction);
   }
 
   private static class HandlerProxy<V> extends SerializableProxy {
 
     private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
 
-    private HandlerProxy(final Mapper<? super Throwable, ? extends Iterable<? extends V>> mapper,
-        final Class<?>[] exceptionTypes) {
-      super(proxy(mapper), exceptionTypes);
+    private HandlerProxy(final Action action) {
+      super(proxy(action));
     }
 
     @NotNull
@@ -122,9 +121,7 @@ class ElseLoopLoopHandler<V> extends LoopHandler<V, V> implements Serializable {
     private Object readResolve() throws ObjectStreamException {
       try {
         final Object[] args = deserializeArgs();
-        return new ElseLoopLoopHandler<V>(
-            (Mapper<? super Throwable, ? extends Iterable<? extends V>>) args[0],
-            (Class<?>[]) args[1]);
+        return new DoneLoopExpression<V>((Action) args[0]);
 
       } catch (final Throwable t) {
         throw new InvalidObjectException(t.getMessage());

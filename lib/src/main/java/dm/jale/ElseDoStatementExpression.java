@@ -22,9 +22,8 @@ import java.io.InvalidObjectException;
 import java.io.ObjectStreamException;
 import java.io.Serializable;
 
-import dm.jale.async.EvaluationCollection;
-import dm.jale.async.Loop;
-import dm.jale.async.Mapper;
+import dm.jale.async.Evaluation;
+import dm.jale.async.Observer;
 import dm.jale.config.BuildConfig;
 import dm.jale.util.ConstantConditions;
 import dm.jale.util.SerializableProxy;
@@ -32,32 +31,45 @@ import dm.jale.util.SerializableProxy;
 /**
  * Created by davide-maestroni on 02/01/2018.
  */
-class ThenLoopIfStatementHandler<V, R> extends StatementLoopHandler<V, R> implements Serializable {
+class ElseDoStatementExpression<V> extends StatementExpression<V, V> implements Serializable {
 
   private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
 
-  private final Mapper<? super V, ? extends Loop<R>> mMapper;
+  private final Observer<? super Throwable> mObserver;
 
-  ThenLoopIfStatementHandler(@NotNull final Mapper<? super V, ? extends Loop<R>> mapper) {
-    mMapper = ConstantConditions.notNull("mapper", mapper);
+  private final Class<?>[] mTypes;
+
+  ElseDoStatementExpression(@NotNull final Observer<? super Throwable> observer,
+      @NotNull final Class<?>[] exceptionTypes) {
+    mObserver = ConstantConditions.notNull("observer", observer);
+    mTypes = ConstantConditions.notNullElements("exception types", exceptionTypes);
   }
 
   @Override
-  void value(final V value, @NotNull final EvaluationCollection<R> evaluation) throws Exception {
-    mMapper.apply(value).to(evaluation);
+  void failure(@NotNull final Throwable failure, @NotNull final Evaluation<V> evaluation) throws
+      Exception {
+    for (final Class<?> type : mTypes) {
+      if (type.isInstance(failure)) {
+        mObserver.accept(failure);
+        break;
+      }
+    }
+
+    super.failure(failure, evaluation);
   }
 
   @NotNull
   private Object writeReplace() throws ObjectStreamException {
-    return new HandlerProxy<V, R>(mMapper);
+    return new HandlerProxy<V>(mObserver, mTypes);
   }
 
-  private static class HandlerProxy<V, R> extends SerializableProxy {
+  private static class HandlerProxy<V> extends SerializableProxy {
 
     private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
 
-    private HandlerProxy(final Mapper<? super V, ? extends Loop<R>> mapper) {
-      super(proxy(mapper));
+    private HandlerProxy(final Observer<? super Throwable> observer,
+        final Class<?>[] exceptionTypes) {
+      super(proxy(observer), exceptionTypes);
     }
 
     @NotNull
@@ -65,7 +77,8 @@ class ThenLoopIfStatementHandler<V, R> extends StatementLoopHandler<V, R> implem
     private Object readResolve() throws ObjectStreamException {
       try {
         final Object[] args = deserializeArgs();
-        return new ThenLoopIfStatementHandler<V, R>((Mapper<? super V, ? extends Loop<R>>) args[0]);
+        return new ElseDoStatementExpression<V>((Observer<? super Throwable>) args[0],
+            (Class<?>[]) args[1]);
 
       } catch (final Throwable t) {
         throw new InvalidObjectException(t.getMessage());

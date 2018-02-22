@@ -22,10 +22,9 @@ import org.jetbrains.annotations.Nullable;
 import java.io.InvalidObjectException;
 import java.io.ObjectStreamException;
 import java.io.Serializable;
-import java.util.Iterator;
 
-import dm.jale.async.Action;
 import dm.jale.async.EvaluationCollection;
+import dm.jale.async.Observer;
 import dm.jale.config.BuildConfig;
 import dm.jale.util.ConstantConditions;
 import dm.jale.util.Iterables;
@@ -34,25 +33,34 @@ import dm.jale.util.SerializableProxy;
 /**
  * Created by davide-maestroni on 02/01/2018.
  */
-class DoneLoopHandler<V> extends LoopHandler<V, V> implements Serializable {
+class ElseDoLoopExpression<V> extends LoopExpression<V, V> implements Serializable {
 
   private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
 
-  private final Action mAction;
+  private final Observer<? super Throwable> mObserver;
 
-  DoneLoopHandler(@NotNull final Action action) {
-    mAction = ConstantConditions.notNull("action", action);
+  private final Class<?>[] mTypes;
+
+  ElseDoLoopExpression(@NotNull final Observer<? super Throwable> observer,
+      @NotNull final Class<?>[] exceptionTypes) {
+    mObserver = ConstantConditions.notNull("observer", observer);
+    mTypes = ConstantConditions.notNullElements("exception types", exceptionTypes);
   }
 
   @Override
   void addFailure(@NotNull final Throwable failure,
       @NotNull final EvaluationCollection<V> evaluation) throws Exception {
-    mAction.perform();
+    for (final Class<?> type : mTypes) {
+      if (type.isInstance(failure)) {
+        mObserver.accept(failure);
+        break;
+      }
+    }
+
     super.addFailure(failure, evaluation);
   }
 
   @Override
-  @SuppressWarnings("WhileLoopReplaceableByForEach")
   void addFailures(@Nullable final Iterable<? extends Throwable> failures,
       @NotNull final EvaluationCollection<V> evaluation) throws Exception {
     if (failures == null) {
@@ -61,11 +69,16 @@ class DoneLoopHandler<V> extends LoopHandler<V, V> implements Serializable {
 
     int index = 0;
     try {
-      @SuppressWarnings("UnnecessaryLocalVariable") final Action action = mAction;
-      final Iterator<? extends Throwable> iterator = failures.iterator();
-      while (iterator.hasNext()) {
-        iterator.next();
-        action.perform();
+      @SuppressWarnings("UnnecessaryLocalVariable") final Observer<? super Throwable> observer =
+          mObserver;
+      for (final Throwable failure : failures) {
+        for (final Class<?> type : mTypes) {
+          if (type.isInstance(failure)) {
+            observer.accept(failure);
+            break;
+          }
+        }
+
         ++index;
       }
 
@@ -74,46 +87,18 @@ class DoneLoopHandler<V> extends LoopHandler<V, V> implements Serializable {
     }
   }
 
-  @Override
-  void addValue(final V value, @NotNull final EvaluationCollection<V> evaluation) throws Exception {
-    mAction.perform();
-    super.addValue(value, evaluation);
-  }
-
-  @Override
-  @SuppressWarnings("WhileLoopReplaceableByForEach")
-  void addValues(@Nullable final Iterable<? extends V> values,
-      @NotNull final EvaluationCollection<V> evaluation) throws Exception {
-    if (values == null) {
-      return;
-    }
-
-    int index = 0;
-    try {
-      @SuppressWarnings("UnnecessaryLocalVariable") final Action action = mAction;
-      final Iterator<? extends V> iterator = values.iterator();
-      while (iterator.hasNext()) {
-        iterator.next();
-        action.perform();
-        ++index;
-      }
-
-    } finally {
-      evaluation.addValues(Iterables.asList(values).subList(0, index)).set();
-    }
-  }
-
   @NotNull
   private Object writeReplace() throws ObjectStreamException {
-    return new HandlerProxy<V>(mAction);
+    return new HandlerProxy<V>(mObserver, mTypes);
   }
 
   private static class HandlerProxy<V> extends SerializableProxy {
 
     private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
 
-    private HandlerProxy(final Action action) {
-      super(proxy(action));
+    private HandlerProxy(final Observer<? super Throwable> observer,
+        final Class<?>[] exceptionTypes) {
+      super(proxy(observer), exceptionTypes);
     }
 
     @NotNull
@@ -121,7 +106,8 @@ class DoneLoopHandler<V> extends LoopHandler<V, V> implements Serializable {
     private Object readResolve() throws ObjectStreamException {
       try {
         final Object[] args = deserializeArgs();
-        return new DoneLoopHandler<V>((Action) args[0]);
+        return new ElseDoLoopExpression<V>((Observer<? super Throwable>) args[0],
+            (Class<?>[]) args[1]);
 
       } catch (final Throwable t) {
         throw new InvalidObjectException(t.getMessage());

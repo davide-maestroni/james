@@ -29,14 +29,15 @@ import dm.jale.util.ConstantConditions;
 /**
  * Created by davide-maestroni on 02/05/2018.
  */
-class ToEvaluationStatementHandler<V> extends StatementHandler<V, Void> implements Serializable {
+class ToEvaluationStatementExpression<V> extends StatementExpression<V, Void>
+    implements Serializable {
 
   private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
 
   private final Evaluation<V> mEvaluation;
 
   @SuppressWarnings("unchecked")
-  ToEvaluationStatementHandler(@NotNull final Evaluation<? super V> evaluation) {
+  ToEvaluationStatementExpression(@NotNull final Evaluation<? super V> evaluation) {
     mEvaluation = (Evaluation<V>) ConstantConditions.notNull("evaluation", evaluation);
   }
 
@@ -52,7 +53,7 @@ class ToEvaluationStatementHandler<V> extends StatementHandler<V, Void> implemen
 
   @NotNull
   @Override
-  StatementHandler<V, Void> renew() {
+  StatementExpression<V, Void> renew() {
     return ConstantConditions.unsupported();
   }
 

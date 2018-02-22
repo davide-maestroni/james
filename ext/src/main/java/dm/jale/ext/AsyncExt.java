@@ -60,6 +60,7 @@ import dm.jale.util.Iterables;
  */
 public class AsyncExt extends Async {
 
+  // TODO: 22/02/2018 Yielders: sort, sortBy?
   // TODO: 21/02/2018 BatchYielder
   // TODO: 21/02/2018 Joiners: zip(BiMapper), zip(TriMapper), zip(TetraMapper),
   // TODO: 16/02/2018 Forkers: repeat(), repeatAll(), repeatLast(), repeatFirst(), repeatSince(),

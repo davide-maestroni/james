@@ -22,9 +22,8 @@ import java.io.InvalidObjectException;
 import java.io.ObjectStreamException;
 import java.io.Serializable;
 
+import dm.jale.async.Action;
 import dm.jale.async.Evaluation;
-import dm.jale.async.Mapper;
-import dm.jale.async.Statement;
 import dm.jale.config.BuildConfig;
 import dm.jale.util.ConstantConditions;
 import dm.jale.util.SerializableProxy;
@@ -32,32 +31,40 @@ import dm.jale.util.SerializableProxy;
 /**
  * Created by davide-maestroni on 02/01/2018.
  */
-class ThenIfStatementHandler<V, R> extends StatementHandler<V, R> implements Serializable {
+class DoneStatementExpression<V> extends StatementExpression<V, V> implements Serializable {
 
   private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
 
-  private final Mapper<? super V, ? extends Statement<R>> mMapper;
+  private final Action mAction;
 
-  ThenIfStatementHandler(@NotNull final Mapper<? super V, ? extends Statement<R>> mapper) {
-    mMapper = ConstantConditions.notNull("mapper", mapper);
+  DoneStatementExpression(@NotNull final Action action) {
+    mAction = ConstantConditions.notNull("action", action);
   }
 
   @Override
-  void value(final V value, @NotNull final Evaluation<R> evaluation) throws Exception {
-    mMapper.apply(value).to(evaluation);
+  void failure(@NotNull final Throwable failure, @NotNull final Evaluation<V> evaluation) throws
+      Exception {
+    mAction.perform();
+    super.failure(failure, evaluation);
+  }
+
+  @Override
+  void value(final V value, @NotNull final Evaluation<V> evaluation) throws Exception {
+    mAction.perform();
+    super.value(value, evaluation);
   }
 
   @NotNull
   private Object writeReplace() throws ObjectStreamException {
-    return new HandlerProxy<V, R>(mMapper);
+    return new HandlerProxy<V>(mAction);
   }
 
-  private static class HandlerProxy<V, R> extends SerializableProxy {
+  private static class HandlerProxy<V> extends SerializableProxy {
 
     private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
 
-    private HandlerProxy(final Mapper<? super V, ? extends Statement<R>> mapper) {
-      super(proxy(mapper));
+    private HandlerProxy(final Action action) {
+      super(proxy(action));
     }
 
     @NotNull
@@ -65,8 +72,7 @@ class ThenIfStatementHandler<V, R> extends StatementHandler<V, R> implements Ser
     private Object readResolve() throws ObjectStreamException {
       try {
         final Object[] args = deserializeArgs();
-        return new ThenIfStatementHandler<V, R>(
-            (Mapper<? super V, ? extends Statement<R>>) args[0]);
+        return new DoneStatementExpression<V>((Action) args[0]);
 
       } catch (final Throwable t) {
         throw new InvalidObjectException(t.getMessage());

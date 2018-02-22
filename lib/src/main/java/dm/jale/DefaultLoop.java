@@ -546,14 +546,14 @@ class DefaultLoop<V> implements Loop<V>, Serializable {
   public Loop<V> elseForEach(@NotNull final Mapper<? super Throwable, V> mapper,
       @Nullable Class<?>... exceptionTypes) {
     return propagate(
-        new ElseCatchLoopHandler<V>(mapper, Asyncs.cloneExceptionTypes(exceptionTypes)));
+        new ElseCatchLoopExpression<V>(mapper, Asyncs.cloneExceptionTypes(exceptionTypes)));
   }
 
   @NotNull
   public Loop<V> elseForEachDo(@NotNull final Observer<? super Throwable> observer,
       @Nullable Class<?>... exceptionTypes) {
     return propagate(
-        new ElseDoLoopHandler<V>(observer, Asyncs.cloneExceptionTypes(exceptionTypes)));
+        new ElseDoLoopExpression<V>(observer, Asyncs.cloneExceptionTypes(exceptionTypes)));
   }
 
   @NotNull
@@ -561,7 +561,7 @@ class DefaultLoop<V> implements Loop<V>, Serializable {
       @NotNull final Mapper<? super Throwable, ? extends Statement<? extends V>> mapper,
       @Nullable Class<?>... exceptionTypes) {
     return propagate(
-        new ElseIfStatementHandler<V>(mapper, Asyncs.cloneExceptionTypes(exceptionTypes)));
+        new ElseIfStatementExpression<V>(mapper, Asyncs.cloneExceptionTypes(exceptionTypes)));
   }
 
   @NotNull
@@ -569,7 +569,7 @@ class DefaultLoop<V> implements Loop<V>, Serializable {
       @NotNull final Mapper<? super Throwable, ? extends Iterable<? extends V>> mapper,
       @Nullable Class<?>... exceptionTypes) {
     return propagate(
-        new ElseLoopLoopHandler<V>(mapper, Asyncs.cloneExceptionTypes(exceptionTypes)));
+        new ElseLoopLoopExpression<V>(mapper, Asyncs.cloneExceptionTypes(exceptionTypes)));
   }
 
   @NotNull
@@ -577,7 +577,7 @@ class DefaultLoop<V> implements Loop<V>, Serializable {
       @NotNull final Mapper<? super Throwable, ? extends Loop<? extends V>> mapper,
       @Nullable Class<?>... exceptionTypes) {
     return propagate(
-        new ElseLoopIfStatementHandler<V>(mapper, Asyncs.cloneExceptionTypes(exceptionTypes)));
+        new ElseLoopIfStatementExpression<V>(mapper, Asyncs.cloneExceptionTypes(exceptionTypes)));
   }
 
   @NotNull
@@ -585,7 +585,7 @@ class DefaultLoop<V> implements Loop<V>, Serializable {
       @NotNull final Mapper<? super Throwable, ? extends Statement<? extends V>> mapper,
       @Nullable Class<?>... exceptionTypes) {
     return propagateOrdered(
-        new ElseIfStatementHandler<V>(mapper, Asyncs.cloneExceptionTypes(exceptionTypes)));
+        new ElseIfStatementExpression<V>(mapper, Asyncs.cloneExceptionTypes(exceptionTypes)));
   }
 
   @NotNull
@@ -593,72 +593,72 @@ class DefaultLoop<V> implements Loop<V>, Serializable {
       @NotNull final Mapper<? super Throwable, ? extends Loop<? extends V>> mapper,
       @Nullable Class<?>... exceptionTypes) {
     return propagateOrdered(
-        new ElseLoopIfStatementHandler<V>(mapper, Asyncs.cloneExceptionTypes(exceptionTypes)));
+        new ElseLoopIfStatementExpression<V>(mapper, Asyncs.cloneExceptionTypes(exceptionTypes)));
   }
 
   @NotNull
   public <R> Loop<R> forEach(@NotNull final Mapper<? super V, R> mapper) {
-    return propagate(new ThenLoopHandler<V, R>(mapper));
+    return propagate(new ThenLoopExpression<V, R>(mapper));
   }
 
   @NotNull
   public Loop<V> forEachDo(@NotNull final Observer<? super V> observer) {
-    return propagate(new ThenDoLoopHandler<V, V>(observer));
+    return propagate(new ThenDoLoopExpression<V, V>(observer));
   }
 
   @NotNull
   public Loop<V> forEachDone(@NotNull final Action action) {
-    return propagate(new DoneLoopHandler<V>(action));
+    return propagate(new DoneLoopExpression<V>(action));
   }
 
   @NotNull
   public <R> Loop<R> forEachIf(@NotNull final Mapper<? super V, ? extends Statement<R>> mapper) {
-    return propagate(new ThenIfStatementHandler<V, R>(mapper));
+    return propagate(new ThenIfStatementExpression<V, R>(mapper));
   }
 
   @NotNull
   public <R> Loop<R> forEachLoop(@NotNull final Mapper<? super V, ? extends Iterable<R>> mapper) {
-    return propagate(new ThenLoopLoopHandler<V, R>(mapper));
+    return propagate(new ThenLoopLoopExpression<V, R>(mapper));
   }
 
   @NotNull
   public <R> Loop<R> forEachLoopIf(@NotNull final Mapper<? super V, ? extends Loop<R>> mapper) {
-    return propagate(new ThenLoopIfStatementHandler<V, R>(mapper));
+    return propagate(new ThenLoopIfStatementExpression<V, R>(mapper));
   }
 
   @NotNull
   public <R> Loop<R> forEachOrderedIf(
       @NotNull final Mapper<? super V, ? extends Statement<R>> mapper) {
-    return propagateOrdered(new ThenIfStatementHandler<V, R>(mapper));
+    return propagateOrdered(new ThenIfStatementExpression<V, R>(mapper));
   }
 
   @NotNull
   public <R> Loop<R> forEachOrderedLoopIf(
       @NotNull final Mapper<? super V, ? extends Loop<R>> mapper) {
-    return propagateOrdered(new ThenLoopIfStatementHandler<V, R>(mapper));
+    return propagateOrdered(new ThenLoopIfStatementExpression<V, R>(mapper));
   }
 
   @NotNull
   public <R> Loop<R> forEachOrderedTryIf(
       @NotNull final Mapper<? super V, ? extends Closeable> closeable,
       @NotNull final Mapper<? super V, ? extends Statement<R>> mapper) {
-    return propagateOrdered(new TryIfStatementHandler<V, R>(closeable, mapper, mLogger.getName()));
+    return propagateOrdered(
+        new TryIfStatementExpression<V, R>(closeable, mapper, mLogger.getName()));
   }
 
   @NotNull
   public <R> Loop<R> forEachOrderedTryLoopIf(
       @NotNull final Mapper<? super V, ? extends Closeable> closeable,
       @NotNull final Mapper<? super V, ? extends Loop<R>> mapper) {
-    return propagateOrdered(
-        new TryStatementLoopHandler<V, R>(closeable, new ThenLoopIfStatementHandler<V, R>(mapper),
-            mLogger.getName()));
+    return propagateOrdered(new TryStatementLoopExpression<V, R>(closeable,
+        new ThenLoopIfStatementExpression<V, R>(mapper), mLogger.getName()));
   }
 
   @NotNull
   public <R> Loop<R> forEachTry(@NotNull final Mapper<? super V, ? extends Closeable> closeable,
       @NotNull final Mapper<? super V, R> mapper) {
     return propagate(
-        new TryStatementHandler<V, R>(closeable, new ThenStatementHandler<V, R>(mapper),
+        new TryStatementExpression<V, R>(closeable, new ThenStatementExpression<V, R>(mapper),
             mLogger.getName()));
   }
 
@@ -666,31 +666,29 @@ class DefaultLoop<V> implements Loop<V>, Serializable {
   public Loop<V> forEachTryDo(@NotNull final Mapper<? super V, ? extends Closeable> closeable,
       @NotNull final Observer<? super V> observer) {
     return propagate(
-        new TryStatementHandler<V, V>(closeable, new ThenDoStatementHandler<V, V>(observer),
+        new TryStatementExpression<V, V>(closeable, new ThenDoStatementExpression<V, V>(observer),
             mLogger.getName()));
   }
 
   @NotNull
   public <R> Loop<R> forEachTryIf(@NotNull final Mapper<? super V, ? extends Closeable> closeable,
       @NotNull final Mapper<? super V, ? extends Statement<R>> mapper) {
-    return propagate(new TryIfStatementHandler<V, R>(closeable, mapper, mLogger.getName()));
+    return propagate(new TryIfStatementExpression<V, R>(closeable, mapper, mLogger.getName()));
   }
 
   @NotNull
   public <R> Loop<R> forEachTryLoop(@NotNull final Mapper<? super V, ? extends Closeable> closeable,
       @NotNull final Mapper<? super V, ? extends Iterable<R>> mapper) {
-    return propagate(
-        new TryStatementLoopHandler<V, R>(closeable, new ThenLoopStatementHandler<V, R>(mapper),
-            mLogger.getName()));
+    return propagate(new TryStatementLoopExpression<V, R>(closeable,
+        new ThenLoopStatementExpression<V, R>(mapper), mLogger.getName()));
   }
 
   @NotNull
   public <R> Loop<R> forEachTryLoopIf(
       @NotNull final Mapper<? super V, ? extends Closeable> closeable,
       @NotNull final Mapper<? super V, ? extends Loop<R>> mapper) {
-    return propagate(
-        new TryStatementLoopHandler<V, R>(closeable, new ThenLoopIfStatementHandler<V, R>(mapper),
-            mLogger.getName()));
+    return propagate(new TryStatementLoopExpression<V, R>(closeable,
+        new ThenLoopIfStatementExpression<V, R>(mapper), mLogger.getName()));
   }
 
   @NotNull
@@ -831,12 +829,12 @@ class DefaultLoop<V> implements Loop<V>, Serializable {
 
   public void to(@NotNull final EvaluationCollection<? super V> evaluation) {
     checkEvaluated();
-    propagate(new ToEvaluationLoopHandler<V>(evaluation)).consume();
+    propagate(new ToEvaluationLoopExpression<V>(evaluation)).consume();
   }
 
   @NotNull
   public <S, R> Loop<R> yield(@NotNull final Yielder<S, ? super V, R> yielder) {
-    return propagate(new YieldLoopHandler<S, V, R>(yielder, mLogger.getName()));
+    return propagate(new YieldLoopExpression<S, V, R>(yielder, mLogger.getName()));
   }
 
   @NotNull
@@ -850,7 +848,7 @@ class DefaultLoop<V> implements Loop<V>, Serializable {
 
   @NotNull
   public <S, R> Loop<R> yieldOrdered(@NotNull final Yielder<S, ? super V, R> yielder) {
-    return propagateOrdered(new YieldLoopHandler<S, V, R>(yielder, mLogger.getName()));
+    return propagateOrdered(new YieldLoopExpression<S, V, R>(yielder, mLogger.getName()));
   }
 
   @NotNull
@@ -959,18 +957,18 @@ class DefaultLoop<V> implements Loop<V>, Serializable {
   }
 
   @NotNull
-  private <R> Loop<R> propagate(@NotNull final StatementHandler<V, R> handler) {
-    return propagate(new PropagationStatementHandler<V, R>(handler));
+  private <R> Loop<R> propagate(@NotNull final StatementExpression<V, R> expression) {
+    return propagate(new PropagationStatementExpression<V, R>(expression));
   }
 
   @NotNull
-  private <R> Loop<R> propagate(@NotNull final StatementLoopHandler<V, R> handler) {
-    return propagate(new PropagationStatementLoopHandler<V, R>(handler));
+  private <R> Loop<R> propagate(@NotNull final StatementLoopExpression<V, R> expression) {
+    return propagate(new PropagationStatementLoopExpression<V, R>(expression));
   }
 
   @NotNull
-  private <R> Loop<R> propagate(@NotNull final LoopHandler<V, R> handler) {
-    return propagate(new PropagationLoopHandler<V, R>(handler));
+  private <R> Loop<R> propagate(@NotNull final LoopExpression<V, R> expression) {
+    return propagate(new PropagationLoopExpression<V, R>(expression));
   }
 
   @NotNull
@@ -1029,18 +1027,18 @@ class DefaultLoop<V> implements Loop<V>, Serializable {
   }
 
   @NotNull
-  private <R> Loop<R> propagateOrdered(@NotNull final LoopHandler<V, R> handler) {
-    return propagate(new PropagationLoopHandlerOrdered<V, R>(handler));
+  private <R> Loop<R> propagateOrdered(@NotNull final LoopExpression<V, R> expression) {
+    return propagate(new PropagationLoopExpressionOrdered<V, R>(expression));
   }
 
   @NotNull
-  private <R> Loop<R> propagateOrdered(@NotNull final StatementHandler<V, R> handler) {
-    return propagate(new PropagationStatementHandlerOrdered<V, R>(handler));
+  private <R> Loop<R> propagateOrdered(@NotNull final StatementExpression<V, R> expression) {
+    return propagate(new PropagationStatementExpressionOrdered<V, R>(expression));
   }
 
   @NotNull
-  private <R> Loop<R> propagateOrdered(@NotNull final StatementLoopHandler<V, R> handler) {
-    return propagate(new PropagationStatementLoopHandlerOrdered<V, R>(handler));
+  private <R> Loop<R> propagateOrdered(@NotNull final StatementLoopExpression<V, R> expression) {
+    return propagate(new PropagationStatementLoopExpressionOrdered<V, R>(expression));
   }
 
   @NotNull
@@ -1079,7 +1077,7 @@ class DefaultLoop<V> implements Loop<V>, Serializable {
     return new LoopProxy(mObserver, mIsEvaluated, mLogger.getName(), propagations);
   }
 
-  private static class ForkObserver<S, V> extends LoopHandler<V, V>
+  private static class ForkObserver<S, V> extends LoopExpression<V, V>
       implements RenewableObserver<EvaluationCollection<V>>, Serializable {
 
     private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
@@ -2023,7 +2021,7 @@ class DefaultLoop<V> implements Loop<V>, Serializable {
     }
   }
 
-  private static class PropagationLoopHandler<V, R> extends LoopPropagation<V, R>
+  private static class PropagationLoopExpression<V, R> extends LoopPropagation<V, R>
       implements Serializable {
 
     private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
@@ -2031,12 +2029,12 @@ class DefaultLoop<V> implements Loop<V>, Serializable {
     private final PropagationEvaluationCollection mEvaluation =
         new PropagationEvaluationCollection();
 
-    private final LoopHandler<V, R> mHandler;
+    private final LoopExpression<V, R> mExpression;
 
     private final AtomicLong mPendingCount = new AtomicLong(1);
 
-    private PropagationLoopHandler(@Nullable final LoopHandler<V, R> handler) {
-      mHandler = ConstantConditions.notNull("handler", handler);
+    private PropagationLoopExpression(@Nullable final LoopExpression<V, R> expression) {
+      mExpression = ConstantConditions.notNull("expression", expression);
     }
 
     private void innerFailSafe(final LoopPropagation<R, ?> next, @NotNull final Throwable failure) {
@@ -2054,23 +2052,23 @@ class DefaultLoop<V> implements Loop<V>, Serializable {
 
     @NotNull
     private Object writeReplace() throws ObjectStreamException {
-      return new PropagationProxy<V, R>(mHandler);
+      return new PropagationProxy<V, R>(mExpression);
     }
 
     private static class PropagationProxy<V, R> implements Serializable {
 
       private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
 
-      private final LoopHandler<V, R> mHandler;
+      private final LoopExpression<V, R> mExpression;
 
-      private PropagationProxy(final LoopHandler<V, R> handler) {
-        mHandler = handler;
+      private PropagationProxy(final LoopExpression<V, R> expression) {
+        mExpression = expression;
       }
 
       @NotNull
       private Object readResolve() throws ObjectStreamException {
         try {
-          return new PropagationLoopHandler<V, R>(mHandler);
+          return new PropagationLoopExpression<V, R>(mExpression);
 
         } catch (final Throwable t) {
           throw new InvalidObjectException(t.getMessage());
@@ -2122,7 +2120,7 @@ class DefaultLoop<V> implements Loop<V>, Serializable {
     void addFailure(final LoopPropagation<R, ?> next, @NotNull final Throwable failure) {
       mPendingCount.incrementAndGet();
       try {
-        mHandler.addFailure(failure, mEvaluation.withNext(next));
+        mExpression.addFailure(failure, mEvaluation.withNext(next));
 
       } catch (final CancellationException e) {
         getLogger().wrn(e, "Loop has been cancelled");
@@ -2138,7 +2136,7 @@ class DefaultLoop<V> implements Loop<V>, Serializable {
     void addValue(final LoopPropagation<R, ?> next, final V value) {
       mPendingCount.incrementAndGet();
       try {
-        mHandler.addValue(value, mEvaluation.withNext(next));
+        mExpression.addValue(value, mEvaluation.withNext(next));
 
       } catch (final CancellationException e) {
         getLogger().wrn(e, "Loop has been cancelled");
@@ -2154,7 +2152,7 @@ class DefaultLoop<V> implements Loop<V>, Serializable {
     void addValues(final LoopPropagation<R, ?> next, @NotNull final Iterable<? extends V> values) {
       mPendingCount.incrementAndGet();
       try {
-        mHandler.addValues(values, mEvaluation.withNext(next));
+        mExpression.addValues(values, mEvaluation.withNext(next));
 
       } catch (final CancellationException e) {
         getLogger().wrn(e, "Loop has been cancelled");
@@ -2169,7 +2167,7 @@ class DefaultLoop<V> implements Loop<V>, Serializable {
     @NotNull
     @Override
     LoopPropagation<V, R> copy() {
-      return new PropagationLoopHandler<V, R>(mHandler.renew());
+      return new PropagationLoopExpression<V, R>(mExpression.renew());
     }
 
     @Override
@@ -2177,7 +2175,7 @@ class DefaultLoop<V> implements Loop<V>, Serializable {
         @NotNull final Iterable<? extends Throwable> failures) {
       mPendingCount.incrementAndGet();
       try {
-        mHandler.addFailures(failures, mEvaluation.withNext(next));
+        mExpression.addFailures(failures, mEvaluation.withNext(next));
 
       } catch (final CancellationException e) {
         getLogger().wrn(e, "Loop has been cancelled");
@@ -2192,7 +2190,7 @@ class DefaultLoop<V> implements Loop<V>, Serializable {
     @Override
     void set(final LoopPropagation<R, ?> next) {
       try {
-        mHandler.set(mEvaluation.withNext(next));
+        mExpression.set(mEvaluation.withNext(next));
 
       } catch (final CancellationException e) {
         getLogger().wrn(e, "Loop has been cancelled");
@@ -2205,12 +2203,12 @@ class DefaultLoop<V> implements Loop<V>, Serializable {
     }
   }
 
-  private static class PropagationLoopHandlerOrdered<V, R> extends LoopPropagation<V, R>
+  private static class PropagationLoopExpressionOrdered<V, R> extends LoopPropagation<V, R>
       implements Serializable {
 
     private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
 
-    private final LoopHandler<V, R> mHandler;
+    private final LoopExpression<V, R> mExpression;
 
     private final Object mMutex = new Object();
 
@@ -2218,8 +2216,8 @@ class DefaultLoop<V> implements Loop<V>, Serializable {
 
     private final NestedQueue<SimpleState<R>> mQueue = new NestedQueue<SimpleState<R>>();
 
-    private PropagationLoopHandlerOrdered(@Nullable final LoopHandler<V, R> handler) {
-      mHandler = ConstantConditions.notNull("handler", handler);
+    private PropagationLoopExpressionOrdered(@Nullable final LoopExpression<V, R> expression) {
+      mExpression = ConstantConditions.notNull("expression", expression);
     }
 
     private void flushQueue(final LoopPropagation<R, ?> next) {
@@ -2245,23 +2243,23 @@ class DefaultLoop<V> implements Loop<V>, Serializable {
 
     @NotNull
     private Object writeReplace() throws ObjectStreamException {
-      return new PropagationProxy<V, R>(mHandler);
+      return new PropagationProxy<V, R>(mExpression);
     }
 
     private static class PropagationProxy<V, R> implements Serializable {
 
       private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
 
-      private final LoopHandler<V, R> mHandler;
+      private final LoopExpression<V, R> mExpression;
 
-      private PropagationProxy(final LoopHandler<V, R> handler) {
-        mHandler = handler;
+      private PropagationProxy(final LoopExpression<V, R> expression) {
+        mExpression = expression;
       }
 
       @NotNull
       private Object readResolve() throws ObjectStreamException {
         try {
-          return new PropagationLoopHandlerOrdered<V, R>(mHandler);
+          return new PropagationLoopExpressionOrdered<V, R>(mExpression);
 
         } catch (final Throwable t) {
           throw new InvalidObjectException(t.getMessage());
@@ -2351,7 +2349,7 @@ class DefaultLoop<V> implements Loop<V>, Serializable {
     void addFailure(final LoopPropagation<R, ?> next, @NotNull final Throwable failure) {
       mPendingCount.incrementAndGet();
       try {
-        mHandler.addFailure(failure, new PropagationEvaluations(mQueue.addNested(), next));
+        mExpression.addFailure(failure, new PropagationEvaluations(mQueue.addNested(), next));
 
       } catch (final CancellationException e) {
         getLogger().wrn(e, "Loop has been cancelled");
@@ -2367,7 +2365,7 @@ class DefaultLoop<V> implements Loop<V>, Serializable {
     void addValue(final LoopPropagation<R, ?> next, final V value) {
       mPendingCount.incrementAndGet();
       try {
-        mHandler.addValue(value, new PropagationEvaluations(mQueue.addNested(), next));
+        mExpression.addValue(value, new PropagationEvaluations(mQueue.addNested(), next));
 
       } catch (final CancellationException e) {
         getLogger().wrn(e, "Loop has been cancelled");
@@ -2383,7 +2381,7 @@ class DefaultLoop<V> implements Loop<V>, Serializable {
     void addValues(final LoopPropagation<R, ?> next, @NotNull final Iterable<? extends V> values) {
       mPendingCount.incrementAndGet();
       try {
-        mHandler.addValues(values, new PropagationEvaluations(mQueue.addNested(), next));
+        mExpression.addValues(values, new PropagationEvaluations(mQueue.addNested(), next));
 
       } catch (final CancellationException e) {
         getLogger().wrn(e, "Loop has been cancelled");
@@ -2398,7 +2396,7 @@ class DefaultLoop<V> implements Loop<V>, Serializable {
     @NotNull
     @Override
     LoopPropagation<V, R> copy() {
-      return new PropagationLoopHandlerOrdered<V, R>(mHandler.renew());
+      return new PropagationLoopExpressionOrdered<V, R>(mExpression.renew());
     }
 
     @Override
@@ -2406,7 +2404,7 @@ class DefaultLoop<V> implements Loop<V>, Serializable {
         @NotNull final Iterable<? extends Throwable> failures) {
       mPendingCount.incrementAndGet();
       try {
-        mHandler.addFailures(failures, new PropagationEvaluations(mQueue.addNested(), next));
+        mExpression.addFailures(failures, new PropagationEvaluations(mQueue.addNested(), next));
 
       } catch (final CancellationException e) {
         getLogger().wrn(e, "Loop has been cancelled");
@@ -2421,7 +2419,7 @@ class DefaultLoop<V> implements Loop<V>, Serializable {
     @Override
     void set(final LoopPropagation<R, ?> next) {
       try {
-        mHandler.set(new PropagationEvaluations(mQueue.addNested(), next));
+        mExpression.set(new PropagationEvaluations(mQueue.addNested(), next));
 
       } catch (final CancellationException e) {
         getLogger().wrn(e, "Loop has been cancelled");
@@ -2434,19 +2432,19 @@ class DefaultLoop<V> implements Loop<V>, Serializable {
     }
   }
 
-  private static class PropagationStatementHandler<V, R> extends LoopPropagation<V, R>
+  private static class PropagationStatementExpression<V, R> extends LoopPropagation<V, R>
       implements Serializable {
 
     private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
 
     private final PropagationEvaluation mEvaluation = new PropagationEvaluation();
 
-    private final StatementHandler<V, R> mHandler;
+    private final StatementExpression<V, R> mExpression;
 
     private final AtomicLong mPendingCount = new AtomicLong(1);
 
-    private PropagationStatementHandler(@Nullable final StatementHandler<V, R> handler) {
-      mHandler = ConstantConditions.notNull("handler", handler);
+    private PropagationStatementExpression(@Nullable final StatementExpression<V, R> expression) {
+      mExpression = ConstantConditions.notNull("expression", expression);
     }
 
     private void innerFailSafe(final LoopPropagation<R, ?> next, @NotNull final Throwable failure) {
@@ -2464,23 +2462,23 @@ class DefaultLoop<V> implements Loop<V>, Serializable {
 
     @NotNull
     private Object writeReplace() throws ObjectStreamException {
-      return new PropagationProxy<V, R>(mHandler);
+      return new PropagationProxy<V, R>(mExpression);
     }
 
     private static class PropagationProxy<V, R> implements Serializable {
 
       private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
 
-      private final StatementHandler<V, R> mHandler;
+      private final StatementExpression<V, R> mExpression;
 
-      private PropagationProxy(final StatementHandler<V, R> handler) {
-        mHandler = handler;
+      private PropagationProxy(final StatementExpression<V, R> expression) {
+        mExpression = expression;
       }
 
       @NotNull
       private Object readResolve() throws ObjectStreamException {
         try {
-          return new PropagationStatementHandler<V, R>(mHandler);
+          return new PropagationStatementExpression<V, R>(mExpression);
 
         } catch (final Throwable t) {
           throw new InvalidObjectException(t.getMessage());
@@ -2515,7 +2513,7 @@ class DefaultLoop<V> implements Loop<V>, Serializable {
     void addFailure(final LoopPropagation<R, ?> next, @NotNull final Throwable failure) {
       mPendingCount.incrementAndGet();
       try {
-        mHandler.failure(failure, mEvaluation.withNext(next));
+        mExpression.failure(failure, mEvaluation.withNext(next));
 
       } catch (final CancellationException e) {
         getLogger().wrn(e, "Loop has been cancelled");
@@ -2531,7 +2529,7 @@ class DefaultLoop<V> implements Loop<V>, Serializable {
     void addValue(final LoopPropagation<R, ?> next, final V value) {
       mPendingCount.incrementAndGet();
       try {
-        mHandler.value(value, mEvaluation.withNext(next));
+        mExpression.value(value, mEvaluation.withNext(next));
 
       } catch (final CancellationException e) {
         getLogger().wrn(e, "Loop has been cancelled");
@@ -2549,7 +2547,7 @@ class DefaultLoop<V> implements Loop<V>, Serializable {
       final PropagationEvaluation evaluation = mEvaluation.withNext(next);
       for (final V value : values) {
         try {
-          mHandler.value(value, evaluation);
+          mExpression.value(value, evaluation);
 
         } catch (final CancellationException e) {
           getLogger().wrn(e, "Loop has been cancelled");
@@ -2567,7 +2565,7 @@ class DefaultLoop<V> implements Loop<V>, Serializable {
     @NotNull
     @Override
     LoopPropagation<V, R> copy() {
-      return new PropagationStatementHandler<V, R>(mHandler.renew());
+      return new PropagationStatementExpression<V, R>(mExpression.renew());
     }
 
     @Override
@@ -2577,7 +2575,7 @@ class DefaultLoop<V> implements Loop<V>, Serializable {
       final PropagationEvaluation evaluation = mEvaluation.withNext(next);
       for (final Throwable failure : failures) {
         try {
-          mHandler.failure(failure, evaluation);
+          mExpression.failure(failure, evaluation);
 
         } catch (final CancellationException e) {
           getLogger().wrn(e, "Loop has been cancelled");
@@ -2598,12 +2596,12 @@ class DefaultLoop<V> implements Loop<V>, Serializable {
     }
   }
 
-  private static class PropagationStatementHandlerOrdered<V, R> extends LoopPropagation<V, R>
+  private static class PropagationStatementExpressionOrdered<V, R> extends LoopPropagation<V, R>
       implements Serializable {
 
     private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
 
-    private final StatementHandler<V, R> mHandler;
+    private final StatementExpression<V, R> mExpression;
 
     private final Object mMutex = new Object();
 
@@ -2611,8 +2609,9 @@ class DefaultLoop<V> implements Loop<V>, Serializable {
 
     private final NestedQueue<SimpleState<R>> mQueue = new NestedQueue<SimpleState<R>>();
 
-    private PropagationStatementHandlerOrdered(@Nullable final StatementHandler<V, R> handler) {
-      mHandler = ConstantConditions.notNull("handler", handler);
+    private PropagationStatementExpressionOrdered(
+        @Nullable final StatementExpression<V, R> expression) {
+      mExpression = ConstantConditions.notNull("expression", expression);
     }
 
     private void flushQueue(final LoopPropagation<R, ?> next) {
@@ -2647,23 +2646,23 @@ class DefaultLoop<V> implements Loop<V>, Serializable {
 
     @NotNull
     private Object writeReplace() throws ObjectStreamException {
-      return new PropagationProxy<V, R>(mHandler);
+      return new PropagationProxy<V, R>(mExpression);
     }
 
     private static class PropagationProxy<V, R> implements Serializable {
 
       private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
 
-      private final StatementHandler<V, R> mHandler;
+      private final StatementExpression<V, R> mExpression;
 
-      private PropagationProxy(final StatementHandler<V, R> handler) {
-        mHandler = handler;
+      private PropagationProxy(final StatementExpression<V, R> expression) {
+        mExpression = expression;
       }
 
       @NotNull
       private Object readResolve() throws ObjectStreamException {
         try {
-          return new PropagationStatementHandlerOrdered<V, R>(mHandler);
+          return new PropagationStatementExpressionOrdered<V, R>(mExpression);
 
         } catch (final Throwable t) {
           throw new InvalidObjectException(t.getMessage());
@@ -2708,7 +2707,7 @@ class DefaultLoop<V> implements Loop<V>, Serializable {
     void addFailure(final LoopPropagation<R, ?> next, @NotNull final Throwable failure) {
       mPendingCount.incrementAndGet();
       try {
-        mHandler.failure(failure, new PropagationEvaluation(mQueue.addNested(), next));
+        mExpression.failure(failure, new PropagationEvaluation(mQueue.addNested(), next));
 
       } catch (final CancellationException e) {
         getLogger().wrn(e, "Loop has been cancelled");
@@ -2724,7 +2723,7 @@ class DefaultLoop<V> implements Loop<V>, Serializable {
     void addValue(final LoopPropagation<R, ?> next, final V value) {
       mPendingCount.incrementAndGet();
       try {
-        mHandler.value(value, new PropagationEvaluation(mQueue.addNested(), next));
+        mExpression.value(value, new PropagationEvaluation(mQueue.addNested(), next));
 
       } catch (final CancellationException e) {
         getLogger().wrn(e, "Loop has been cancelled");
@@ -2741,7 +2740,7 @@ class DefaultLoop<V> implements Loop<V>, Serializable {
       mPendingCount.addAndGet(Iterables.size(values));
       for (final V value : values) {
         try {
-          mHandler.value(value, new PropagationEvaluation(mQueue.addNested(), next));
+          mExpression.value(value, new PropagationEvaluation(mQueue.addNested(), next));
 
         } catch (final CancellationException e) {
           getLogger().wrn(e, "Loop has been cancelled");
@@ -2759,7 +2758,7 @@ class DefaultLoop<V> implements Loop<V>, Serializable {
     @NotNull
     @Override
     LoopPropagation<V, R> copy() {
-      return new PropagationStatementHandlerOrdered<V, R>(mHandler.renew());
+      return new PropagationStatementExpressionOrdered<V, R>(mExpression.renew());
     }
 
     @Override
@@ -2768,7 +2767,7 @@ class DefaultLoop<V> implements Loop<V>, Serializable {
       mPendingCount.addAndGet(Iterables.size(failures));
       for (final Throwable failure : failures) {
         try {
-          mHandler.failure(failure, new PropagationEvaluation(mQueue.addNested(), next));
+          mExpression.failure(failure, new PropagationEvaluation(mQueue.addNested(), next));
 
         } catch (final CancellationException e) {
           getLogger().wrn(e, "Loop has been cancelled");
@@ -2790,7 +2789,7 @@ class DefaultLoop<V> implements Loop<V>, Serializable {
     }
   }
 
-  private static class PropagationStatementLoopHandler<V, R> extends LoopPropagation<V, R>
+  private static class PropagationStatementLoopExpression<V, R> extends LoopPropagation<V, R>
       implements Serializable {
 
     private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
@@ -2798,12 +2797,13 @@ class DefaultLoop<V> implements Loop<V>, Serializable {
     private final PropagationEvaluationCollection mEvaluation =
         new PropagationEvaluationCollection();
 
-    private final StatementLoopHandler<V, R> mHandler;
+    private final StatementLoopExpression<V, R> mExpression;
 
     private final AtomicLong mPendingCount = new AtomicLong(1);
 
-    private PropagationStatementLoopHandler(@Nullable final StatementLoopHandler<V, R> handler) {
-      mHandler = ConstantConditions.notNull("handler", handler);
+    private PropagationStatementLoopExpression(
+        @Nullable final StatementLoopExpression<V, R> expression) {
+      mExpression = ConstantConditions.notNull("expression", expression);
     }
 
     private void innerFailSafe(final LoopPropagation<R, ?> next, @NotNull final Throwable failure) {
@@ -2821,23 +2821,23 @@ class DefaultLoop<V> implements Loop<V>, Serializable {
 
     @NotNull
     private Object writeReplace() throws ObjectStreamException {
-      return new PropagationProxy<V, R>(mHandler);
+      return new PropagationProxy<V, R>(mExpression);
     }
 
     private static class PropagationProxy<V, R> implements Serializable {
 
       private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
 
-      private final StatementLoopHandler<V, R> mHandler;
+      private final StatementLoopExpression<V, R> mExpression;
 
-      private PropagationProxy(final StatementLoopHandler<V, R> handler) {
-        mHandler = handler;
+      private PropagationProxy(final StatementLoopExpression<V, R> expression) {
+        mExpression = expression;
       }
 
       @NotNull
       private Object readResolve() throws ObjectStreamException {
         try {
-          return new PropagationStatementLoopHandler<V, R>(mHandler);
+          return new PropagationStatementLoopExpression<V, R>(mExpression);
 
         } catch (final Throwable t) {
           throw new InvalidObjectException(t.getMessage());
@@ -2889,7 +2889,7 @@ class DefaultLoop<V> implements Loop<V>, Serializable {
     void addFailure(final LoopPropagation<R, ?> next, @NotNull final Throwable failure) {
       mPendingCount.incrementAndGet();
       try {
-        mHandler.failure(failure, mEvaluation.withNext(next));
+        mExpression.failure(failure, mEvaluation.withNext(next));
 
       } catch (final CancellationException e) {
         getLogger().wrn(e, "Loop has been cancelled");
@@ -2905,7 +2905,7 @@ class DefaultLoop<V> implements Loop<V>, Serializable {
     void addValue(final LoopPropagation<R, ?> next, final V value) {
       mPendingCount.incrementAndGet();
       try {
-        mHandler.value(value, mEvaluation.withNext(next));
+        mExpression.value(value, mEvaluation.withNext(next));
 
       } catch (final CancellationException e) {
         getLogger().wrn(e, "Loop has been cancelled");
@@ -2923,7 +2923,7 @@ class DefaultLoop<V> implements Loop<V>, Serializable {
       final PropagationEvaluationCollection evaluation = mEvaluation.withNext(next);
       for (final V value : values) {
         try {
-          mHandler.value(value, evaluation);
+          mExpression.value(value, evaluation);
 
         } catch (final CancellationException e) {
           getLogger().wrn(e, "Loop has been cancelled");
@@ -2941,7 +2941,7 @@ class DefaultLoop<V> implements Loop<V>, Serializable {
     @NotNull
     @Override
     LoopPropagation<V, R> copy() {
-      return new PropagationStatementLoopHandler<V, R>(mHandler.renew());
+      return new PropagationStatementLoopExpression<V, R>(mExpression.renew());
     }
 
     @Override
@@ -2951,7 +2951,7 @@ class DefaultLoop<V> implements Loop<V>, Serializable {
       final PropagationEvaluationCollection evaluation = mEvaluation.withNext(next);
       for (final Throwable failure : failures) {
         try {
-          mHandler.failure(failure, evaluation);
+          mExpression.failure(failure, evaluation);
 
         } catch (final CancellationException e) {
           getLogger().wrn(e, "Loop has been cancelled");
@@ -2972,12 +2972,12 @@ class DefaultLoop<V> implements Loop<V>, Serializable {
     }
   }
 
-  private static class PropagationStatementLoopHandlerOrdered<V, R> extends LoopPropagation<V, R>
+  private static class PropagationStatementLoopExpressionOrdered<V, R> extends LoopPropagation<V, R>
       implements Serializable {
 
     private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
 
-    private final StatementLoopHandler<V, R> mHandler;
+    private final StatementLoopExpression<V, R> mExpression;
 
     private final Object mMutex = new Object();
 
@@ -2985,9 +2985,9 @@ class DefaultLoop<V> implements Loop<V>, Serializable {
 
     private final NestedQueue<SimpleState<R>> mQueue = new NestedQueue<SimpleState<R>>();
 
-    private PropagationStatementLoopHandlerOrdered(
-        @Nullable final StatementLoopHandler<V, R> handler) {
-      mHandler = ConstantConditions.notNull("handler", handler);
+    private PropagationStatementLoopExpressionOrdered(
+        @Nullable final StatementLoopExpression<V, R> expression) {
+      mExpression = ConstantConditions.notNull("expression", expression);
     }
 
     private void flushQueue(final LoopPropagation<R, ?> next) {
@@ -3013,23 +3013,23 @@ class DefaultLoop<V> implements Loop<V>, Serializable {
 
     @NotNull
     private Object writeReplace() throws ObjectStreamException {
-      return new PropagationProxy<V, R>(mHandler);
+      return new PropagationProxy<V, R>(mExpression);
     }
 
     private static class PropagationProxy<V, R> implements Serializable {
 
       private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
 
-      private final StatementLoopHandler<V, R> mHandler;
+      private final StatementLoopExpression<V, R> mExpression;
 
-      private PropagationProxy(final StatementLoopHandler<V, R> handler) {
-        mHandler = handler;
+      private PropagationProxy(final StatementLoopExpression<V, R> expression) {
+        mExpression = expression;
       }
 
       @NotNull
       private Object readResolve() throws ObjectStreamException {
         try {
-          return new PropagationStatementLoopHandlerOrdered<V, R>(mHandler);
+          return new PropagationStatementLoopExpressionOrdered<V, R>(mExpression);
 
         } catch (final Throwable t) {
           throw new InvalidObjectException(t.getMessage());
@@ -3119,7 +3119,7 @@ class DefaultLoop<V> implements Loop<V>, Serializable {
     void addFailure(final LoopPropagation<R, ?> next, @NotNull final Throwable failure) {
       mPendingCount.incrementAndGet();
       try {
-        mHandler.failure(failure, new PropagationEvaluations(mQueue.addNested(), next));
+        mExpression.failure(failure, new PropagationEvaluations(mQueue.addNested(), next));
 
       } catch (final CancellationException e) {
         getLogger().wrn(e, "Loop has been cancelled");
@@ -3135,7 +3135,7 @@ class DefaultLoop<V> implements Loop<V>, Serializable {
     void addValue(final LoopPropagation<R, ?> next, final V value) {
       mPendingCount.incrementAndGet();
       try {
-        mHandler.value(value, new PropagationEvaluations(mQueue.addNested(), next));
+        mExpression.value(value, new PropagationEvaluations(mQueue.addNested(), next));
 
       } catch (final CancellationException e) {
         getLogger().wrn(e, "Loop has been cancelled");
@@ -3152,7 +3152,7 @@ class DefaultLoop<V> implements Loop<V>, Serializable {
       mPendingCount.addAndGet(Iterables.size(values));
       for (final V value : values) {
         try {
-          mHandler.value(value, new PropagationEvaluations(mQueue.addNested(), next));
+          mExpression.value(value, new PropagationEvaluations(mQueue.addNested(), next));
 
         } catch (final CancellationException e) {
           getLogger().wrn(e, "Loop has been cancelled");
@@ -3170,7 +3170,7 @@ class DefaultLoop<V> implements Loop<V>, Serializable {
     @NotNull
     @Override
     LoopPropagation<V, R> copy() {
-      return new PropagationStatementLoopHandlerOrdered<V, R>(mHandler.renew());
+      return new PropagationStatementLoopExpressionOrdered<V, R>(mExpression.renew());
     }
 
     @Override
@@ -3179,7 +3179,7 @@ class DefaultLoop<V> implements Loop<V>, Serializable {
       mPendingCount.addAndGet(Iterables.size(failures));
       for (final Throwable failure : failures) {
         try {
-          mHandler.failure(failure, new PropagationEvaluations(mQueue.addNested(), next));
+          mExpression.failure(failure, new PropagationEvaluations(mQueue.addNested(), next));
 
         } catch (final CancellationException e) {
           getLogger().wrn(e, "Loop has been cancelled");

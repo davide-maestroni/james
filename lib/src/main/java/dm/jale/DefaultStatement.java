@@ -292,14 +292,14 @@ class DefaultStatement<V> implements Statement<V>, Serializable {
   public Statement<V> elseCatch(@NotNull final Mapper<? super Throwable, ? extends V> mapper,
       @Nullable final Class<?>[] exceptionTypes) {
     return propagate(
-        new ElseCatchStatementHandler<V>(mapper, Asyncs.cloneExceptionTypes(exceptionTypes)));
+        new ElseCatchStatementExpression<V>(mapper, Asyncs.cloneExceptionTypes(exceptionTypes)));
   }
 
   @NotNull
   public Statement<V> elseDo(@NotNull final Observer<? super Throwable> observer,
       @Nullable final Class<?>[] exceptionTypes) {
     return propagate(
-        new ElseDoStatementHandler<V>(observer, Asyncs.cloneExceptionTypes(exceptionTypes)));
+        new ElseDoStatementExpression<V>(observer, Asyncs.cloneExceptionTypes(exceptionTypes)));
   }
 
   @NotNull
@@ -307,7 +307,7 @@ class DefaultStatement<V> implements Statement<V>, Serializable {
       @NotNull final Mapper<? super Throwable, ? extends Statement<? extends V>> mapper,
       @Nullable final Class<?>[] exceptionTypes) {
     return propagate(
-        new ElseIfStatementHandler<V>(mapper, Asyncs.cloneExceptionTypes(exceptionTypes)));
+        new ElseIfStatementExpression<V>(mapper, Asyncs.cloneExceptionTypes(exceptionTypes)));
   }
 
   @NotNull
@@ -453,24 +453,24 @@ class DefaultStatement<V> implements Statement<V>, Serializable {
 
   @NotNull
   public <R> Statement<R> then(@NotNull final Mapper<? super V, R> mapper) {
-    return propagate(new ThenStatementHandler<V, R>(mapper));
+    return propagate(new ThenStatementExpression<V, R>(mapper));
   }
 
   @NotNull
   public Statement<V> thenDo(@NotNull final Observer<? super V> observer) {
-    return propagate(new ThenDoStatementHandler<V, V>(observer));
+    return propagate(new ThenDoStatementExpression<V, V>(observer));
   }
 
   @NotNull
   public <R> Statement<R> thenIf(@NotNull final Mapper<? super V, ? extends Statement<R>> mapper) {
-    return propagate(new ThenIfStatementHandler<V, R>(mapper));
+    return propagate(new ThenIfStatementExpression<V, R>(mapper));
   }
 
   @NotNull
   public <R> Statement<R> thenTry(@NotNull final Mapper<? super V, ? extends Closeable> closeable,
       @NotNull final Mapper<? super V, R> mapper) {
     return propagate(
-        new TryStatementHandler<V, R>(closeable, new ThenStatementHandler<V, R>(mapper),
+        new TryStatementExpression<V, R>(closeable, new ThenStatementExpression<V, R>(mapper),
             mLogger.getName()));
   }
 
@@ -478,19 +478,19 @@ class DefaultStatement<V> implements Statement<V>, Serializable {
   public Statement<V> thenTryDo(@NotNull final Mapper<? super V, ? extends Closeable> closeable,
       @NotNull final Observer<? super V> observer) {
     return propagate(
-        new TryStatementHandler<V, V>(closeable, new ThenDoStatementHandler<V, V>(observer),
+        new TryStatementExpression<V, V>(closeable, new ThenDoStatementExpression<V, V>(observer),
             mLogger.getName()));
   }
 
   @NotNull
   public <R> Statement<R> thenTryIf(@NotNull final Mapper<? super V, ? extends Closeable> closeable,
       @NotNull final Mapper<? super V, ? extends Statement<R>> mapper) {
-    return propagate(new TryIfStatementHandler<V, R>(closeable, mapper, mLogger.getName()));
+    return propagate(new TryIfStatementExpression<V, R>(closeable, mapper, mLogger.getName()));
   }
 
   @NotNull
   public Statement<V> whenDone(@NotNull final Action action) {
-    return propagate(new DoneStatementHandler<V>(action));
+    return propagate(new DoneStatementExpression<V>(action));
   }
 
   @NotNull
@@ -532,7 +532,7 @@ class DefaultStatement<V> implements Statement<V>, Serializable {
 
   public void to(@NotNull final Evaluation<? super V> evaluation) {
     checkEvaluated();
-    propagate(new ToEvaluationStatementHandler<V>(evaluation)).consume();
+    propagate(new ToEvaluationStatementExpression<V>(evaluation)).consume();
   }
 
   @SuppressWarnings("unchecked")
@@ -577,8 +577,8 @@ class DefaultStatement<V> implements Statement<V>, Serializable {
   }
 
   @NotNull
-  private <R> Statement<R> propagate(@NotNull final StatementHandler<V, R> handler) {
-    return propagate(new PropagationHandler<V, R>(handler));
+  private <R> Statement<R> propagate(@NotNull final StatementExpression<V, R> expression) {
+    return propagate(new PropagationExpression<V, R>(expression));
   }
 
   @NotNull
@@ -667,7 +667,7 @@ class DefaultStatement<V> implements Statement<V>, Serializable {
     return new StatementProxy(mObserver, mIsEvaluated, mLogger.getName(), propagations);
   }
 
-  private static class ForkObserver<S, V> extends StatementHandler<V, V>
+  private static class ForkObserver<S, V> extends StatementExpression<V, V>
       implements RenewableObserver<Evaluation<V>>, Serializable {
 
     private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
@@ -891,6 +891,79 @@ class DefaultStatement<V> implements Statement<V>, Serializable {
     }
   }
 
+  private static class PropagationExpression<V, R> extends StatementPropagation<V, R>
+      implements Serializable {
+
+    private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
+
+    private final StatementExpression<V, R> mExpression;
+
+    PropagationExpression(@NotNull final StatementExpression<V, R> expression) {
+      mExpression = expression;
+    }
+
+    @NotNull
+    private Object writeReplace() throws ObjectStreamException {
+      return new PropagationProxy<V, R>(mExpression);
+    }
+
+    private static class PropagationProxy<V, R> implements Serializable {
+
+      private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
+
+      private final StatementExpression<V, R> mExpression;
+
+      private PropagationProxy(@NotNull final StatementExpression<V, R> expression) {
+        mExpression = expression;
+      }
+
+      @NotNull
+      private Object readResolve() throws ObjectStreamException {
+        try {
+          return new PropagationExpression<V, R>(mExpression);
+
+        } catch (final Throwable t) {
+          throw new InvalidObjectException(t.getMessage());
+        }
+      }
+    }
+
+    @NotNull
+    StatementPropagation<V, R> copy() {
+      return new PropagationExpression<V, R>(mExpression.renew());
+    }
+
+    void fail(final StatementPropagation<R, ?> next, final Throwable failure) {
+      try {
+        getLogger().dbg("Processing failure with reason: %s", failure);
+        mExpression.failure(failure, next);
+
+      } catch (final CancellationException e) {
+        getLogger().wrn(e, "Statement has been cancelled");
+        next.failSafe(e);
+
+      } catch (final Throwable t) {
+        getLogger().err(t, "Error while processing failure with reason: %s", failure);
+        next.failSafe(t);
+      }
+    }
+
+    void set(final StatementPropagation<R, ?> next, final V value) {
+      try {
+        getLogger().dbg("Processing value: %s", value);
+        mExpression.value(value, next);
+
+      } catch (final CancellationException e) {
+        getLogger().wrn(e, "Statement has been cancelled");
+        next.failSafe(e);
+
+      } catch (final Throwable t) {
+        getLogger().err(t, "Error while processing value: %s", value);
+        next.failSafe(t);
+      }
+    }
+  }
+
   private static class PropagationForkObserver<S, V>
       implements RenewableObserver<Evaluation<V>>, Serializable {
 
@@ -945,79 +1018,6 @@ class DefaultStatement<V> implements Statement<V>, Serializable {
       mObserver.propagate(evaluation);
     }
 
-  }
-
-  private static class PropagationHandler<V, R> extends StatementPropagation<V, R>
-      implements Serializable {
-
-    private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
-
-    private final StatementHandler<V, R> mHandler;
-
-    PropagationHandler(@NotNull final StatementHandler<V, R> handler) {
-      mHandler = handler;
-    }
-
-    @NotNull
-    private Object writeReplace() throws ObjectStreamException {
-      return new PropagationProxy<V, R>(mHandler);
-    }
-
-    private static class PropagationProxy<V, R> implements Serializable {
-
-      private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
-
-      private final StatementHandler<V, R> mHandler;
-
-      private PropagationProxy(@NotNull final StatementHandler<V, R> handler) {
-        mHandler = handler;
-      }
-
-      @NotNull
-      private Object readResolve() throws ObjectStreamException {
-        try {
-          return new PropagationHandler<V, R>(mHandler);
-
-        } catch (final Throwable t) {
-          throw new InvalidObjectException(t.getMessage());
-        }
-      }
-    }
-
-    @NotNull
-    StatementPropagation<V, R> copy() {
-      return new PropagationHandler<V, R>(mHandler.renew());
-    }
-
-    void fail(final StatementPropagation<R, ?> next, final Throwable failure) {
-      try {
-        getLogger().dbg("Processing failure with reason: %s", failure);
-        mHandler.failure(failure, next);
-
-      } catch (final CancellationException e) {
-        getLogger().wrn(e, "Statement has been cancelled");
-        next.failSafe(e);
-
-      } catch (final Throwable t) {
-        getLogger().err(t, "Error while processing failure with reason: %s", failure);
-        next.failSafe(t);
-      }
-    }
-
-    void set(final StatementPropagation<R, ?> next, final V value) {
-      try {
-        getLogger().dbg("Processing value: %s", value);
-        mHandler.value(value, next);
-
-      } catch (final CancellationException e) {
-        getLogger().wrn(e, "Statement has been cancelled");
-        next.failSafe(e);
-
-      } catch (final Throwable t) {
-        getLogger().err(t, "Error while processing value: %s", value);
-        next.failSafe(t);
-      }
-    }
   }
 
   private static class PropagationHead<V> extends StatementPropagation<V, V> {

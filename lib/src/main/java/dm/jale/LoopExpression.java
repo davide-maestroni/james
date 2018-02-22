@@ -24,7 +24,7 @@ import dm.jale.async.EvaluationCollection;
 /**
  * Created by davide-maestroni on 02/01/2018.
  */
-class LoopHandler<V, R> {
+class LoopExpression<V, R> {
 
   void addFailure(@NotNull final Throwable failure,
       @NotNull final EvaluationCollection<R> evaluation) throws Exception {
@@ -48,7 +48,7 @@ class LoopHandler<V, R> {
   }
 
   @NotNull
-  LoopHandler<V, R> renew() {
+  LoopExpression<V, R> renew() {
     return this;
   }
 

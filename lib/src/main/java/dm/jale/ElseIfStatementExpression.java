@@ -23,7 +23,8 @@ import java.io.ObjectStreamException;
 import java.io.Serializable;
 
 import dm.jale.async.Evaluation;
-import dm.jale.async.Observer;
+import dm.jale.async.Mapper;
+import dm.jale.async.Statement;
 import dm.jale.config.BuildConfig;
 import dm.jale.util.ConstantConditions;
 import dm.jale.util.SerializableProxy;
@@ -31,17 +32,18 @@ import dm.jale.util.SerializableProxy;
 /**
  * Created by davide-maestroni on 02/01/2018.
  */
-class ElseDoStatementHandler<V> extends StatementHandler<V, V> implements Serializable {
+class ElseIfStatementExpression<V> extends StatementExpression<V, V> implements Serializable {
 
   private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
 
-  private final Observer<? super Throwable> mObserver;
+  private final Mapper<? super Throwable, ? extends Statement<? extends V>> mMapper;
 
   private final Class<?>[] mTypes;
 
-  ElseDoStatementHandler(@NotNull final Observer<? super Throwable> observer,
+  ElseIfStatementExpression(
+      @NotNull final Mapper<? super Throwable, ? extends Statement<? extends V>> mapper,
       @NotNull final Class<?>[] exceptionTypes) {
-    mObserver = ConstantConditions.notNull("observer", observer);
+    mMapper = ConstantConditions.notNull("mapper", mapper);
     mTypes = ConstantConditions.notNullElements("exception types", exceptionTypes);
   }
 
@@ -50,8 +52,8 @@ class ElseDoStatementHandler<V> extends StatementHandler<V, V> implements Serial
       Exception {
     for (final Class<?> type : mTypes) {
       if (type.isInstance(failure)) {
-        mObserver.accept(failure);
-        break;
+        mMapper.apply(failure).to(evaluation);
+        return;
       }
     }
 
@@ -60,16 +62,16 @@ class ElseDoStatementHandler<V> extends StatementHandler<V, V> implements Serial
 
   @NotNull
   private Object writeReplace() throws ObjectStreamException {
-    return new HandlerProxy<V>(mObserver, mTypes);
+    return new HandlerProxy<V>(mMapper, mTypes);
   }
 
   private static class HandlerProxy<V> extends SerializableProxy {
 
     private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
 
-    private HandlerProxy(final Observer<? super Throwable> observer,
+    private HandlerProxy(final Mapper<? super Throwable, ? extends Statement<? extends V>> mapper,
         final Class<?>[] exceptionTypes) {
-      super(proxy(observer), exceptionTypes);
+      super(proxy(mapper), exceptionTypes);
     }
 
     @NotNull
@@ -77,7 +79,8 @@ class ElseDoStatementHandler<V> extends StatementHandler<V, V> implements Serial
     private Object readResolve() throws ObjectStreamException {
       try {
         final Object[] args = deserializeArgs();
-        return new ElseDoStatementHandler<V>((Observer<? super Throwable>) args[0],
+        return new ElseIfStatementExpression<V>(
+            (Mapper<? super Throwable, ? extends Statement<? extends V>>) args[0],
             (Class<?>[]) args[1]);
 
       } catch (final Throwable t) {

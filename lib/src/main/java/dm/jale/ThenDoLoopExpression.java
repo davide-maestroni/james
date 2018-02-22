@@ -19,62 +19,68 @@ package dm.jale;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
-import java.io.Closeable;
 import java.io.InvalidObjectException;
 import java.io.ObjectStreamException;
 import java.io.Serializable;
-import java.util.Locale;
 
 import dm.jale.async.EvaluationCollection;
-import dm.jale.async.Mapper;
+import dm.jale.async.Observer;
 import dm.jale.config.BuildConfig;
-import dm.jale.log.Logger;
 import dm.jale.util.ConstantConditions;
+import dm.jale.util.Iterables;
 import dm.jale.util.SerializableProxy;
 
 /**
  * Created by davide-maestroni on 02/01/2018.
  */
-class TryStatementLoopHandler<V, R> extends StatementLoopHandler<V, R> implements Serializable {
+class ThenDoLoopExpression<V, R> extends LoopExpression<V, R> implements Serializable {
 
   private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
 
-  private final Mapper<? super V, ? extends Closeable> mCloseable;
+  private final Observer<? super V> mObserver;
 
-  private final StatementLoopHandler<V, R> mHandler;
-
-  private final Logger mLogger;
-
-  TryStatementLoopHandler(@NotNull final Mapper<? super V, ? extends Closeable> closeable,
-      @NotNull final StatementLoopHandler<V, R> handler, @Nullable final String loggerName) {
-    mCloseable = ConstantConditions.notNull("closeable", closeable);
-    mHandler = ConstantConditions.notNull("handler", handler);
-    mLogger = Logger.newLogger(this, loggerName, Locale.ENGLISH);
+  ThenDoLoopExpression(@NotNull final Observer<? super V> observer) {
+    mObserver = ConstantConditions.notNull("observer", observer);
   }
 
   @Override
-  void value(final V value, @NotNull final EvaluationCollection<R> evaluation) throws Exception {
-    final Closeable closeable = mCloseable.apply(value);
+  void addValue(final V value, @NotNull final EvaluationCollection<R> evaluation) throws Exception {
+    mObserver.accept(value);
+    super.addValue(value, evaluation);
+  }
+
+  @Override
+  @SuppressWarnings("unchecked")
+  void addValues(@Nullable final Iterable<? extends V> values,
+      @NotNull final EvaluationCollection<R> evaluation) throws Exception {
+    if (values == null) {
+      return;
+    }
+
+    int index = 0;
     try {
-      mHandler.value(value, evaluation);
+      @SuppressWarnings("UnnecessaryLocalVariable") final Observer<? super V> observer = mObserver;
+      for (final V value : values) {
+        observer.accept(value);
+        ++index;
+      }
 
     } finally {
-      Asyncs.close(closeable, mLogger);
+      evaluation.addValues((Iterable<R>) Iterables.asList(values).subList(0, index)).set();
     }
   }
 
   @NotNull
   private Object writeReplace() throws ObjectStreamException {
-    return new HandlerProxy<V, R>(mCloseable, mHandler, mLogger.getName());
+    return new HandlerProxy<V, R>(mObserver);
   }
 
   private static class HandlerProxy<V, R> extends SerializableProxy {
 
     private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
 
-    private HandlerProxy(final Mapper<? super V, ? extends Closeable> closeable,
-        final StatementLoopHandler<V, R> handler, final String loggerName) {
-      super(proxy(closeable), handler, loggerName);
+    private HandlerProxy(final Observer<? super V> observer) {
+      super(proxy(observer));
     }
 
     @NotNull
@@ -82,8 +88,7 @@ class TryStatementLoopHandler<V, R> extends StatementLoopHandler<V, R> implement
     private Object readResolve() throws ObjectStreamException {
       try {
         final Object[] args = deserializeArgs();
-        return new TryStatementLoopHandler<V, R>((Mapper<? super V, ? extends Closeable>) args[0],
-            (StatementLoopHandler<V, R>) args[1], (String) args[2]);
+        return new ThenDoLoopExpression<V, R>((Observer<? super V>) args[0]);
 
       } catch (final Throwable t) {
         throw new InvalidObjectException(t.getMessage());

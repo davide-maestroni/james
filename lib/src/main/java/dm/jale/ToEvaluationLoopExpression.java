@@ -31,14 +31,14 @@ import dm.jale.util.ConstantConditions;
 /**
  * Created by davide-maestroni on 02/05/2018.
  */
-class ToEvaluationLoopHandler<V> extends LoopHandler<V, Void> implements Serializable {
+class ToEvaluationLoopExpression<V> extends LoopExpression<V, Void> implements Serializable {
 
   private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
 
   private final EvaluationCollection<V> mEvaluation;
 
   @SuppressWarnings("unchecked")
-  ToEvaluationLoopHandler(@NotNull final EvaluationCollection<? super V> evaluation) {
+  ToEvaluationLoopExpression(@NotNull final EvaluationCollection<? super V> evaluation) {
     mEvaluation = (EvaluationCollection<V>) ConstantConditions.notNull("evaluation", evaluation);
   }
 
@@ -108,7 +108,7 @@ class ToEvaluationLoopHandler<V> extends LoopHandler<V, Void> implements Seriali
 
   @NotNull
   @Override
-  LoopHandler<V, Void> renew() {
+  LoopExpression<V, Void> renew() {
     return ConstantConditions.unsupported();
   }
 

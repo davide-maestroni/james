@@ -31,7 +31,7 @@ import dm.jale.util.SerializableProxy;
 /**
  * Created by davide-maestroni on 02/01/2018.
  */
-class ElseCatchStatementHandler<V> extends StatementHandler<V, V> implements Serializable {
+class ElseCatchStatementExpression<V> extends StatementExpression<V, V> implements Serializable {
 
   private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
 
@@ -39,7 +39,7 @@ class ElseCatchStatementHandler<V> extends StatementHandler<V, V> implements Ser
 
   private final Class<?>[] mTypes;
 
-  ElseCatchStatementHandler(@NotNull final Mapper<? super Throwable, ? extends V> mapper,
+  ElseCatchStatementExpression(@NotNull final Mapper<? super Throwable, ? extends V> mapper,
       @NotNull final Class<?>[] exceptionTypes) {
     mMapper = ConstantConditions.notNull("mapper", mapper);
     mTypes = ConstantConditions.notNullElements("exception types", exceptionTypes);
@@ -77,7 +77,7 @@ class ElseCatchStatementHandler<V> extends StatementHandler<V, V> implements Ser
     private Object readResolve() throws ObjectStreamException {
       try {
         final Object[] args = deserializeArgs();
-        return new ElseCatchStatementHandler<V>((Mapper<? super Throwable, ? extends V>) args[0],
+        return new ElseCatchStatementExpression<V>((Mapper<? super Throwable, ? extends V>) args[0],
             (Class<?>[]) args[1]);
 
       } catch (final Throwable t) {
