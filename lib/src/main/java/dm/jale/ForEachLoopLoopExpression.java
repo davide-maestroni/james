@@ -28,24 +28,27 @@ import dm.jale.config.BuildConfig;
 import dm.jale.eventual.EvaluationCollection;
 import dm.jale.eventual.Mapper;
 import dm.jale.util.ConstantConditions;
+import dm.jale.util.Iterables;
 import dm.jale.util.SerializableProxy;
 
 /**
  * Created by davide-maestroni on 02/01/2018.
  */
-class EventuallyLoopExpression<V, R> extends LoopExpression<V, R> implements Serializable {
+class ForEachLoopLoopExpression<V, R> extends LoopExpression<V, R> implements Serializable {
 
   private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
 
-  private final Mapper<? super V, ? extends R> mMapper;
+  private final Mapper<? super V, ? extends Iterable<? extends R>> mMapper;
 
-  EventuallyLoopExpression(@NotNull final Mapper<? super V, ? extends R> mapper) {
+  ForEachLoopLoopExpression(
+      @NotNull final Mapper<? super V, ? extends Iterable<? extends R>> mapper) {
     mMapper = ConstantConditions.notNull("mapper", mapper);
   }
 
   @Override
+  @SuppressWarnings("unchecked")
   void addValue(final V value, @NotNull final EvaluationCollection<R> evaluation) throws Exception {
-    evaluation.addValue(mMapper.apply(value)).set();
+    evaluation.addValues(mMapper.apply(value)).set();
   }
 
   @Override
@@ -56,11 +59,12 @@ class EventuallyLoopExpression<V, R> extends LoopExpression<V, R> implements Ser
     }
 
     final ArrayList<R> outputs = new ArrayList<R>();
-    @SuppressWarnings("UnnecessaryLocalVariable") final Mapper<? super V, ? extends R> mapper =
-        mMapper;
+    @SuppressWarnings(
+        "UnnecessaryLocalVariable") final Mapper<? super V, ? extends Iterable<? extends R>>
+        mapper = mMapper;
     try {
       for (final V value : values) {
-        outputs.add(mapper.apply(value));
+        Iterables.addAll(mapper.apply(value), outputs);
       }
 
     } finally {
@@ -77,7 +81,7 @@ class EventuallyLoopExpression<V, R> extends LoopExpression<V, R> implements Ser
 
     private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
 
-    private HandlerProxy(final Mapper<? super V, ? extends R> mapper) {
+    private HandlerProxy(final Mapper<? super V, ? extends Iterable<? extends R>> mapper) {
       super(proxy(mapper));
     }
 
@@ -86,7 +90,8 @@ class EventuallyLoopExpression<V, R> extends LoopExpression<V, R> implements Ser
     private Object readResolve() throws ObjectStreamException {
       try {
         final Object[] args = deserializeArgs();
-        return new EventuallyLoopExpression<V, R>((Mapper<? super V, ? extends R>) args[0]);
+        return new ForEachLoopLoopExpression<V, R>(
+            (Mapper<? super V, ? extends Iterable<? extends R>>) args[0]);
 
       } catch (final Throwable t) {
         throw new InvalidObjectException(t.getMessage());

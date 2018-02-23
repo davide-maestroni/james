@@ -366,9 +366,8 @@ class DefaultStatement<V> implements Statement<V>, Serializable {
   public Statement<V> eventuallyTryDo(
       @NotNull final Mapper<? super V, ? extends Closeable> closeable,
       @NotNull final Observer<? super V> observer) {
-    return propagate(
-        new TryStatementExpression<V, V>(closeable, new EventuallyDoStatementExpression<V, V>(observer),
-            mLogger.getName()));
+    return propagate(new TryStatementExpression<V, V>(closeable,
+        new EventuallyDoStatementExpression<V, V>(observer), mLogger.getName()));
   }
 
   @NotNull

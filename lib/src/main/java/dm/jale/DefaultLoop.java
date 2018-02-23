@@ -611,12 +611,12 @@ class DefaultLoop<V> implements Loop<V>, Serializable {
 
   @NotNull
   public <R> Loop<R> forEach(@NotNull final Mapper<? super V, R> mapper) {
-    return propagate(new EventuallyLoopExpression<V, R>(mapper));
+    return propagate(new ForEachLoopExpression<V, R>(mapper));
   }
 
   @NotNull
   public Loop<V> forEachDo(@NotNull final Observer<? super V> observer) {
-    return propagate(new EventuallyDoLoopExpression<V, V>(observer));
+    return propagate(new ForEachDoLoopExpression<V, V>(observer));
   }
 
   @NotNull
@@ -631,12 +631,12 @@ class DefaultLoop<V> implements Loop<V>, Serializable {
 
   @NotNull
   public <R> Loop<R> forEachLoop(@NotNull final Mapper<? super V, ? extends Iterable<R>> mapper) {
-    return propagate(new EventuallyLoopLoopExpression<V, R>(mapper));
+    return propagate(new ForEachLoopLoopExpression<V, R>(mapper));
   }
 
   @NotNull
   public <R> Loop<R> forEachLoopIf(@NotNull final Mapper<? super V, ? extends Loop<R>> mapper) {
-    return propagate(new EventuallyLoopIfStatementExpression<V, R>(mapper));
+    return propagate(new ForEachLoopIfStatementExpression<V, R>(mapper));
   }
 
   @NotNull
@@ -648,7 +648,7 @@ class DefaultLoop<V> implements Loop<V>, Serializable {
   @NotNull
   public <R> Loop<R> forEachOrderedLoopIf(
       @NotNull final Mapper<? super V, ? extends Loop<R>> mapper) {
-    return propagateOrdered(new EventuallyLoopIfStatementExpression<V, R>(mapper));
+    return propagateOrdered(new ForEachLoopIfStatementExpression<V, R>(mapper));
   }
 
   @NotNull
@@ -664,7 +664,7 @@ class DefaultLoop<V> implements Loop<V>, Serializable {
       @NotNull final Mapper<? super V, ? extends Closeable> closeable,
       @NotNull final Mapper<? super V, ? extends Loop<R>> mapper) {
     return propagateOrdered(new TryStatementLoopExpression<V, R>(closeable,
-        new EventuallyLoopIfStatementExpression<V, R>(mapper), mLogger.getName()));
+        new ForEachLoopIfStatementExpression<V, R>(mapper), mLogger.getName()));
   }
 
   @NotNull
@@ -692,7 +692,7 @@ class DefaultLoop<V> implements Loop<V>, Serializable {
   public <R> Loop<R> forEachTryLoop(@NotNull final Mapper<? super V, ? extends Closeable> closeable,
       @NotNull final Mapper<? super V, ? extends Iterable<R>> mapper) {
     return propagate(new TryStatementLoopExpression<V, R>(closeable,
-        new EventuallyLoopStatementExpression<V, R>(mapper), mLogger.getName()));
+        new ForEachLoopStatementExpression<V, R>(mapper), mLogger.getName()));
   }
 
   @NotNull
@@ -700,7 +700,7 @@ class DefaultLoop<V> implements Loop<V>, Serializable {
       @NotNull final Mapper<? super V, ? extends Closeable> closeable,
       @NotNull final Mapper<? super V, ? extends Loop<R>> mapper) {
     return propagate(new TryStatementLoopExpression<V, R>(closeable,
-        new EventuallyLoopIfStatementExpression<V, R>(mapper), mLogger.getName()));
+        new ForEachLoopIfStatementExpression<V, R>(mapper), mLogger.getName()));
   }
 
   @NotNull

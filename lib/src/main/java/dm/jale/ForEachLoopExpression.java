@@ -17,10 +17,12 @@
 package dm.jale;
 
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 
 import java.io.InvalidObjectException;
 import java.io.ObjectStreamException;
 import java.io.Serializable;
+import java.util.ArrayList;
 
 import dm.jale.config.BuildConfig;
 import dm.jale.eventual.EvaluationCollection;
@@ -31,21 +33,39 @@ import dm.jale.util.SerializableProxy;
 /**
  * Created by davide-maestroni on 02/01/2018.
  */
-class EventuallyLoopStatementExpression<V, R> extends StatementLoopExpression<V, R>
-    implements Serializable {
+class ForEachLoopExpression<V, R> extends LoopExpression<V, R> implements Serializable {
 
   private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
 
-  private final Mapper<? super V, ? extends Iterable<R>> mMapper;
+  private final Mapper<? super V, ? extends R> mMapper;
 
-  EventuallyLoopStatementExpression(
-      @NotNull final Mapper<? super V, ? extends Iterable<R>> mapper) {
+  ForEachLoopExpression(@NotNull final Mapper<? super V, ? extends R> mapper) {
     mMapper = ConstantConditions.notNull("mapper", mapper);
   }
 
   @Override
-  void value(final V value, @NotNull final EvaluationCollection<R> evaluation) throws Exception {
-    evaluation.addValues(mMapper.apply(value)).set();
+  void addValue(final V value, @NotNull final EvaluationCollection<R> evaluation) throws Exception {
+    evaluation.addValue(mMapper.apply(value)).set();
+  }
+
+  @Override
+  void addValues(@Nullable final Iterable<? extends V> values,
+      @NotNull final EvaluationCollection<R> evaluation) throws Exception {
+    if (values == null) {
+      return;
+    }
+
+    final ArrayList<R> outputs = new ArrayList<R>();
+    @SuppressWarnings("UnnecessaryLocalVariable") final Mapper<? super V, ? extends R> mapper =
+        mMapper;
+    try {
+      for (final V value : values) {
+        outputs.add(mapper.apply(value));
+      }
+
+    } finally {
+      evaluation.addValues(outputs).set();
+    }
   }
 
   @NotNull
@@ -57,7 +77,7 @@ class EventuallyLoopStatementExpression<V, R> extends StatementLoopExpression<V,
 
     private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
 
-    private HandlerProxy(final Mapper<? super V, ? extends Iterable<R>> mapper) {
+    private HandlerProxy(final Mapper<? super V, ? extends R> mapper) {
       super(proxy(mapper));
     }
 
@@ -66,8 +86,7 @@ class EventuallyLoopStatementExpression<V, R> extends StatementLoopExpression<V,
     private Object readResolve() throws ObjectStreamException {
       try {
         final Object[] args = deserializeArgs();
-        return new EventuallyLoopStatementExpression<V, R>(
-            (Mapper<? super V, ? extends Iterable<R>>) args[0]);
+        return new ForEachLoopExpression<V, R>((Mapper<? super V, ? extends R>) args[0]);
 
       } catch (final Throwable t) {
         throw new InvalidObjectException(t.getMessage());
