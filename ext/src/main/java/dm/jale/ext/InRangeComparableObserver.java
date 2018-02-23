@@ -32,7 +32,7 @@ import dm.jale.util.SerializableProxy;
 /**
  * Created by davide-maestroni on 02/16/2018.
  */
-class InRangeComparableObserver<V extends Comparable<V>>
+class InRangeComparableObserver<V extends Comparable<? super V>>
     implements Observer<EvaluationCollection<V>>, Serializable {
 
   private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
@@ -78,7 +78,7 @@ class InRangeComparableObserver<V extends Comparable<V>>
     return new ObserverProxy<V>(mStart, mEnd, mIncrement, mIsInclusive);
   }
 
-  private static class ObserverProxy<V extends Comparable<V>> extends SerializableProxy {
+  private static class ObserverProxy<V extends Comparable<? super V>> extends SerializableProxy {
 
     private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
 

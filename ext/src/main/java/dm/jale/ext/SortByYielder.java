@@ -21,11 +21,12 @@ import org.jetbrains.annotations.NotNull;
 import java.io.InvalidObjectException;
 import java.io.ObjectStreamException;
 import java.io.Serializable;
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Comparator;
 
 import dm.jale.eventual.Loop.YieldOutputs;
 import dm.jale.eventual.Loop.Yielder;
-import dm.jale.ext.MaxByYielder.YielderStack;
 import dm.jale.ext.config.BuildConfig;
 import dm.jale.util.ConstantConditions;
 import dm.jale.util.SerializableProxy;
@@ -33,56 +34,46 @@ import dm.jale.util.SerializableProxy;
 /**
  * Created by davide-maestroni on 02/19/2018.
  */
-class MaxByYielder<V> implements Yielder<YielderStack<V>, V, V>, Serializable {
+class SortByYielder<V> implements Yielder<ArrayList<V>, V, V>, Serializable {
 
   private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
 
   private final Comparator<? super V> mComparator;
 
-  MaxByYielder(@NotNull final Comparator<? super V> comparator) {
+  SortByYielder(@NotNull final Comparator<? super V> comparator) {
     mComparator = ConstantConditions.notNull("comparator", comparator);
   }
 
-  public void done(final YielderStack<V> stack, @NotNull final YieldOutputs<V> outputs) {
+  public void done(final ArrayList<V> stack, @NotNull final YieldOutputs<V> outputs) {
     if (stack != null) {
-      outputs.yieldValue(stack.max);
+      Collections.sort(stack, mComparator);
+      outputs.yieldValues(stack);
     }
   }
 
-  public YielderStack<V> failure(final YielderStack<V> stack, @NotNull final Throwable failure,
+  public ArrayList<V> failure(final ArrayList<V> stack, @NotNull final Throwable failure,
       @NotNull final YieldOutputs<V> outputs) {
     outputs.yieldFailure(failure);
     return null;
   }
 
-  public YielderStack<V> init() {
-    return new YielderStack<V>();
+  public ArrayList<V> init() {
+    return new ArrayList<V>();
   }
 
-  public boolean loop(final YielderStack<V> stack) {
+  public boolean loop(final ArrayList<V> stack) {
     return (stack != null);
   }
 
-  public YielderStack<V> value(final YielderStack<V> stack, final V value,
-      @NotNull final YieldOutputs<V> outputs) throws Exception {
-    if (stack.max == null) {
-      stack.max = ConstantConditions.notNull("value", value);
-
-    } else if (mComparator.compare(value, stack.max) > 0) {
-      stack.max = value;
-    }
-
+  public ArrayList<V> value(final ArrayList<V> stack, final V value,
+      @NotNull final YieldOutputs<V> outputs) {
+    stack.add(value);
     return stack;
   }
 
   @NotNull
   private Object writeReplace() throws ObjectStreamException {
     return new YielderProxy<V>(mComparator);
-  }
-
-  static class YielderStack<V> {
-
-    private V max;
   }
 
   private static class YielderProxy<V> extends SerializableProxy {
@@ -98,7 +89,7 @@ class MaxByYielder<V> implements Yielder<YielderStack<V>, V, V>, Serializable {
     private Object readResolve() throws ObjectStreamException {
       try {
         final Object[] args = deserializeArgs();
-        return new MaxByYielder<V>((Comparator<? super V>) args[0]);
+        return new SortByYielder<V>((Comparator<? super V>) args[0]);
 
       } catch (final Throwable t) {
         throw new InvalidObjectException(t.getMessage());

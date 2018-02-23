@@ -65,8 +65,7 @@ import static dm.jale.executor.ExecutorPool.withThrottling;
  */
 public class EventualExt extends Eventual {
 
-  // TODO: 22/02/2018 Yielders: sort, sortBy?
-  // TODO: 21/02/2018 BatchYielder
+  // TODO: 21/02/2018 Yielders: groupBy
   // TODO: 21/02/2018 Joiners: zip(BiMapper), zip(TriMapper), zip(TetraMapper),
   // TODO: 16/02/2018 Forkers: repeat(), repeatAll(), repeatLast(), repeatFirst(), repeatSince(),
   // TODO: 16/02/2018 - refreshAfter(), refreshAllAfter()
@@ -170,6 +169,11 @@ public class EventualExt extends Eventual {
   public <V> Statement<V> anyOf(
       @NotNull final Iterable<? extends Statement<? extends V>> statements) {
     return statementOf(AnyOfJoiner.<V>instance(), statements);
+  }
+
+  @NotNull
+  public <V> Yielder<?, V, V> batch(final int maxValues, final int maxFailures) {
+    return new BatchYielder<V>(maxValues, maxFailures);
   }
 
   @NotNull
@@ -428,8 +432,8 @@ public class EventualExt extends Eventual {
   }
 
   @NotNull
-  public <V extends Comparable<V>> Loop<V> inRange(@NotNull final V start, @NotNull final V end,
-      @NotNull final Mapper<? super V, ? extends V> increment) {
+  public <V extends Comparable<? super V>> Loop<V> inRange(@NotNull final V start,
+      @NotNull final V end, @NotNull final Mapper<? super V, ? extends V> increment) {
     return loop(new InRangeComparableObserver<V>(start, end, increment, false));
   }
 
@@ -474,7 +478,7 @@ public class EventualExt extends Eventual {
   }
 
   @NotNull
-  public <V extends Comparable<V>> Loop<V> inRangeInclusive(@NotNull final V start,
+  public <V extends Comparable<? super V>> Loop<V> inRangeInclusive(@NotNull final V start,
       @NotNull final V end, @NotNull final Mapper<? super V, ? extends V> increment) {
     return loop(new InRangeComparableObserver<V>(start, end, increment, true));
   }
@@ -527,7 +531,7 @@ public class EventualExt extends Eventual {
   }
 
   @NotNull
-  public <V extends Comparable<V>> Yielder<?, V, V> max() {
+  public <V extends Comparable<? super V>> Yielder<?, V, V> max() {
     return MaxYielder.instance();
   }
 
@@ -542,7 +546,7 @@ public class EventualExt extends Eventual {
   }
 
   @NotNull
-  public <V extends Comparable<V>> Yielder<?, V, V> min() {
+  public <V extends Comparable<? super V>> Yielder<?, V, V> min() {
     return MinYielder.instance();
   }
 
@@ -559,6 +563,16 @@ public class EventualExt extends Eventual {
         new AsyncInvocationHandler(this.evaluateOn(
             withThrottling(1, (executor != null) ? withNoDelay(executor) : immediateExecutor())),
             object));
+  }
+
+  @NotNull
+  public <V extends Comparable<? super V>> Yielder<?, V, V> sort() {
+    return SortYielder.instance();
+  }
+
+  @NotNull
+  public <V> Yielder<?, V, V> sortBy(@NotNull final Comparator<? super V> comparator) {
+    return new SortByYielder<V>(comparator);
   }
 
   @NotNull

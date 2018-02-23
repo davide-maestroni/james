@@ -106,6 +106,7 @@ class ExecutorLoopBatchForker<V>
       mExecutor.execute(new ForkerRunnable(stack) {
 
         protected void innerRun(@NotNull final EvaluationCollection<V> evaluation) {
+          evaluation.addFailures(stack.failures).addValues(stack.values);
         }
       });
       return stack;

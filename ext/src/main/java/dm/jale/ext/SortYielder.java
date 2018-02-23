@@ -20,71 +20,61 @@ import org.jetbrains.annotations.NotNull;
 
 import java.io.ObjectStreamException;
 import java.io.Serializable;
+import java.util.ArrayList;
+import java.util.Collections;
 
 import dm.jale.eventual.Loop.YieldOutputs;
 import dm.jale.eventual.Loop.Yielder;
-import dm.jale.ext.MinYielder.YielderStack;
 import dm.jale.ext.config.BuildConfig;
-import dm.jale.util.ConstantConditions;
 
 /**
  * Created by davide-maestroni on 02/19/2018.
  */
-class MinYielder<V extends Comparable<? super V>>
-    implements Yielder<YielderStack<V>, V, V>, Serializable {
+class SortYielder<V extends Comparable<? super V>>
+    implements Yielder<ArrayList<V>, V, V>, Serializable {
 
-  private static final MinYielder<?> sInstance = new MinYielder();
+  private static final SortYielder<?> sInstance = new SortYielder();
 
   private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
 
-  private MinYielder() {
+  private SortYielder() {
   }
 
   @NotNull
   @SuppressWarnings("unchecked")
-  static <V extends Comparable<? super V>> MinYielder<V> instance() {
-    return (MinYielder<V>) sInstance;
+  static <V extends Comparable<? super V>> SortYielder<V> instance() {
+    return (SortYielder<V>) sInstance;
   }
 
-  public void done(final YielderStack<V> stack, @NotNull final YieldOutputs<V> outputs) {
+  public void done(final ArrayList<V> stack, @NotNull final YieldOutputs<V> outputs) {
     if (stack != null) {
-      outputs.yieldValue(stack.min);
+      Collections.sort(stack);
+      outputs.yieldValues(stack);
     }
   }
 
-  public YielderStack<V> failure(final YielderStack<V> stack, @NotNull final Throwable failure,
+  public ArrayList<V> failure(final ArrayList<V> stack, @NotNull final Throwable failure,
       @NotNull final YieldOutputs<V> outputs) {
     outputs.yieldFailure(failure);
     return null;
   }
 
-  public YielderStack<V> init() {
-    return new YielderStack<V>();
+  public ArrayList<V> init() {
+    return new ArrayList<V>();
   }
 
-  public boolean loop(final YielderStack<V> stack) {
+  public boolean loop(final ArrayList<V> stack) {
     return (stack != null);
   }
 
-  public YielderStack<V> value(final YielderStack<V> stack, final V value,
+  public ArrayList<V> value(final ArrayList<V> stack, final V value,
       @NotNull final YieldOutputs<V> outputs) {
-    if (stack.min == null) {
-      stack.min = ConstantConditions.notNull("value", value);
-
-    } else if (value.compareTo(stack.min) < 0) {
-      stack.min = value;
-    }
-
+    stack.add(value);
     return stack;
   }
 
   @NotNull
   private Object readResolve() throws ObjectStreamException {
     return sInstance;
-  }
-
-  static class YielderStack<V> {
-
-    private V min;
   }
 }

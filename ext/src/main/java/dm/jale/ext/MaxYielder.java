@@ -30,7 +30,8 @@ import dm.jale.util.ConstantConditions;
 /**
  * Created by davide-maestroni on 02/19/2018.
  */
-class MaxYielder<V extends Comparable<V>> implements Yielder<YielderStack<V>, V, V>, Serializable {
+class MaxYielder<V extends Comparable<? super V>>
+    implements Yielder<YielderStack<V>, V, V>, Serializable {
 
   private static final MaxYielder<?> sInstance = new MaxYielder();
 
@@ -41,7 +42,7 @@ class MaxYielder<V extends Comparable<V>> implements Yielder<YielderStack<V>, V,
 
   @NotNull
   @SuppressWarnings("unchecked")
-  static <V extends Comparable<V>> MaxYielder<V> instance() {
+  static <V extends Comparable<? super V>> MaxYielder<V> instance() {
     return (MaxYielder<V>) sInstance;
   }
 

@@ -72,7 +72,7 @@ class MinByYielder<V> implements Yielder<YielderStack<V>, V, V>, Serializable {
       stack.min = value;
     }
 
-    return null;
+    return stack;
   }
 
   @NotNull
