@@ -21,7 +21,7 @@ import org.jetbrains.annotations.Nullable;
 
 import java.io.Serializable;
 
-import dm.jale.async.EvaluationCollection;
+import dm.jale.eventual.EvaluationCollection;
 import dm.jale.ext.config.BuildConfig;
 import dm.jale.ext.io.AllocationType;
 import dm.jale.ext.io.Chunk;

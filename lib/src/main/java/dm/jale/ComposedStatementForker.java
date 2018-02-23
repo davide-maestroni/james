@@ -23,13 +23,13 @@ import java.io.InvalidObjectException;
 import java.io.ObjectStreamException;
 import java.io.Serializable;
 
-import dm.jale.async.Completer;
-import dm.jale.async.Evaluation;
-import dm.jale.async.Mapper;
-import dm.jale.async.Statement;
-import dm.jale.async.StatementForker;
-import dm.jale.async.Updater;
 import dm.jale.config.BuildConfig;
+import dm.jale.eventual.Completer;
+import dm.jale.eventual.Evaluation;
+import dm.jale.eventual.Mapper;
+import dm.jale.eventual.Statement;
+import dm.jale.eventual.StatementForker;
+import dm.jale.eventual.Updater;
 import dm.jale.util.SerializableProxy;
 
 /**

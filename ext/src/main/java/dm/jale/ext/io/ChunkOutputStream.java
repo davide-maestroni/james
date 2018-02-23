@@ -31,7 +31,7 @@ import java.nio.ByteBuffer;
 import java.nio.channels.ReadableByteChannel;
 import java.nio.channels.WritableByteChannel;
 
-import dm.jale.async.EvaluationCollection;
+import dm.jale.eventual.EvaluationCollection;
 import dm.jale.ext.config.BuildConfig;
 import dm.jale.util.ConstantConditions;
 import dm.jale.util.DoubleQueue;

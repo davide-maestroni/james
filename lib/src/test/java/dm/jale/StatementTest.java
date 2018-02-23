@@ -35,17 +35,17 @@ import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 
-import dm.jale.async.Action;
-import dm.jale.async.Completer;
-import dm.jale.async.Evaluation;
-import dm.jale.async.EvaluationState;
-import dm.jale.async.Mapper;
-import dm.jale.async.Observer;
-import dm.jale.async.RuntimeTimeoutException;
-import dm.jale.async.SimpleState;
-import dm.jale.async.Statement;
-import dm.jale.async.Statement.Forker;
-import dm.jale.async.Updater;
+import dm.jale.eventual.Action;
+import dm.jale.eventual.Completer;
+import dm.jale.eventual.Evaluation;
+import dm.jale.eventual.EvaluationState;
+import dm.jale.eventual.Mapper;
+import dm.jale.eventual.Observer;
+import dm.jale.eventual.RuntimeTimeoutException;
+import dm.jale.eventual.SimpleState;
+import dm.jale.eventual.Statement;
+import dm.jale.eventual.Statement.Forker;
+import dm.jale.eventual.Updater;
 import dm.jale.log.Logger;
 import dm.jale.util.ConstantConditions;
 
@@ -61,7 +61,7 @@ public class StatementTest {
 
   @NotNull
   private static Statement<String> createStatement() {
-    return new Async().value("test").then(new Mapper<String, String>() {
+    return new Eventual().value("test").eventually(new Mapper<String, String>() {
 
       public String apply(final String input) {
         return input.toUpperCase();
@@ -71,19 +71,19 @@ public class StatementTest {
 
   @NotNull
   private static Statement<String> createStatementAsync() {
-    return new Async().value("test")
-                      .forkOn(backgroundExecutor())
-                      .then(new Mapper<String, String>() {
+    return new Eventual().value("test")
+        .forkOn(backgroundExecutor())
+        .eventually(new Mapper<String, String>() {
 
-                        public String apply(final String input) {
-                          return input.toUpperCase();
-                        }
-                      });
+          public String apply(final String input) {
+            return input.toUpperCase();
+          }
+        });
   }
 
   @NotNull
   private static Statement<String> createStatementFork(@NotNull final Statement<String> statement) {
-    return fork(statement.then(new Mapper<String, String>() {
+    return fork(statement.eventually(new Mapper<String, String>() {
 
       public String apply(final String input) {
         return input.toUpperCase();
@@ -94,7 +94,7 @@ public class StatementTest {
   @NotNull
   private static <V> Statement<V> fork(@NotNull final Statement<V> statement) {
     return statement.fork(
-        Async.buffered(new Forker<Evaluation<V>, V, Evaluation<V>, Statement<V>>() {
+        Eventual.buffered(new Forker<Evaluation<V>, V, Evaluation<V>, Statement<V>>() {
 
           public Evaluation<V> done(final Evaluation<V> stack,
               @NotNull final Statement<V> context) {
@@ -133,7 +133,7 @@ public class StatementTest {
 
   @Test
   public void cancelUnevaluated() {
-    final Statement<String> statement = new Async().evaluated(false).value("test");
+    final Statement<String> statement = new Eventual().evaluated(false).value("test");
     assertThat(statement.isCancelled()).isFalse();
     assertThat(statement.isDone()).isFalse();
     assertThat(statement.cancel(false)).isTrue();
@@ -143,40 +143,41 @@ public class StatementTest {
 
   @Test
   public void cancelled() {
-    final Statement<Void> statement = new Async().evaluated(false).value(null);
+    final Statement<Void> statement = new Eventual().evaluated(false).value(null);
     statement.cancel(false);
     assertThat(statement.isCancelled()).isTrue();
   }
 
   @Test
   public void consumeFailure() {
-    final Statement<String> statement = new Async().failure(new Exception("test"));
+    final Statement<String> statement = new Eventual().failure(new Exception("test"));
     statement.consume();
     assertThat(statement.isDone()).isTrue();
   }
 
   @Test
   public void consumeValue() {
-    final Statement<String> statement = new Async().value("test");
+    final Statement<String> statement = new Eventual().value("test");
     statement.consume();
     assertThat(statement.isDone()).isTrue();
   }
 
   @Test
   public void creation() {
-    final Statement<String> statement = new Async().statement(new Observer<Evaluation<String>>() {
+    final Statement<String> statement =
+        new Eventual().statement(new Observer<Evaluation<String>>() {
 
-      public void accept(final Evaluation<String> evaluation) {
-        evaluation.set("hello");
-      }
-    });
+          public void accept(final Evaluation<String> evaluation) {
+            evaluation.set("hello");
+          }
+        });
     assertThat(statement.value()).isEqualTo("hello");
   }
 
   @Test
   public void creationAsyncFailure() {
-    final Statement<String> statement =
-        new Async().evaluateOn(backgroundExecutor()).statement(new Observer<Evaluation<String>>() {
+    final Statement<String> statement = new Eventual().evaluateOn(backgroundExecutor())
+        .statement(new Observer<Evaluation<String>>() {
 
           public void accept(final Evaluation<String> evaluation) throws Exception {
             throw new Exception("test");
@@ -189,20 +190,21 @@ public class StatementTest {
 
   @Test
   public void creationFailure() {
-    final Statement<String> statement = new Async().statement(new Observer<Evaluation<String>>() {
+    final Statement<String> statement =
+        new Eventual().statement(new Observer<Evaluation<String>>() {
 
-      public void accept(final Evaluation<String> evaluation) throws Exception {
-        throw new Exception("test");
-      }
-    });
+          public void accept(final Evaluation<String> evaluation) throws Exception {
+            throw new Exception("test");
+          }
+        });
     assertThat(statement.failure().getMessage()).isEqualTo("test");
   }
 
   @Test
   public void doneOn() {
     final Statement<String> statement =
-        new Async().evaluateOn(withDelay(100, TimeUnit.MILLISECONDS, backgroundExecutor()))
-                   .value("test");
+        new Eventual().evaluateOn(withDelay(100, TimeUnit.MILLISECONDS, backgroundExecutor()))
+            .value("test");
     statement.getDone();
     assertThat(statement.isDone()).isTrue();
   }
@@ -210,7 +212,7 @@ public class StatementTest {
   @Test
   public void elseCatch() {
     final Statement<String> statement =
-        new Async().<String>failure(new IllegalStateException("test")).elseCatch(
+        new Eventual().<String>failure(new IllegalStateException("test")).elseCatch(
             new Mapper<Throwable, String>() {
 
               public String apply(final Throwable error) {
@@ -223,7 +225,7 @@ public class StatementTest {
   @Test
   public void elseCatchFiltered() {
     final Statement<String> statement =
-        new Async().<String>failure(new IllegalStateException("test")).elseCatch(
+        new Eventual().<String>failure(new IllegalStateException("test")).elseCatch(
             new Mapper<Throwable, String>() {
 
               public String apply(final Throwable error) {
@@ -236,12 +238,12 @@ public class StatementTest {
   @Test(expected = NullPointerException.class)
   @SuppressWarnings("ConstantConditions")
   public void elseCatchNPE() {
-    new Async().value(null).elseCatch(null);
+    new Eventual().value(null).elseCatch(null);
   }
 
   @Test
   public void elseCatchNoType() {
-    assertThat(new Async().failure(new Exception()).elseCatch(new Mapper<Throwable, Object>() {
+    assertThat(new Eventual().failure(new Exception()).elseCatch(new Mapper<Throwable, Object>() {
 
       public Object apply(final Throwable input) {
         return null;
@@ -252,7 +254,7 @@ public class StatementTest {
   @Test
   public void elseCatchNotFiltered() {
     final Statement<String> statement =
-        new Async().<String>failure(new IllegalStateException("test")).elseCatch(
+        new Eventual().<String>failure(new IllegalStateException("test")).elseCatch(
             new Mapper<Throwable, String>() {
 
               public String apply(final Throwable error) {
@@ -265,7 +267,7 @@ public class StatementTest {
 
   @Test(expected = NullPointerException.class)
   public void elseCatchTypesNPE() {
-    new Async().value(null).elseCatch(new Mapper<Throwable, Object>() {
+    new Eventual().value(null).elseCatch(new Mapper<Throwable, Object>() {
 
       public Object apply(final Throwable input) {
         return null;
@@ -277,7 +279,7 @@ public class StatementTest {
   public void elseDo() {
     final AtomicReference<String> ref = new AtomicReference<String>();
     final Statement<String> statement =
-        new Async().<String>failure(new IllegalStateException("test")).elseDo(
+        new Eventual().<String>failure(new IllegalStateException("test")).elseDo(
             new Observer<Throwable>() {
 
               public void accept(final Throwable input) {
@@ -292,7 +294,7 @@ public class StatementTest {
   @Test
   public void elseDoFail() {
     final Statement<String> statement =
-        new Async().<String>failure(new IllegalStateException("test")).elseDo(
+        new Eventual().<String>failure(new IllegalStateException("test")).elseDo(
             new Observer<Throwable>() {
 
               public void accept(final Throwable input) {
@@ -307,7 +309,7 @@ public class StatementTest {
   public void elseDoFiltered() {
     final AtomicReference<String> ref = new AtomicReference<String>();
     final Statement<String> statement =
-        new Async().<String>failure(new IllegalStateException("test")).elseDo(
+        new Eventual().<String>failure(new IllegalStateException("test")).elseDo(
             new Observer<Throwable>() {
 
               public void accept(final Throwable input) {
@@ -322,13 +324,13 @@ public class StatementTest {
   @Test(expected = NullPointerException.class)
   @SuppressWarnings("ConstantConditions")
   public void elseDoNPE() {
-    new Async().value(null).elseDo(null);
+    new Eventual().value(null).elseDo(null);
   }
 
   @Test
   public void elseDoNoType() {
     final AtomicReference<String> ref = new AtomicReference<String>();
-    assertThat(new Async().failure(new Exception()).elseDo(new Observer<Throwable>() {
+    assertThat(new Eventual().failure(new Exception()).elseDo(new Observer<Throwable>() {
 
       public void accept(final Throwable input) throws Exception {
         ref.set("test");
@@ -341,7 +343,7 @@ public class StatementTest {
   public void elseDoNotFiltered() {
     final AtomicReference<String> ref = new AtomicReference<String>();
     final Statement<String> statement =
-        new Async().<String>failure(new IllegalStateException("test")).elseDo(
+        new Eventual().<String>failure(new IllegalStateException("test")).elseDo(
             new Observer<Throwable>() {
 
               public void accept(final Throwable input) {
@@ -355,7 +357,7 @@ public class StatementTest {
 
   @Test(expected = NullPointerException.class)
   public void elseDoTypesNPE() {
-    new Async().value(null).elseDo(new Observer<Throwable>() {
+    new Eventual().value(null).elseDo(new Observer<Throwable>() {
 
       public void accept(final Throwable input) {
 
@@ -366,7 +368,7 @@ public class StatementTest {
   @Test
   public void elseFail() {
     final Statement<String> statement =
-        new Async().<String>failure(new IllegalStateException("test")).elseCatch(
+        new Eventual().<String>failure(new IllegalStateException("test")).elseCatch(
             new Mapper<Throwable, String>() {
 
               public String apply(final Throwable input) {
@@ -380,11 +382,11 @@ public class StatementTest {
   @Test
   public void elseIf() {
     final Statement<Integer> statement =
-        new Async().<Integer>failure(new IllegalStateException("test")).elseIf(
+        new Eventual().<Integer>failure(new IllegalStateException("test")).elseIf(
             new Mapper<Throwable, Statement<Integer>>() {
 
               public Statement<Integer> apply(final Throwable input) {
-                return new Async().value(input.getMessage().length());
+                return new Eventual().value(input.getMessage().length());
               }
             });
     assertThat(statement.getValue()).isEqualTo(4);
@@ -393,13 +395,12 @@ public class StatementTest {
   @Test
   public void elseIfAsync() {
     final Statement<Integer> statement =
-        new Async().<Integer>failure(new IllegalStateException("test")).elseIf(
+        new Eventual().<Integer>failure(new IllegalStateException("test")).elseIf(
             new Mapper<Throwable, Statement<Integer>>() {
 
               public Statement<Integer> apply(final Throwable input) {
-                return new Async().value(input.getMessage().length())
-                                  .forkOn(
-                                      withDelay(100, TimeUnit.MILLISECONDS, backgroundExecutor()));
+                return new Eventual().value(input.getMessage().length())
+                    .forkOn(withDelay(100, TimeUnit.MILLISECONDS, backgroundExecutor()));
               }
             });
     assertThat(statement.getValue()).isEqualTo(4);
@@ -408,13 +409,12 @@ public class StatementTest {
   @Test
   public void elseIfAsyncFiltered() {
     final Statement<Integer> statement =
-        new Async().<Integer>failure(new IllegalStateException("test")).elseIf(
+        new Eventual().<Integer>failure(new IllegalStateException("test")).elseIf(
             new Mapper<Throwable, Statement<Integer>>() {
 
               public Statement<Integer> apply(final Throwable input) {
-                return new Async().value(input.getMessage().length())
-                                  .forkOn(
-                                      withDelay(100, TimeUnit.MILLISECONDS, backgroundExecutor()));
+                return new Eventual().value(input.getMessage().length())
+                    .forkOn(withDelay(100, TimeUnit.MILLISECONDS, backgroundExecutor()));
               }
             }, IllegalStateException.class);
     assertThat(statement.getValue()).isEqualTo(4);
@@ -423,13 +423,12 @@ public class StatementTest {
   @Test
   public void elseIfAsyncNotFiltered() {
     final Statement<Integer> statement =
-        new Async().<Integer>failure(new IllegalStateException("test")).elseIf(
+        new Eventual().<Integer>failure(new IllegalStateException("test")).elseIf(
             new Mapper<Throwable, Statement<Integer>>() {
 
               public Statement<Integer> apply(final Throwable input) {
-                return new Async().value(input.getMessage().length())
-                                  .forkOn(
-                                      withDelay(100, TimeUnit.MILLISECONDS, backgroundExecutor()));
+                return new Eventual().value(input.getMessage().length())
+                    .forkOn(withDelay(100, TimeUnit.MILLISECONDS, backgroundExecutor()));
               }
             }, IOException.class);
     assertThat(ConstantConditions.notNull(statement.getFailure()).getCause()).isExactlyInstanceOf(
@@ -439,11 +438,11 @@ public class StatementTest {
   @Test
   public void elseIfFail() {
     final Statement<Integer> statement =
-        new Async().<Integer>failure(new IllegalStateException("test")).elseIf(
+        new Eventual().<Integer>failure(new IllegalStateException("test")).elseIf(
             new Mapper<Throwable, Statement<Integer>>() {
 
               public Statement<Integer> apply(final Throwable input) {
-                return new Async().failure(new IllegalArgumentException());
+                return new Eventual().failure(new IllegalArgumentException());
               }
             });
     assertThat(ConstantConditions.notNull(statement.getFailure()).getCause()).isExactlyInstanceOf(
@@ -453,11 +452,11 @@ public class StatementTest {
   @Test
   public void elseIfFiltered() {
     final Statement<Integer> statement =
-        new Async().<Integer>failure(new IllegalStateException("test")).elseIf(
+        new Eventual().<Integer>failure(new IllegalStateException("test")).elseIf(
             new Mapper<Throwable, Statement<Integer>>() {
 
               public Statement<Integer> apply(final Throwable input) {
-                return new Async().value(input.getMessage().length());
+                return new Eventual().value(input.getMessage().length());
               }
             }, IllegalStateException.class);
     assertThat(statement.getValue()).isEqualTo(4);
@@ -466,27 +465,28 @@ public class StatementTest {
   @Test(expected = NullPointerException.class)
   @SuppressWarnings("ConstantConditions")
   public void elseIfNPE() {
-    new Async().value(null).elseIf(null);
+    new Eventual().value(null).elseIf(null);
   }
 
   @Test
   public void elseIfNoType() {
-    assertThat(new Async().failure(new Exception()).elseIf(new Mapper<Throwable, Statement<?>>() {
+    assertThat(
+        new Eventual().failure(new Exception()).elseIf(new Mapper<Throwable, Statement<?>>() {
 
-      public Statement<?> apply(final Throwable input) {
-        return new Async().value(null);
-      }
-    }, (Class<?>[]) null).failure()).isExactlyInstanceOf(Exception.class);
+          public Statement<?> apply(final Throwable input) {
+            return new Eventual().value(null);
+          }
+        }, (Class<?>[]) null).failure()).isExactlyInstanceOf(Exception.class);
   }
 
   @Test
   public void elseIfNotFiltered() {
     final Statement<Integer> statement =
-        new Async().<Integer>failure(new IllegalStateException("test")).elseIf(
+        new Eventual().<Integer>failure(new IllegalStateException("test")).elseIf(
             new Mapper<Throwable, Statement<Integer>>() {
 
               public Statement<Integer> apply(final Throwable input) {
-                return new Async().value(input.getMessage().length());
+                return new Eventual().value(input.getMessage().length());
               }
             }, IOException.class);
     assertThat(ConstantConditions.notNull(statement.getFailure()).getCause()).isExactlyInstanceOf(
@@ -495,20 +495,21 @@ public class StatementTest {
 
   @Test
   public void elseIfStatementNPE() {
-    assertThat(new Async().failure(new Exception()).elseIf(new Mapper<Throwable, Statement<?>>() {
+    assertThat(
+        new Eventual().failure(new Exception()).elseIf(new Mapper<Throwable, Statement<?>>() {
 
-      public Statement<?> apply(final Throwable input) {
-        return null;
-      }
-    }).failure()).isExactlyInstanceOf(NullPointerException.class);
+          public Statement<?> apply(final Throwable input) {
+            return null;
+          }
+        }).failure()).isExactlyInstanceOf(NullPointerException.class);
   }
 
   @Test(expected = NullPointerException.class)
   public void elseIfTypesNPE() {
-    new Async().value(null).elseIf(new Mapper<Throwable, Statement<?>>() {
+    new Eventual().value(null).elseIf(new Mapper<Throwable, Statement<?>>() {
 
       public Statement<?> apply(final Throwable input) {
-        return new Async().value(null);
+        return new Eventual().value(null);
       }
     }, new Class<?>[]{null});
   }
@@ -517,13 +518,13 @@ public class StatementTest {
   public void evaluate() {
     final Random random = new Random();
     final Statement<Float> statement =
-        new Async().evaluateOn(withDelay(100, TimeUnit.MILLISECONDS, backgroundExecutor()))
-                   .statement(new Observer<Evaluation<Float>>() {
+        new Eventual().evaluateOn(withDelay(100, TimeUnit.MILLISECONDS, backgroundExecutor()))
+            .statement(new Observer<Evaluation<Float>>() {
 
-                     public void accept(final Evaluation<Float> evaluation) {
-                       evaluation.set(random.nextFloat());
-                     }
-                   });
+              public void accept(final Evaluation<Float> evaluation) {
+                evaluation.set(random.nextFloat());
+              }
+            });
     long startTime = System.currentTimeMillis();
     final Float value = statement.getValue();
     assertThat(System.currentTimeMillis() - startTime).isGreaterThanOrEqualTo(100);
@@ -536,12 +537,12 @@ public class StatementTest {
   public void evaluateFork() {
     final Random random = new Random();
     final Statement<Float> statement =
-        fork(new Async().statement(new Observer<Evaluation<Float>>() {
+        fork(new Eventual().statement(new Observer<Evaluation<Float>>() {
 
           public void accept(final Evaluation<Float> evaluation) {
             evaluation.set(random.nextFloat());
           }
-        })).then(new Mapper<Float, Float>() {
+        })).eventually(new Mapper<Float, Float>() {
 
           public Float apply(final Float input) {
             return input;
@@ -555,7 +556,7 @@ public class StatementTest {
   public void evaluated() {
     final Random random = new Random();
     final Statement<Integer> statement =
-        new Async().evaluated(false).statement(new Observer<Evaluation<Integer>>() {
+        new Eventual().evaluated(false).statement(new Observer<Evaluation<Integer>>() {
 
           public void accept(final Evaluation<Integer> evaluation) {
             evaluation.set(random.nextInt());
@@ -569,7 +570,7 @@ public class StatementTest {
   public void evaluatedEvaluate() {
     final Random random = new Random();
     final Statement<Integer> statement =
-        new Async().evaluated(false).statement(new Observer<Evaluation<Integer>>() {
+        new Eventual().evaluated(false).statement(new Observer<Evaluation<Integer>>() {
 
           public void accept(final Evaluation<Integer> evaluation) {
             evaluation.set(random.nextInt());
@@ -581,36 +582,36 @@ public class StatementTest {
   @Test
   public void evaluating() {
     final Statement<String> statement =
-        new Async().value("test").forkOn(withDelay(1, TimeUnit.SECONDS, backgroundExecutor()));
+        new Eventual().value("test").forkOn(withDelay(1, TimeUnit.SECONDS, backgroundExecutor()));
     assertThat(statement.isEvaluating()).isTrue();
   }
 
   @Test
   public void evaluatingBackground() {
     final Statement<String> statement =
-        new Async().value("test").forkOn(withDelay(1, TimeUnit.SECONDS, backgroundExecutor()));
+        new Eventual().value("test").forkOn(withDelay(1, TimeUnit.SECONDS, backgroundExecutor()));
     assertThat(statement.isEvaluating()).isTrue();
   }
 
   @Test
   public void evaluatingEvaluated() {
     final Statement<String> statement = //
-        new Async().evaluated(false)
-                   .value("test")
-                   .forkOn(withDelay(1, SECONDS, backgroundExecutor()))
-                   .then(new Mapper<String, String>() {
+        new Eventual().evaluated(false)
+            .value("test")
+            .forkOn(withDelay(1, SECONDS, backgroundExecutor()))
+            .eventually(new Mapper<String, String>() {
 
-                     public String apply(final String input) {
-                       return input.toUpperCase();
-                     }
-                   })
-                   .evaluated();
+              public String apply(final String input) {
+                return input.toUpperCase();
+              }
+            })
+            .evaluated();
     assertThat(statement.isEvaluating()).isTrue();
   }
 
   @Test(expected = IllegalStateException.class)
   public void evaluatingFailureException() {
-    final Statement<String> statement = new Async().<String>failure(new Exception()).forkOn(
+    final Statement<String> statement = new Eventual().<String>failure(new Exception()).forkOn(
         withDelay(1, TimeUnit.SECONDS, backgroundExecutor()));
     ConstantConditions.notNull(statement.failure());
   }
@@ -618,36 +619,602 @@ public class StatementTest {
   @Test
   public void evaluatingOn() {
     final Statement<String> statement =
-        new Async().evaluateOn(withDelay(1, TimeUnit.SECONDS, backgroundExecutor())).value("test");
+        new Eventual().evaluateOn(withDelay(1, TimeUnit.SECONDS, backgroundExecutor()))
+            .value("test");
     assertThat(statement.isEvaluating()).isTrue();
   }
 
   @Test
   public void evaluatingUnevaluated() {
     final Statement<String> statement = //
-        new Async().evaluated(false)
-                   .value("test")
-                   .forkOn(withDelay(1, SECONDS, backgroundExecutor()))
-                   .then(new Mapper<String, String>() {
+        new Eventual().evaluated(false)
+            .value("test")
+            .forkOn(withDelay(1, SECONDS, backgroundExecutor()))
+            .eventually(new Mapper<String, String>() {
 
-                     public String apply(final String input) {
-                       return input.toUpperCase();
-                     }
-                   });
+              public String apply(final String input) {
+                return input.toUpperCase();
+              }
+            });
     assertThat(statement.isEvaluating()).isFalse();
   }
 
   @Test(expected = IllegalStateException.class)
   public void evaluatingValueException() {
     final Statement<String> statement =
-        new Async().value("test").forkOn(withDelay(1, TimeUnit.SECONDS, backgroundExecutor()));
+        new Eventual().value("test").forkOn(withDelay(1, TimeUnit.SECONDS, backgroundExecutor()));
     statement.value();
   }
 
   @Test
-  public void failThen() {
+  public void eventually() {
     final Statement<String> statement =
-        new Async().<String>failure(new NullPointerException("test")).then(
+        new Eventual().value("test").eventually(new Mapper<String, String>() {
+
+          public String apply(final String input) {
+            return input.toUpperCase();
+          }
+        });
+    assertThat(statement.getValue()).isEqualTo("TEST");
+  }
+
+  @Test
+  public void eventuallyDo() {
+    final AtomicReference<String> ref = new AtomicReference<String>();
+    final Statement<String> statement =
+        new Eventual().value("test").eventuallyDo(new Observer<String>() {
+
+          public void accept(final String input) {
+            ref.set(input);
+          }
+        });
+    assertThat(statement.getValue()).isEqualTo("test");
+    assertThat(ref.get()).isEqualTo("test");
+  }
+
+  @Test
+  public void eventuallyDoFail() {
+    final Statement<String> statement =
+        new Eventual().value("test").eventuallyDo(new Observer<String>() {
+
+          public void accept(final String input) {
+            throw new IllegalArgumentException();
+          }
+        });
+    assertThat(ConstantConditions.notNull(statement.getFailure()).getCause()).isExactlyInstanceOf(
+        IllegalArgumentException.class);
+  }
+
+  @Test(expected = NullPointerException.class)
+  @SuppressWarnings("ConstantConditions")
+  public void eventuallyDoNPE() {
+    new Eventual().value(null).eventuallyDo(null);
+  }
+
+  @Test
+  public void eventuallyFail() {
+    final Statement<String> statement =
+        new Eventual().value("test").eventually(new Mapper<String, String>() {
+
+          public String apply(final String input) {
+            throw new IllegalArgumentException();
+          }
+        });
+    assertThat(ConstantConditions.notNull(statement.getFailure()).getCause()).isExactlyInstanceOf(
+        IllegalArgumentException.class);
+  }
+
+  @Test
+  public void eventuallyIf() {
+    final Statement<Integer> statement =
+        new Eventual().value("test").eventuallyIf(new Mapper<String, Statement<Integer>>() {
+
+          public Statement<Integer> apply(final String input) {
+            return new Eventual().value(input.length());
+          }
+        });
+    assertThat(statement.getValue()).isEqualTo(4);
+  }
+
+  @Test
+  public void eventuallyIfAsync() {
+    final Statement<Integer> statement =
+        new Eventual().value("test").eventuallyIf(new Mapper<String, Statement<Integer>>() {
+
+          public Statement<Integer> apply(final String input) {
+            return new Eventual().value(input.length())
+                .forkOn(withDelay(100, TimeUnit.MILLISECONDS, backgroundExecutor()));
+          }
+        });
+    assertThat(statement.getValue()).isEqualTo(4);
+  }
+
+  @Test
+  public void eventuallyIfFail() {
+    final Statement<Integer> statement =
+        new Eventual().value("test").eventuallyIf(new Mapper<String, Statement<Integer>>() {
+
+          public Statement<Integer> apply(final String input) {
+            return new Eventual().failure(new IllegalArgumentException());
+          }
+        });
+    assertThat(ConstantConditions.notNull(statement.getFailure()).getCause()).isExactlyInstanceOf(
+        IllegalArgumentException.class);
+  }
+
+  @Test(expected = NullPointerException.class)
+  @SuppressWarnings("ConstantConditions")
+  public void eventuallyIfNPE() {
+    new Eventual().value(null).eventuallyIf(null);
+  }
+
+  @Test
+  public void eventuallyIfStatementNPE() {
+    assertThat(new Eventual().value(null).eventuallyIf(new Mapper<Object, Statement<Object>>() {
+
+      public Statement<Object> apply(final Object input) {
+        return null;
+      }
+    }).failure()).isExactlyInstanceOf(NullPointerException.class);
+  }
+
+  @Test(expected = IllegalStateException.class)
+  public void eventuallyIllegal() {
+    final Statement<String> statement = new Eventual().value("test");
+    statement.eventually(new Mapper<String, String>() {
+
+      public String apply(final String input) {
+        return input.toUpperCase();
+      }
+    });
+    statement.eventually(new ToUpper());
+  }
+
+  @Test(expected = NullPointerException.class)
+  @SuppressWarnings("ConstantConditions")
+  public void eventuallyNPE() {
+    new Eventual().value(null).eventually(null);
+  }
+
+  @Test
+  public void eventuallyTry() {
+    final AtomicCloseable closeable = new AtomicCloseable();
+    final Statement<String> statement =
+        new Eventual().value("test").eventuallyTry(new Mapper<String, Closeable>() {
+
+          public Closeable apply(final String input) {
+            return closeable;
+          }
+        }, new Mapper<String, String>() {
+
+          public String apply(final String input) {
+            return input.toUpperCase();
+          }
+        });
+    assertThat(statement.getValue()).isEqualTo("TEST");
+    assertThat(closeable.isCalled()).isTrue();
+  }
+
+  @Test(expected = NullPointerException.class)
+  @SuppressWarnings("ConstantConditions")
+  public void eventuallyTryCloseableNPE() {
+    new Eventual().value(null).eventuallyTry(null, new Mapper<Object, Object>() {
+
+      public Object apply(final Object input) {
+        return null;
+      }
+    });
+  }
+
+  @Test
+  public void eventuallyTryDo() {
+    final AtomicCloseable closeable = new AtomicCloseable();
+    final AtomicReference<String> ref = new AtomicReference<String>();
+    final Statement<String> statement =
+        new Eventual().value("test").eventuallyTryDo(new Mapper<String, Closeable>() {
+
+          public Closeable apply(final String input) {
+            return closeable;
+          }
+        }, new Observer<String>() {
+
+          public void accept(final String input) {
+            ref.set(input);
+          }
+        });
+    assertThat(statement.getValue()).isEqualTo("test");
+    assertThat(ref.get()).isEqualTo("test");
+    assertThat(closeable.isCalled()).isTrue();
+  }
+
+  @Test(expected = NullPointerException.class)
+  @SuppressWarnings("ConstantConditions")
+  public void eventuallyTryDoCloseableNPE() {
+    new Eventual().value(null).eventuallyTryDo(null, new Observer<Object>() {
+
+      public void accept(final Object input) {
+
+      }
+    });
+  }
+
+  @Test
+  public void eventuallyTryDoException() {
+    final AtomicReference<String> ref = new AtomicReference<String>();
+    final Statement<String> statement =
+        new Eventual().value("test").eventuallyTryDo(new Mapper<String, Closeable>() {
+
+          public Closeable apply(final String input) {
+            throw new RuntimeException();
+          }
+        }, new Observer<String>() {
+
+          public void accept(final String input) {
+            ref.set(input);
+          }
+        });
+    assertThat(statement.isFailed()).isTrue();
+    assertThat(ref.get()).isNull();
+  }
+
+  @Test
+  public void eventuallyTryDoFail() {
+    final AtomicCloseable closeable = new AtomicCloseable();
+    final Statement<String> statement =
+        new Eventual().value("test").eventuallyTryDo(new Mapper<String, Closeable>() {
+
+          public Closeable apply(final String input) {
+            return closeable;
+          }
+        }, new Observer<String>() {
+
+          public void accept(final String input) {
+            throw new IllegalArgumentException();
+          }
+        });
+    assertThat(ConstantConditions.notNull(statement.getFailure()).getCause()).isExactlyInstanceOf(
+        IllegalArgumentException.class);
+    assertThat(closeable.isCalled()).isTrue();
+  }
+
+  @Test
+  public void eventuallyTryDoIOException() {
+    final AtomicReference<String> ref = new AtomicReference<String>();
+    final Statement<String> statement =
+        new Eventual().value("test").eventuallyTryDo(new Mapper<String, Closeable>() {
+
+          public Closeable apply(final String input) {
+            return new Closeable() {
+
+              public void close() throws IOException {
+                throw new IOException();
+              }
+            };
+          }
+        }, new Observer<String>() {
+
+          public void accept(final String input) {
+            ref.set(input);
+          }
+        });
+    assertThat(statement.getValue()).isEqualTo("test");
+    assertThat(ref.get()).isEqualTo("test");
+  }
+
+  @Test(expected = NullPointerException.class)
+  @SuppressWarnings("ConstantConditions")
+  public void eventuallyTryDoNPE() {
+    new Eventual().value(null).eventuallyTryDo(new Mapper<Object, Closeable>() {
+
+      public Closeable apply(final Object input) {
+        return null;
+      }
+    }, null);
+  }
+
+  @Test
+  public void eventuallyTryDoNull() {
+    final AtomicReference<String> ref = new AtomicReference<String>();
+    final Statement<String> statement =
+        new Eventual().value("test").eventuallyTryDo(new Mapper<String, Closeable>() {
+
+          public Closeable apply(final String input) {
+            return null;
+          }
+        }, new Observer<String>() {
+
+          public void accept(final String input) {
+            ref.set(input);
+          }
+        });
+    assertThat(statement.getValue()).isEqualTo("test");
+    assertThat(ref.get()).isEqualTo("test");
+  }
+
+  @Test
+  public void eventuallyTryException() {
+    final Statement<String> statement =
+        new Eventual().value("test").eventuallyTry(new Mapper<String, Closeable>() {
+
+          public Closeable apply(final String input) {
+            throw new RuntimeException();
+          }
+        }, new Mapper<String, String>() {
+
+          public String apply(final String input) {
+            return input.toUpperCase();
+          }
+        });
+    assertThat(statement.isFailed()).isTrue();
+  }
+
+  @Test
+  public void eventuallyTryFail() {
+    final AtomicCloseable closeable = new AtomicCloseable();
+    final Statement<String> statement =
+        new Eventual().value("test").eventuallyTry(new Mapper<String, Closeable>() {
+
+          public Closeable apply(final String input) {
+            return closeable;
+          }
+        }, new Mapper<String, String>() {
+
+          public String apply(final String input) {
+            throw new IllegalArgumentException();
+          }
+        });
+    assertThat(ConstantConditions.notNull(statement.getFailure()).getCause()).isExactlyInstanceOf(
+        IllegalArgumentException.class);
+    assertThat(closeable.isCalled()).isTrue();
+  }
+
+  @Test
+  public void eventuallyTryIOException() {
+    final Statement<String> statement =
+        new Eventual().value("test").eventuallyTry(new Mapper<String, Closeable>() {
+
+          public Closeable apply(final String input) {
+            return new Closeable() {
+
+              public void close() throws IOException {
+                throw new IOException();
+              }
+            };
+          }
+        }, new Mapper<String, String>() {
+
+          public String apply(final String input) {
+            return input.toUpperCase();
+          }
+        });
+    assertThat(statement.getValue()).isEqualTo("TEST");
+  }
+
+  @Test
+  public void eventuallyTryIf() {
+    final AtomicCloseable closeable = new AtomicCloseable();
+    final Statement<Integer> statement =
+        new Eventual().value("test").eventuallyTryIf(new Mapper<String, Closeable>() {
+
+          public Closeable apply(final String input) {
+            return closeable;
+          }
+        }, new Mapper<String, Statement<Integer>>() {
+
+          public Statement<Integer> apply(final String input) {
+            return new Eventual().value(input.length());
+          }
+        });
+    assertThat(statement.getValue()).isEqualTo(4);
+    assertThat(closeable.isCalled()).isTrue();
+  }
+
+  @Test
+  public void eventuallyTryIfAsync() {
+    final AtomicCloseable closeable = new AtomicCloseable();
+    final Statement<Integer> statement =
+        new Eventual().value("test").eventuallyTryIf(new Mapper<String, Closeable>() {
+
+          public Closeable apply(final String input) {
+            return closeable;
+          }
+        }, new Mapper<String, Statement<Integer>>() {
+
+          public Statement<Integer> apply(final String input) {
+            return new Eventual().value(input.length())
+                .forkOn(withDelay(100, TimeUnit.MILLISECONDS, backgroundExecutor()));
+          }
+        });
+    assertThat(statement.getValue()).isEqualTo(4);
+    assertThat(closeable.isCalled()).isTrue();
+  }
+
+  @Test
+  public void eventuallyTryIfAsyncException() {
+    final Statement<Integer> statement =
+        new Eventual().value("test").eventuallyTryIf(new Mapper<String, Closeable>() {
+
+          public Closeable apply(final String input) {
+            throw new RuntimeException();
+          }
+        }, new Mapper<String, Statement<Integer>>() {
+
+          public Statement<Integer> apply(final String input) {
+            return new Eventual().value(input.length())
+                .forkOn(withDelay(100, TimeUnit.MILLISECONDS, backgroundExecutor()));
+          }
+        });
+    assertThat(statement.getFailure()).isNotNull();
+  }
+
+  @Test
+  public void eventuallyTryIfAsyncIOException() {
+    final Statement<Integer> statement =
+        new Eventual().value("test").eventuallyTryIf(new Mapper<String, Closeable>() {
+
+          public Closeable apply(final String input) {
+            return new Closeable() {
+
+              public void close() throws IOException {
+                throw new IOException();
+              }
+            };
+          }
+        }, new Mapper<String, Statement<Integer>>() {
+
+          public Statement<Integer> apply(final String input) {
+            return new Eventual().value(input.length())
+                .forkOn(withDelay(100, TimeUnit.MILLISECONDS, backgroundExecutor()));
+          }
+        });
+    assertThat(statement.getFailure()).isNotNull();
+  }
+
+  @Test(expected = NullPointerException.class)
+  @SuppressWarnings("ConstantConditions")
+  public void eventuallyTryIfCloseableNPE() {
+    new Eventual().value(null).eventuallyTryIf(null, new Mapper<Object, Statement<Object>>() {
+
+      public Statement<Object> apply(final Object input) {
+        return new Eventual().value(null);
+      }
+    });
+  }
+
+  @Test
+  public void eventuallyTryIfException() {
+    final Statement<Integer> statement =
+        new Eventual().value("test").eventuallyTryIf(new Mapper<String, Closeable>() {
+
+          public Closeable apply(final String input) {
+            throw new RuntimeException();
+          }
+        }, new Mapper<String, Statement<Integer>>() {
+
+          public Statement<Integer> apply(final String input) {
+            return new Eventual().value(input.length());
+          }
+        });
+    assertThat(statement.isFailed()).isTrue();
+  }
+
+  @Test
+  public void eventuallyTryIfFail() {
+    final AtomicCloseable closeable = new AtomicCloseable();
+    final Statement<Integer> statement =
+        new Eventual().value("test").eventuallyTryIf(new Mapper<String, Closeable>() {
+
+          public Closeable apply(final String input) {
+            return closeable;
+          }
+        }, new Mapper<String, Statement<Integer>>() {
+
+          public Statement<Integer> apply(final String input) {
+            return new Eventual().failure(new IllegalArgumentException());
+          }
+        });
+    assertThat(ConstantConditions.notNull(statement.getFailure()).getCause()).isExactlyInstanceOf(
+        IllegalArgumentException.class);
+    assertThat(closeable.isCalled()).isTrue();
+  }
+
+  @Test
+  public void eventuallyTryIfIOException() {
+    final Statement<Integer> statement =
+        new Eventual().value("test").eventuallyTryIf(new Mapper<String, Closeable>() {
+
+          public Closeable apply(final String input) {
+            return new Closeable() {
+
+              public void close() throws IOException {
+                throw new IOException();
+              }
+            };
+          }
+        }, new Mapper<String, Statement<Integer>>() {
+
+          public Statement<Integer> apply(final String input) {
+            return new Eventual().value(input.length());
+          }
+        });
+    assertThat(statement.isFailed()).isTrue();
+  }
+
+  @Test(expected = NullPointerException.class)
+  @SuppressWarnings("ConstantConditions")
+  public void eventuallyTryIfNPE() {
+    new Eventual().value(null).eventuallyTryIf(new Mapper<Object, Closeable>() {
+
+      public Closeable apply(final Object input) {
+        return null;
+      }
+    }, null);
+  }
+
+  @Test
+  public void eventuallyTryIfNull() {
+    final Statement<Integer> statement =
+        new Eventual().value("test").eventuallyTryIf(new Mapper<String, Closeable>() {
+
+          public Closeable apply(final String input) {
+            return null;
+          }
+        }, new Mapper<String, Statement<Integer>>() {
+
+          public Statement<Integer> apply(final String input) {
+            return new Eventual().value(input.length());
+          }
+        });
+    assertThat(statement.getValue()).isEqualTo(4);
+  }
+
+  @Test
+  public void eventuallyTryIfStatementNPE() {
+    assertThat(new Eventual().value(null).eventuallyTryIf(new Mapper<Object, Closeable>() {
+
+      public Closeable apply(final Object input) {
+        return null;
+      }
+    }, new Mapper<Object, Statement<Object>>() {
+
+      public Statement<Object> apply(final Object input) {
+        return null;
+      }
+    }).failure()).isExactlyInstanceOf(NullPointerException.class);
+  }
+
+  @Test(expected = NullPointerException.class)
+  @SuppressWarnings("ConstantConditions")
+  public void eventuallyTryNPE() {
+    new Eventual().value(null).eventuallyTry(new Mapper<Object, Closeable>() {
+
+      public Closeable apply(final Object input) {
+        return null;
+      }
+    }, null);
+  }
+
+  @Test
+  public void eventuallyTryNull() {
+    final Statement<String> statement =
+        new Eventual().value("test").eventuallyTry(new Mapper<String, Closeable>() {
+
+          public Closeable apply(final String input) {
+            return null;
+          }
+        }, new Mapper<String, String>() {
+
+          public String apply(final String input) {
+            return input.toUpperCase();
+          }
+        });
+    assertThat(statement.getValue()).isEqualTo("TEST");
+  }
+
+  @Test
+  public void failEventually() {
+    final Statement<String> statement =
+        new Eventual().<String>failure(new NullPointerException("test")).eventually(
             new Mapper<String, String>() {
 
               public String apply(final String input) {
@@ -661,32 +1228,32 @@ public class StatementTest {
 
   @Test
   public void failure() {
-    final Statement<String> statement = new Async().failure(new IllegalArgumentException());
+    final Statement<String> statement = new Eventual().failure(new IllegalArgumentException());
     assertThat(statement.failure()).isExactlyInstanceOf(IllegalArgumentException.class);
   }
 
   @Test
   public void failureCancelled() {
-    final Statement<String> statement = new Async().failure(new IllegalArgumentException());
+    final Statement<String> statement = new Eventual().failure(new IllegalArgumentException());
     assertThat(statement.isCancelled()).isFalse();
   }
 
   @Test
   public void failureEvaluating() {
-    final Statement<String> statement = new Async().failure(new IllegalArgumentException());
+    final Statement<String> statement = new Eventual().failure(new IllegalArgumentException());
     assertThat(statement.isEvaluating()).isFalse();
   }
 
   @Test
   public void failureFailed() {
-    final Statement<String> statement = new Async().failure(new IllegalArgumentException());
+    final Statement<String> statement = new Eventual().failure(new IllegalArgumentException());
     assertThat(statement.isFailed()).isTrue();
   }
 
   @Test(expected = IllegalStateException.class)
   public void failureIllegal() {
-    final Statement<Object> statement = new Async().failure(new IllegalArgumentException());
-    statement.thenDo(new Observer<Object>() {
+    final Statement<Object> statement = new Eventual().failure(new IllegalArgumentException());
+    statement.eventuallyDo(new Observer<Object>() {
 
       public void accept(final Object input) {
       }
@@ -696,28 +1263,28 @@ public class StatementTest {
 
   @Test(expected = IllegalStateException.class)
   public void failureInvalidStateEvaluating() {
-    final Statement<Void> statement = new Async().evaluated(false).failure(new Exception());
+    final Statement<Void> statement = new Eventual().evaluated(false).failure(new Exception());
     assertThat(statement.failure());
   }
 
   @Test(expected = IllegalStateException.class)
   public void failureInvalidStateValue() {
-    final Statement<String> statement = new Async().value(null);
+    final Statement<String> statement = new Eventual().value(null);
     assertThat(statement.failure());
   }
 
   @Test
   public void failureSet() {
-    final Statement<String> statement = new Async().failure(new IllegalArgumentException());
+    final Statement<String> statement = new Eventual().failure(new IllegalArgumentException());
     assertThat(statement.isSet()).isFalse();
   }
 
   @Test
   public void fork() {
-    final Statement<String> statement = createStatementFork(new Async().value("test"));
+    final Statement<String> statement = createStatementFork(new Eventual().value("test"));
     assertThat(statement.isFinal()).isTrue();
     assertThat(statement.isDone()).isFalse();
-    assertThat(statement.then(new Mapper<String, String>() {
+    assertThat(statement.eventually(new Mapper<String, String>() {
 
       public String apply(final String input) {
         return input;
@@ -728,13 +1295,14 @@ public class StatementTest {
   @Test
   public void forkCancel() {
     final Statement<String> statement = createStatementFork(
-        new Async().evaluateOn(withDelay(1, TimeUnit.SECONDS, backgroundExecutor())).value("test"));
+        new Eventual().evaluateOn(withDelay(1, TimeUnit.SECONDS, backgroundExecutor()))
+            .value("test"));
     assertThat(statement.isFinal()).isTrue();
     assertThat(statement.isDone()).isFalse();
     assertThat(statement.cancel(true)).isTrue();
     assertThat(statement.isCancelled()).isFalse();
     assertThat(statement.isFailed()).isFalse();
-    assertThat(statement.then(new Mapper<String, String>() {
+    assertThat(statement.eventually(new Mapper<String, String>() {
 
       public String apply(final String input) {
         return input;
@@ -744,12 +1312,12 @@ public class StatementTest {
 
   @Test
   public void forkCancelFailure() {
-    final Statement<String> statement = createStatementFork(new Async().value("test"));
+    final Statement<String> statement = createStatementFork(new Eventual().value("test"));
     assertThat(statement.isFinal()).isTrue();
     assertThat(statement.isDone()).isFalse();
     assertThat(statement.cancel(false)).isFalse();
     assertThat(statement.isCancelled()).isFalse();
-    assertThat(statement.then(new Mapper<String, String>() {
+    assertThat(statement.eventually(new Mapper<String, String>() {
 
       public String apply(final String input) {
         return input;
@@ -760,8 +1328,9 @@ public class StatementTest {
   @Test
   public void forkCancelForked() {
     final Statement<String> statement = createStatementFork(
-        new Async().evaluateOn(withDelay(1, TimeUnit.SECONDS, backgroundExecutor())).value("test"));
-    final Statement<String> forked = statement.then(new Mapper<String, String>() {
+        new Eventual().evaluateOn(withDelay(1, TimeUnit.SECONDS, backgroundExecutor()))
+            .value("test"));
+    final Statement<String> forked = statement.eventually(new Mapper<String, String>() {
 
       public String apply(final String input) {
         return input;
@@ -779,20 +1348,19 @@ public class StatementTest {
   @Test
   public void forkDefaultFunctions() {
     final Statement<String> statement = //
-        new Async().value("test")
-                   .fork(null, null, null, null,
-                       new Updater<Object, Evaluation<String>, Statement<String>>() {
+        new Eventual().value("test")
+            .fork(null, null, null, null,
+                new Updater<Object, Evaluation<String>, Statement<String>>() {
 
-                         public Object update(final Object stack,
-                             final Evaluation<String> evaluation,
-                             @NotNull final Statement<String> statement) {
-                           evaluation.set("TEST");
-                           return null;
-                         }
-                       });
+                  public Object update(final Object stack, final Evaluation<String> evaluation,
+                      @NotNull final Statement<String> statement) {
+                    evaluation.set("TEST");
+                    return null;
+                  }
+                });
     assertThat(statement.isFinal()).isTrue();
     assertThat(statement.isDone()).isFalse();
-    assertThat(statement.then(new Mapper<String, String>() {
+    assertThat(statement.eventually(new Mapper<String, String>() {
 
       public String apply(final String input) {
         return input;
@@ -803,10 +1371,10 @@ public class StatementTest {
   @Test
   public void forkDefaultStatement() {
     final Statement<String> statement = //
-        new Async().value("test").fork(null, null, null, null, null);
+        new Eventual().value("test").fork(null, null, null, null, null);
     assertThat(statement.isFinal()).isTrue();
     assertThat(statement.isDone()).isFalse();
-    assertThat(statement.then(new Mapper<String, String>() {
+    assertThat(statement.eventually(new Mapper<String, String>() {
 
       public String apply(final String input) {
         return input;
@@ -817,12 +1385,12 @@ public class StatementTest {
   @Test
   public void forkFailure() {
     final Statement<String> statement =
-        createStatementFork(new Async().<String>failure(new IllegalArgumentException()));
+        createStatementFork(new Eventual().<String>failure(new IllegalArgumentException()));
     assertThat(statement.isFinal()).isTrue();
     assertThat(statement.isDone()).isFalse();
     assertThat(statement.isCancelled()).isFalse();
     assertThat(statement.isFailed()).isFalse();
-    assertThat(statement.then(new Mapper<String, String>() {
+    assertThat(statement.eventually(new Mapper<String, String>() {
 
       public String apply(final String input) {
         return input;
@@ -833,7 +1401,7 @@ public class StatementTest {
   @Test
   public void forkFailureDoneFail() {
     final Statement<String> statement = //
-        new Async().<String>failure(new Exception()).fork(null, null, null,
+        new Eventual().<String>failure(new Exception()).fork(null, null, null,
             new Completer<String, Statement<String>>() {
 
               public String complete(final String stack,
@@ -843,7 +1411,7 @@ public class StatementTest {
             }, null);
     assertThat(statement.isFinal()).isTrue();
     assertThat(statement.isDone()).isFalse();
-    assertThat(statement.then(new Mapper<String, String>() {
+    assertThat(statement.eventually(new Mapper<String, String>() {
 
       public String apply(final String input) {
         return input;
@@ -854,14 +1422,14 @@ public class StatementTest {
   @Test(expected = IllegalStateException.class)
   public void forkFailureException() {
     final Statement<String> statement =
-        createStatementFork(new Async().<String>failure(new Exception()));
+        createStatementFork(new Eventual().<String>failure(new Exception()));
     ConstantConditions.notNull(statement.failure());
   }
 
   @Test
   public void forkFailureFail() {
     final Statement<String> statement = //
-        new Async().<String>failure(new Exception()).fork(null, null,
+        new Eventual().<String>failure(new Exception()).fork(null, null,
             new Updater<String, Throwable, Statement<String>>() {
 
               public String update(final String stack, final Throwable input,
@@ -871,7 +1439,7 @@ public class StatementTest {
             }, null, null);
     assertThat(statement.isFinal()).isTrue();
     assertThat(statement.isDone()).isFalse();
-    assertThat(statement.then(new Mapper<String, String>() {
+    assertThat(statement.eventually(new Mapper<String, String>() {
 
       public String apply(final String input) {
         return input;
@@ -882,7 +1450,7 @@ public class StatementTest {
   @Test
   public void forkFunctions() {
     final Statement<String> statement = //
-        new Async().value("test").fork(new Mapper<Statement<String>, EvaluationState<String>>() {
+        new Eventual().value("test").fork(new Mapper<Statement<String>, EvaluationState<String>>() {
 
           public EvaluationState<String> apply(final Statement<String> input) {
             return null;
@@ -918,7 +1486,7 @@ public class StatementTest {
         });
     assertThat(statement.isFinal()).isTrue();
     assertThat(statement.isDone()).isFalse();
-    assertThat(statement.then(new Mapper<String, String>() {
+    assertThat(statement.eventually(new Mapper<String, String>() {
 
       public String apply(final String input) {
         return input.toUpperCase();
@@ -929,20 +1497,20 @@ public class StatementTest {
   @Test(expected = UnsupportedOperationException.class)
   public void forkGetFailureException() {
     final Statement<String> statement =
-        createStatementFork(new Async().<String>failure(new Exception()));
+        createStatementFork(new Eventual().<String>failure(new Exception()));
     ConstantConditions.notNull(statement.getFailure());
   }
 
   @Test(expected = UnsupportedOperationException.class)
   public void forkGetValueException() {
-    final Statement<String> statement = createStatementFork(new Async().value("test"));
+    final Statement<String> statement = createStatementFork(new Eventual().value("test"));
     statement.getValue();
   }
 
   @Test
   public void forkInit() {
     final Statement<String> statement = //
-        new Async().value("test").fork(new Mapper<Statement<String>, String>() {
+        new Eventual().value("test").fork(new Mapper<Statement<String>, String>() {
 
           public String apply(final Statement<String> input) {
             return "TEST";
@@ -957,7 +1525,7 @@ public class StatementTest {
         });
     assertThat(statement.isFinal()).isTrue();
     assertThat(statement.isDone()).isFalse();
-    assertThat(statement.then(new Mapper<String, String>() {
+    assertThat(statement.eventually(new Mapper<String, String>() {
 
       public String apply(final String input) {
         return input;
@@ -968,7 +1536,7 @@ public class StatementTest {
   @Test
   public void forkInitFail() {
     final Statement<String> statement = //
-        new Async().value("test").fork(new Mapper<Statement<String>, String>() {
+        new Eventual().value("test").fork(new Mapper<Statement<String>, String>() {
 
           public String apply(final Statement<String> input) {
             throw new RuntimeException("test");
@@ -976,7 +1544,7 @@ public class StatementTest {
         }, null, null, null, null);
     assertThat(statement.isFinal()).isTrue();
     assertThat(statement.isDone()).isFalse();
-    assertThat(statement.then(new Mapper<String, String>() {
+    assertThat(statement.eventually(new Mapper<String, String>() {
 
       public String apply(final String input) {
         return input;
@@ -987,24 +1555,24 @@ public class StatementTest {
   @Test(expected = NullPointerException.class)
   @SuppressWarnings("ConstantConditions")
   public void forkNPE() {
-    new Async().value(null).fork(null);
+    new Eventual().value(null).fork(null);
   }
 
   @Test
   public void forkStatementFail() {
     final Statement<String> statement = //
-        new Async().value("test")
-                   .fork(null, null, null, null,
-                       new Updater<String, Evaluation<String>, Statement<String>>() {
+        new Eventual().value("test")
+            .fork(null, null, null, null,
+                new Updater<String, Evaluation<String>, Statement<String>>() {
 
-                         public String update(final String stack, final Evaluation<String> input,
-                             @NotNull final Statement<String> statement) {
-                           throw new RuntimeException("test");
-                         }
-                       });
+                  public String update(final String stack, final Evaluation<String> input,
+                      @NotNull final Statement<String> statement) {
+                    throw new RuntimeException("test");
+                  }
+                });
     assertThat(statement.isFinal()).isTrue();
     assertThat(statement.isDone()).isFalse();
-    assertThat(statement.then(new Mapper<String, String>() {
+    assertThat(statement.eventually(new Mapper<String, String>() {
 
       public String apply(final String input) {
         return input;
@@ -1015,17 +1583,17 @@ public class StatementTest {
   @Test
   public void forkValueDoneFail() {
     final Statement<String> statement = //
-        new Async().value("test")
-                   .fork(null, null, null, new Completer<String, Statement<String>>() {
+        new Eventual().value("test")
+            .fork(null, null, null, new Completer<String, Statement<String>>() {
 
-                     public String complete(final String stack,
-                         @NotNull final Statement<String> statement) {
-                       throw new RuntimeException("test");
-                     }
-                   }, null);
+              public String complete(final String stack,
+                  @NotNull final Statement<String> statement) {
+                throw new RuntimeException("test");
+              }
+            }, null);
     assertThat(statement.isFinal()).isTrue();
     assertThat(statement.isDone()).isFalse();
-    assertThat(statement.then(new Mapper<String, String>() {
+    assertThat(statement.eventually(new Mapper<String, String>() {
 
       public String apply(final String input) {
         return input;
@@ -1035,14 +1603,14 @@ public class StatementTest {
 
   @Test(expected = IllegalStateException.class)
   public void forkValueException() {
-    final Statement<String> statement = createStatementFork(new Async().value("test"));
+    final Statement<String> statement = createStatementFork(new Eventual().value("test"));
     statement.value();
   }
 
   @Test
   public void forkValueFail() {
     final Statement<String> statement = //
-        new Async().value("test").fork(null, new Updater<String, String, Statement<String>>() {
+        new Eventual().value("test").fork(null, new Updater<String, String, Statement<String>>() {
 
           public String update(final String stack, final String input,
               @NotNull final Statement<String> statement) {
@@ -1051,7 +1619,7 @@ public class StatementTest {
         }, null, null, null);
     assertThat(statement.isFinal()).isTrue();
     assertThat(statement.isDone()).isFalse();
-    assertThat(statement.then(new Mapper<String, String>() {
+    assertThat(statement.eventually(new Mapper<String, String>() {
 
       public String apply(final String input) {
         return input;
@@ -1062,16 +1630,16 @@ public class StatementTest {
   @Test
   public void get() throws ExecutionException, InterruptedException {
     final Statement<String> statement =
-        new Async().evaluateOn(withDelay(100, TimeUnit.MILLISECONDS, backgroundExecutor()))
-                   .value("test");
+        new Eventual().evaluateOn(withDelay(100, TimeUnit.MILLISECONDS, backgroundExecutor()))
+            .value("test");
     assertThat(statement.get()).isEqualTo("test");
   }
 
   @Test(expected = CancellationException.class)
   public void getCancelled() throws ExecutionException, InterruptedException {
     final Statement<String> statement =
-        new Async().evaluateOn(withDelay(100, TimeUnit.MILLISECONDS, backgroundExecutor()))
-                   .value("test");
+        new Eventual().evaluateOn(withDelay(100, TimeUnit.MILLISECONDS, backgroundExecutor()))
+            .value("test");
     assertThat(statement.cancel(true)).isTrue();
     statement.get();
   }
@@ -1080,8 +1648,8 @@ public class StatementTest {
   public void getCancelledWithTimeout() throws ExecutionException, InterruptedException,
       TimeoutException {
     final Statement<String> statement =
-        new Async().evaluateOn(withDelay(100, TimeUnit.MILLISECONDS, backgroundExecutor()))
-                   .value("test");
+        new Eventual().evaluateOn(withDelay(100, TimeUnit.MILLISECONDS, backgroundExecutor()))
+            .value("test");
     assertThat(statement.cancel(true)).isTrue();
     statement.get(10, TimeUnit.MILLISECONDS);
   }
@@ -1089,15 +1657,15 @@ public class StatementTest {
   @Test(expected = ExecutionException.class)
   public void getFailure() throws ExecutionException, InterruptedException {
     final Statement<String> statement =
-        new Async().evaluateOn(withDelay(100, TimeUnit.MILLISECONDS, backgroundExecutor()))
-                   .failure(new IllegalArgumentException());
+        new Eventual().evaluateOn(withDelay(100, TimeUnit.MILLISECONDS, backgroundExecutor()))
+            .failure(new IllegalArgumentException());
     statement.get();
   }
 
   @Test(expected = IllegalStateException.class)
   public void getFailureIllegal() {
-    final Statement<Object> statement = new Async().failure(new IllegalArgumentException());
-    statement.thenDo(new Observer<Object>() {
+    final Statement<Object> statement = new Eventual().failure(new IllegalArgumentException());
+    statement.eventuallyDo(new Observer<Object>() {
 
       public void accept(final Object input) {
       }
@@ -1108,14 +1676,15 @@ public class StatementTest {
   @Test(expected = NullPointerException.class)
   @SuppressWarnings({"ConstantConditions", "ThrowableNotThrown"})
   public void getFailureNPE() {
-    new Async().value(null).getFailure(0, null);
+    new Eventual().value(null).getFailure(0, null);
   }
 
   @Test(expected = RuntimeTimeoutException.class)
   public void getFailureTimeout() throws ExecutionException, InterruptedException,
       TimeoutException {
     final Statement<String> statement =
-        new Async().evaluateOn(withDelay(1, TimeUnit.SECONDS, backgroundExecutor())).value("test");
+        new Eventual().evaluateOn(withDelay(1, TimeUnit.SECONDS, backgroundExecutor()))
+            .value("test");
     assertThat(statement.getFailure(10, TimeUnit.MILLISECONDS));
   }
 
@@ -1123,22 +1692,23 @@ public class StatementTest {
   public void getFailureWithTimeout() throws ExecutionException, InterruptedException,
       TimeoutException {
     final Statement<String> statement =
-        new Async().evaluateOn(withDelay(100, TimeUnit.MILLISECONDS, backgroundExecutor()))
-                   .failure(new IllegalArgumentException());
+        new Eventual().evaluateOn(withDelay(100, TimeUnit.MILLISECONDS, backgroundExecutor()))
+            .failure(new IllegalArgumentException());
     statement.get(1, TimeUnit.SECONDS);
   }
 
   @Test(expected = TimeoutException.class)
   public void getTimeout() throws ExecutionException, InterruptedException, TimeoutException {
     final Statement<String> statement =
-        new Async().evaluateOn(withDelay(1, TimeUnit.SECONDS, backgroundExecutor())).value("test");
+        new Eventual().evaluateOn(withDelay(1, TimeUnit.SECONDS, backgroundExecutor()))
+            .value("test");
     statement.get(10, TimeUnit.MILLISECONDS);
   }
 
   @Test(expected = IllegalStateException.class)
   public void getValueIllegal() {
-    final Statement<Object> statement = new Async().value(null);
-    statement.thenDo(new Observer<Object>() {
+    final Statement<Object> statement = new Eventual().value(null);
+    statement.eventuallyDo(new Observer<Object>() {
 
       public void accept(final Object input) {
       }
@@ -1149,36 +1719,36 @@ public class StatementTest {
   @Test(expected = NullPointerException.class)
   @SuppressWarnings("ConstantConditions")
   public void getValueNPE() {
-    new Async().value(null).getValue(0, null);
+    new Eventual().value(null).getValue(0, null);
   }
 
   @Test(expected = RuntimeTimeoutException.class)
   public void getValueTimeout() {
     final Statement<String> statement = //
-        new Async().value("test")
-                   .forkOn(withDelay(1, TimeUnit.SECONDS, backgroundExecutor()))
-                   .then(new ToUpper());
+        new Eventual().value("test")
+            .forkOn(withDelay(1, TimeUnit.SECONDS, backgroundExecutor()))
+            .eventually(new ToUpper());
     statement.getValue(0, TimeUnit.MILLISECONDS);
   }
 
   @Test
   public void getWithTimeout() throws ExecutionException, InterruptedException, TimeoutException {
     final Statement<String> statement =
-        new Async().evaluateOn(withDelay(100, TimeUnit.MILLISECONDS, backgroundExecutor()))
-                   .value("test");
+        new Eventual().evaluateOn(withDelay(100, TimeUnit.MILLISECONDS, backgroundExecutor()))
+            .value("test");
     assertThat(statement.get(1, TimeUnit.SECONDS)).isEqualTo("test");
   }
 
   @Test
   public void isFinal() {
-    final Statement<String> statement = new Async().failure(new IllegalArgumentException());
+    final Statement<String> statement = new Eventual().failure(new IllegalArgumentException());
     assertThat(statement.isFinal()).isTrue();
   }
 
   @Test
   public void isNotFinal() {
-    final Statement<String> statement = new Async().failure(new IllegalArgumentException());
-    final Statement<String> newStatement = statement.thenDo(new Observer<String>() {
+    final Statement<String> statement = new Eventual().failure(new IllegalArgumentException());
+    final Statement<String> newStatement = statement.eventuallyDo(new Observer<String>() {
 
       public void accept(final String input) {
 
@@ -1191,7 +1761,7 @@ public class StatementTest {
   @Test(expected = NullPointerException.class)
   @SuppressWarnings("ConstantConditions")
   public void onNPE() {
-    new Async().value(null).forkOn(null);
+    new Eventual().value(null).forkOn(null);
   }
 
   @Test
@@ -1225,7 +1795,7 @@ public class StatementTest {
   @Test
   public void serializeElse() throws IOException, ClassNotFoundException {
     final Statement<String> statement =
-        new Async().<String>failure(new IllegalArgumentException("test")).elseCatch(
+        new Eventual().<String>failure(new IllegalArgumentException("test")).elseCatch(
             new ToMessage());
     final ByteArrayOutputStream byteOutputStream = new ByteArrayOutputStream();
     final ObjectOutputStream objectOutputStream = new ObjectOutputStream(byteOutputStream);
@@ -1241,7 +1811,7 @@ public class StatementTest {
   @Test
   public void serializeElseDo() throws IOException, ClassNotFoundException {
     final Statement<String> statement =
-        new Async().<String>failure(new IllegalArgumentException("test")).elseDo(
+        new Eventual().<String>failure(new IllegalArgumentException("test")).elseDo(
             new PrintMessage("test.logger"));
     final ByteArrayOutputStream byteOutputStream = new ByteArrayOutputStream();
     final ObjectOutputStream objectOutputStream = new ObjectOutputStream(byteOutputStream);
@@ -1259,7 +1829,7 @@ public class StatementTest {
   @Test
   public void serializeElseIf() throws IOException, ClassNotFoundException {
     final Statement<String> statement =
-        new Async().<String>failure(new IllegalArgumentException("test")).elseIf(
+        new Eventual().<String>failure(new IllegalArgumentException("test")).elseIf(
             new ToMessageStatement());
     final ByteArrayOutputStream byteOutputStream = new ByteArrayOutputStream();
     final ObjectOutputStream objectOutputStream = new ObjectOutputStream(byteOutputStream);
@@ -1274,7 +1844,7 @@ public class StatementTest {
 
   @Test(expected = IOException.class)
   public void serializeError() throws IOException, ClassNotFoundException {
-    final Statement<String> promise = new Async().statement(new Observer<Evaluation<String>>() {
+    final Statement<String> promise = new Eventual().statement(new Observer<Evaluation<String>>() {
 
       public void accept(final Evaluation<String> evaluation) {
         evaluation.set("test");
@@ -1321,8 +1891,8 @@ public class StatementTest {
   }
 
   @Test
-  public void serializeFork() throws IOException, ClassNotFoundException {
-    final Statement<String> statement = createStatementFork(new Async().value("test"));
+  public void serializeEventually() throws IOException, ClassNotFoundException {
+    final Statement<String> statement = new Eventual().value("test").eventually(new ToUpper());
     final ByteArrayOutputStream byteOutputStream = new ByteArrayOutputStream();
     final ObjectOutputStream objectOutputStream = new ObjectOutputStream(byteOutputStream);
     objectOutputStream.writeObject(statement);
@@ -1331,7 +1901,96 @@ public class StatementTest {
     final ObjectInputStream objectInputStream = new ObjectInputStream(byteInputStream);
     @SuppressWarnings("unchecked") final Statement<String> deserialized =
         (Statement<String>) objectInputStream.readObject();
-    assertThat(deserialized.then(new Mapper<String, String>() {
+    assertThat(deserialized.getValue()).isEqualTo("TEST");
+  }
+
+  @Test
+  public void serializeEventuallyDo() throws IOException, ClassNotFoundException {
+    final Statement<String> statement =
+        new Eventual().value("test").eventuallyDo(new PrintString("test.logger"));
+    final ByteArrayOutputStream byteOutputStream = new ByteArrayOutputStream();
+    final ObjectOutputStream objectOutputStream = new ObjectOutputStream(byteOutputStream);
+    objectOutputStream.writeObject(statement);
+    final ByteArrayInputStream byteInputStream =
+        new ByteArrayInputStream(byteOutputStream.toByteArray());
+    final ObjectInputStream objectInputStream = new ObjectInputStream(byteInputStream);
+    @SuppressWarnings("unchecked") final Statement<String> deserialized =
+        (Statement<String>) objectInputStream.readObject();
+    assertThat(deserialized.getValue()).isEqualTo("test");
+  }
+
+  @Test
+  public void serializeEventuallyIf() throws IOException, ClassNotFoundException {
+    final Statement<String> statement =
+        new Eventual().value("test").eventuallyIf(new ToUpperStatement());
+    final ByteArrayOutputStream byteOutputStream = new ByteArrayOutputStream();
+    final ObjectOutputStream objectOutputStream = new ObjectOutputStream(byteOutputStream);
+    objectOutputStream.writeObject(statement);
+    final ByteArrayInputStream byteInputStream =
+        new ByteArrayInputStream(byteOutputStream.toByteArray());
+    final ObjectInputStream objectInputStream = new ObjectInputStream(byteInputStream);
+    @SuppressWarnings("unchecked") final Statement<String> deserialized =
+        (Statement<String>) objectInputStream.readObject();
+    assertThat(deserialized.getValue()).isEqualTo("TEST");
+  }
+
+  @Test
+  public void serializeEventuallyTry() throws IOException, ClassNotFoundException {
+    final Statement<AtomicBoolean> statement = new Eventual().value(new AtomicBoolean())
+        .eventuallyTry(new ToCloseable(), new Identity<AtomicBoolean>());
+    final ByteArrayOutputStream byteOutputStream = new ByteArrayOutputStream();
+    final ObjectOutputStream objectOutputStream = new ObjectOutputStream(byteOutputStream);
+    objectOutputStream.writeObject(statement);
+    final ByteArrayInputStream byteInputStream =
+        new ByteArrayInputStream(byteOutputStream.toByteArray());
+    final ObjectInputStream objectInputStream = new ObjectInputStream(byteInputStream);
+    @SuppressWarnings("unchecked") final Statement<AtomicBoolean> deserialized =
+        (Statement<AtomicBoolean>) objectInputStream.readObject();
+    assertThat(deserialized.getValue().get()).isTrue();
+  }
+
+  @Test
+  public void serializeEventuallyTryDo() throws IOException, ClassNotFoundException {
+    final Statement<AtomicBoolean> statement = new Eventual().value(new AtomicBoolean())
+        .eventuallyTryDo(new ToCloseable(), new Sink<AtomicBoolean>());
+    final ByteArrayOutputStream byteOutputStream = new ByteArrayOutputStream();
+    final ObjectOutputStream objectOutputStream = new ObjectOutputStream(byteOutputStream);
+    objectOutputStream.writeObject(statement);
+    final ByteArrayInputStream byteInputStream =
+        new ByteArrayInputStream(byteOutputStream.toByteArray());
+    final ObjectInputStream objectInputStream = new ObjectInputStream(byteInputStream);
+    @SuppressWarnings("unchecked") final Statement<AtomicBoolean> deserialized =
+        (Statement<AtomicBoolean>) objectInputStream.readObject();
+    assertThat(deserialized.getValue().get()).isTrue();
+  }
+
+  @Test
+  public void serializeEventuallyTryIf() throws IOException, ClassNotFoundException {
+    final Statement<AtomicBoolean> statement = new Eventual().value(new AtomicBoolean())
+        .eventuallyTryIf(new ToCloseable(), new ToStatement<AtomicBoolean>());
+    final ByteArrayOutputStream byteOutputStream = new ByteArrayOutputStream();
+    final ObjectOutputStream objectOutputStream = new ObjectOutputStream(byteOutputStream);
+    objectOutputStream.writeObject(statement);
+    final ByteArrayInputStream byteInputStream =
+        new ByteArrayInputStream(byteOutputStream.toByteArray());
+    final ObjectInputStream objectInputStream = new ObjectInputStream(byteInputStream);
+    @SuppressWarnings("unchecked") final Statement<AtomicBoolean> deserialized =
+        (Statement<AtomicBoolean>) objectInputStream.readObject();
+    assertThat(deserialized.getValue().get()).isTrue();
+  }
+
+  @Test
+  public void serializeFork() throws IOException, ClassNotFoundException {
+    final Statement<String> statement = createStatementFork(new Eventual().value("test"));
+    final ByteArrayOutputStream byteOutputStream = new ByteArrayOutputStream();
+    final ObjectOutputStream objectOutputStream = new ObjectOutputStream(byteOutputStream);
+    objectOutputStream.writeObject(statement);
+    final ByteArrayInputStream byteInputStream =
+        new ByteArrayInputStream(byteOutputStream.toByteArray());
+    final ObjectInputStream objectInputStream = new ObjectInputStream(byteInputStream);
+    @SuppressWarnings("unchecked") final Statement<String> deserialized =
+        (Statement<String>) objectInputStream.readObject();
+    assertThat(deserialized.eventually(new Mapper<String, String>() {
 
       public String apply(final String input) {
         return input;
@@ -1342,7 +2001,7 @@ public class StatementTest {
   @Test
   public void serializeForkDefault() throws IOException, ClassNotFoundException {
     final Statement<String> statement =
-        new Async().value("test").fork(null, null, null, null, null);
+        new Eventual().value("test").fork(null, null, null, null, null);
     final ByteArrayOutputStream byteOutputStream = new ByteArrayOutputStream();
     final ObjectOutputStream objectOutputStream = new ObjectOutputStream(byteOutputStream);
     objectOutputStream.writeObject(statement);
@@ -1351,7 +2010,7 @@ public class StatementTest {
     final ObjectInputStream objectInputStream = new ObjectInputStream(byteInputStream);
     @SuppressWarnings("unchecked") final Statement<String> deserialized =
         (Statement<String>) objectInputStream.readObject();
-    assertThat(deserialized.then(new Mapper<String, String>() {
+    assertThat(deserialized.eventually(new Mapper<String, String>() {
 
       public String apply(final String input) {
         return input;
@@ -1362,7 +2021,7 @@ public class StatementTest {
   @Test
   public void serializeForked() throws IOException, ClassNotFoundException {
     final Statement<String> statement =
-        createStatementFork(new Async().value("test")).then(new ToUpper());
+        createStatementFork(new Eventual().value("test")).eventually(new ToUpper());
     final ByteArrayOutputStream byteOutputStream = new ByteArrayOutputStream();
     final ObjectOutputStream objectOutputStream = new ObjectOutputStream(byteOutputStream);
     objectOutputStream.writeObject(statement);
@@ -1376,8 +2035,8 @@ public class StatementTest {
 
   @Test
   public void serializePartial() throws IOException, ClassNotFoundException {
-    final Statement<String> statement = new Async().value("test");
-    statement.then(new ToUpper());
+    final Statement<String> statement = new Eventual().value("test");
+    statement.eventually(new ToUpper());
     final ByteArrayOutputStream byteOutputStream = new ByteArrayOutputStream();
     final ObjectOutputStream objectOutputStream = new ObjectOutputStream(byteOutputStream);
     objectOutputStream.writeObject(statement);
@@ -1387,102 +2046,11 @@ public class StatementTest {
     @SuppressWarnings("unchecked") final Statement<String> deserialized =
         (Statement<String>) objectInputStream.readObject();
     assertThat(deserialized.getValue()).isEqualTo("test");
-  }
-
-  @Test
-  public void serializeThen() throws IOException, ClassNotFoundException {
-    final Statement<String> statement = new Async().value("test").then(new ToUpper());
-    final ByteArrayOutputStream byteOutputStream = new ByteArrayOutputStream();
-    final ObjectOutputStream objectOutputStream = new ObjectOutputStream(byteOutputStream);
-    objectOutputStream.writeObject(statement);
-    final ByteArrayInputStream byteInputStream =
-        new ByteArrayInputStream(byteOutputStream.toByteArray());
-    final ObjectInputStream objectInputStream = new ObjectInputStream(byteInputStream);
-    @SuppressWarnings("unchecked") final Statement<String> deserialized =
-        (Statement<String>) objectInputStream.readObject();
-    assertThat(deserialized.getValue()).isEqualTo("TEST");
-  }
-
-  @Test
-  public void serializeThenDo() throws IOException, ClassNotFoundException {
-    final Statement<String> statement =
-        new Async().value("test").thenDo(new PrintString("test.logger"));
-    final ByteArrayOutputStream byteOutputStream = new ByteArrayOutputStream();
-    final ObjectOutputStream objectOutputStream = new ObjectOutputStream(byteOutputStream);
-    objectOutputStream.writeObject(statement);
-    final ByteArrayInputStream byteInputStream =
-        new ByteArrayInputStream(byteOutputStream.toByteArray());
-    final ObjectInputStream objectInputStream = new ObjectInputStream(byteInputStream);
-    @SuppressWarnings("unchecked") final Statement<String> deserialized =
-        (Statement<String>) objectInputStream.readObject();
-    assertThat(deserialized.getValue()).isEqualTo("test");
-  }
-
-  @Test
-  public void serializeThenIf() throws IOException, ClassNotFoundException {
-    final Statement<String> statement = new Async().value("test").thenIf(new ToUpperStatement());
-    final ByteArrayOutputStream byteOutputStream = new ByteArrayOutputStream();
-    final ObjectOutputStream objectOutputStream = new ObjectOutputStream(byteOutputStream);
-    objectOutputStream.writeObject(statement);
-    final ByteArrayInputStream byteInputStream =
-        new ByteArrayInputStream(byteOutputStream.toByteArray());
-    final ObjectInputStream objectInputStream = new ObjectInputStream(byteInputStream);
-    @SuppressWarnings("unchecked") final Statement<String> deserialized =
-        (Statement<String>) objectInputStream.readObject();
-    assertThat(deserialized.getValue()).isEqualTo("TEST");
-  }
-
-  @Test
-  public void serializeThenTry() throws IOException, ClassNotFoundException {
-    final Statement<AtomicBoolean> statement = new Async().value(new AtomicBoolean())
-                                                          .thenTry(new ToCloseable(),
-                                                              new Identity<AtomicBoolean>());
-    final ByteArrayOutputStream byteOutputStream = new ByteArrayOutputStream();
-    final ObjectOutputStream objectOutputStream = new ObjectOutputStream(byteOutputStream);
-    objectOutputStream.writeObject(statement);
-    final ByteArrayInputStream byteInputStream =
-        new ByteArrayInputStream(byteOutputStream.toByteArray());
-    final ObjectInputStream objectInputStream = new ObjectInputStream(byteInputStream);
-    @SuppressWarnings("unchecked") final Statement<AtomicBoolean> deserialized =
-        (Statement<AtomicBoolean>) objectInputStream.readObject();
-    assertThat(deserialized.getValue().get()).isTrue();
-  }
-
-  @Test
-  public void serializeThenTryDo() throws IOException, ClassNotFoundException {
-    final Statement<AtomicBoolean> statement = new Async().value(new AtomicBoolean())
-                                                          .thenTryDo(new ToCloseable(),
-                                                              new Sink<AtomicBoolean>());
-    final ByteArrayOutputStream byteOutputStream = new ByteArrayOutputStream();
-    final ObjectOutputStream objectOutputStream = new ObjectOutputStream(byteOutputStream);
-    objectOutputStream.writeObject(statement);
-    final ByteArrayInputStream byteInputStream =
-        new ByteArrayInputStream(byteOutputStream.toByteArray());
-    final ObjectInputStream objectInputStream = new ObjectInputStream(byteInputStream);
-    @SuppressWarnings("unchecked") final Statement<AtomicBoolean> deserialized =
-        (Statement<AtomicBoolean>) objectInputStream.readObject();
-    assertThat(deserialized.getValue().get()).isTrue();
-  }
-
-  @Test
-  public void serializeThenTryIf() throws IOException, ClassNotFoundException {
-    final Statement<AtomicBoolean> statement = new Async().value(new AtomicBoolean())
-                                                          .thenTryIf(new ToCloseable(),
-                                                              new ToStatement<AtomicBoolean>());
-    final ByteArrayOutputStream byteOutputStream = new ByteArrayOutputStream();
-    final ObjectOutputStream objectOutputStream = new ObjectOutputStream(byteOutputStream);
-    objectOutputStream.writeObject(statement);
-    final ByteArrayInputStream byteInputStream =
-        new ByteArrayInputStream(byteOutputStream.toByteArray());
-    final ObjectInputStream objectInputStream = new ObjectInputStream(byteInputStream);
-    @SuppressWarnings("unchecked") final Statement<AtomicBoolean> deserialized =
-        (Statement<AtomicBoolean>) objectInputStream.readObject();
-    assertThat(deserialized.getValue().get()).isTrue();
   }
 
   @Test
   public void serializeUnevaluated() throws IOException, ClassNotFoundException {
-    final Statement<String> statement = new Async().evaluated(false).value("test");
+    final Statement<String> statement = new Eventual().evaluated(false).value("test");
     final ByteArrayOutputStream byteOutputStream = new ByteArrayOutputStream();
     final ObjectOutputStream objectOutputStream = new ObjectOutputStream(byteOutputStream);
     objectOutputStream.writeObject(statement);
@@ -1497,7 +2065,7 @@ public class StatementTest {
   @Test
   public void serializeUnevaluatedFork() throws IOException, ClassNotFoundException {
     final Statement<String> statement =
-        createStatementFork(new Async().evaluated(false).value("test"));
+        createStatementFork(new Eventual().evaluated(false).value("test"));
     final ByteArrayOutputStream byteOutputStream = new ByteArrayOutputStream();
     final ObjectOutputStream objectOutputStream = new ObjectOutputStream(byteOutputStream);
     objectOutputStream.writeObject(statement);
@@ -1506,13 +2074,14 @@ public class StatementTest {
     final ObjectInputStream objectInputStream = new ObjectInputStream(byteInputStream);
     @SuppressWarnings("unchecked") final Statement<String> deserialized =
         (Statement<String>) objectInputStream.readObject();
-    assertThat(deserialized.then(new ToUpper()).evaluate().getValue()).isEqualTo("TEST");
+    assertThat(deserialized.eventually(new ToUpper()).evaluate().getValue()).isEqualTo("TEST");
   }
 
   @Test
   public void serializeUnevaluatedForked() throws IOException, ClassNotFoundException {
     final Statement<String> statement =
-        createStatementFork(new Async().evaluated(false).value("test")).then(new ToUpper());
+        createStatementFork(new Eventual().evaluated(false).value("test")).eventually(
+            new ToUpper());
     final ByteArrayOutputStream byteOutputStream = new ByteArrayOutputStream();
     final ObjectOutputStream objectOutputStream = new ObjectOutputStream(byteOutputStream);
     objectOutputStream.writeObject(statement);
@@ -1526,7 +2095,7 @@ public class StatementTest {
 
   @Test
   public void serializeWhenDone() throws IOException, ClassNotFoundException {
-    final Statement<String> statement = new Async().value("test").whenDone(new NoOp());
+    final Statement<String> statement = new Eventual().value("test").whenDone(new NoOp());
     final ByteArrayOutputStream byteOutputStream = new ByteArrayOutputStream();
     final ObjectOutputStream objectOutputStream = new ObjectOutputStream(byteOutputStream);
     objectOutputStream.writeObject(statement);
@@ -1541,7 +2110,8 @@ public class StatementTest {
   @Test
   public void stateCancelled() {
     final Statement<String> statement =
-        new Async().evaluateOn(withDelay(1, TimeUnit.SECONDS, backgroundExecutor())).value("test");
+        new Eventual().evaluateOn(withDelay(1, TimeUnit.SECONDS, backgroundExecutor()))
+            .value("test");
     statement.cancel(true);
     statement.getDone();
     assertThat(statement.isCancelled()).isTrue();
@@ -1554,7 +2124,8 @@ public class StatementTest {
   @Test
   public void stateEvaluating() {
     final Statement<String> statement =
-        new Async().evaluateOn(withDelay(1, TimeUnit.SECONDS, backgroundExecutor())).value("test");
+        new Eventual().evaluateOn(withDelay(1, TimeUnit.SECONDS, backgroundExecutor()))
+            .value("test");
     assertThat(statement.isCancelled()).isFalse();
     assertThat(statement.isDone()).isFalse();
     assertThat(statement.isEvaluating()).isTrue();
@@ -1564,8 +2135,8 @@ public class StatementTest {
 
   @Test
   public void stateExtended() {
-    final Statement<String> statement = new Async().value("test");
-    statement.then(new ToUpper());
+    final Statement<String> statement = new Eventual().value("test");
+    statement.eventually(new ToUpper());
     assertThat(statement.isCancelled()).isFalse();
     assertThat(statement.isDone()).isTrue();
     assertThat(statement.isEvaluating()).isFalse();
@@ -1575,7 +2146,7 @@ public class StatementTest {
 
   @Test
   public void stateFailed() {
-    final Statement<String> statement = new Async().failure(new Exception());
+    final Statement<String> statement = new Eventual().failure(new Exception());
     assertThat(statement.isCancelled()).isFalse();
     assertThat(statement.isDone()).isTrue();
     assertThat(statement.isEvaluating()).isFalse();
@@ -1585,7 +2156,7 @@ public class StatementTest {
 
   @Test
   public void stateSet() {
-    final Statement<String> statement = new Async().value("test");
+    final Statement<String> statement = new Eventual().value("test");
     assertThat(statement.isCancelled()).isFalse();
     assertThat(statement.isDone()).isTrue();
     assertThat(statement.isEvaluating()).isFalse();
@@ -1593,604 +2164,41 @@ public class StatementTest {
     assertThat(statement.isSet()).isTrue();
   }
 
-  @Test
-  public void then() {
-    final Statement<String> statement =
-        new Async().value("test").then(new Mapper<String, String>() {
-
-          public String apply(final String input) {
-            return input.toUpperCase();
-          }
-        });
-    assertThat(statement.getValue()).isEqualTo("TEST");
-  }
-
-  @Test
-  public void thenDo() {
-    final AtomicReference<String> ref = new AtomicReference<String>();
-    final Statement<String> statement = new Async().value("test").thenDo(new Observer<String>() {
-
-      public void accept(final String input) {
-        ref.set(input);
-      }
-    });
-    assertThat(statement.getValue()).isEqualTo("test");
-    assertThat(ref.get()).isEqualTo("test");
-  }
-
-  @Test
-  public void thenDoFail() {
-    final Statement<String> statement = new Async().value("test").thenDo(new Observer<String>() {
-
-      public void accept(final String input) {
-        throw new IllegalArgumentException();
-      }
-    });
-    assertThat(ConstantConditions.notNull(statement.getFailure()).getCause()).isExactlyInstanceOf(
-        IllegalArgumentException.class);
-  }
-
-  @Test(expected = NullPointerException.class)
-  @SuppressWarnings("ConstantConditions")
-  public void thenDoNPE() {
-    new Async().value(null).thenDo(null);
-  }
-
-  @Test
-  public void thenFail() {
-    final Statement<String> statement =
-        new Async().value("test").then(new Mapper<String, String>() {
-
-          public String apply(final String input) {
-            throw new IllegalArgumentException();
-          }
-        });
-    assertThat(ConstantConditions.notNull(statement.getFailure()).getCause()).isExactlyInstanceOf(
-        IllegalArgumentException.class);
-  }
-
-  @Test
-  public void thenIf() {
-    final Statement<Integer> statement =
-        new Async().value("test").thenIf(new Mapper<String, Statement<Integer>>() {
-
-          public Statement<Integer> apply(final String input) {
-            return new Async().value(input.length());
-          }
-        });
-    assertThat(statement.getValue()).isEqualTo(4);
-  }
-
-  @Test
-  public void thenIfAsync() {
-    final Statement<Integer> statement =
-        new Async().value("test").thenIf(new Mapper<String, Statement<Integer>>() {
-
-          public Statement<Integer> apply(final String input) {
-            return new Async().value(input.length())
-                              .forkOn(withDelay(100, TimeUnit.MILLISECONDS, backgroundExecutor()));
-          }
-        });
-    assertThat(statement.getValue()).isEqualTo(4);
-  }
-
-  @Test
-  public void thenIfFail() {
-    final Statement<Integer> statement =
-        new Async().value("test").thenIf(new Mapper<String, Statement<Integer>>() {
-
-          public Statement<Integer> apply(final String input) {
-            return new Async().failure(new IllegalArgumentException());
-          }
-        });
-    assertThat(ConstantConditions.notNull(statement.getFailure()).getCause()).isExactlyInstanceOf(
-        IllegalArgumentException.class);
-  }
-
-  @Test(expected = NullPointerException.class)
-  @SuppressWarnings("ConstantConditions")
-  public void thenIfNPE() {
-    new Async().value(null).thenIf(null);
-  }
-
-  @Test
-  public void thenIfStatementNPE() {
-    assertThat(new Async().value(null).thenIf(new Mapper<Object, Statement<Object>>() {
-
-      public Statement<Object> apply(final Object input) {
-        return null;
-      }
-    }).failure()).isExactlyInstanceOf(NullPointerException.class);
-  }
-
-  @Test(expected = IllegalStateException.class)
-  public void thenIllegal() {
-    final Statement<String> statement = new Async().value("test");
-    statement.then(new Mapper<String, String>() {
-
-      public String apply(final String input) {
-        return input.toUpperCase();
-      }
-    });
-    statement.then(new ToUpper());
-  }
-
-  @Test(expected = NullPointerException.class)
-  @SuppressWarnings("ConstantConditions")
-  public void thenNPE() {
-    new Async().value(null).then(null);
-  }
-
-  @Test
-  public void thenTry() {
-    final AtomicCloseable closeable = new AtomicCloseable();
-    final Statement<String> statement =
-        new Async().value("test").thenTry(new Mapper<String, Closeable>() {
-
-          public Closeable apply(final String input) {
-            return closeable;
-          }
-        }, new Mapper<String, String>() {
-
-          public String apply(final String input) {
-            return input.toUpperCase();
-          }
-        });
-    assertThat(statement.getValue()).isEqualTo("TEST");
-    assertThat(closeable.isCalled()).isTrue();
-  }
-
-  @Test(expected = NullPointerException.class)
-  @SuppressWarnings("ConstantConditions")
-  public void thenTryCloseableNPE() {
-    new Async().value(null).thenTry(null, new Mapper<Object, Object>() {
-
-      public Object apply(final Object input) {
-        return null;
-      }
-    });
-  }
-
-  @Test
-  public void thenTryDo() {
-    final AtomicCloseable closeable = new AtomicCloseable();
-    final AtomicReference<String> ref = new AtomicReference<String>();
-    final Statement<String> statement =
-        new Async().value("test").thenTryDo(new Mapper<String, Closeable>() {
-
-          public Closeable apply(final String input) {
-            return closeable;
-          }
-        }, new Observer<String>() {
-
-          public void accept(final String input) {
-            ref.set(input);
-          }
-        });
-    assertThat(statement.getValue()).isEqualTo("test");
-    assertThat(ref.get()).isEqualTo("test");
-    assertThat(closeable.isCalled()).isTrue();
-  }
-
-  @Test(expected = NullPointerException.class)
-  @SuppressWarnings("ConstantConditions")
-  public void thenTryDoCloseableNPE() {
-    new Async().value(null).thenTryDo(null, new Observer<Object>() {
-
-      public void accept(final Object input) {
-
-      }
-    });
-  }
-
-  @Test
-  public void thenTryDoException() {
-    final AtomicReference<String> ref = new AtomicReference<String>();
-    final Statement<String> statement =
-        new Async().value("test").thenTryDo(new Mapper<String, Closeable>() {
-
-          public Closeable apply(final String input) {
-            throw new RuntimeException();
-          }
-        }, new Observer<String>() {
-
-          public void accept(final String input) {
-            ref.set(input);
-          }
-        });
-    assertThat(statement.isFailed()).isTrue();
-    assertThat(ref.get()).isNull();
-  }
-
-  @Test
-  public void thenTryDoFail() {
-    final AtomicCloseable closeable = new AtomicCloseable();
-    final Statement<String> statement =
-        new Async().value("test").thenTryDo(new Mapper<String, Closeable>() {
-
-          public Closeable apply(final String input) {
-            return closeable;
-          }
-        }, new Observer<String>() {
-
-          public void accept(final String input) {
-            throw new IllegalArgumentException();
-          }
-        });
-    assertThat(ConstantConditions.notNull(statement.getFailure()).getCause()).isExactlyInstanceOf(
-        IllegalArgumentException.class);
-    assertThat(closeable.isCalled()).isTrue();
-  }
-
-  @Test
-  public void thenTryDoIOException() {
-    final AtomicReference<String> ref = new AtomicReference<String>();
-    final Statement<String> statement =
-        new Async().value("test").thenTryDo(new Mapper<String, Closeable>() {
-
-          public Closeable apply(final String input) {
-            return new Closeable() {
-
-              public void close() throws IOException {
-                throw new IOException();
-              }
-            };
-          }
-        }, new Observer<String>() {
-
-          public void accept(final String input) {
-            ref.set(input);
-          }
-        });
-    assertThat(statement.getValue()).isEqualTo("test");
-    assertThat(ref.get()).isEqualTo("test");
-  }
-
-  @Test(expected = NullPointerException.class)
-  @SuppressWarnings("ConstantConditions")
-  public void thenTryDoNPE() {
-    new Async().value(null).thenTryDo(new Mapper<Object, Closeable>() {
-
-      public Closeable apply(final Object input) {
-        return null;
-      }
-    }, null);
-  }
-
-  @Test
-  public void thenTryDoNull() {
-    final AtomicReference<String> ref = new AtomicReference<String>();
-    final Statement<String> statement =
-        new Async().value("test").thenTryDo(new Mapper<String, Closeable>() {
-
-          public Closeable apply(final String input) {
-            return null;
-          }
-        }, new Observer<String>() {
-
-          public void accept(final String input) {
-            ref.set(input);
-          }
-        });
-    assertThat(statement.getValue()).isEqualTo("test");
-    assertThat(ref.get()).isEqualTo("test");
-  }
-
-  @Test
-  public void thenTryException() {
-    final Statement<String> statement =
-        new Async().value("test").thenTry(new Mapper<String, Closeable>() {
-
-          public Closeable apply(final String input) {
-            throw new RuntimeException();
-          }
-        }, new Mapper<String, String>() {
-
-          public String apply(final String input) {
-            return input.toUpperCase();
-          }
-        });
-    assertThat(statement.isFailed()).isTrue();
-  }
-
-  @Test
-  public void thenTryFail() {
-    final AtomicCloseable closeable = new AtomicCloseable();
-    final Statement<String> statement =
-        new Async().value("test").thenTry(new Mapper<String, Closeable>() {
-
-          public Closeable apply(final String input) {
-            return closeable;
-          }
-        }, new Mapper<String, String>() {
-
-          public String apply(final String input) {
-            throw new IllegalArgumentException();
-          }
-        });
-    assertThat(ConstantConditions.notNull(statement.getFailure()).getCause()).isExactlyInstanceOf(
-        IllegalArgumentException.class);
-    assertThat(closeable.isCalled()).isTrue();
-  }
-
-  @Test
-  public void thenTryIOException() {
-    final Statement<String> statement =
-        new Async().value("test").thenTry(new Mapper<String, Closeable>() {
-
-          public Closeable apply(final String input) {
-            return new Closeable() {
-
-              public void close() throws IOException {
-                throw new IOException();
-              }
-            };
-          }
-        }, new Mapper<String, String>() {
-
-          public String apply(final String input) {
-            return input.toUpperCase();
-          }
-        });
-    assertThat(statement.getValue()).isEqualTo("TEST");
-  }
-
-  @Test
-  public void thenTryIf() {
-    final AtomicCloseable closeable = new AtomicCloseable();
-    final Statement<Integer> statement =
-        new Async().value("test").thenTryIf(new Mapper<String, Closeable>() {
-
-          public Closeable apply(final String input) {
-            return closeable;
-          }
-        }, new Mapper<String, Statement<Integer>>() {
-
-          public Statement<Integer> apply(final String input) {
-            return new Async().value(input.length());
-          }
-        });
-    assertThat(statement.getValue()).isEqualTo(4);
-    assertThat(closeable.isCalled()).isTrue();
-  }
-
-  @Test
-  public void thenTryIfAsync() {
-    final AtomicCloseable closeable = new AtomicCloseable();
-    final Statement<Integer> statement =
-        new Async().value("test").thenTryIf(new Mapper<String, Closeable>() {
-
-          public Closeable apply(final String input) {
-            return closeable;
-          }
-        }, new Mapper<String, Statement<Integer>>() {
-
-          public Statement<Integer> apply(final String input) {
-            return new Async().value(input.length())
-                              .forkOn(withDelay(100, TimeUnit.MILLISECONDS, backgroundExecutor()));
-          }
-        });
-    assertThat(statement.getValue()).isEqualTo(4);
-    assertThat(closeable.isCalled()).isTrue();
-  }
-
-  @Test
-  public void thenTryIfAsyncException() {
-    final Statement<Integer> statement =
-        new Async().value("test").thenTryIf(new Mapper<String, Closeable>() {
-
-          public Closeable apply(final String input) {
-            throw new RuntimeException();
-          }
-        }, new Mapper<String, Statement<Integer>>() {
-
-          public Statement<Integer> apply(final String input) {
-            return new Async().value(input.length())
-                              .forkOn(withDelay(100, TimeUnit.MILLISECONDS, backgroundExecutor()));
-          }
-        });
-    assertThat(statement.getFailure()).isNotNull();
-  }
-
-  @Test
-  public void thenTryIfAsyncIOException() {
-    final Statement<Integer> statement =
-        new Async().value("test").thenTryIf(new Mapper<String, Closeable>() {
-
-          public Closeable apply(final String input) {
-            return new Closeable() {
-
-              public void close() throws IOException {
-                throw new IOException();
-              }
-            };
-          }
-        }, new Mapper<String, Statement<Integer>>() {
-
-          public Statement<Integer> apply(final String input) {
-            return new Async().value(input.length())
-                              .forkOn(withDelay(100, TimeUnit.MILLISECONDS, backgroundExecutor()));
-          }
-        });
-    assertThat(statement.getFailure()).isNotNull();
-  }
-
-  @Test(expected = NullPointerException.class)
-  @SuppressWarnings("ConstantConditions")
-  public void thenTryIfCloseableNPE() {
-    new Async().value(null).thenTryIf(null, new Mapper<Object, Statement<Object>>() {
-
-      public Statement<Object> apply(final Object input) {
-        return new Async().value(null);
-      }
-    });
-  }
-
-  @Test
-  public void thenTryIfException() {
-    final Statement<Integer> statement =
-        new Async().value("test").thenTryIf(new Mapper<String, Closeable>() {
-
-          public Closeable apply(final String input) {
-            throw new RuntimeException();
-          }
-        }, new Mapper<String, Statement<Integer>>() {
-
-          public Statement<Integer> apply(final String input) {
-            return new Async().value(input.length());
-          }
-        });
-    assertThat(statement.isFailed()).isTrue();
-  }
-
-  @Test
-  public void thenTryIfFail() {
-    final AtomicCloseable closeable = new AtomicCloseable();
-    final Statement<Integer> statement =
-        new Async().value("test").thenTryIf(new Mapper<String, Closeable>() {
-
-          public Closeable apply(final String input) {
-            return closeable;
-          }
-        }, new Mapper<String, Statement<Integer>>() {
-
-          public Statement<Integer> apply(final String input) {
-            return new Async().failure(new IllegalArgumentException());
-          }
-        });
-    assertThat(ConstantConditions.notNull(statement.getFailure()).getCause()).isExactlyInstanceOf(
-        IllegalArgumentException.class);
-    assertThat(closeable.isCalled()).isTrue();
-  }
-
-  @Test
-  public void thenTryIfIOException() {
-    final Statement<Integer> statement =
-        new Async().value("test").thenTryIf(new Mapper<String, Closeable>() {
-
-          public Closeable apply(final String input) {
-            return new Closeable() {
-
-              public void close() throws IOException {
-                throw new IOException();
-              }
-            };
-          }
-        }, new Mapper<String, Statement<Integer>>() {
-
-          public Statement<Integer> apply(final String input) {
-            return new Async().value(input.length());
-          }
-        });
-    assertThat(statement.isFailed()).isTrue();
-  }
-
-  @Test(expected = NullPointerException.class)
-  @SuppressWarnings("ConstantConditions")
-  public void thenTryIfNPE() {
-    new Async().value(null).thenTryIf(new Mapper<Object, Closeable>() {
-
-      public Closeable apply(final Object input) {
-        return null;
-      }
-    }, null);
-  }
-
-  @Test
-  public void thenTryIfNull() {
-    final Statement<Integer> statement =
-        new Async().value("test").thenTryIf(new Mapper<String, Closeable>() {
-
-          public Closeable apply(final String input) {
-            return null;
-          }
-        }, new Mapper<String, Statement<Integer>>() {
-
-          public Statement<Integer> apply(final String input) {
-            return new Async().value(input.length());
-          }
-        });
-    assertThat(statement.getValue()).isEqualTo(4);
-  }
-
-  @Test
-  public void thenTryIfStatementNPE() {
-    assertThat(new Async().value(null).thenTryIf(new Mapper<Object, Closeable>() {
-
-      public Closeable apply(final Object input) {
-        return null;
-      }
-    }, new Mapper<Object, Statement<Object>>() {
-
-      public Statement<Object> apply(final Object input) {
-        return null;
-      }
-    }).failure()).isExactlyInstanceOf(NullPointerException.class);
-  }
-
-  @Test(expected = NullPointerException.class)
-  @SuppressWarnings("ConstantConditions")
-  public void thenTryNPE() {
-    new Async().value(null).thenTry(new Mapper<Object, Closeable>() {
-
-      public Closeable apply(final Object input) {
-        return null;
-      }
-    }, null);
-  }
-
-  @Test
-  public void thenTryNull() {
-    final Statement<String> statement =
-        new Async().value("test").thenTry(new Mapper<String, Closeable>() {
-
-          public Closeable apply(final String input) {
-            return null;
-          }
-        }, new Mapper<String, String>() {
-
-          public String apply(final String input) {
-            return input.toUpperCase();
-          }
-        });
-    assertThat(statement.getValue()).isEqualTo("TEST");
-  }
-
   @Test(expected = UnsupportedOperationException.class)
   public void toException() {
     final TestEvaluation<String> evaluation = new TestEvaluation<String>();
-    final Statement<String> statement = new Async().evaluated(false).value("test");
+    final Statement<String> statement = new Eventual().evaluated(false).value("test");
     statement.to(evaluation);
   }
 
   @Test
   public void value() {
-    final Statement<String> statement = new Async().value("hello");
+    final Statement<String> statement = new Eventual().value("hello");
     assertThat(statement.value()).isEqualTo("hello");
   }
 
   @Test
   public void valueCancelled() {
-    final Statement<String> statement = new Async().value("hello");
+    final Statement<String> statement = new Eventual().value("hello");
     assertThat(statement.isCancelled()).isFalse();
   }
 
   @Test
   public void valueEvaluating() {
-    final Statement<String> statement = new Async().value("hello");
+    final Statement<String> statement = new Eventual().value("hello");
     assertThat(statement.isEvaluating()).isFalse();
   }
 
   @Test
   public void valueFailed() {
-    final Statement<String> statement = new Async().value("hello");
+    final Statement<String> statement = new Eventual().value("hello");
     assertThat(statement.isFailed()).isFalse();
   }
 
   @Test(expected = IllegalStateException.class)
   public void valueIllegal() {
-    final Statement<Object> statement = new Async().value(null);
-    statement.thenDo(new Observer<Object>() {
+    final Statement<Object> statement = new Eventual().value(null);
+    statement.eventuallyDo(new Observer<Object>() {
 
       public void accept(final Object input) {
       }
@@ -2200,49 +2208,49 @@ public class StatementTest {
 
   @Test(expected = IllegalStateException.class)
   public void valueInvalidStateEvaluating() {
-    final Statement<Void> statement = new Async().evaluated(false).value(null);
+    final Statement<Void> statement = new Eventual().evaluated(false).value(null);
     statement.value();
   }
 
   @Test(expected = IllegalStateException.class)
   public void valueInvalidStateFailure() {
-    final Statement<String> statement = new Async().failure(new Exception());
+    final Statement<String> statement = new Eventual().failure(new Exception());
     statement.value();
   }
 
   @Test
   public void valueSet() {
-    final Statement<String> statement = new Async().value("hello");
+    final Statement<String> statement = new Eventual().value("hello");
     assertThat(statement.isSet()).isTrue();
   }
 
   @Test(expected = NullPointerException.class)
   @SuppressWarnings("ConstantConditions")
   public void waitDoneNPE() {
-    new Async().value(null).getDone(0, null);
+    new Eventual().value(null).getDone(0, null);
   }
 
   @Test
   public void waitDoneOn() {
     final Statement<String> statement =
-        new Async().evaluateOn(withDelay(100, TimeUnit.MILLISECONDS, backgroundExecutor()))
-                   .value("test");
+        new Eventual().evaluateOn(withDelay(100, TimeUnit.MILLISECONDS, backgroundExecutor()))
+            .value("test");
     assertThat(statement.getDone(1, TimeUnit.SECONDS)).isTrue();
   }
 
   @Test
   public void waitDoneTimeout() {
     final Statement<String> statement = //
-        new Async().value("test")
-                   .forkOn(withDelay(1, TimeUnit.SECONDS, backgroundExecutor()))
-                   .then(new ToUpper());
+        new Eventual().value("test")
+            .forkOn(withDelay(1, TimeUnit.SECONDS, backgroundExecutor()))
+            .eventually(new ToUpper());
     assertThat(statement.getDone(1, TimeUnit.MILLISECONDS)).isFalse();
   }
 
   @Test(expected = NullPointerException.class)
   @SuppressWarnings("ConstantConditions")
   public void whenDoneNPE() {
-    new Async().value(null).whenDone(null);
+    new Eventual().value(null).whenDone(null);
   }
 
   private static class Identity<V> implements Mapper<V, V> {
@@ -2328,14 +2336,14 @@ public class StatementTest {
   private static class ToMessageStatement implements Mapper<Throwable, Statement<String>> {
 
     public Statement<String> apply(final Throwable input) {
-      return new Async().value(input.getMessage());
+      return new Eventual().value(input.getMessage());
     }
   }
 
   private static class ToStatement<V> implements Mapper<V, Statement<V>> {
 
     public Statement<V> apply(final V input) {
-      return new Async().value(input);
+      return new Eventual().value(input);
     }
   }
 
@@ -2349,7 +2357,7 @@ public class StatementTest {
   private static class ToUpperStatement implements Mapper<String, Statement<String>> {
 
     public Statement<String> apply(final String input) {
-      return new Async().value(input.toUpperCase());
+      return new Eventual().value(input.toUpperCase());
     }
   }
 }

@@ -23,9 +23,9 @@ import java.io.InvalidObjectException;
 import java.io.ObjectStreamException;
 import java.io.Serializable;
 
-import dm.jale.async.Provider;
-import dm.jale.async.Settler;
-import dm.jale.async.Updater;
+import dm.jale.eventual.Provider;
+import dm.jale.eventual.Settler;
+import dm.jale.eventual.Updater;
 import dm.jale.ext.backoff.Backoffer;
 import dm.jale.ext.backoff.PendingEvaluation;
 import dm.jale.ext.config.BuildConfig;

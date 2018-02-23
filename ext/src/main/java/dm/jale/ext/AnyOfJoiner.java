@@ -22,11 +22,11 @@ import java.io.ObjectStreamException;
 import java.io.Serializable;
 import java.util.List;
 
-import dm.jale.async.Evaluation;
-import dm.jale.async.EvaluationState;
-import dm.jale.async.SimpleState;
-import dm.jale.async.Statement;
-import dm.jale.async.StatementJoiner;
+import dm.jale.eventual.Evaluation;
+import dm.jale.eventual.EvaluationState;
+import dm.jale.eventual.SimpleState;
+import dm.jale.eventual.Statement;
+import dm.jale.eventual.StatementJoiner;
 import dm.jale.ext.config.BuildConfig;
 
 /**

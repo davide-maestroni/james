@@ -37,23 +37,23 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicLong;
 
-import dm.jale.async.Action;
-import dm.jale.async.Completer;
-import dm.jale.async.Evaluation;
-import dm.jale.async.EvaluationCollection;
-import dm.jale.async.EvaluationState;
-import dm.jale.async.FailureException;
-import dm.jale.async.Loop;
-import dm.jale.async.Mapper;
-import dm.jale.async.Observer;
-import dm.jale.async.Provider;
-import dm.jale.async.RuntimeInterruptedException;
-import dm.jale.async.RuntimeTimeoutException;
-import dm.jale.async.Settler;
-import dm.jale.async.SimpleState;
-import dm.jale.async.Statement;
-import dm.jale.async.Updater;
 import dm.jale.config.BuildConfig;
+import dm.jale.eventual.Action;
+import dm.jale.eventual.Completer;
+import dm.jale.eventual.Evaluation;
+import dm.jale.eventual.EvaluationCollection;
+import dm.jale.eventual.EvaluationState;
+import dm.jale.eventual.FailureException;
+import dm.jale.eventual.Loop;
+import dm.jale.eventual.Mapper;
+import dm.jale.eventual.Observer;
+import dm.jale.eventual.Provider;
+import dm.jale.eventual.RuntimeInterruptedException;
+import dm.jale.eventual.RuntimeTimeoutException;
+import dm.jale.eventual.Settler;
+import dm.jale.eventual.SimpleState;
+import dm.jale.eventual.Statement;
+import dm.jale.eventual.Updater;
 import dm.jale.executor.ExecutorPool;
 import dm.jale.log.Logger;
 import dm.jale.util.ConstantConditions;
@@ -338,6 +338,44 @@ class DefaultLoop<V> implements Loop<V>, Serializable {
     propagate(new PropagationConsume<V>());
   }
 
+  @NotNull
+  public <R> Statement<R> eventually(@NotNull final Mapper<? super Iterable<V>, R> mapper) {
+    return toStatement().eventually(mapper);
+  }
+
+  @NotNull
+  public Statement<Iterable<V>> eventuallyDo(
+      @NotNull final Observer<? super Iterable<V>> observer) {
+    return toStatement().eventuallyDo(observer);
+  }
+
+  @NotNull
+  public <R> Statement<R> eventuallyIf(
+      @NotNull final Mapper<? super Iterable<V>, ? extends Statement<R>> mapper) {
+    return toStatement().eventuallyIf(mapper);
+  }
+
+  @NotNull
+  public <R> Statement<R> eventuallyTry(
+      @NotNull final Mapper<? super Iterable<V>, ? extends Closeable> closeable,
+      @NotNull final Mapper<? super Iterable<V>, R> mapper) {
+    return toStatement().eventuallyTry(closeable, mapper);
+  }
+
+  @NotNull
+  public Statement<Iterable<V>> eventuallyTryDo(
+      @NotNull final Mapper<? super Iterable<V>, ? extends Closeable> closeable,
+      @NotNull final Observer<? super Iterable<V>> observer) {
+    return toStatement().eventuallyTryDo(closeable, observer);
+  }
+
+  @NotNull
+  public <R> Statement<R> eventuallyTryIf(
+      @NotNull final Mapper<? super Iterable<V>, ? extends Closeable> closeable,
+      @NotNull final Mapper<? super Iterable<V>, ? extends Statement<R>> mapper) {
+    return toStatement().eventuallyTryIf(closeable, mapper);
+  }
+
   public boolean getDone() {
     return getDone(-1, TimeUnit.MILLISECONDS);
   }
@@ -433,43 +471,6 @@ class DefaultLoop<V> implements Loop<V>, Serializable {
   }
 
   @NotNull
-  public <R> Statement<R> then(@NotNull final Mapper<? super Iterable<V>, R> mapper) {
-    return toStatement().then(mapper);
-  }
-
-  @NotNull
-  public Statement<Iterable<V>> thenDo(@NotNull final Observer<? super Iterable<V>> observer) {
-    return toStatement().thenDo(observer);
-  }
-
-  @NotNull
-  public <R> Statement<R> thenIf(
-      @NotNull final Mapper<? super Iterable<V>, ? extends Statement<R>> mapper) {
-    return toStatement().thenIf(mapper);
-  }
-
-  @NotNull
-  public <R> Statement<R> thenTry(
-      @NotNull final Mapper<? super Iterable<V>, ? extends Closeable> closeable,
-      @NotNull final Mapper<? super Iterable<V>, R> mapper) {
-    return toStatement().thenTry(closeable, mapper);
-  }
-
-  @NotNull
-  public Statement<Iterable<V>> thenTryDo(
-      @NotNull final Mapper<? super Iterable<V>, ? extends Closeable> closeable,
-      @NotNull final Observer<? super Iterable<V>> observer) {
-    return toStatement().thenTryDo(closeable, observer);
-  }
-
-  @NotNull
-  public <R> Statement<R> thenTryIf(
-      @NotNull final Mapper<? super Iterable<V>, ? extends Closeable> closeable,
-      @NotNull final Mapper<? super Iterable<V>, ? extends Statement<R>> mapper) {
-    return toStatement().thenTryIf(closeable, mapper);
-  }
-
-  @NotNull
   public Statement<Iterable<V>> whenDone(@NotNull final Action action) {
     return toStatement().whenDone(action);
   }
@@ -477,20 +478,20 @@ class DefaultLoop<V> implements Loop<V>, Serializable {
   @NotNull
   public Loop<V> elseCatch(@NotNull final Mapper<? super Throwable, ? extends Iterable<V>> mapper,
       @Nullable final Class<?>[] exceptionTypes) {
-    return yield(new ElseCatchYielder<V>(mapper, Asyncs.cloneExceptionTypes(exceptionTypes)));
+    return yield(new ElseCatchYielder<V>(mapper, Eventuals.cloneExceptionTypes(exceptionTypes)));
   }
 
   @NotNull
   public Loop<V> elseDo(@NotNull final Observer<? super Throwable> observer,
       @Nullable final Class<?>[] exceptionTypes) {
-    return yield(new ElseDoYielder<V>(observer, Asyncs.cloneExceptionTypes(exceptionTypes)));
+    return yield(new ElseDoYielder<V>(observer, Eventuals.cloneExceptionTypes(exceptionTypes)));
   }
 
   @NotNull
   public Loop<V> elseIf(
       @NotNull final Mapper<? super Throwable, ? extends Statement<? extends Iterable<V>>> mapper,
       @Nullable final Class<?>[] exceptionTypes) {
-    return yield(new ElseIfYielder<V>(mapper, Asyncs.cloneExceptionTypes(exceptionTypes)));
+    return yield(new ElseIfYielder<V>(mapper, Eventuals.cloneExceptionTypes(exceptionTypes)));
   }
 
   @NotNull
@@ -546,14 +547,14 @@ class DefaultLoop<V> implements Loop<V>, Serializable {
   public Loop<V> elseForEach(@NotNull final Mapper<? super Throwable, V> mapper,
       @Nullable Class<?>... exceptionTypes) {
     return propagate(
-        new ElseCatchLoopExpression<V>(mapper, Asyncs.cloneExceptionTypes(exceptionTypes)));
+        new ElseCatchLoopExpression<V>(mapper, Eventuals.cloneExceptionTypes(exceptionTypes)));
   }
 
   @NotNull
   public Loop<V> elseForEachDo(@NotNull final Observer<? super Throwable> observer,
       @Nullable Class<?>... exceptionTypes) {
     return propagate(
-        new ElseDoLoopExpression<V>(observer, Asyncs.cloneExceptionTypes(exceptionTypes)));
+        new ElseDoLoopExpression<V>(observer, Eventuals.cloneExceptionTypes(exceptionTypes)));
   }
 
   @NotNull
@@ -561,7 +562,7 @@ class DefaultLoop<V> implements Loop<V>, Serializable {
       @NotNull final Mapper<? super Throwable, ? extends Statement<? extends V>> mapper,
       @Nullable Class<?>... exceptionTypes) {
     return propagate(
-        new ElseIfStatementExpression<V>(mapper, Asyncs.cloneExceptionTypes(exceptionTypes)));
+        new ElseIfStatementExpression<V>(mapper, Eventuals.cloneExceptionTypes(exceptionTypes)));
   }
 
   @NotNull
@@ -569,15 +570,15 @@ class DefaultLoop<V> implements Loop<V>, Serializable {
       @NotNull final Mapper<? super Throwable, ? extends Iterable<? extends V>> mapper,
       @Nullable Class<?>... exceptionTypes) {
     return propagate(
-        new ElseLoopLoopExpression<V>(mapper, Asyncs.cloneExceptionTypes(exceptionTypes)));
+        new ElseLoopLoopExpression<V>(mapper, Eventuals.cloneExceptionTypes(exceptionTypes)));
   }
 
   @NotNull
   public Loop<V> elseForEachLoopIf(
       @NotNull final Mapper<? super Throwable, ? extends Loop<? extends V>> mapper,
       @Nullable Class<?>... exceptionTypes) {
-    return propagate(
-        new ElseLoopIfStatementExpression<V>(mapper, Asyncs.cloneExceptionTypes(exceptionTypes)));
+    return propagate(new ElseLoopIfStatementExpression<V>(mapper,
+        Eventuals.cloneExceptionTypes(exceptionTypes)));
   }
 
   @NotNull
@@ -585,15 +586,15 @@ class DefaultLoop<V> implements Loop<V>, Serializable {
       @NotNull final Mapper<? super Throwable, ? extends Statement<? extends V>> mapper,
       @Nullable Class<?>... exceptionTypes) {
     return propagateOrdered(
-        new ElseIfStatementExpression<V>(mapper, Asyncs.cloneExceptionTypes(exceptionTypes)));
+        new ElseIfStatementExpression<V>(mapper, Eventuals.cloneExceptionTypes(exceptionTypes)));
   }
 
   @NotNull
   public Loop<V> elseForEachOrderedLoopIf(
       @NotNull final Mapper<? super Throwable, ? extends Loop<? extends V>> mapper,
       @Nullable Class<?>... exceptionTypes) {
-    return propagateOrdered(
-        new ElseLoopIfStatementExpression<V>(mapper, Asyncs.cloneExceptionTypes(exceptionTypes)));
+    return propagateOrdered(new ElseLoopIfStatementExpression<V>(mapper,
+        Eventuals.cloneExceptionTypes(exceptionTypes)));
   }
 
   @NotNull
@@ -1278,7 +1279,7 @@ class DefaultLoop<V> implements Loop<V>, Serializable {
         public void run() {
           final Throwable failure = mFailure;
           if (failure != null) {
-            Asyncs.failSafe(evaluation, failure);
+            Eventuals.failSafe(evaluation, failure);
             return;
           }
 
@@ -1313,7 +1314,7 @@ class DefaultLoop<V> implements Loop<V>, Serializable {
     private void clearEvaluations(@NotNull final Throwable failure) {
       final ArrayList<EvaluationCollection<V>> evaluations = mEvaluations;
       for (final EvaluationCollection<V> evaluation : evaluations) {
-        Asyncs.failSafe(evaluation, failure);
+        Eventuals.failSafe(evaluation, failure);
       }
 
       evaluations.clear();

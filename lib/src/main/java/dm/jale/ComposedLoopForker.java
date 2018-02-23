@@ -23,13 +23,13 @@ import java.io.InvalidObjectException;
 import java.io.ObjectStreamException;
 import java.io.Serializable;
 
-import dm.jale.async.Completer;
-import dm.jale.async.EvaluationCollection;
-import dm.jale.async.Loop;
-import dm.jale.async.LoopForker;
-import dm.jale.async.Mapper;
-import dm.jale.async.Updater;
 import dm.jale.config.BuildConfig;
+import dm.jale.eventual.Completer;
+import dm.jale.eventual.EvaluationCollection;
+import dm.jale.eventual.Loop;
+import dm.jale.eventual.LoopForker;
+import dm.jale.eventual.Mapper;
+import dm.jale.eventual.Updater;
 import dm.jale.util.SerializableProxy;
 
 /**
@@ -119,7 +119,7 @@ class ComposedLoopForker<S, V> implements LoopForker<S, V>, Serializable {
     public S update(final S stack, final EvaluationCollection<V> evaluation,
         @NotNull final Loop<V> loop) {
       evaluation.addFailure(new IllegalStateException("the loop evaluation cannot be propagated"))
-                .set();
+          .set();
       return stack;
     }
 

@@ -23,8 +23,8 @@ import java.io.ObjectStreamException;
 import java.io.Serializable;
 import java.util.Comparator;
 
-import dm.jale.async.Loop.YieldOutputs;
-import dm.jale.async.Loop.Yielder;
+import dm.jale.eventual.Loop.YieldOutputs;
+import dm.jale.eventual.Loop.Yielder;
 import dm.jale.ext.MaxByYielder.YielderStack;
 import dm.jale.ext.config.BuildConfig;
 import dm.jale.util.ConstantConditions;

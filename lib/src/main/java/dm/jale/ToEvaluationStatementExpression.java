@@ -22,8 +22,8 @@ import java.io.NotSerializableException;
 import java.io.ObjectStreamException;
 import java.io.Serializable;
 
-import dm.jale.async.Evaluation;
 import dm.jale.config.BuildConfig;
+import dm.jale.eventual.Evaluation;
 import dm.jale.util.ConstantConditions;
 
 /**

@@ -22,12 +22,12 @@ import java.io.Serializable;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 
-import dm.jale.async.EvaluationCollection;
-import dm.jale.async.Loop;
-import dm.jale.async.LoopJoiner;
+import dm.jale.eventual.EvaluationCollection;
+import dm.jale.eventual.Loop;
+import dm.jale.eventual.LoopJoiner;
 import dm.jale.ext.SwitchSinceJoiner.JoinerStack;
-import dm.jale.ext.async.TimedState;
 import dm.jale.ext.config.BuildConfig;
+import dm.jale.ext.eventual.TimedState;
 import dm.jale.util.ConstantConditions;
 import dm.jale.util.DoubleQueue;
 

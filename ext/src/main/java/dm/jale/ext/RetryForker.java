@@ -20,11 +20,11 @@ import org.jetbrains.annotations.NotNull;
 
 import java.io.Serializable;
 
-import dm.jale.Async;
-import dm.jale.async.Evaluation;
-import dm.jale.async.Statement;
-import dm.jale.async.Statement.Forker;
-import dm.jale.async.StatementForker;
+import dm.jale.Eventual;
+import dm.jale.eventual.Evaluation;
+import dm.jale.eventual.Statement;
+import dm.jale.eventual.Statement.Forker;
+import dm.jale.eventual.StatementForker;
 import dm.jale.ext.config.BuildConfig;
 import dm.jale.util.ConstantConditions;
 
@@ -43,7 +43,7 @@ class RetryForker<V> implements StatementForker<Evaluation<V>, V>, Serializable 
 
   @NotNull
   static <V> Forker<?, V, Evaluation<V>, Statement<V>> newForker(final int maxCount) {
-    return Async.buffered(new RetryForker<V>(maxCount));
+    return Eventual.buffered(new RetryForker<V>(maxCount));
   }
 
   public Evaluation<V> done(final Evaluation<V> stack, @NotNull final Statement<V> context) {

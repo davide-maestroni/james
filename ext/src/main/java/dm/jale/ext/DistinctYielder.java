@@ -22,8 +22,8 @@ import java.io.ObjectStreamException;
 import java.io.Serializable;
 import java.util.HashSet;
 
-import dm.jale.async.Loop.YieldOutputs;
-import dm.jale.async.Loop.Yielder;
+import dm.jale.eventual.Loop.YieldOutputs;
+import dm.jale.eventual.Loop.Yielder;
 import dm.jale.ext.config.BuildConfig;
 
 /**

@@ -16,7 +16,7 @@
 
 package dm.jale;
 
-import dm.jale.async.Observer;
+import dm.jale.eventual.Observer;
 
 /**
  * Created by davide-maestroni on 01/27/2018.

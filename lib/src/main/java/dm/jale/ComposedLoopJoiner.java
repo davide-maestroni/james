@@ -24,14 +24,14 @@ import java.io.ObjectStreamException;
 import java.io.Serializable;
 import java.util.List;
 
-import dm.jale.async.EvaluationCollection;
-import dm.jale.async.JoinCompleter;
-import dm.jale.async.JoinSettler;
-import dm.jale.async.JoinUpdater;
-import dm.jale.async.Joiner;
-import dm.jale.async.Loop;
-import dm.jale.async.Mapper;
 import dm.jale.config.BuildConfig;
+import dm.jale.eventual.EvaluationCollection;
+import dm.jale.eventual.JoinCompleter;
+import dm.jale.eventual.JoinSettler;
+import dm.jale.eventual.JoinUpdater;
+import dm.jale.eventual.Joiner;
+import dm.jale.eventual.Loop;
+import dm.jale.eventual.Mapper;
 import dm.jale.util.SerializableProxy;
 
 /**

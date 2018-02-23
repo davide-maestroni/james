@@ -31,11 +31,11 @@ import java.util.concurrent.Executor;
 import java.util.concurrent.atomic.AtomicLong;
 
 import dm.jale.ExecutorLoopBatchForker.Stack;
-import dm.jale.async.EvaluationCollection;
-import dm.jale.async.FailureException;
-import dm.jale.async.Loop;
-import dm.jale.async.LoopForker;
 import dm.jale.config.BuildConfig;
+import dm.jale.eventual.EvaluationCollection;
+import dm.jale.eventual.FailureException;
+import dm.jale.eventual.Loop;
+import dm.jale.eventual.LoopForker;
 import dm.jale.executor.EvaluationExecutor;
 import dm.jale.executor.ExecutorPool;
 import dm.jale.log.Logger;

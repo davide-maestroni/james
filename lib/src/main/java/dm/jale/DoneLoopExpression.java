@@ -24,9 +24,9 @@ import java.io.ObjectStreamException;
 import java.io.Serializable;
 import java.util.Iterator;
 
-import dm.jale.async.Action;
-import dm.jale.async.EvaluationCollection;
 import dm.jale.config.BuildConfig;
+import dm.jale.eventual.Action;
+import dm.jale.eventual.EvaluationCollection;
 import dm.jale.util.ConstantConditions;
 import dm.jale.util.Iterables;
 import dm.jale.util.SerializableProxy;

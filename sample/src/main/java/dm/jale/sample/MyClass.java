@@ -16,13 +16,13 @@
 
 package dm.jale.sample;
 
-import dm.jale.Async;
-import dm.jale.async.Statement;
+import dm.jale.Eventual;
+import dm.jale.eventual.Statement;
 
 public class MyClass {
 
   public static Statement<Integer> convert(CharSequence sequence) {
-    return new Async().value(sequence).then(MyClass::count);
+    return new Eventual().value(sequence).eventually(MyClass::count);
   }
 
   public static int count(CharSequence sequence) {
@@ -34,10 +34,10 @@ public class MyClass {
   }
 
   public static void test() {
-    final Statement<String> statement = new Async().value("test");
-    statement.then(String::toLowerCase);
-    statement.then(CharSequence::length);
-    statement.then(MyClass::count);
-    statement.then(CharSequence.class::cast).thenIf(MyClass::convert);
+    final Statement<String> statement = new Eventual().value("test");
+    statement.eventually(String::toLowerCase);
+    statement.eventually(CharSequence::length);
+    statement.eventually(MyClass::count);
+    statement.eventually(CharSequence.class::cast).eventuallyIf(MyClass::convert);
   }
 }

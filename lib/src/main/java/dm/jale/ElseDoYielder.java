@@ -23,9 +23,9 @@ import java.io.ObjectStreamException;
 import java.io.Serializable;
 import java.util.ArrayList;
 
-import dm.jale.async.Loop.YieldOutputs;
-import dm.jale.async.Observer;
 import dm.jale.config.BuildConfig;
+import dm.jale.eventual.Loop.YieldOutputs;
+import dm.jale.eventual.Observer;
 import dm.jale.util.ConstantConditions;
 import dm.jale.util.SerializableProxy;
 

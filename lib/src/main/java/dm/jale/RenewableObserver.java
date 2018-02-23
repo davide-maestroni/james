@@ -18,7 +18,7 @@ package dm.jale;
 
 import org.jetbrains.annotations.NotNull;
 
-import dm.jale.async.Observer;
+import dm.jale.eventual.Observer;
 
 /**
  * Created by davide-maestroni on 01/28/2018.

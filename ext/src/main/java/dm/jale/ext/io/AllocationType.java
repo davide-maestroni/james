@@ -20,7 +20,7 @@ import org.jetbrains.annotations.NotNull;
 
 import java.nio.ByteBuffer;
 
-import dm.jale.async.Mapper;
+import dm.jale.eventual.Mapper;
 
 /**
  * Created by davide-maestroni on 08/12/2017.

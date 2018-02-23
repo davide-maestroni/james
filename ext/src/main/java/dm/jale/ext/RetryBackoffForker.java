@@ -23,11 +23,11 @@ import java.io.ObjectStreamException;
 import java.io.Serializable;
 import java.util.concurrent.TimeUnit;
 
-import dm.jale.Async;
-import dm.jale.async.Evaluation;
-import dm.jale.async.Statement;
-import dm.jale.async.Statement.Forker;
-import dm.jale.async.StatementForker;
+import dm.jale.Eventual;
+import dm.jale.eventual.Evaluation;
+import dm.jale.eventual.Statement;
+import dm.jale.eventual.Statement.Forker;
+import dm.jale.eventual.StatementForker;
 import dm.jale.executor.ScheduledExecutor;
 import dm.jale.ext.RetryBackoffForker.ForkerStack;
 import dm.jale.ext.backoff.BackoffUpdater;
@@ -62,14 +62,14 @@ class RetryBackoffForker<S, V> implements StatementForker<ForkerStack<S, V>, V>,
   @NotNull
   static <S, V> Forker<?, V, Evaluation<V>, Statement<V>> newForker(
       @NotNull final ScheduledExecutor executor, @NotNull final BackoffUpdater<S> backoff) {
-    return Async.buffered(new RetryBackoffForker<S, V>(executor, backoff, null, 0));
+    return Eventual.buffered(new RetryBackoffForker<S, V>(executor, backoff, null, 0));
   }
 
   @NotNull
   private static <S, V> Forker<?, V, Evaluation<V>, Statement<V>> newForker(
       @NotNull final ScheduledExecutor executor, @NotNull final BackoffUpdater<S> backoff,
       final S stack, final int retryCount) {
-    return Async.buffered(new RetryBackoffForker<S, V>(executor, backoff, stack, retryCount));
+    return Eventual.buffered(new RetryBackoffForker<S, V>(executor, backoff, stack, retryCount));
   }
 
   public ForkerStack<S, V> done(final ForkerStack<S, V> stack,
@@ -146,9 +146,8 @@ class RetryBackoffForker<S, V> implements StatementForker<ForkerStack<S, V>, V>,
 
         public void run() {
           statement.evaluate()
-                   .fork(RetryBackoffForker.<S, V>newForker(executor, mBackoff, stack,
-                       mRetryCount + 1))
-                   .to(evaluation);
+              .fork(RetryBackoffForker.<S, V>newForker(executor, mBackoff, stack, mRetryCount + 1))
+              .to(evaluation);
         }
       });
     }
@@ -162,9 +161,8 @@ class RetryBackoffForker<S, V> implements StatementForker<ForkerStack<S, V>, V>,
 
         public void run() {
           statement.evaluate()
-                   .fork(RetryBackoffForker.<S, V>newForker(executor, mBackoff, stack,
-                       mRetryCount + 1))
-                   .to(evaluation);
+              .fork(RetryBackoffForker.<S, V>newForker(executor, mBackoff, stack, mRetryCount + 1))
+              .to(evaluation);
         }
       }, delay, timeUnit);
     }

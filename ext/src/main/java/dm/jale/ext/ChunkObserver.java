@@ -19,8 +19,8 @@ package dm.jale.ext;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
-import dm.jale.async.EvaluationCollection;
-import dm.jale.async.Observer;
+import dm.jale.eventual.EvaluationCollection;
+import dm.jale.eventual.Observer;
 import dm.jale.ext.io.AllocationType;
 import dm.jale.ext.io.Chunk;
 import dm.jale.ext.io.ChunkOutputStream;

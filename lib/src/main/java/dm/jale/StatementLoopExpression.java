@@ -18,7 +18,7 @@ package dm.jale;
 
 import org.jetbrains.annotations.NotNull;
 
-import dm.jale.async.EvaluationCollection;
+import dm.jale.eventual.EvaluationCollection;
 
 /**
  * Created by davide-maestroni on 01/14/2018.

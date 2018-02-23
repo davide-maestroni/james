@@ -25,9 +25,9 @@ import java.io.ObjectStreamException;
 import java.io.Serializable;
 import java.util.Locale;
 
-import dm.jale.async.EvaluationCollection;
-import dm.jale.async.Mapper;
 import dm.jale.config.BuildConfig;
+import dm.jale.eventual.EvaluationCollection;
+import dm.jale.eventual.Mapper;
 import dm.jale.log.Logger;
 import dm.jale.util.ConstantConditions;
 import dm.jale.util.SerializableProxy;
@@ -60,7 +60,7 @@ class TryStatementLoopExpression<V, R> extends StatementLoopExpression<V, R>
       mHandler.value(value, evaluation);
 
     } finally {
-      Asyncs.close(closeable, mLogger);
+      Eventuals.close(closeable, mLogger);
     }
   }
 

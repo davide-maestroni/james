@@ -30,17 +30,17 @@
         <Bug pattern="WA_NOT_IN_LOOP"/>
     </Match>
     <Match>
-        <Class name="dm.jale.async.FailureException"/>
+        <Class name="dm.jale.eventual.FailureException"/>
         <Method name="wrapIfNot"/>
         <Bug pattern="BC_UNCONFIRMED_CAST"/>
     </Match>
     <Match>
-        <Class name="dm.jale.async.RuntimeInterruptedException"/>
+        <Class name="dm.jale.eventual.RuntimeInterruptedException"/>
         <Method name="toInterruptedException"/>
         <Bug pattern="BC_UNCONFIRMED_CAST_OF_RETURN_VALUE"/>
     </Match>
     <Match>
-        <Class name="dm.jale.async.RuntimeTimeoutException"/>
+        <Class name="dm.jale.eventual.RuntimeTimeoutException"/>
         <Method name="toTimeoutException"/>
         <Bug pattern="BC_UNCONFIRMED_CAST_OF_RETURN_VALUE"/>
     </Match>
@@ -53,9 +53,5 @@
         <Class name="dm.jale.DefaultLoop"/>
         <Method name="failure"/>
         <Bug pattern="NP_NULL_ON_SOME_PATH_FROM_RETURN_VALUE"/>
-    </Match>
-    <Match>
-        <Package name="~dm\.james.*"/>
-        <Bug code="Se,SnVI,RI,Wa,BC,DLS,Eq,NP"/>
     </Match>
 </FindBugsFilter>

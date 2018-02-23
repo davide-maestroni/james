@@ -34,17 +34,17 @@ import java.util.concurrent.Executor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
-import dm.jale.async.Action;
-import dm.jale.async.Completer;
-import dm.jale.async.Evaluation;
-import dm.jale.async.FailureException;
-import dm.jale.async.Mapper;
-import dm.jale.async.Observer;
-import dm.jale.async.RuntimeInterruptedException;
-import dm.jale.async.RuntimeTimeoutException;
-import dm.jale.async.Statement;
-import dm.jale.async.Updater;
 import dm.jale.config.BuildConfig;
+import dm.jale.eventual.Action;
+import dm.jale.eventual.Completer;
+import dm.jale.eventual.Evaluation;
+import dm.jale.eventual.FailureException;
+import dm.jale.eventual.Mapper;
+import dm.jale.eventual.Observer;
+import dm.jale.eventual.RuntimeInterruptedException;
+import dm.jale.eventual.RuntimeTimeoutException;
+import dm.jale.eventual.Statement;
+import dm.jale.eventual.Updater;
 import dm.jale.executor.ExecutorPool;
 import dm.jale.log.Logger;
 import dm.jale.util.ConstantConditions;
@@ -292,14 +292,14 @@ class DefaultStatement<V> implements Statement<V>, Serializable {
   public Statement<V> elseCatch(@NotNull final Mapper<? super Throwable, ? extends V> mapper,
       @Nullable final Class<?>[] exceptionTypes) {
     return propagate(
-        new ElseCatchStatementExpression<V>(mapper, Asyncs.cloneExceptionTypes(exceptionTypes)));
+        new ElseCatchStatementExpression<V>(mapper, Eventuals.cloneExceptionTypes(exceptionTypes)));
   }
 
   @NotNull
   public Statement<V> elseDo(@NotNull final Observer<? super Throwable> observer,
       @Nullable final Class<?>[] exceptionTypes) {
     return propagate(
-        new ElseDoStatementExpression<V>(observer, Asyncs.cloneExceptionTypes(exceptionTypes)));
+        new ElseDoStatementExpression<V>(observer, Eventuals.cloneExceptionTypes(exceptionTypes)));
   }
 
   @NotNull
@@ -307,7 +307,7 @@ class DefaultStatement<V> implements Statement<V>, Serializable {
       @NotNull final Mapper<? super Throwable, ? extends Statement<? extends V>> mapper,
       @Nullable final Class<?>[] exceptionTypes) {
     return propagate(
-        new ElseIfStatementExpression<V>(mapper, Asyncs.cloneExceptionTypes(exceptionTypes)));
+        new ElseIfStatementExpression<V>(mapper, Eventuals.cloneExceptionTypes(exceptionTypes)));
   }
 
   @NotNull
@@ -335,6 +335,47 @@ class DefaultStatement<V> implements Statement<V>, Serializable {
   @NotNull
   public Statement<V> evaluated() {
     return (mIsEvaluated) ? this : evaluate();
+  }
+
+  @NotNull
+  public <R> Statement<R> eventually(@NotNull final Mapper<? super V, R> mapper) {
+    return propagate(new ThenStatementExpression<V, R>(mapper));
+  }
+
+  @NotNull
+  public Statement<V> eventuallyDo(@NotNull final Observer<? super V> observer) {
+    return propagate(new ThenDoStatementExpression<V, V>(observer));
+  }
+
+  @NotNull
+  public <R> Statement<R> eventuallyIf(
+      @NotNull final Mapper<? super V, ? extends Statement<R>> mapper) {
+    return propagate(new ThenIfStatementExpression<V, R>(mapper));
+  }
+
+  @NotNull
+  public <R> Statement<R> eventuallyTry(
+      @NotNull final Mapper<? super V, ? extends Closeable> closeable,
+      @NotNull final Mapper<? super V, R> mapper) {
+    return propagate(
+        new TryStatementExpression<V, R>(closeable, new ThenStatementExpression<V, R>(mapper),
+            mLogger.getName()));
+  }
+
+  @NotNull
+  public Statement<V> eventuallyTryDo(
+      @NotNull final Mapper<? super V, ? extends Closeable> closeable,
+      @NotNull final Observer<? super V> observer) {
+    return propagate(
+        new TryStatementExpression<V, V>(closeable, new ThenDoStatementExpression<V, V>(observer),
+            mLogger.getName()));
+  }
+
+  @NotNull
+  public <R> Statement<R> eventuallyTryIf(
+      @NotNull final Mapper<? super V, ? extends Closeable> closeable,
+      @NotNull final Mapper<? super V, ? extends Statement<R>> mapper) {
+    return propagate(new TryIfStatementExpression<V, R>(closeable, mapper, mLogger.getName()));
   }
 
   @NotNull
@@ -449,43 +490,6 @@ class DefaultStatement<V> implements Statement<V>, Serializable {
     synchronized (mMutex) {
       return (mPropagation == null);
     }
-  }
-
-  @NotNull
-  public <R> Statement<R> then(@NotNull final Mapper<? super V, R> mapper) {
-    return propagate(new ThenStatementExpression<V, R>(mapper));
-  }
-
-  @NotNull
-  public Statement<V> thenDo(@NotNull final Observer<? super V> observer) {
-    return propagate(new ThenDoStatementExpression<V, V>(observer));
-  }
-
-  @NotNull
-  public <R> Statement<R> thenIf(@NotNull final Mapper<? super V, ? extends Statement<R>> mapper) {
-    return propagate(new ThenIfStatementExpression<V, R>(mapper));
-  }
-
-  @NotNull
-  public <R> Statement<R> thenTry(@NotNull final Mapper<? super V, ? extends Closeable> closeable,
-      @NotNull final Mapper<? super V, R> mapper) {
-    return propagate(
-        new TryStatementExpression<V, R>(closeable, new ThenStatementExpression<V, R>(mapper),
-            mLogger.getName()));
-  }
-
-  @NotNull
-  public Statement<V> thenTryDo(@NotNull final Mapper<? super V, ? extends Closeable> closeable,
-      @NotNull final Observer<? super V> observer) {
-    return propagate(
-        new TryStatementExpression<V, V>(closeable, new ThenDoStatementExpression<V, V>(observer),
-            mLogger.getName()));
-  }
-
-  @NotNull
-  public <R> Statement<R> thenTryIf(@NotNull final Mapper<? super V, ? extends Closeable> closeable,
-      @NotNull final Mapper<? super V, ? extends Statement<R>> mapper) {
-    return propagate(new TryIfStatementExpression<V, R>(closeable, mapper, mLogger.getName()));
   }
 
   @NotNull
@@ -783,7 +787,7 @@ class DefaultStatement<V> implements Statement<V>, Serializable {
         public void run() {
           final Throwable failure = mFailure;
           if (failure != null) {
-            Asyncs.failSafe(evaluation, failure);
+            Eventuals.failSafe(evaluation, failure);
             return;
           }
 

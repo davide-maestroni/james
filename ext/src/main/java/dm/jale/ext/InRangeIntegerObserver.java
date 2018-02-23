@@ -18,8 +18,8 @@ package dm.jale.ext;
 
 import java.io.Serializable;
 
-import dm.jale.async.EvaluationCollection;
-import dm.jale.async.Observer;
+import dm.jale.eventual.EvaluationCollection;
+import dm.jale.eventual.Observer;
 import dm.jale.ext.config.BuildConfig;
 
 /**

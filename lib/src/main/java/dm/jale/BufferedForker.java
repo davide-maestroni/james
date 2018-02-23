@@ -24,9 +24,9 @@ import java.io.Serializable;
 import java.util.ArrayList;
 
 import dm.jale.BufferedForker.ForkerStack;
-import dm.jale.async.SimpleState;
-import dm.jale.async.Statement.Forker;
 import dm.jale.config.BuildConfig;
+import dm.jale.eventual.SimpleState;
+import dm.jale.eventual.Statement.Forker;
 import dm.jale.util.ConstantConditions;
 import dm.jale.util.SerializableProxy;
 

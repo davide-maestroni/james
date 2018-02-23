@@ -20,10 +20,10 @@ import org.jetbrains.annotations.NotNull;
 
 import java.io.Serializable;
 
-import dm.jale.async.Evaluation;
-import dm.jale.async.Loop;
-import dm.jale.async.Observer;
 import dm.jale.config.BuildConfig;
+import dm.jale.eventual.Evaluation;
+import dm.jale.eventual.Loop;
+import dm.jale.eventual.Observer;
 import dm.jale.util.ConstantConditions;
 
 /**

@@ -22,9 +22,9 @@ import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.List;
 
-import dm.jale.async.EvaluationCollection;
-import dm.jale.async.Loop;
-import dm.jale.async.LoopJoiner;
+import dm.jale.eventual.EvaluationCollection;
+import dm.jale.eventual.Loop;
+import dm.jale.eventual.LoopJoiner;
 import dm.jale.ext.ZipFillJoiner.JoinerStack;
 import dm.jale.ext.config.BuildConfig;
 import dm.jale.util.DoubleQueue;

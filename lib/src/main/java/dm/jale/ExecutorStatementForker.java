@@ -23,10 +23,10 @@ import java.io.ObjectStreamException;
 import java.io.Serializable;
 import java.util.concurrent.Executor;
 
-import dm.jale.async.Evaluation;
-import dm.jale.async.Statement;
-import dm.jale.async.StatementForker;
 import dm.jale.config.BuildConfig;
+import dm.jale.eventual.Evaluation;
+import dm.jale.eventual.Statement;
+import dm.jale.eventual.StatementForker;
 import dm.jale.executor.EvaluationExecutor;
 import dm.jale.executor.ExecutorPool;
 

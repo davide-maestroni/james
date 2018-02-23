@@ -21,10 +21,10 @@ import org.jetbrains.annotations.NotNull;
 import java.io.ObjectStreamException;
 import java.io.Serializable;
 
-import dm.jale.async.Loop.YieldOutputs;
-import dm.jale.async.Loop.Yielder;
-import dm.jale.ext.async.TimedState;
+import dm.jale.eventual.Loop.YieldOutputs;
+import dm.jale.eventual.Loop.Yielder;
 import dm.jale.ext.config.BuildConfig;
+import dm.jale.ext.eventual.TimedState;
 
 /**
  * Created by davide-maestroni on 02/19/2018.

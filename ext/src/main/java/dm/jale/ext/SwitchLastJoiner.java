@@ -21,10 +21,10 @@ import org.jetbrains.annotations.NotNull;
 import java.io.Serializable;
 import java.util.List;
 
-import dm.jale.async.EvaluationCollection;
-import dm.jale.async.Loop;
-import dm.jale.async.LoopJoiner;
-import dm.jale.async.SimpleState;
+import dm.jale.eventual.EvaluationCollection;
+import dm.jale.eventual.Loop;
+import dm.jale.eventual.LoopJoiner;
+import dm.jale.eventual.SimpleState;
 import dm.jale.ext.SwitchLastJoiner.JoinerStack;
 import dm.jale.ext.config.BuildConfig;
 import dm.jale.util.ConstantConditions;

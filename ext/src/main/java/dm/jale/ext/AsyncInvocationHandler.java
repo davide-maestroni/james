@@ -24,10 +24,10 @@ import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.Type;
 import java.util.Arrays;
 
-import dm.jale.Async;
-import dm.jale.async.Evaluation;
-import dm.jale.async.Observer;
-import dm.jale.async.Statement;
+import dm.jale.Eventual;
+import dm.jale.eventual.Evaluation;
+import dm.jale.eventual.Observer;
+import dm.jale.eventual.Statement;
 import dm.jale.util.ConstantConditions;
 
 import static dm.jale.util.Reflections.cloneArgs;
@@ -37,12 +37,12 @@ import static dm.jale.util.Reflections.cloneArgs;
  */
 class AsyncInvocationHandler implements InvocationHandler {
 
-  private final Async mAsync;
+  private final Eventual mEventual;
 
   private final Object mTarget;
 
-  AsyncInvocationHandler(@NotNull final Async async, @NotNull final Object target) {
-    mAsync = ConstantConditions.notNull("async", async);
+  AsyncInvocationHandler(@NotNull final Eventual eventual, @NotNull final Object target) {
+    mEventual = ConstantConditions.notNull("eventual", eventual);
     mTarget = ConstantConditions.notNull("target", target);
   }
 
@@ -73,8 +73,8 @@ class AsyncInvocationHandler implements InvocationHandler {
       if (methodName.equals(targetMethod.getName()) && Arrays.equals(method.getParameterTypes(),
           targetMethod.getParameterTypes()) && returnType.isAssignableFrom(
           targetMethod.getReturnType())) {
-        return mAsync.statement(new InvocationHandlerObserver(mTarget, targetMethod, args))
-                     .getValue();
+        return mEventual.statement(new InvocationHandlerObserver(mTarget, targetMethod, args))
+            .getValue();
       }
     }
 
@@ -82,7 +82,7 @@ class AsyncInvocationHandler implements InvocationHandler {
       if (methodName.equals(targetMethod.getName() + "Statement") && Arrays.equals(
           method.getParameterTypes(), targetMethod.getParameterTypes()) && canReturnStatement(
           method, targetMethod)) {
-        return mAsync.statement(new InvocationHandlerObserver(mTarget, targetMethod, args));
+        return mEventual.statement(new InvocationHandlerObserver(mTarget, targetMethod, args));
       }
     }
 

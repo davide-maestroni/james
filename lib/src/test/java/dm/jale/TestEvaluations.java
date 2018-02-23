@@ -21,9 +21,9 @@ import org.jetbrains.annotations.Nullable;
 
 import java.util.ArrayList;
 
-import dm.jale.async.EvaluationCollection;
-import dm.jale.async.EvaluationState;
-import dm.jale.async.SimpleState;
+import dm.jale.eventual.EvaluationCollection;
+import dm.jale.eventual.EvaluationState;
+import dm.jale.eventual.SimpleState;
 
 /**
  * Created by davide-maestroni on 01/30/2018.

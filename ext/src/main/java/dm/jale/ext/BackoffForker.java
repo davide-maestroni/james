@@ -26,12 +26,12 @@ import java.util.concurrent.Executor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 
-import dm.jale.Async;
-import dm.jale.async.EvaluationCollection;
-import dm.jale.async.Loop;
-import dm.jale.async.LoopForker;
-import dm.jale.async.RuntimeInterruptedException;
-import dm.jale.async.Statement.Forker;
+import dm.jale.Eventual;
+import dm.jale.eventual.EvaluationCollection;
+import dm.jale.eventual.Loop;
+import dm.jale.eventual.LoopForker;
+import dm.jale.eventual.RuntimeInterruptedException;
+import dm.jale.eventual.Statement.Forker;
 import dm.jale.executor.EvaluationExecutor;
 import dm.jale.executor.ExecutorPool;
 import dm.jale.ext.BackoffForker.ForkerEvaluation;
@@ -64,7 +64,7 @@ class BackoffForker<S, V> implements LoopForker<ForkerEvaluation<S, V>, V>, Seri
   @NotNull
   static <S, V> Forker<?, V, EvaluationCollection<V>, Loop<V>> newForker(
       @NotNull final Backoffer<S, V> backoffer, @NotNull final Executor executor) {
-    return Async.buffered(new BackoffForker<S, V>(backoffer, executor));
+    return Eventual.buffered(new BackoffForker<S, V>(backoffer, executor));
   }
 
   public ForkerEvaluation<S, V> done(final ForkerEvaluation<S, V> stack,
@@ -78,7 +78,7 @@ class BackoffForker<S, V> implements LoopForker<ForkerEvaluation<S, V>, V>, Seri
       Exception {
     if (!stack.setEvaluations(evaluation)) {
       evaluation.addFailure(new IllegalStateException("the loop evaluation cannot be propagated"))
-                .set();
+          .set();
     }
 
     return stack;

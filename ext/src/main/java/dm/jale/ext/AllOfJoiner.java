@@ -23,9 +23,9 @@ import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.List;
 
-import dm.jale.async.Evaluation;
-import dm.jale.async.Statement;
-import dm.jale.async.StatementJoiner;
+import dm.jale.eventual.Evaluation;
+import dm.jale.eventual.Statement;
+import dm.jale.eventual.StatementJoiner;
 import dm.jale.ext.config.BuildConfig;
 
 /**

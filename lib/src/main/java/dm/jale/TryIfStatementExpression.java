@@ -25,11 +25,11 @@ import java.io.ObjectStreamException;
 import java.io.Serializable;
 import java.util.Locale;
 
-import dm.jale.async.Action;
-import dm.jale.async.Evaluation;
-import dm.jale.async.Mapper;
-import dm.jale.async.Statement;
 import dm.jale.config.BuildConfig;
+import dm.jale.eventual.Action;
+import dm.jale.eventual.Evaluation;
+import dm.jale.eventual.Mapper;
+import dm.jale.eventual.Statement;
 import dm.jale.log.Logger;
 import dm.jale.util.ConstantConditions;
 import dm.jale.util.SerializableProxy;
@@ -60,7 +60,7 @@ class TryIfStatementExpression<V, R> extends StatementExpression<V, R> implement
     mMapper.apply(value).whenDone(new Action() {
 
       public void perform() throws Exception {
-        Asyncs.close(mCloseable.apply(value), mLogger);
+        Eventuals.close(mCloseable.apply(value), mLogger);
       }
     }).to(evaluation);
   }

@@ -28,11 +28,11 @@ import java.util.List;
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.Executor;
 
-import dm.jale.async.EvaluationCollection;
-import dm.jale.async.FailureException;
-import dm.jale.async.Joiner;
-import dm.jale.async.Loop;
 import dm.jale.config.BuildConfig;
+import dm.jale.eventual.EvaluationCollection;
+import dm.jale.eventual.FailureException;
+import dm.jale.eventual.Joiner;
+import dm.jale.eventual.Loop;
 import dm.jale.log.Logger;
 import dm.jale.util.ConstantConditions;
 import dm.jale.util.Iterables;
@@ -89,12 +89,12 @@ class JoinLoopObserver<S, V, R>
     } catch (final CancellationException e) {
       mLogger.wrn(e, "Loop has been cancelled");
       state.setFailed(e);
-      Asyncs.failSafe(evaluation, e);
+      Eventuals.failSafe(evaluation, e);
 
     } catch (final Throwable t) {
       mLogger.err(t, "Error while initializing statements joining");
       state.setFailed(t);
-      Asyncs.failSafe(evaluation, t);
+      Eventuals.failSafe(evaluation, t);
     }
   }
 
@@ -163,12 +163,12 @@ class JoinLoopObserver<S, V, R>
           } catch (final CancellationException e) {
             mLogger.wrn(e, "Loop has been cancelled");
             state.setFailed(e);
-            Asyncs.failSafe(evaluation, e);
+            Eventuals.failSafe(evaluation, e);
 
           } catch (final Throwable t) {
             mLogger.err(t, "Error while processing failure: %s", failure);
             state.setFailed(t);
-            Asyncs.failSafe(evaluation, t);
+            Eventuals.failSafe(evaluation, t);
           }
         }
       });
@@ -204,12 +204,12 @@ class JoinLoopObserver<S, V, R>
             } catch (final CancellationException e) {
               mLogger.wrn(e, "Loop has been cancelled");
               state.setFailed(e);
-              Asyncs.failSafe(evaluation, e);
+              Eventuals.failSafe(evaluation, e);
 
             } catch (final Throwable t) {
               mLogger.err(t, "Error while processing failures: %s", failures);
               state.setFailed(t);
-              Asyncs.failSafe(evaluation, t);
+              Eventuals.failSafe(evaluation, t);
             }
           }
         }
@@ -237,12 +237,12 @@ class JoinLoopObserver<S, V, R>
           } catch (final CancellationException e) {
             mLogger.wrn(e, "Loop has been cancelled");
             state.setFailed(e);
-            Asyncs.failSafe(evaluation, e);
+            Eventuals.failSafe(evaluation, e);
 
           } catch (final Throwable t) {
             mLogger.err(t, "Error while processing value: %s", value);
             state.setFailed(t);
-            Asyncs.failSafe(evaluation, t);
+            Eventuals.failSafe(evaluation, t);
           }
         }
       });
@@ -277,12 +277,12 @@ class JoinLoopObserver<S, V, R>
             } catch (final CancellationException e) {
               mLogger.wrn(e, "Loop has been cancelled");
               state.setFailed(e);
-              Asyncs.failSafe(evaluation, e);
+              Eventuals.failSafe(evaluation, e);
 
             } catch (final Throwable t) {
               mLogger.err(t, "Error while processing values: %s", values);
               state.setFailed(t);
-              Asyncs.failSafe(evaluation, t);
+              Eventuals.failSafe(evaluation, t);
             }
           }
         }
@@ -314,12 +314,12 @@ class JoinLoopObserver<S, V, R>
           } catch (final CancellationException e) {
             mLogger.wrn(e, "Statement has been cancelled");
             state.setFailed(e);
-            Asyncs.failSafe(evaluation, e);
+            Eventuals.failSafe(evaluation, e);
 
           } catch (final Throwable t) {
             mLogger.err(t, "Error while completing loop");
             state.setFailed(t);
-            Asyncs.failSafe(evaluation, t);
+            Eventuals.failSafe(evaluation, t);
           }
         }
       });

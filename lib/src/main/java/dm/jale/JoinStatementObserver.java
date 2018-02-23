@@ -27,11 +27,11 @@ import java.util.List;
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.Executor;
 
-import dm.jale.async.Evaluation;
-import dm.jale.async.FailureException;
-import dm.jale.async.Joiner;
-import dm.jale.async.Statement;
 import dm.jale.config.BuildConfig;
+import dm.jale.eventual.Evaluation;
+import dm.jale.eventual.FailureException;
+import dm.jale.eventual.Joiner;
+import dm.jale.eventual.Statement;
 import dm.jale.log.Logger;
 import dm.jale.util.ConstantConditions;
 import dm.jale.util.Iterables;
@@ -87,12 +87,12 @@ class JoinStatementObserver<S, V, R> implements RenewableObserver<Evaluation<R>>
     } catch (final CancellationException e) {
       mLogger.wrn(e, "Statement has been cancelled");
       state.setFailed(e);
-      Asyncs.failSafe(evaluation, e);
+      Eventuals.failSafe(evaluation, e);
 
     } catch (final Throwable t) {
       mLogger.err(t, "Error while initializing statements joining");
       state.setFailed(t);
-      Asyncs.failSafe(evaluation, t);
+      Eventuals.failSafe(evaluation, t);
     }
   }
 
@@ -167,12 +167,12 @@ class JoinStatementObserver<S, V, R> implements RenewableObserver<Evaluation<R>>
           } catch (final CancellationException e) {
             mLogger.wrn(e, "Statement has been cancelled");
             state.setFailed(e);
-            Asyncs.failSafe(evaluation, e);
+            Eventuals.failSafe(evaluation, e);
 
           } catch (final Throwable t) {
             mLogger.err(t, "Error while processing failure: %s", failure);
             state.setFailed(t);
-            Asyncs.failSafe(evaluation, t);
+            Eventuals.failSafe(evaluation, t);
           }
         }
       });
@@ -204,12 +204,12 @@ class JoinStatementObserver<S, V, R> implements RenewableObserver<Evaluation<R>>
           } catch (final CancellationException e) {
             mLogger.wrn(e, "Statement has been cancelled");
             state.setFailed(e);
-            Asyncs.failSafe(evaluation, e);
+            Eventuals.failSafe(evaluation, e);
 
           } catch (final Throwable t) {
             mLogger.err(t, "Error while processing value: %s", value);
             state.setFailed(t);
-            Asyncs.failSafe(evaluation, t);
+            Eventuals.failSafe(evaluation, t);
           }
         }
       });

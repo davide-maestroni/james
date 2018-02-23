@@ -22,10 +22,10 @@ import java.io.InvalidObjectException;
 import java.io.ObjectStreamException;
 import java.io.Serializable;
 
-import dm.jale.async.Loop.YieldOutputs;
-import dm.jale.async.Loop.Yielder;
-import dm.jale.ext.async.Tester;
+import dm.jale.eventual.Loop.YieldOutputs;
+import dm.jale.eventual.Loop.Yielder;
 import dm.jale.ext.config.BuildConfig;
+import dm.jale.ext.eventual.Tester;
 import dm.jale.util.ConstantConditions;
 import dm.jale.util.SerializableProxy;
 

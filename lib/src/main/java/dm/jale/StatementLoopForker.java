@@ -25,12 +25,12 @@ import java.util.ArrayList;
 import java.util.List;
 
 import dm.jale.StatementLoopForker.ForkerStack;
-import dm.jale.async.Evaluation;
-import dm.jale.async.EvaluationCollection;
-import dm.jale.async.Loop;
-import dm.jale.async.Statement;
-import dm.jale.async.Statement.Forker;
 import dm.jale.config.BuildConfig;
+import dm.jale.eventual.Evaluation;
+import dm.jale.eventual.EvaluationCollection;
+import dm.jale.eventual.Loop;
+import dm.jale.eventual.Statement;
+import dm.jale.eventual.Statement.Forker;
 import dm.jale.util.ConstantConditions;
 import dm.jale.util.SerializableProxy;
 

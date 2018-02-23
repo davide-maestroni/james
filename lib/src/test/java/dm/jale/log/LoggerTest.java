@@ -51,8 +51,8 @@ public class LoggerTest {
     @Override
     public synchronized String format(final LogRecord record) {
       return "[" + ManagementFactory.getThreadMXBean()
-                                    .getThreadInfo(record.getThreadID())
-                                    .getThreadName() + "] " + super.format(record);
+          .getThreadInfo(record.getThreadID())
+          .getThreadName() + "] " + super.format(record);
     }
   }
 }
