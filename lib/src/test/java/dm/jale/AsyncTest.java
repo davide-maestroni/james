@@ -38,6 +38,7 @@ import dm.jale.log.LogConnector;
 import dm.jale.log.LogPrinter;
 import dm.jale.log.Logger;
 
+import static dm.jale.executor.ExecutorPool.immediateExecutor;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
@@ -152,11 +153,42 @@ public class AsyncTest {
   }
 
   @Test
+  public void getExecutor() {
+    assertThat(new Async().evaluateOn(immediateExecutor()).getExecutor()).isSameAs(
+        immediateExecutor());
+  }
+
+  @Test
+  public void getExecutorDefault() {
+    assertThat(new Async().getExecutor()).isNull();
+  }
+
+  @Test
+  public void getIsEvaluated() {
+    assertThat(new Async().evaluated(false).isEvaluated()).isFalse();
+  }
+
+  @Test
+  public void getIsEvaluatedDefault() {
+    assertThat(new Async().isEvaluated()).isTrue();
+  }
+
+  @Test
+  public void getLoggerName() {
+    assertThat(new Async().loggerName("test").getLoggerName()).isEqualTo("test");
+  }
+
+  @Test
+  public void getLoggerNameDefault() {
+    assertThat(new Async().getLoggerName()).isNull();
+  }
+
+  @Test
   public void immutable() {
     final Async async = new Async();
     assertThat(async.loggerName("test")).isNotSameAs(async);
     assertThat(async.loggerName(null)).isNotSameAs(async);
-    assertThat(async.evaluateOn(ExecutorPool.immediateExecutor())).isNotSameAs(async);
+    assertThat(async.evaluateOn(immediateExecutor())).isNotSameAs(async);
   }
 
   @Test
