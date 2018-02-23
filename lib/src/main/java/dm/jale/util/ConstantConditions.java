@@ -251,7 +251,7 @@ public class ConstantConditions {
           && "unsupported".equals(traceElement.getMethodName())) {
         if (callerOfMethodName == null) {
           if ((i + 1) < length) {
-            return stackTrace[i + 1].getMethodName();
+            return unsupportedMethodName(stackTrace[i + 1]);
           }
 
           return "";
@@ -260,7 +260,7 @@ public class ConstantConditions {
           for (int j = i + 1; j < length; ++j) {
             if (callerOfMethodName.equals(stackTrace[j].getMethodName())) {
               if ((j + 1) < length) {
-                return stackTrace[j + 1].getMethodName();
+                return unsupportedMethodName(stackTrace[j + 1]);
               }
 
               return "";
@@ -271,5 +271,11 @@ public class ConstantConditions {
     }
 
     return "";
+  }
+
+  @NotNull
+  private static String unsupportedMethodName(@NotNull final StackTraceElement traceElement) {
+    final String[] parts = traceElement.getClassName().split("\\.");
+    return parts[parts.length - 1] + "#" + traceElement.getMethodName();
   }
 }

@@ -115,6 +115,20 @@ public class Async {
     return loop(new FailuresObserver<V>(failures));
   }
 
+  @Nullable
+  public Executor getExecutor() {
+    return mExecutor;
+  }
+
+  @Nullable
+  public String getLoggerName() {
+    return mLoggerName;
+  }
+
+  public boolean isEvaluated() {
+    return mIsEvaluated;
+  }
+
   @NotNull
   public Async loggerName(@Nullable final String loggerName) {
     return new Async(mIsEvaluated, mExecutor, loggerName);

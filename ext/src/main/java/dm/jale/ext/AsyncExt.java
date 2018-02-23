@@ -20,6 +20,7 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 import java.io.InputStream;
+import java.lang.reflect.Proxy;
 import java.nio.ByteBuffer;
 import java.nio.channels.ReadableByteChannel;
 import java.util.ArrayList;
@@ -54,6 +55,10 @@ import dm.jale.ext.backoff.PendingEvaluation;
 import dm.jale.ext.io.AllocationType;
 import dm.jale.ext.io.Chunk;
 import dm.jale.util.Iterables;
+
+import static dm.jale.executor.ExecutorPool.immediateExecutor;
+import static dm.jale.executor.ExecutorPool.withNoDelay;
+import static dm.jale.executor.ExecutorPool.withThrottling;
 
 /**
  * Created by davide-maestroni on 02/15/2018.
@@ -104,21 +109,6 @@ public class AsyncExt extends Async {
   }
 
   @NotNull
-  public static <S, V> Forker<?, V, EvaluationCollection<V>, Loop<V>> onBackoffed(
-      @NotNull final Executor executor, @NotNull final Backoffer<S, V> backoffer) {
-    return BackoffForker.newForker(executor, backoffer);
-  }
-
-  @NotNull
-  public static <S, V> Forker<?, V, EvaluationCollection<V>, Loop<V>> onBackoffed(
-      @NotNull final Executor executor, @Nullable final Provider<S> init,
-      @Nullable final Updater<S, ? super V, ? super PendingEvaluation<V>> value,
-      @Nullable final Updater<S, ? super Throwable, ? super PendingEvaluation<V>> failure,
-      @Nullable final Settler<S, ? super PendingEvaluation<V>> done) {
-    return onBackoffed(executor, new ComposedBackoffer<S, V>(init, value, failure, done));
-  }
-
-  @NotNull
   public static <V> Forker<?, V, Evaluation<V>, Statement<V>> retry(final int maxCount) {
     return RetryForker.newForker(maxCount);
   }
@@ -152,6 +142,22 @@ public class AsyncExt extends Async {
   @NotNull
   public static Yielder<?, Number, Long> sumLong() {
     return SumLongYielder.instance();
+  }
+
+  @NotNull
+  public static <S, V> Forker<?, V, EvaluationCollection<V>, Loop<V>> withBackoff(
+      @NotNull final Backoffer<S, V> backoffer, @NotNull final Executor executor) {
+    return BackoffForker.newForker(backoffer, executor);
+  }
+
+  @NotNull
+  public static <S, V> Forker<?, V, EvaluationCollection<V>, Loop<V>> withBackoff(
+      @Nullable final Provider<S> init,
+      @Nullable final Updater<S, ? super V, ? super PendingEvaluation<V>> value,
+      @Nullable final Updater<S, ? super Throwable, ? super PendingEvaluation<V>> failure,
+      @Nullable final Settler<S, ? super PendingEvaluation<V>> done,
+      @NotNull final Executor executor) {
+    return withBackoff(new ComposedBackoffer<S, V>(init, value, failure, done), executor);
   }
 
   @NotNull
@@ -543,6 +549,16 @@ public class AsyncExt extends Async {
   @NotNull
   public <V> Yielder<?, V, V> minBy(@NotNull final Comparator<? super V> comparator) {
     return new MinByYielder<V>(comparator);
+  }
+
+  @NotNull
+  @SuppressWarnings("unchecked")
+  public <T> T proxy(@NotNull final Object object, @NotNull final Class<? extends T> type) {
+    final Executor executor = getExecutor();
+    return (T) Proxy.newProxyInstance(AsyncExt.class.getClassLoader(), new Class<?>[]{type},
+        new AsyncInvocationHandler(this.evaluateOn(
+            withThrottling(1, (executor != null) ? withNoDelay(executor) : immediateExecutor())),
+            object));
   }
 
   @NotNull

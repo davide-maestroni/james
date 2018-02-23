@@ -282,6 +282,11 @@ public class ExecutorPool {
     return NoDelayExecutor.of(executor);
   }
 
+  @NotNull
+  public static Executor withNoDelay(@NotNull final Executor executor) {
+    return NoDelayExecutor.of(new ScheduledExecutorWrapper(asOwner(executor)));
+  }
+
   /**
    * Returns an executor providing ordering of executions based on priority.
    * <p>

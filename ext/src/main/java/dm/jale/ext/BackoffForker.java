@@ -55,16 +55,16 @@ class BackoffForker<S, V> implements LoopForker<ForkerEvaluation<S, V>, V>, Seri
 
   private final EvaluationExecutor mExecutor;
 
-  private BackoffForker(@NotNull final Executor executor,
-      @NotNull final Backoffer<S, V> backoffer) {
+  private BackoffForker(@NotNull final Backoffer<S, V> backoffer,
+      @NotNull final Executor executor) {
     mBackoffer = ConstantConditions.notNull("backoffer", backoffer);
     mExecutor = ExecutorPool.register(executor);
   }
 
   @NotNull
   static <S, V> Forker<?, V, EvaluationCollection<V>, Loop<V>> newForker(
-      @NotNull final Executor executor, @NotNull final Backoffer<S, V> backoffer) {
-    return Async.buffered(new BackoffForker<S, V>(executor, backoffer));
+      @NotNull final Backoffer<S, V> backoffer, @NotNull final Executor executor) {
+    return Async.buffered(new BackoffForker<S, V>(backoffer, executor));
   }
 
   public ForkerEvaluation<S, V> done(final ForkerEvaluation<S, V> stack,
@@ -371,7 +371,7 @@ class BackoffForker<S, V> implements LoopForker<ForkerEvaluation<S, V>, V>, Seri
     private Object readResolve() throws ObjectStreamException {
       try {
         final Object[] args = deserializeArgs();
-        return new BackoffForker<S, V>((Executor) args[0], (Backoffer<S, V>) args[1]);
+        return new BackoffForker<S, V>((Backoffer<S, V>) args[1], (Executor) args[0]);
 
       } catch (final Throwable t) {
         throw new InvalidObjectException(t.getMessage());
