@@ -17,33 +17,59 @@
 package dm.jale;
 
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 
 import java.io.InvalidObjectException;
 import java.io.ObjectStreamException;
 import java.io.Serializable;
+import java.util.ArrayList;
 
 import dm.jale.config.BuildConfig;
-import dm.jale.eventual.Evaluation;
+import dm.jale.eventual.EvaluationCollection;
 import dm.jale.eventual.Mapper;
 import dm.jale.util.ConstantConditions;
+import dm.jale.util.Iterables;
 import dm.jale.util.SerializableProxy;
 
 /**
  * Created by davide-maestroni on 02/01/2018.
  */
-class ThenStatementExpression<V, R> extends StatementExpression<V, R> implements Serializable {
+class EventuallyLoopLoopExpression<V, R> extends LoopExpression<V, R> implements Serializable {
 
   private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
 
-  private final Mapper<? super V, ? extends R> mMapper;
+  private final Mapper<? super V, ? extends Iterable<? extends R>> mMapper;
 
-  ThenStatementExpression(@NotNull final Mapper<? super V, ? extends R> mapper) {
+  EventuallyLoopLoopExpression(
+      @NotNull final Mapper<? super V, ? extends Iterable<? extends R>> mapper) {
     mMapper = ConstantConditions.notNull("mapper", mapper);
   }
 
   @Override
-  void value(final V value, @NotNull final Evaluation<R> evaluation) throws Exception {
-    evaluation.set(mMapper.apply(value));
+  @SuppressWarnings("unchecked")
+  void addValue(final V value, @NotNull final EvaluationCollection<R> evaluation) throws Exception {
+    evaluation.addValues(mMapper.apply(value)).set();
+  }
+
+  @Override
+  void addValues(@Nullable final Iterable<? extends V> values,
+      @NotNull final EvaluationCollection<R> evaluation) throws Exception {
+    if (values == null) {
+      return;
+    }
+
+    final ArrayList<R> outputs = new ArrayList<R>();
+    @SuppressWarnings(
+        "UnnecessaryLocalVariable") final Mapper<? super V, ? extends Iterable<? extends R>>
+        mapper = mMapper;
+    try {
+      for (final V value : values) {
+        Iterables.addAll(mapper.apply(value), outputs);
+      }
+
+    } finally {
+      evaluation.addValues(outputs).set();
+    }
   }
 
   @NotNull
@@ -55,7 +81,7 @@ class ThenStatementExpression<V, R> extends StatementExpression<V, R> implements
 
     private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
 
-    private HandlerProxy(final Mapper<? super V, ? extends R> mapper) {
+    private HandlerProxy(final Mapper<? super V, ? extends Iterable<? extends R>> mapper) {
       super(proxy(mapper));
     }
 
@@ -64,7 +90,8 @@ class ThenStatementExpression<V, R> extends StatementExpression<V, R> implements
     private Object readResolve() throws ObjectStreamException {
       try {
         final Object[] args = deserializeArgs();
-        return new ThenStatementExpression<V, R>((Mapper<? super V, ? extends R>) args[0]);
+        return new EventuallyLoopLoopExpression<V, R>(
+            (Mapper<? super V, ? extends Iterable<? extends R>>) args[0]);
 
       } catch (final Throwable t) {
         throw new InvalidObjectException(t.getMessage());

@@ -33,7 +33,7 @@ public interface Statement<V> extends EvaluationState<V>, Future<V>, Serializabl
   void consume();
 
   @NotNull
-  Statement<V> elseCatch(@NotNull dm.jale.eventual.Mapper<? super Throwable, ? extends V> mapper,
+  Statement<V> elseCatch(@NotNull Mapper<? super Throwable, ? extends V> mapper,
       @Nullable Class<?>... exceptionTypes);
 
   @NotNull
@@ -41,8 +41,7 @@ public interface Statement<V> extends EvaluationState<V>, Future<V>, Serializabl
       @Nullable Class<?>... exceptionTypes);
 
   @NotNull
-  Statement<V> elseIf(
-      @NotNull dm.jale.eventual.Mapper<? super Throwable, ? extends Statement<? extends V>> mapper,
+  Statement<V> elseIf(@NotNull Mapper<? super Throwable, ? extends Statement<? extends V>> mapper,
       @Nullable Class<?>... exceptionTypes);
 
   @NotNull
@@ -52,41 +51,36 @@ public interface Statement<V> extends EvaluationState<V>, Future<V>, Serializabl
   Statement<V> evaluated();
 
   @NotNull
-  <R> Statement<R> eventually(@NotNull dm.jale.eventual.Mapper<? super V, R> mapper);
+  <R> Statement<R> eventually(@NotNull Mapper<? super V, R> mapper);
 
   @NotNull
   Statement<V> eventuallyDo(@NotNull Observer<? super V> observer);
 
   @NotNull
-  <R> Statement<R> eventuallyIf(
-      @NotNull dm.jale.eventual.Mapper<? super V, ? extends Statement<R>> mapper);
+  <R> Statement<R> eventuallyIf(@NotNull Mapper<? super V, ? extends Statement<R>> mapper);
 
   @NotNull
-  <R> Statement<R> eventuallyTry(
-      @NotNull dm.jale.eventual.Mapper<? super V, ? extends Closeable> closeable,
-      @NotNull dm.jale.eventual.Mapper<? super V, R> mapper);
+  <R> Statement<R> eventuallyTry(@NotNull Mapper<? super V, ? extends Closeable> closeable,
+      @NotNull Mapper<? super V, R> mapper);
 
   @NotNull
-  Statement<V> eventuallyTryDo(
-      @NotNull dm.jale.eventual.Mapper<? super V, ? extends Closeable> closeable,
+  Statement<V> eventuallyTryDo(@NotNull Mapper<? super V, ? extends Closeable> closeable,
       @NotNull Observer<? super V> observer);
 
   @NotNull
-  <R> Statement<R> eventuallyTryIf(
-      @NotNull dm.jale.eventual.Mapper<? super V, ? extends Closeable> closeable,
-      @NotNull dm.jale.eventual.Mapper<? super V, ? extends Statement<R>> mapper);
+  <R> Statement<R> eventuallyTryIf(@NotNull Mapper<? super V, ? extends Closeable> closeable,
+      @NotNull Mapper<? super V, ? extends Statement<R>> mapper);
 
   @NotNull
   <S> Statement<V> fork(
       @NotNull Forker<S, ? super V, ? super Evaluation<V>, ? super Statement<V>> forker);
 
   @NotNull
-  <S> Statement<V> fork(@Nullable dm.jale.eventual.Mapper<? super Statement<V>, S> init,
-      @Nullable dm.jale.eventual.Updater<S, ? super V, ? super Statement<V>> value,
-      @Nullable dm.jale.eventual.Updater<S, ? super Throwable, ? super Statement<V>> failure,
-      @Nullable dm.jale.eventual.Completer<S, ? super Statement<V>> done,
-      @Nullable dm.jale.eventual.Updater<S, ? super Evaluation<V>, ? super Statement<V>>
-          evaluation);
+  <S> Statement<V> fork(@Nullable Mapper<? super Statement<V>, S> init,
+      @Nullable Updater<S, ? super V, ? super Statement<V>> value,
+      @Nullable Updater<S, ? super Throwable, ? super Statement<V>> failure,
+      @Nullable Completer<S, ? super Statement<V>> done,
+      @Nullable Updater<S, ? super Evaluation<V>, ? super Statement<V>> evaluation);
 
   @NotNull
   Statement<V> forkOn(@NotNull Executor executor);
@@ -96,10 +90,10 @@ public interface Statement<V> extends EvaluationState<V>, Future<V>, Serializabl
   boolean getDone(long timeout, @NotNull TimeUnit timeUnit);
 
   @Nullable
-  dm.jale.eventual.FailureException getFailure();
+  FailureException getFailure();
 
   @Nullable
-  dm.jale.eventual.FailureException getFailure(long timeout, @NotNull TimeUnit timeUnit);
+  FailureException getFailure(long timeout, @NotNull TimeUnit timeUnit);
 
   V getValue();
 
@@ -108,7 +102,7 @@ public interface Statement<V> extends EvaluationState<V>, Future<V>, Serializabl
   boolean isFinal();
 
   @NotNull
-  Statement<V> whenDone(@NotNull dm.jale.eventual.Action action);
+  Statement<V> whenDone(@NotNull Action action);
 
   interface Forker<S, V, R, C> {
 

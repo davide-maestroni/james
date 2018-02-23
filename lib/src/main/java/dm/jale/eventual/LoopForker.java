@@ -16,9 +16,11 @@
 
 package dm.jale.eventual;
 
+import dm.jale.eventual.Statement.Forker;
+
 /**
  * Created by davide-maestroni on 02/15/2018.
  */
-public interface LoopForker<S, V> extends Statement.Forker<S, V, EvaluationCollection<V>, Loop<V>> {
+public interface LoopForker<S, V> extends Forker<S, V, EvaluationCollection<V>, Loop<V>> {
 
 }

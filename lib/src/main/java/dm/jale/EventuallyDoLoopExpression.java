@@ -22,63 +22,65 @@ import org.jetbrains.annotations.Nullable;
 import java.io.InvalidObjectException;
 import java.io.ObjectStreamException;
 import java.io.Serializable;
-import java.util.ArrayList;
 
 import dm.jale.config.BuildConfig;
 import dm.jale.eventual.EvaluationCollection;
-import dm.jale.eventual.Mapper;
+import dm.jale.eventual.Observer;
 import dm.jale.util.ConstantConditions;
+import dm.jale.util.Iterables;
 import dm.jale.util.SerializableProxy;
 
 /**
  * Created by davide-maestroni on 02/01/2018.
  */
-class ThenLoopExpression<V, R> extends LoopExpression<V, R> implements Serializable {
+class EventuallyDoLoopExpression<V, R> extends LoopExpression<V, R> implements Serializable {
 
   private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
 
-  private final Mapper<? super V, ? extends R> mMapper;
+  private final Observer<? super V> mObserver;
 
-  ThenLoopExpression(@NotNull final Mapper<? super V, ? extends R> mapper) {
-    mMapper = ConstantConditions.notNull("mapper", mapper);
+  EventuallyDoLoopExpression(@NotNull final Observer<? super V> observer) {
+    mObserver = ConstantConditions.notNull("observer", observer);
   }
 
   @Override
   void addValue(final V value, @NotNull final EvaluationCollection<R> evaluation) throws Exception {
-    evaluation.addValue(mMapper.apply(value)).set();
+    mObserver.accept(value);
+    super.addValue(value, evaluation);
   }
 
   @Override
+  @SuppressWarnings("unchecked")
   void addValues(@Nullable final Iterable<? extends V> values,
       @NotNull final EvaluationCollection<R> evaluation) throws Exception {
     if (values == null) {
       return;
     }
 
-    final ArrayList<R> outputs = new ArrayList<R>();
-    @SuppressWarnings("UnnecessaryLocalVariable") final Mapper<? super V, ? extends R> mapper =
-        mMapper;
+    int index = 0;
     try {
+      @SuppressWarnings("UnnecessaryLocalVariable") final Observer<? super V> observer = mObserver;
       for (final V value : values) {
-        outputs.add(mapper.apply(value));
+        observer.accept(value);
+        ++index;
       }
 
     } finally {
-      evaluation.addValues(outputs).set();
+      evaluation.addValues((Iterable<R>) Iterables.asList(values).subList(0, index)).set();
     }
   }
 
   @NotNull
   private Object writeReplace() throws ObjectStreamException {
-    return new HandlerProxy<V, R>(mMapper);
+    return new HandlerProxy<V, R>(mObserver);
   }
 
   private static class HandlerProxy<V, R> extends SerializableProxy {
 
     private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
 
-    private HandlerProxy(final Mapper<? super V, ? extends R> mapper) {
-      super(proxy(mapper));
+    private HandlerProxy(final Observer<? super V> observer) {
+      super(proxy(observer));
     }
 
     @NotNull
@@ -86,7 +88,7 @@ class ThenLoopExpression<V, R> extends LoopExpression<V, R> implements Serializa
     private Object readResolve() throws ObjectStreamException {
       try {
         final Object[] args = deserializeArgs();
-        return new ThenLoopExpression<V, R>((Mapper<? super V, ? extends R>) args[0]);
+        return new EventuallyDoLoopExpression<V, R>((Observer<? super V>) args[0]);
 
       } catch (final Throwable t) {
         throw new InvalidObjectException(t.getMessage());

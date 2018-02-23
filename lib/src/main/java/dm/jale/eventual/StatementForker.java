@@ -21,7 +21,6 @@ import dm.jale.eventual.Statement.Forker;
 /**
  * Created by davide-maestroni on 02/15/2018.
  */
-public interface StatementForker<S, V>
-    extends Forker<S, V, Evaluation<V>, dm.jale.eventual.Statement<V>> {
+public interface StatementForker<S, V> extends Forker<S, V, Evaluation<V>, Statement<V>> {
 
 }

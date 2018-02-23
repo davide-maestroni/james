@@ -24,40 +24,41 @@ import java.io.Serializable;
 
 import dm.jale.config.BuildConfig;
 import dm.jale.eventual.Evaluation;
-import dm.jale.eventual.Mapper;
-import dm.jale.eventual.Statement;
+import dm.jale.eventual.Observer;
 import dm.jale.util.ConstantConditions;
 import dm.jale.util.SerializableProxy;
 
 /**
  * Created by davide-maestroni on 02/01/2018.
  */
-class ThenIfStatementExpression<V, R> extends StatementExpression<V, R> implements Serializable {
+class EventuallyDoStatementExpression<V, R> extends StatementExpression<V, R>
+    implements Serializable {
 
   private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
 
-  private final Mapper<? super V, ? extends Statement<R>> mMapper;
+  private final Observer<? super V> mObserver;
 
-  ThenIfStatementExpression(@NotNull final Mapper<? super V, ? extends Statement<R>> mapper) {
-    mMapper = ConstantConditions.notNull("mapper", mapper);
+  EventuallyDoStatementExpression(@NotNull final Observer<? super V> observer) {
+    mObserver = ConstantConditions.notNull("observer", observer);
   }
 
   @Override
   void value(final V value, @NotNull final Evaluation<R> evaluation) throws Exception {
-    mMapper.apply(value).to(evaluation);
+    mObserver.accept(value);
+    super.value(value, evaluation);
   }
 
   @NotNull
   private Object writeReplace() throws ObjectStreamException {
-    return new HandlerProxy<V, R>(mMapper);
+    return new HandlerProxy<V, R>(mObserver);
   }
 
   private static class HandlerProxy<V, R> extends SerializableProxy {
 
     private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
 
-    private HandlerProxy(final Mapper<? super V, ? extends Statement<R>> mapper) {
-      super(proxy(mapper));
+    private HandlerProxy(final Observer<? super V> observer) {
+      super(proxy(observer));
     }
 
     @NotNull
@@ -65,8 +66,7 @@ class ThenIfStatementExpression<V, R> extends StatementExpression<V, R> implemen
     private Object readResolve() throws ObjectStreamException {
       try {
         final Object[] args = deserializeArgs();
-        return new ThenIfStatementExpression<V, R>(
-            (Mapper<? super V, ? extends Statement<R>>) args[0]);
+        return new EventuallyDoStatementExpression<V, R>((Observer<? super V>) args[0]);
 
       } catch (final Throwable t) {
         throw new InvalidObjectException(t.getMessage());

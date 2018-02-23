@@ -339,18 +339,18 @@ class DefaultStatement<V> implements Statement<V>, Serializable {
 
   @NotNull
   public <R> Statement<R> eventually(@NotNull final Mapper<? super V, R> mapper) {
-    return propagate(new ThenStatementExpression<V, R>(mapper));
+    return propagate(new EventuallyStatementExpression<V, R>(mapper));
   }
 
   @NotNull
   public Statement<V> eventuallyDo(@NotNull final Observer<? super V> observer) {
-    return propagate(new ThenDoStatementExpression<V, V>(observer));
+    return propagate(new EventuallyDoStatementExpression<V, V>(observer));
   }
 
   @NotNull
   public <R> Statement<R> eventuallyIf(
       @NotNull final Mapper<? super V, ? extends Statement<R>> mapper) {
-    return propagate(new ThenIfStatementExpression<V, R>(mapper));
+    return propagate(new EventuallyIfStatementExpression<V, R>(mapper));
   }
 
   @NotNull
@@ -358,7 +358,7 @@ class DefaultStatement<V> implements Statement<V>, Serializable {
       @NotNull final Mapper<? super V, ? extends Closeable> closeable,
       @NotNull final Mapper<? super V, R> mapper) {
     return propagate(
-        new TryStatementExpression<V, R>(closeable, new ThenStatementExpression<V, R>(mapper),
+        new TryStatementExpression<V, R>(closeable, new EventuallyStatementExpression<V, R>(mapper),
             mLogger.getName()));
   }
 
@@ -367,7 +367,7 @@ class DefaultStatement<V> implements Statement<V>, Serializable {
       @NotNull final Mapper<? super V, ? extends Closeable> closeable,
       @NotNull final Observer<? super V> observer) {
     return propagate(
-        new TryStatementExpression<V, V>(closeable, new ThenDoStatementExpression<V, V>(observer),
+        new TryStatementExpression<V, V>(closeable, new EventuallyDoStatementExpression<V, V>(observer),
             mLogger.getName()));
   }
 

@@ -23,28 +23,28 @@ import java.io.ObjectStreamException;
 import java.io.Serializable;
 
 import dm.jale.config.BuildConfig;
-import dm.jale.eventual.EvaluationCollection;
-import dm.jale.eventual.Loop;
+import dm.jale.eventual.Evaluation;
 import dm.jale.eventual.Mapper;
+import dm.jale.eventual.Statement;
 import dm.jale.util.ConstantConditions;
 import dm.jale.util.SerializableProxy;
 
 /**
  * Created by davide-maestroni on 02/01/2018.
  */
-class ThenLoopIfStatementExpression<V, R> extends StatementLoopExpression<V, R>
+class EventuallyIfStatementExpression<V, R> extends StatementExpression<V, R>
     implements Serializable {
 
   private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
 
-  private final Mapper<? super V, ? extends Loop<R>> mMapper;
+  private final Mapper<? super V, ? extends Statement<R>> mMapper;
 
-  ThenLoopIfStatementExpression(@NotNull final Mapper<? super V, ? extends Loop<R>> mapper) {
+  EventuallyIfStatementExpression(@NotNull final Mapper<? super V, ? extends Statement<R>> mapper) {
     mMapper = ConstantConditions.notNull("mapper", mapper);
   }
 
   @Override
-  void value(final V value, @NotNull final EvaluationCollection<R> evaluation) throws Exception {
+  void value(final V value, @NotNull final Evaluation<R> evaluation) throws Exception {
     mMapper.apply(value).to(evaluation);
   }
 
@@ -57,7 +57,7 @@ class ThenLoopIfStatementExpression<V, R> extends StatementLoopExpression<V, R>
 
     private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
 
-    private HandlerProxy(final Mapper<? super V, ? extends Loop<R>> mapper) {
+    private HandlerProxy(final Mapper<? super V, ? extends Statement<R>> mapper) {
       super(proxy(mapper));
     }
 
@@ -66,8 +66,8 @@ class ThenLoopIfStatementExpression<V, R> extends StatementLoopExpression<V, R>
     private Object readResolve() throws ObjectStreamException {
       try {
         final Object[] args = deserializeArgs();
-        return new ThenLoopIfStatementExpression<V, R>(
-            (Mapper<? super V, ? extends Loop<R>>) args[0]);
+        return new EventuallyIfStatementExpression<V, R>(
+            (Mapper<? super V, ? extends Statement<R>>) args[0]);
 
       } catch (final Throwable t) {
         throw new InvalidObjectException(t.getMessage());
