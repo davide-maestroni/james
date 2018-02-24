@@ -45,6 +45,7 @@ import dm.jale.eventual.Provider;
 import dm.jale.eventual.Settler;
 import dm.jale.eventual.Statement;
 import dm.jale.eventual.Statement.Forker;
+import dm.jale.eventual.StatementForker;
 import dm.jale.eventual.Updater;
 import dm.jale.executor.ScheduledExecutor;
 import dm.jale.ext.backoff.BackoffUpdater;
@@ -105,6 +106,17 @@ public class EventualExt extends Eventual {
   @NotNull
   public static Yielder<?, Number, Long> averageLong() {
     return AverageLongYielder.instance();
+  }
+
+  @NotNull
+  public static <V> StatementForker<?, V> repeat() {
+    return RepeatForker.instance();
+  }
+
+  @NotNull
+  public static <V> StatementForker<?, V> repeatSince(final long timeout,
+      @NotNull final TimeUnit timeUnit) {
+    return new RepeatSinceForker<V>(timeout, timeUnit);
   }
 
   @NotNull
