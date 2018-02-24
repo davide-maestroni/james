@@ -304,7 +304,7 @@ class YieldLoopExpression<S, V, R> extends LoopExpression<V, R> implements Seria
 
     private void checkSet() {
       if (mIsSet.get()) {
-        throw new IllegalStateException("loop has already complete");
+        throw new IllegalStateException("loop has already completed");
       }
     }
 

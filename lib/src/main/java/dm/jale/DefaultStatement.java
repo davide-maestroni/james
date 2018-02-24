@@ -533,9 +533,17 @@ class DefaultStatement<V> implements Statement<V>, Serializable {
     }
   }
 
+  @SuppressWarnings("unchecked")
   public void to(@NotNull final Evaluation<? super V> evaluation) {
     checkEvaluated();
-    propagate(new ToEvaluationStatementExpression<V>(evaluation)).consume();
+    if (mIsFork) {
+      @SuppressWarnings("UnnecessaryLocalVariable") final Observer<? extends Evaluation<?>>
+          observer = mObserver;
+      ((ForkObserver<?, V>) observer).propagate((Evaluation<V>) evaluation);
+
+    } else {
+      propagate(new ToEvaluationStatementExpression<V>(evaluation)).consume();
+    }
   }
 
   @SuppressWarnings("unchecked")

@@ -839,9 +839,18 @@ class DefaultLoop<V> implements Loop<V>, Serializable {
     return outputs;
   }
 
+  @SuppressWarnings("unchecked")
   public void to(@NotNull final EvaluationCollection<? super V> evaluation) {
     checkEvaluated();
-    propagate(new ToEvaluationLoopExpression<V>(evaluation)).consume();
+    if (mIsFork) {
+      @SuppressWarnings(
+          "UnnecessaryLocalVariable") final Observer<? extends EvaluationCollection<?>> observer =
+          mObserver;
+      ((ForkObserver<?, V>) observer).propagate((EvaluationCollection<V>) evaluation);
+
+    } else {
+      propagate(new ToEvaluationLoopExpression<V>(evaluation)).consume();
+    }
   }
 
   @NotNull
@@ -910,8 +919,7 @@ class DefaultLoop<V> implements Loop<V>, Serializable {
   }
 
   public void to(@NotNull final Evaluation<? super Iterable<V>> evaluation) {
-    checkEvaluated();
-    yield(new ToEvaluationYielder<V>(evaluation)).consume();
+    to(new CollectionToEvaluation<V>(evaluation, mLogger));
   }
 
   @SuppressWarnings("unchecked")
@@ -1515,7 +1523,7 @@ class DefaultLoop<V> implements Loop<V>, Serializable {
       @Override
       Runnable add() {
         mLogger.wrn("Loop has already failed with reason: %s", mFailure);
-        throw FailureException.wrap(new IllegalStateException("loop has already complete"));
+        throw FailureException.wrap(new IllegalStateException("loop has already completed"));
       }
 
       @Nullable
@@ -1542,7 +1550,7 @@ class DefaultLoop<V> implements Loop<V>, Serializable {
       @Override
       Runnable set() {
         mLogger.wrn("Loop has already failed with reason: %s", mFailure);
-        throw new IllegalStateException("loop has already complete");
+        throw new IllegalStateException("loop has already completed");
       }
     }
 
@@ -1619,14 +1627,14 @@ class DefaultLoop<V> implements Loop<V>, Serializable {
       @Nullable
       @Override
       Runnable add() {
-        mLogger.wrn("Loop has already complete");
-        throw new IllegalStateException("loop has already complete");
+        mLogger.wrn("Loop has already completed");
+        throw new IllegalStateException("loop has already completed");
       }
 
       @Nullable
       @Override
       Runnable addFailureSafe(@NotNull final Throwable failure) {
-        mLogger.wrn("Loop has already complete");
+        mLogger.wrn("Loop has already completed");
         return null;
       }
 
@@ -1640,8 +1648,8 @@ class DefaultLoop<V> implements Loop<V>, Serializable {
       @Nullable
       @Override
       Runnable set() {
-        mLogger.wrn("Loop has already complete");
-        throw new IllegalStateException("loop has already complete");
+        mLogger.wrn("Loop has already completed");
+        throw new IllegalStateException("loop has already completed");
       }
     }
 
