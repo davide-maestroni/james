@@ -25,7 +25,7 @@ import java.util.concurrent.TimeUnit;
 import dm.jale.eventual.Evaluation;
 import dm.jale.eventual.Statement;
 import dm.jale.eventual.StatementForker;
-import dm.jale.ext.RepeatSinceForker.ForkerStack;
+import dm.jale.ext.RefreshAfterForker.ForkerStack;
 import dm.jale.ext.config.BuildConfig;
 import dm.jale.ext.eventual.TimedState;
 import dm.jale.util.ConstantConditions;
@@ -33,7 +33,7 @@ import dm.jale.util.ConstantConditions;
 /**
  * Created by davide-maestroni on 02/19/2018.
  */
-class RepeatSinceForker<V> implements StatementForker<ForkerStack<V>, V>, Serializable {
+class RefreshAfterForker<V> implements StatementForker<ForkerStack<V>, V>, Serializable {
 
   private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
 
@@ -41,7 +41,7 @@ class RepeatSinceForker<V> implements StatementForker<ForkerStack<V>, V>, Serial
 
   private final long mTimeout;
 
-  RepeatSinceForker(final long timeout, @NotNull final TimeUnit timeUnit) {
+  RefreshAfterForker(final long timeout, @NotNull final TimeUnit timeUnit) {
     mTimeUnit = ConstantConditions.notNull("timeUnit", timeUnit);
     mTimeout = timeout;
   }
