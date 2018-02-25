@@ -68,8 +68,8 @@ public class EventualExt extends Eventual {
 
   // TODO: 21/02/2018 Yielders: groupBy
   // TODO: 21/02/2018 Joiners: zip(BiMapper), zip(TriMapper), zip(TetraMapper),
-  // TODO: 16/02/2018 Forkers: repeatAll(), repeatLast(), repeatFirst(), repeatSince(),
-  // TODO: 16/02/2018 - refreshAllAfter()
+  // TODO: 16/02/2018 Forkers: refresh(), repeatAll(), repeatLast(), repeatFirst(), repeatSince(),
+  // TODO: 16/02/2018 - refreshAll(), refreshAllAfter()?
   // TODO: 20/02/2018 Backoff.apply(int count, long lastDelay) => BackoffUpdater
   // TODO: 20/02/2018 (Backoffers): dropFirst, dropLast, wait(backoff?)
 

@@ -609,7 +609,13 @@ class DefaultStatement<V> implements Statement<V>, Serializable {
         final Iterator<WeakReference<Statement<?>>> iterator = mForked.iterator();
         while (iterator.hasNext()) {
           final WeakReference<Statement<?>> next = iterator.next();
-          if (next.get() == null) {
+          final Statement<?> statement = next.get();
+          if (statement == null) {
+            iterator.remove();
+
+          } else if (statement.isDone()) {
+            final DefaultStatement<?> defaultStatement = (DefaultStatement<?>) statement;
+            ((PropagationForkObserver) defaultStatement.mObserver).cancel(defaultStatement.mHead);
             iterator.remove();
 
           } else {
@@ -1028,7 +1034,6 @@ class DefaultStatement<V> implements Statement<V>, Serializable {
     public void accept(final Evaluation<V> evaluation) {
       mObserver.propagate(evaluation);
     }
-
   }
 
   private static class PropagationHead<V> extends StatementPropagation<V, V> {

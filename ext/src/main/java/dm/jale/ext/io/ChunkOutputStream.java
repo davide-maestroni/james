@@ -677,6 +677,5 @@ public class ChunkOutputStream extends OutputStream {
 
       return bytes.length;
     }
-
   }
 }

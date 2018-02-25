@@ -994,8 +994,13 @@ class DefaultLoop<V> implements Loop<V>, Serializable {
         final Iterator<WeakReference<Loop<?>>> iterator = mForked.iterator();
         while (iterator.hasNext()) {
           final WeakReference<Loop<?>> next = iterator.next();
-          if (next.get() == null) {
+          final Statement<?> statement = next.get();
+          if (statement == null) {
             iterator.remove();
+
+          } else if (statement.isDone()) {
+            final DefaultLoop<?> defaultLoop = (DefaultLoop<?>) statement;
+            ((PropagationForkObserver) defaultLoop.mObserver).cancel(defaultLoop.mHead);
 
           } else {
             newForked.add(next);
@@ -1851,7 +1856,6 @@ class DefaultLoop<V> implements Loop<V>, Serializable {
     public void accept(final EvaluationCollection<V> evaluation) {
       mObserver.propagate(evaluation);
     }
-
   }
 
   private static class PropagationHead<V> extends LoopPropagation<V, V> {

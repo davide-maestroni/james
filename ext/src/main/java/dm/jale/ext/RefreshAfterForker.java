@@ -23,10 +23,12 @@ import java.util.ArrayList;
 import java.util.concurrent.TimeUnit;
 
 import dm.jale.eventual.Evaluation;
+import dm.jale.eventual.Mapper;
 import dm.jale.eventual.Statement;
 import dm.jale.eventual.StatementForker;
 import dm.jale.ext.RefreshAfterForker.ForkerStack;
 import dm.jale.ext.config.BuildConfig;
+import dm.jale.ext.eventual.Identity;
 import dm.jale.ext.eventual.TimedState;
 import dm.jale.util.ConstantConditions;
 
@@ -52,20 +54,32 @@ class RefreshAfterForker<V> implements StatementForker<ForkerStack<V>, V>, Seria
 
   public ForkerStack<V> evaluation(final ForkerStack<V> stack,
       @NotNull final Evaluation<V> evaluation, @NotNull final Statement<V> context) {
-    final TimedState<V> state = stack.state;
-    final Statement<V> statement = stack.statement;
-    if (statement != null) {
-      statement.to(evaluation);
+    final Statement<TimedState<V>> valueStatement = stack.valueStatement;
+    if (valueStatement != null) {
+      if (valueStatement.isSet()) {
+        stack.state = valueStatement.value();
 
-    } else if (state != null) {
+      } else {
+        stack.statement.eventually(new ToEvaluationMapper<V>(evaluation));
+        return stack;
+      }
+    }
+
+    final TimedState<V> state = stack.state;
+    if (state != null) {
       final long timeout = mTimeout;
       if ((timeout < 0) || (System.currentTimeMillis() <= (state.timestamp() + mTimeUnit.toMillis(
           timeout)))) {
         state.to(evaluation);
 
       } else {
-        stack.statement = context.evaluate().fork(this);
-        stack.statement.to(evaluation);
+        final Statement<TimedState<V>> statement = context.evaluate()
+            .eventually(TimedStateValueMapper.<V>instance())
+            .elseCatch(TimedStateFailureMapper.<V>instance())
+            .fork(RepeatForker.<TimedState<V>>instance());
+        stack.statement = statement;
+        stack.valueStatement = statement.eventually(Identity.<TimedState<V>>instance());
+        statement.eventually(new ToEvaluationMapper<V>(evaluation));
       }
 
     } else {
@@ -117,6 +131,22 @@ class RefreshAfterForker<V> implements StatementForker<ForkerStack<V>, V>, Seria
 
     private TimedState<V> state;
 
-    private Statement<V> statement;
+    private Statement<TimedState<V>> statement;
+
+    private Statement<TimedState<V>> valueStatement;
+  }
+
+  private static class ToEvaluationMapper<V> implements Mapper<TimedState<V>, Void> {
+
+    private final Evaluation<V> mEvaluation;
+
+    private ToEvaluationMapper(@NotNull final Evaluation<V> evaluation) {
+      mEvaluation = evaluation;
+    }
+
+    public Void apply(final TimedState<V> value) {
+      value.to(mEvaluation);
+      return null;
+    }
   }
 }
