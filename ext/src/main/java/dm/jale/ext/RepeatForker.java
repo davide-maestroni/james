@@ -20,19 +20,16 @@ import org.jetbrains.annotations.NotNull;
 
 import java.io.ObjectStreamException;
 import java.io.Serializable;
-import java.util.ArrayList;
 
 import dm.jale.eventual.Evaluation;
-import dm.jale.eventual.SimpleState;
 import dm.jale.eventual.Statement;
 import dm.jale.eventual.StatementForker;
-import dm.jale.ext.RepeatForker.ForkerStack;
 import dm.jale.ext.config.BuildConfig;
 
 /**
  * Created by davide-maestroni on 02/19/2018.
  */
-class RepeatForker<V> implements StatementForker<ForkerStack<V>, V>, Serializable {
+class RepeatForker<V> implements StatementForker<Void, V>, Serializable {
 
   private static final RepeatForker<?> sInstance = new RepeatForker<Object>();
 
@@ -47,68 +44,31 @@ class RepeatForker<V> implements StatementForker<ForkerStack<V>, V>, Serializabl
     return (RepeatForker<V>) sInstance;
   }
 
-  public ForkerStack<V> done(final ForkerStack<V> stack, @NotNull final Statement<V> context) {
-    return stack;
+  public Void done(final Void stack, @NotNull final Statement<V> context) {
+    return null;
   }
 
-  public ForkerStack<V> evaluation(final ForkerStack<V> stack,
-      @NotNull final Evaluation<V> evaluation, @NotNull final Statement<V> context) {
-    final SimpleState<V> state = stack.state;
-    if (state != null) {
-      state.to(evaluation);
-
-    } else {
-      stack.evaluations.add(evaluation);
-    }
-
-    return stack;
-  }
-
-  public ForkerStack<V> failure(final ForkerStack<V> stack, @NotNull final Throwable failure,
+  public Void evaluation(final Void stack, @NotNull final Evaluation<V> evaluation,
       @NotNull final Statement<V> context) {
-    final SimpleState<V> state = (stack.state = SimpleState.ofFailure(failure));
-    final ArrayList<Evaluation<V>> evaluations = stack.evaluations;
-    try {
-      for (final Evaluation<V> evaluation : evaluations) {
-        state.to(evaluation);
-      }
-
-    } finally {
-      evaluations.clear();
-    }
-
-    return stack;
+    context.evaluate().to(evaluation);
+    return null;
   }
 
-  public ForkerStack<V> init(@NotNull final Statement<V> context) {
-    return new ForkerStack<V>();
-  }
-
-  public ForkerStack<V> value(final ForkerStack<V> stack, final V value,
+  public Void failure(final Void stack, @NotNull final Throwable failure,
       @NotNull final Statement<V> context) {
-    final SimpleState<V> state = (stack.state = SimpleState.ofValue(value));
-    final ArrayList<Evaluation<V>> evaluations = stack.evaluations;
-    try {
-      for (final Evaluation<V> evaluation : evaluations) {
-        state.to(evaluation);
-      }
+    return null;
+  }
 
-    } finally {
-      evaluations.clear();
-    }
+  public Void init(@NotNull final Statement<V> context) {
+    return null;
+  }
 
-    return stack;
+  public Void value(final Void stack, final V value, @NotNull final Statement<V> context) {
+    return null;
   }
 
   @NotNull
   private Object readResolve() throws ObjectStreamException {
     return sInstance;
-  }
-
-  static class ForkerStack<V> {
-
-    private final ArrayList<Evaluation<V>> evaluations = new ArrayList<Evaluation<V>>();
-
-    private SimpleState<V> state;
   }
 }

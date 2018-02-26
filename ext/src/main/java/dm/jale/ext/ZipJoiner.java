@@ -51,6 +51,11 @@ class ZipJoiner<V> implements LoopJoiner<JoinerStack<V>, V, List<V>>, Serializab
   public JoinerStack<V> done(final JoinerStack<V> stack,
       @NotNull final EvaluationCollection<List<V>> evaluation,
       @NotNull final List<Loop<V>> contexts, final int index) {
+    if ((stack.failure == null) && !stack.isSet) {
+      stack.isSet = true;
+      evaluation.set();
+    }
+
     return stack;
   }
 
@@ -72,9 +77,6 @@ class ZipJoiner<V> implements LoopJoiner<JoinerStack<V>, V, List<V>>, Serializab
   public void settle(final JoinerStack<V> stack,
       @NotNull final EvaluationCollection<List<V>> evaluation,
       @NotNull final List<Loop<V>> contexts) {
-    if (stack.failure == null) {
-      evaluation.set();
-    }
   }
 
   @SuppressWarnings("unchecked")
@@ -118,6 +120,8 @@ class ZipJoiner<V> implements LoopJoiner<JoinerStack<V>, V, List<V>>, Serializab
     private final DoubleQueue<V>[] states;
 
     private Throwable failure;
+
+    private boolean isSet;
 
     @SuppressWarnings("unchecked")
     private JoinerStack(final int size) {

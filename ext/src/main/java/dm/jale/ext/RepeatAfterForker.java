@@ -26,7 +26,7 @@ import dm.jale.eventual.Evaluation;
 import dm.jale.eventual.Mapper;
 import dm.jale.eventual.Statement;
 import dm.jale.eventual.StatementForker;
-import dm.jale.ext.RefreshAfterForker.ForkerStack;
+import dm.jale.ext.RepeatAfterForker.ForkerStack;
 import dm.jale.ext.config.BuildConfig;
 import dm.jale.ext.eventual.Identity;
 import dm.jale.ext.eventual.TimedState;
@@ -35,7 +35,7 @@ import dm.jale.util.ConstantConditions;
 /**
  * Created by davide-maestroni on 02/19/2018.
  */
-class RefreshAfterForker<V> implements StatementForker<ForkerStack<V>, V>, Serializable {
+class RepeatAfterForker<V> implements StatementForker<ForkerStack<V>, V>, Serializable {
 
   private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
 
@@ -43,7 +43,7 @@ class RefreshAfterForker<V> implements StatementForker<ForkerStack<V>, V>, Seria
 
   private final long mTimeout;
 
-  RefreshAfterForker(final long timeout, @NotNull final TimeUnit timeUnit) {
+  RepeatAfterForker(final long timeout, @NotNull final TimeUnit timeUnit) {
     mTimeUnit = ConstantConditions.notNull("timeUnit", timeUnit);
     mTimeout = timeout;
   }
@@ -76,7 +76,7 @@ class RefreshAfterForker<V> implements StatementForker<ForkerStack<V>, V>, Seria
         final Statement<TimedState<V>> statement = context.evaluate()
             .eventually(TimedStateValueMapper.<V>instance())
             .elseCatch(TimedStateFailureMapper.<V>instance())
-            .fork(RepeatForker.<TimedState<V>>instance());
+            .fork(ReplayForker.<TimedState<V>>instance());
         stack.statement = statement;
         stack.valueStatement = statement.eventually(Identity.<TimedState<V>>instance());
         statement.eventually(new ToEvaluationMapper<V>(evaluation));

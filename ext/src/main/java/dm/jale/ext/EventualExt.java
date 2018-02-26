@@ -109,14 +109,19 @@ public class EventualExt extends Eventual {
   }
 
   @NotNull
-  public static <V> StatementForker<?, V> refreshAfter(final long timeout,
-      @NotNull final TimeUnit timeUnit) {
-    return new RefreshAfterForker<V>(timeout, timeUnit);
+  public static <V> StatementForker<?, V> repeat() {
+    return RepeatForker.instance();
   }
 
   @NotNull
-  public static <V> StatementForker<?, V> repeat() {
-    return RepeatForker.instance();
+  public static <V> StatementForker<?, V> repeatAfter(final long timeout,
+      @NotNull final TimeUnit timeUnit) {
+    return new RepeatAfterForker<V>(timeout, timeUnit);
+  }
+
+  @NotNull
+  public static <V> StatementForker<?, V> replay() {
+    return ReplayForker.instance();
   }
 
   @NotNull
