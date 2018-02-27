@@ -85,7 +85,7 @@ class CollectionToEvaluation<V> implements EvaluationCollection<V> {
   public EvaluationCollection<V> addValue(final V value) {
     synchronized (mMutex) {
       checkSet();
-      if (mFailure != null) {
+      if (mFailure == null) {
         mValues.add(value);
       }
     }
@@ -97,7 +97,7 @@ class CollectionToEvaluation<V> implements EvaluationCollection<V> {
   public EvaluationCollection<V> addValues(@Nullable final Iterable<? extends V> values) {
     synchronized (mMutex) {
       checkSet();
-      if ((mFailure != null) && (values != null)) {
+      if ((mFailure == null) && (values != null)) {
         Iterables.addAll(values, mValues);
       }
     }

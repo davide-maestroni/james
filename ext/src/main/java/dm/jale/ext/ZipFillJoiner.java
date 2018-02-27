@@ -27,6 +27,7 @@ import dm.jale.eventual.Loop;
 import dm.jale.eventual.LoopJoiner;
 import dm.jale.ext.ZipFillJoiner.JoinerStack;
 import dm.jale.ext.config.BuildConfig;
+import dm.jale.util.ConstantConditions;
 import dm.jale.util.DoubleQueue;
 
 /**
@@ -36,10 +37,10 @@ class ZipFillJoiner<V> implements LoopJoiner<JoinerStack<V>, V, List<V>>, Serial
 
   private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
 
-  private final V mFiller;
+  private final List<V> mFillers;
 
-  ZipFillJoiner(final V filler) {
-    mFiller = filler;
+  ZipFillJoiner(@NotNull final List<V> fillers) {
+    mFillers = ConstantConditions.notNull("fillers", fillers);
   }
 
   public JoinerStack<V> done(final JoinerStack<V> stack,
@@ -78,10 +79,12 @@ class ZipFillJoiner<V> implements LoopJoiner<JoinerStack<V>, V, List<V>>, Serial
         }
 
         if (canAdd) {
-          @SuppressWarnings("UnnecessaryLocalVariable") final V filler = mFiller;
+          @SuppressWarnings("UnnecessaryLocalVariable") final List<V> fillers = mFillers;
+          int i = 0;
           final ArrayList<V> values = new ArrayList<V>();
           for (final DoubleQueue<V> state : states) {
-            values.add((!state.isEmpty()) ? state.removeFirst() : filler);
+            values.add((!state.isEmpty()) ? state.removeFirst() : fillers.get(i));
+            ++i;
           }
 
           evaluation.addValue(values);

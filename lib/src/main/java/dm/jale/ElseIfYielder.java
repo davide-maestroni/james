@@ -53,7 +53,7 @@ class ElseIfYielder<V> extends CollectionYielder<V> implements Serializable {
       @NotNull final YieldOutputs<V> outputs) throws Exception {
     for (final Class<?> type : mTypes) {
       if (type.isInstance(failure)) {
-        outputs.yieldLoop(mMapper.apply(failure));
+        outputs.yieldLoopIf(mMapper.apply(failure));
         return null;
       }
     }

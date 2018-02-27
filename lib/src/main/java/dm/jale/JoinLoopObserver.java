@@ -81,9 +81,9 @@ class JoinLoopObserver<S, V, R>
       state.set(joiner.init((List<Loop<V>>) loops));
       for (final Loop<? extends V> loop : loops) {
         final int index = i++;
-        loop.to(
-            new JoinEvaluationCollection<S, V, R>(state, joiner, executor, evaluation, loops, index,
-                logger));
+        loop.evaluated()
+            .to(new JoinEvaluationCollection<S, V, R>(state, joiner, executor, evaluation, loops,
+                index, logger));
       }
 
     } catch (final CancellationException e) {

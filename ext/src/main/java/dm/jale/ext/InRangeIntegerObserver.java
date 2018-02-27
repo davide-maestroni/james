@@ -50,13 +50,13 @@ class InRangeIntegerObserver implements Observer<EvaluationCollection<Integer>>,
     @SuppressWarnings("UnnecessaryLocalVariable") final int end = mEnd;
     @SuppressWarnings("UnnecessaryLocalVariable") final int increment = mIncrement;
     if (mIsInclusive) {
-      while (value < end) {
+      while (value <= end) {
         evaluation.addValue(value);
         value += increment;
       }
 
     } else {
-      while (value <= end) {
+      while (value < end) {
         evaluation.addValue(value);
         value += increment;
       }

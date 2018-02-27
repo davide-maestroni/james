@@ -50,13 +50,13 @@ class InRangeLongObserver implements Observer<EvaluationCollection<Long>>, Seria
     @SuppressWarnings("UnnecessaryLocalVariable") final long end = mEnd;
     @SuppressWarnings("UnnecessaryLocalVariable") final long increment = mIncrement;
     if (mIsInclusive) {
-      while (value < end) {
+      while (value <= end) {
         evaluation.addValue(value);
         value += increment;
       }
 
     } else {
-      while (value <= end) {
+      while (value < end) {
         evaluation.addValue(value);
         value += increment;
       }

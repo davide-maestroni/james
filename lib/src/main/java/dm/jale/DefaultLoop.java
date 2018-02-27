@@ -477,20 +477,20 @@ class DefaultLoop<V> implements Loop<V>, Serializable {
 
   @NotNull
   public Loop<V> elseCatch(@NotNull final Mapper<? super Throwable, ? extends Iterable<V>> mapper,
-      @Nullable final Class<?>[] exceptionTypes) {
+      @Nullable final Class<?>... exceptionTypes) {
     return yield(new ElseCatchYielder<V>(mapper, Eventuals.cloneExceptionTypes(exceptionTypes)));
   }
 
   @NotNull
   public Loop<V> elseDo(@NotNull final Observer<? super Throwable> observer,
-      @Nullable final Class<?>[] exceptionTypes) {
+      @Nullable final Class<?>... exceptionTypes) {
     return yield(new ElseDoYielder<V>(observer, Eventuals.cloneExceptionTypes(exceptionTypes)));
   }
 
   @NotNull
   public Loop<V> elseIf(
       @NotNull final Mapper<? super Throwable, ? extends Statement<? extends Iterable<V>>> mapper,
-      @Nullable final Class<?>[] exceptionTypes) {
+      @Nullable final Class<?>... exceptionTypes) {
     return yield(new ElseIfYielder<V>(mapper, Eventuals.cloneExceptionTypes(exceptionTypes)));
   }
 
@@ -1014,6 +1014,7 @@ class DefaultLoop<V> implements Loop<V>, Serializable {
       return forked;
     }
 
+    final DefaultLoop<R> loop;
     synchronized (mMutex) {
       if (mPropagation != null) {
         throw new IllegalStateException("the loop evaluation is already propagated");
@@ -1025,11 +1026,11 @@ class DefaultLoop<V> implements Loop<V>, Serializable {
         mPropagation = propagation;
         mMutex.notifyAll();
       }
+
+      loop = new DefaultLoop<R>((Observer<EvaluationCollection<?>>) observer, mIsEvaluated, logger,
+          head, propagation, false);
     }
 
-    final DefaultLoop<R> loop =
-        new DefaultLoop<R>((Observer<EvaluationCollection<?>>) observer, mIsEvaluated, logger, head,
-            propagation, false);
     if (propagate != null) {
       propagate.run();
     }

@@ -50,13 +50,13 @@ class InRangeDoubleObserver implements Observer<EvaluationCollection<Double>>, S
     @SuppressWarnings("UnnecessaryLocalVariable") final double end = mEnd;
     @SuppressWarnings("UnnecessaryLocalVariable") final double increment = mIncrement;
     if (mIsInclusive) {
-      while (value < end) {
+      while (value <= end) {
         evaluation.addValue(value);
         value += increment;
       }
 
     } else {
-      while (value <= end) {
+      while (value < end) {
         evaluation.addValue(value);
         value += increment;
       }

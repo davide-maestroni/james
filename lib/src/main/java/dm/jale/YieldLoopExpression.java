@@ -238,7 +238,8 @@ class YieldLoopExpression<S, V, R> extends LoopExpression<V, R> implements Seria
 
     @NotNull
     @SuppressWarnings("unchecked")
-    public YieldOutputs<V> yieldLoop(@NotNull final Statement<? extends Iterable<V>> loop) {
+    public YieldOutputs<V> yieldLoopIf(
+        @NotNull final Statement<? extends Iterable<? extends V>> loop) {
       checkSet();
       if (loop instanceof Loop) {
         ((Loop<V>) loop).to(new EvaluationCollection<V>() {
@@ -273,13 +274,13 @@ class YieldLoopExpression<S, V, R> extends LoopExpression<V, R> implements Seria
         });
 
       } else {
-        loop.to(new Evaluation<Iterable<V>>() {
+        loop.to(new Evaluation<Iterable<? extends V>>() {
 
           public void fail(@NotNull final Throwable failure) {
             mEvaluation.addFailure(failure);
           }
 
-          public void set(final Iterable<V> value) {
+          public void set(final Iterable<? extends V> value) {
             mEvaluation.addValues(value);
           }
         });

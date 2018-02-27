@@ -50,13 +50,13 @@ class InRangeFloatObserver implements Observer<EvaluationCollection<Float>>, Ser
     @SuppressWarnings("UnnecessaryLocalVariable") final float end = mEnd;
     @SuppressWarnings("UnnecessaryLocalVariable") final float increment = mIncrement;
     if (mIsInclusive) {
-      while (value < end) {
+      while (value <= end) {
         evaluation.addValue(value);
         value += increment;
       }
 
     } else {
-      while (value <= end) {
+      while (value < end) {
         evaluation.addValue(value);
         value += increment;
       }

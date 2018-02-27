@@ -58,13 +58,13 @@ class InRangeComparableObserver<V extends Comparable<? super V>>
     final V end = mEnd;
     final Mapper<? super V, ? extends V> increment = mIncrement;
     if (mIsInclusive) {
-      while (value.compareTo(end) < 0) {
+      while (value.compareTo(end) <= 0) {
         evaluation.addValue(value);
         value = increment.apply(value);
       }
 
     } else {
-      while (value.compareTo(end) <= 0) {
+      while (value.compareTo(end) < 0) {
         evaluation.addValue(value);
         value = increment.apply(value);
       }

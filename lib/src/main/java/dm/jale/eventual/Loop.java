@@ -34,16 +34,16 @@ public interface Loop<V> extends Statement<Iterable<V>>, Serializable {
 
   @NotNull
   Loop<V> elseCatch(@NotNull Mapper<? super Throwable, ? extends Iterable<V>> mapper,
-      @Nullable Class<?>[] exceptionTypes);
+      @Nullable Class<?>... exceptionTypes);
 
   @NotNull
   Loop<V> elseDo(@NotNull Observer<? super Throwable> observer,
-      @Nullable Class<?>[] exceptionTypes);
+      @Nullable Class<?>... exceptionTypes);
 
   @NotNull
   Loop<V> elseIf(
       @NotNull Mapper<? super Throwable, ? extends Statement<? extends Iterable<V>>> mapper,
-      @Nullable Class<?>[] exceptionTypes);
+      @Nullable Class<?>... exceptionTypes);
 
   @NotNull
   Loop<V> evaluate();
@@ -253,7 +253,7 @@ public interface Loop<V> extends Statement<Iterable<V>>, Serializable {
     YieldOutputs<V> yieldIf(@NotNull Statement<? extends V> statement);
 
     @NotNull
-    YieldOutputs<V> yieldLoop(@NotNull Statement<? extends Iterable<V>> loop);
+    YieldOutputs<V> yieldLoopIf(@NotNull Statement<? extends Iterable<? extends V>> loop);
 
     @NotNull
     YieldOutputs<V> yieldValue(V value);

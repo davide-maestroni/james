@@ -24,6 +24,7 @@ import java.lang.reflect.Proxy;
 import java.nio.ByteBuffer;
 import java.nio.channels.ReadableByteChannel;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Comparator;
 import java.util.List;
 import java.util.concurrent.Executor;
@@ -43,6 +44,7 @@ import dm.jale.eventual.Mapper;
 import dm.jale.eventual.Observer;
 import dm.jale.eventual.Provider;
 import dm.jale.eventual.Settler;
+import dm.jale.eventual.SimpleState;
 import dm.jale.eventual.Statement;
 import dm.jale.eventual.Statement.Forker;
 import dm.jale.eventual.StatementForker;
@@ -51,8 +53,11 @@ import dm.jale.executor.ScheduledExecutor;
 import dm.jale.ext.backoff.BackoffUpdater;
 import dm.jale.ext.backoff.Backoffer;
 import dm.jale.ext.backoff.PendingEvaluation;
+import dm.jale.ext.eventual.BiMapper;
+import dm.jale.ext.eventual.QuadriMapper;
 import dm.jale.ext.eventual.Tester;
 import dm.jale.ext.eventual.TimedState;
+import dm.jale.ext.eventual.TriMapper;
 import dm.jale.ext.io.AllocationType;
 import dm.jale.ext.io.Chunk;
 import dm.jale.util.Iterables;
@@ -66,10 +71,11 @@ import static dm.jale.executor.ExecutorPool.withThrottling;
  */
 public class EventualExt extends Eventual {
 
-  // TODO: 21/02/2018 Yielders: groupBy
-  // TODO: 21/02/2018 Joiners: zip(BiMapper), zip(TriMapper), zip(TetraMapper),
-  // TODO: 16/02/2018 Forkers: refresh(), repeatAll(), repeatLast(), repeatFirst(), repeatSince(),
-  // TODO: 16/02/2018 - refreshAll(), refreshAllAfter()?
+  // TODO: 26/02/2018 Mappers: fallbackStatement()?
+  // TODO: 21/02/2018 Yielders: groupBy()
+  // TODO: 21/02/2018 Joiners:
+  // TODO: 16/02/2018 Forkers: repeat(), replayAll(), replayLast(), replayFirst(), replaySince(),
+  // TODO: 16/02/2018 - repeatAll(), repeatAllAfter()?
   // TODO: 20/02/2018 Backoff.apply(int count, long lastDelay) => BackoffUpdater
   // TODO: 20/02/2018 (Backoffers): dropFirst, dropLast, wait(backoff?)
 
@@ -81,6 +87,18 @@ public class EventualExt extends Eventual {
 
   private EventualExt(@NotNull final Eventual eventual) {
     mEventual = eventual;
+  }
+
+  @NotNull
+  public static <V> Yielder<?, V, V> accumulate(
+      @NotNull final BiMapper<? super V, ? super V, ? extends V> accumulator) {
+    return new AccumulateYielder<V>(accumulator);
+  }
+
+  @NotNull
+  public static <V> Yielder<?, V, V> accumulate(final V initialValue,
+      @NotNull final BiMapper<? super V, ? super V, ? extends V> accumulator) {
+    return new AccumulateYielder<V>(initialValue, accumulator);
   }
 
   @NotNull
@@ -106,6 +124,12 @@ public class EventualExt extends Eventual {
   @NotNull
   public static Yielder<?, Number, Long> averageLong() {
     return AverageLongYielder.instance();
+  }
+
+  @NotNull
+  public static <V> Yielder<?, V, V> ifEmptyFallback(
+      @NotNull final Loop<? extends V> fallbackLoop) {
+    return new IfEmptyFallback<V>(fallbackLoop);
   }
 
   @NotNull
@@ -179,13 +203,13 @@ public class EventualExt extends Eventual {
   @NotNull
   public <V> Statement<List<V>> allOf(
       @NotNull final Iterable<? extends Statement<? extends V>> statements) {
-    return statementOf(AllOfJoiner.<V>instance(), statements);
+    return joinStatements(AllOfJoiner.<V>instance(), statements);
   }
 
   @NotNull
   public <V> Statement<V> anyOf(
       @NotNull final Iterable<? extends Statement<? extends V>> statements) {
-    return statementOf(AnyOfJoiner.<V>instance(), statements);
+    return joinStatements(AnyOfJoiner.<V>instance(), statements);
   }
 
   @NotNull
@@ -195,7 +219,7 @@ public class EventualExt extends Eventual {
 
   @NotNull
   public <V> Loop<V> concat(@NotNull final Iterable<? extends Loop<? extends V>> loops) {
-    return loopOf(ConcatJoiner.<V>instance(), loops);
+    return joinLoops(ConcatJoiner.<V>instance(), loops);
   }
 
   @NotNull
@@ -234,6 +258,49 @@ public class EventualExt extends Eventual {
 
   @NotNull
   @Override
+  public <S, V, R> Loop<R> joinLoops(
+      @NotNull final Joiner<S, ? super V, ? super EvaluationCollection<R>, Loop<V>> joiner,
+      @NotNull final Iterable<? extends Loop<? extends V>> asyncLoops) {
+    return mEventual.joinLoops(joiner, asyncLoops);
+  }
+
+  @NotNull
+  @Override
+  public <S, V, R> Loop<R> joinLoops(@Nullable final Mapper<? super List<Loop<V>>, S> init,
+      @Nullable final JoinUpdater<S, ? super V, ? super EvaluationCollection<? extends R>,
+          Loop<V>> value,
+      @Nullable final JoinUpdater<S, ? super Throwable, ? super EvaluationCollection<? extends
+          R>, Loop<V>> failure,
+      @Nullable final JoinCompleter<S, ? super EvaluationCollection<? extends R>, Loop<V>> done,
+      @Nullable final JoinSettler<S, ? super EvaluationCollection<? extends R>, Loop<V>> settle,
+      @NotNull final Iterable<? extends Loop<? extends V>> asyncLoops) {
+    return mEventual.joinLoops(init, value, failure, done, settle, asyncLoops);
+  }
+
+  @NotNull
+  @Override
+  public <S, V, R> Statement<R> joinStatements(
+      @NotNull final Joiner<S, ? super V, ? super Evaluation<R>, Statement<V>> joiner,
+      @NotNull final Iterable<? extends Statement<? extends V>> statements) {
+    return mEventual.joinStatements(joiner, statements);
+  }
+
+  @NotNull
+  @Override
+  public <S, V, R> Statement<R> joinStatements(
+      @Nullable final Mapper<? super List<Statement<V>>, S> init,
+      @Nullable final JoinUpdater<S, ? super V, ? super Evaluation<? extends R>, Statement<V>>
+          value,
+      @Nullable final JoinUpdater<S, ? super Throwable, ? super Evaluation<? extends R>,
+          Statement<V>> failure,
+      @Nullable final JoinCompleter<S, ? super Evaluation<? extends R>, Statement<V>> done,
+      @Nullable final JoinSettler<S, ? super Evaluation<? extends R>, Statement<V>> settle,
+      @NotNull final Iterable<? extends Statement<? extends V>> statements) {
+    return mEventual.joinStatements(init, value, failure, done, settle, statements);
+  }
+
+  @NotNull
+  @Override
   public EventualExt loggerName(@Nullable final String loggerName) {
     return new EventualExt(mEventual.loggerName(loggerName));
   }
@@ -252,27 +319,6 @@ public class EventualExt extends Eventual {
 
   @NotNull
   @Override
-  public <S, V, R> Loop<R> loopOf(
-      @NotNull final Joiner<S, ? super V, ? super EvaluationCollection<R>, Loop<V>> joiner,
-      @NotNull final Iterable<? extends Loop<? extends V>> asyncLoops) {
-    return mEventual.loopOf(joiner, asyncLoops);
-  }
-
-  @NotNull
-  @Override
-  public <S, V, R> Loop<R> loopOf(@Nullable final Mapper<? super List<Loop<V>>, S> init,
-      @Nullable final JoinUpdater<S, ? super V, ? super EvaluationCollection<? extends R>,
-          Loop<V>> value,
-      @Nullable final JoinUpdater<S, ? super Throwable, ? super EvaluationCollection<? extends
-          R>, Loop<V>> failure,
-      @Nullable final JoinCompleter<S, ? super EvaluationCollection<? extends R>, Loop<V>> done,
-      @Nullable final JoinSettler<S, ? super EvaluationCollection<? extends R>, Loop<V>> settle,
-      @NotNull final Iterable<? extends Loop<? extends V>> asyncLoops) {
-    return mEventual.loopOf(init, value, failure, done, settle, asyncLoops);
-  }
-
-  @NotNull
-  @Override
   public <V> Loop<V> loopOnce(@NotNull final Statement<? extends V> statement) {
     return mEventual.loopOnce(statement);
   }
@@ -281,28 +327,6 @@ public class EventualExt extends Eventual {
   @Override
   public <V> Statement<V> statement(@NotNull final Observer<Evaluation<V>> observer) {
     return mEventual.statement(observer);
-  }
-
-  @NotNull
-  @Override
-  public <S, V, R> Statement<R> statementOf(
-      @NotNull final Joiner<S, ? super V, ? super Evaluation<R>, Statement<V>> joiner,
-      @NotNull final Iterable<? extends Statement<? extends V>> statements) {
-    return mEventual.statementOf(joiner, statements);
-  }
-
-  @NotNull
-  @Override
-  public <S, V, R> Statement<R> statementOf(
-      @Nullable final Mapper<? super List<Statement<V>>, S> init,
-      @Nullable final JoinUpdater<S, ? super V, ? super Evaluation<? extends R>, Statement<V>>
-          value,
-      @Nullable final JoinUpdater<S, ? super Throwable, ? super Evaluation<? extends R>,
-          Statement<V>> failure,
-      @Nullable final JoinCompleter<S, ? super Evaluation<? extends R>, Statement<V>> done,
-      @Nullable final JoinSettler<S, ? super Evaluation<? extends R>, Statement<V>> settle,
-      @NotNull final Iterable<? extends Statement<? extends V>> statements) {
-    return mEventual.statementOf(init, value, failure, done, settle, statements);
   }
 
   @NotNull
@@ -334,24 +358,24 @@ public class EventualExt extends Eventual {
 
   @NotNull
   public <V> Loop<V> first(@NotNull final Iterable<? extends Loop<? extends V>> loops) {
-    return loopOf(FirstJoiner.<V>instance(), loops);
+    return joinLoops(FirstJoiner.<V>instance(), loops);
   }
 
   @NotNull
   public <V> Loop<V> firstOnly(final boolean mayInterruptIfRunning,
       @NotNull final Iterable<? extends Loop<? extends V>> loops) {
-    return loopOf(new FirstOnlyJoiner<V>(mayInterruptIfRunning), loops);
+    return joinLoops(new FirstOnlyJoiner<V>(mayInterruptIfRunning), loops);
   }
 
   @NotNull
   public <V> Loop<V> firstOrEmpty(@NotNull final Iterable<? extends Loop<? extends V>> loops) {
-    return loopOf(FirstOrEmptyJoiner.<V>instance(), loops);
+    return joinLoops(FirstOrEmptyJoiner.<V>instance(), loops);
   }
 
   @NotNull
   public <V> Loop<V> firstOrEmptyOnly(final boolean mayInterruptIfRunning,
       @NotNull final Iterable<? extends Loop<? extends V>> loops) {
-    return loopOf(new FirstOrEmptyOnlyJoiner<V>(mayInterruptIfRunning), loops);
+    return joinLoops(new FirstOrEmptyOnlyJoiner<V>(mayInterruptIfRunning), loops);
   }
 
   @NotNull
@@ -559,7 +583,7 @@ public class EventualExt extends Eventual {
 
   @NotNull
   public <V> Loop<V> merge(@NotNull final Iterable<? extends Loop<? extends V>> loops) {
-    return loopOf(MergeJoiner.<V>instance(), loops);
+    return joinLoops(MergeJoiner.<V>instance(), loops);
   }
 
   @NotNull
@@ -583,6 +607,76 @@ public class EventualExt extends Eventual {
   }
 
   @NotNull
+  public <V> Yielder<?, V, V> resize(final long size) {
+    return resize(size, SimpleState.<V>ofValue(null));
+  }
+
+  @NotNull
+  public <V> Yielder<?, V, V> resize(final long size, @NotNull final EvaluationState<V> padding) {
+    return new ResizeYielder<V>(size, padding);
+  }
+
+  @NotNull
+  public <V> Yielder<?, V, V> resizeFailures(final long size, @NotNull final Throwable failure) {
+    return new ResizeFailuresYielder<V>(size, failure);
+  }
+
+  @NotNull
+  public <V> Yielder<?, V, V> resizeValues(final long size) {
+    return resizeValues(size, null);
+  }
+
+  @NotNull
+  public <V> Yielder<?, V, V> resizeValues(final long size, final V padding) {
+    return new ResizeValuesYielder<V>(size, padding);
+  }
+
+  @NotNull
+  public <V> Yielder<?, V, V> skip(final int count) {
+    return skipFirst(count);
+  }
+
+  @NotNull
+  public <V> Yielder<?, V, V> skipFailures(final int count) {
+    return skipFirstFailures(count);
+  }
+
+  @NotNull
+  public <V> Yielder<?, V, V> skipFirst(final int count) {
+    return new SkipFirstYielder<V>(count);
+  }
+
+  @NotNull
+  public <V> Yielder<?, V, V> skipFirstFailures(final int count) {
+    return new SkipFirstFailuresYielder<V>(count);
+  }
+
+  @NotNull
+  public <V> Yielder<?, V, V> skipFirstValues(final int count) {
+    return new SkipFirstValuesYielder<V>(count);
+  }
+
+  @NotNull
+  public <V> Yielder<?, V, V> skipLast(final int count) {
+    return new SkipLastYielder<V>(count);
+  }
+
+  @NotNull
+  public <V> Yielder<?, V, V> skipLastFailures(final int count) {
+    return new SkipLastFailuresYielder<V>(count);
+  }
+
+  @NotNull
+  public <V> Yielder<?, V, V> skipLastValues(final int count) {
+    return new SkipLastValuesYielder<V>(count);
+  }
+
+  @NotNull
+  public <V> Yielder<?, V, V> skipValues(final int count) {
+    return skipFirstValues(count);
+  }
+
+  @NotNull
   public <V extends Comparable<? super V>> Yielder<?, V, V> sort() {
     return SortYielder.instance();
   }
@@ -595,7 +689,7 @@ public class EventualExt extends Eventual {
   @NotNull
   public <V> Statement<List<EvaluationState<V>>> statesOf(
       @NotNull final Iterable<? extends Statement<? extends V>> statements) {
-    return statementOf(StatesOfJoiner.<V>instance(), statements);
+    return joinStatements(StatesOfJoiner.<V>instance(), statements);
   }
 
   @NotNull
@@ -604,12 +698,12 @@ public class EventualExt extends Eventual {
     final ArrayList<Loop<?>> allLoops = new ArrayList<Loop<?>>();
     allLoops.add(indexes);
     Iterables.addAll((Iterable<? extends Loop<?>>) loops, allLoops);
-    return loopOf(SwitchAllJoiner.<V>instance(), allLoops);
+    return joinLoops(SwitchAllJoiner.<V>instance(), allLoops);
   }
 
   @NotNull
   public <V> Loop<V> switchBetween(@NotNull final Iterable<? extends Loop<? extends V>> loops) {
-    return loopOf(SwitchJoiner.<V>instance(), loops);
+    return joinLoops(SwitchJoiner.<V>instance(), loops);
   }
 
   @NotNull
@@ -618,7 +712,7 @@ public class EventualExt extends Eventual {
     final ArrayList<Loop<?>> allLoops = new ArrayList<Loop<?>>();
     allLoops.add(indexes);
     Iterables.addAll((Iterable<? extends Loop<?>>) loops, allLoops);
-    return loopOf(new SwitchFirstJoiner<V>(maxCount), allLoops);
+    return joinLoops(new SwitchFirstJoiner<V>(maxCount), allLoops);
   }
 
   @NotNull
@@ -627,13 +721,13 @@ public class EventualExt extends Eventual {
     final ArrayList<Loop<?>> allLoops = new ArrayList<Loop<?>>();
     allLoops.add(indexes);
     Iterables.addAll((Iterable<? extends Loop<?>>) loops, allLoops);
-    return loopOf(new SwitchLastJoiner<V>(maxCount), allLoops);
+    return joinLoops(new SwitchLastJoiner<V>(maxCount), allLoops);
   }
 
   @NotNull
   public <V> Loop<V> switchOnly(final boolean mayInterruptIfRunning,
       @NotNull final Iterable<? extends Loop<? extends V>> loops) {
-    return loopOf(new SwitchOnlyJoiner<V>(mayInterruptIfRunning), loops);
+    return joinLoops(new SwitchOnlyJoiner<V>(mayInterruptIfRunning), loops);
   }
 
   @NotNull
@@ -643,7 +737,7 @@ public class EventualExt extends Eventual {
     final ArrayList<Loop<?>> allLoops = new ArrayList<Loop<?>>();
     allLoops.add(indexes);
     Iterables.addAll((Iterable<? extends Loop<?>>) loops, allLoops);
-    return loopOf(new SwitchSinceJoiner<V>(timeout, timeUnit), allLoops);
+    return joinLoops(new SwitchSinceJoiner<V>(timeout, timeUnit), allLoops);
   }
 
   @NotNull
@@ -652,7 +746,7 @@ public class EventualExt extends Eventual {
     final ArrayList<Loop<?>> allLoops = new ArrayList<Loop<?>>();
     allLoops.add(indexes);
     Iterables.addAll((Iterable<? extends Loop<?>>) loops, allLoops);
-    return loopOf(SwitchWhenJoiner.<V>instance(), allLoops);
+    return joinLoops(SwitchWhenJoiner.<V>instance(), allLoops);
   }
 
   @NotNull
@@ -662,17 +756,98 @@ public class EventualExt extends Eventual {
 
   @NotNull
   public <V> Loop<List<V>> zip(@NotNull final Iterable<? extends Loop<? extends V>> loops) {
-    return loopOf(ZipJoiner.<V>instance(), loops);
+    return joinLoops(ZipJoiner.<V>instance(), loops);
   }
 
   @NotNull
   public <V> Loop<List<V>> zip(final V filler,
       @NotNull final Iterable<? extends Loop<? extends V>> loops) {
-    return loopOf(new ZipFillJoiner<V>(filler), loops);
+    final int size = Iterables.size(loops);
+    final ArrayList<V> fillers = new ArrayList<V>(size);
+    for (int i = 0; i < size; ++i) {
+      fillers.add(filler);
+    }
+
+    return joinLoops(new ZipFillJoiner<V>(fillers), loops);
+  }
+
+  @NotNull
+  public <V1, V2, R> Loop<R> zip(final V1 filler1, final V2 filler2,
+      @NotNull final Loop<? extends V1> loop1, @NotNull final Loop<? extends V2> loop2,
+      @NotNull final BiMapper<V1, V2, R> mapper) {
+    return joinLoops(new ZipFillJoiner<Object>(Arrays.asList(filler1, filler2)),
+        Arrays.asList(loop1, loop2)).forEach(new BiZipMapper<V1, V2, R>(mapper));
+  }
+
+  @NotNull
+  public <V1, V2, R> Loop<R> zip(@NotNull final Loop<? extends V1> loop1,
+      @NotNull final Loop<? extends V2> loop2, @NotNull final BiMapper<V1, V2, R> mapper) {
+    return joinLoops(ZipJoiner.instance(), Arrays.asList(loop1, loop2)).forEach(
+        new BiZipMapper<V1, V2, R>(mapper));
+  }
+
+  @NotNull
+  public <V1, V2, V3, R> Loop<R> zip(final V1 filler1, final V2 filler2, final V3 filler3,
+      @NotNull final Loop<? extends V1> loop1, @NotNull final Loop<? extends V2> loop2,
+      @NotNull final Loop<? extends V3> loop3, @NotNull final TriMapper<V1, V2, V3, R> mapper) {
+    return joinLoops(new ZipFillJoiner<Object>(Arrays.asList(filler1, filler2, filler3)),
+        Arrays.asList(loop1, loop2, loop3)).forEach(new TriZipMapper<V1, V2, V3, R>(mapper));
+  }
+
+  @NotNull
+  public <V1, V2, V3, R> Loop<R> zip(@NotNull final Loop<? extends V1> loop1,
+      @NotNull final Loop<? extends V2> loop2, @NotNull final Loop<? extends V3> loop3,
+      @NotNull final TriMapper<V1, V2, V3, R> mapper) {
+    return joinLoops(ZipJoiner.instance(), Arrays.asList(loop1, loop2, loop3)).forEach(
+        new TriZipMapper<V1, V2, V3, R>(mapper));
+  }
+
+  @NotNull
+  public <V1, V2, V3, V4, R> Loop<R> zip(final V1 filler1, final V2 filler2, final V3 filler3,
+      final V4 filler4, @NotNull final Loop<? extends V1> loop1,
+      @NotNull final Loop<? extends V2> loop2, @NotNull final Loop<? extends V3> loop3,
+      @NotNull final Loop<? extends V4> loop4,
+      @NotNull final QuadriMapper<V1, V2, V3, V4, R> mapper) {
+    return joinLoops(new ZipFillJoiner<Object>(Arrays.asList(filler1, filler2, filler3, filler4)),
+        Arrays.asList(loop1, loop2, loop3, loop4)).forEach(
+        new QuadriZipMapper<V1, V2, V3, V4, R>(mapper));
+  }
+
+  @NotNull
+  public <V1, V2, V3, V4, R> Loop<R> zip(@NotNull final Loop<? extends V1> loop1,
+      @NotNull final Loop<? extends V2> loop2, @NotNull final Loop<? extends V3> loop3,
+      @NotNull final Loop<? extends V4> loop4,
+      @NotNull final QuadriMapper<V1, V2, V3, V4, R> mapper) {
+    return joinLoops(ZipJoiner.instance(), Arrays.asList(loop1, loop2, loop3, loop4)).forEach(
+        new QuadriZipMapper<V1, V2, V3, V4, R>(mapper));
+  }
+
+  @NotNull
+  public <V1, V2, R> Loop<R> zipStrict(@NotNull final Loop<? extends V1> loop1,
+      @NotNull final Loop<? extends V2> loop2, @NotNull final BiMapper<V1, V2, R> mapper) {
+    return joinLoops(ZipStrictJoiner.instance(), Arrays.asList(loop1, loop2)).forEach(
+        new BiZipMapper<V1, V2, R>(mapper));
+  }
+
+  @NotNull
+  public <V1, V2, V3, R> Loop<R> zipStrict(@NotNull final Loop<? extends V1> loop1,
+      @NotNull final Loop<? extends V2> loop2, @NotNull final Loop<? extends V3> loop3,
+      @NotNull final TriMapper<V1, V2, V3, R> mapper) {
+    return joinLoops(ZipStrictJoiner.instance(), Arrays.asList(loop1, loop2, loop3)).forEach(
+        new TriZipMapper<V1, V2, V3, R>(mapper));
+  }
+
+  @NotNull
+  public <V1, V2, V3, V4, R> Loop<R> zipStrict(@NotNull final Loop<? extends V1> loop1,
+      @NotNull final Loop<? extends V2> loop2, @NotNull final Loop<? extends V3> loop3,
+      @NotNull final Loop<? extends V4> loop4,
+      @NotNull final QuadriMapper<V1, V2, V3, V4, R> mapper) {
+    return joinLoops(ZipStrictJoiner.instance(), Arrays.asList(loop1, loop2, loop3, loop4)).forEach(
+        new QuadriZipMapper<V1, V2, V3, V4, R>(mapper));
   }
 
   @NotNull
   public <V> Loop<List<V>> zipStrict(@NotNull final Iterable<? extends Loop<? extends V>> loops) {
-    return loopOf(ZipStrictJoiner.<V>instance(), loops);
+    return joinLoops(ZipStrictJoiner.<V>instance(), loops);
   }
 }

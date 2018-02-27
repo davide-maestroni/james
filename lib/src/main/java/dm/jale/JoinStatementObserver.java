@@ -79,8 +79,8 @@ class JoinStatementObserver<S, V, R> implements RenewableObserver<Evaluation<R>>
       state.set(joiner.init((List<Statement<V>>) statements));
       for (final Statement<? extends V> statement : statements) {
         final int index = i++;
-        statement.to(
-            new JoinEvaluation<S, V, R>(state, joiner, executor, evaluation, statements, index,
+        statement.evaluated()
+            .to(new JoinEvaluation<S, V, R>(state, joiner, executor, evaluation, statements, index,
                 logger));
       }
 

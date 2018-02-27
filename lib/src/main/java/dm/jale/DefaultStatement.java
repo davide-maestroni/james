@@ -290,14 +290,14 @@ class DefaultStatement<V> implements Statement<V>, Serializable {
 
   @NotNull
   public Statement<V> elseCatch(@NotNull final Mapper<? super Throwable, ? extends V> mapper,
-      @Nullable final Class<?>[] exceptionTypes) {
+      @Nullable final Class<?>... exceptionTypes) {
     return propagate(
         new ElseCatchStatementExpression<V>(mapper, Eventuals.cloneExceptionTypes(exceptionTypes)));
   }
 
   @NotNull
   public Statement<V> elseDo(@NotNull final Observer<? super Throwable> observer,
-      @Nullable final Class<?>[] exceptionTypes) {
+      @Nullable final Class<?>... exceptionTypes) {
     return propagate(
         new ElseDoStatementExpression<V>(observer, Eventuals.cloneExceptionTypes(exceptionTypes)));
   }
@@ -305,7 +305,7 @@ class DefaultStatement<V> implements Statement<V>, Serializable {
   @NotNull
   public Statement<V> elseIf(
       @NotNull final Mapper<? super Throwable, ? extends Statement<? extends V>> mapper,
-      @Nullable final Class<?>[] exceptionTypes) {
+      @Nullable final Class<?>... exceptionTypes) {
     return propagate(
         new ElseIfStatementExpression<V>(mapper, Eventuals.cloneExceptionTypes(exceptionTypes)));
   }
@@ -630,6 +630,7 @@ class DefaultStatement<V> implements Statement<V>, Serializable {
       return forked;
     }
 
+    final DefaultStatement<R> statement;
     synchronized (mMutex) {
       if (mPropagation != null) {
         throw new IllegalStateException("the statement evaluation is already propagated");
@@ -641,11 +642,12 @@ class DefaultStatement<V> implements Statement<V>, Serializable {
         mPropagation = propagation;
         mMutex.notifyAll();
       }
+
+      statement =
+          new DefaultStatement<R>((Observer<Evaluation<?>>) observer, mIsEvaluated, logger, head,
+              mTail, propagation);
     }
 
-    final DefaultStatement<R> statement =
-        new DefaultStatement<R>((Observer<Evaluation<?>>) observer, mIsEvaluated, logger, head,
-            mTail, propagation);
     if (propagate != null) {
       propagate.run();
     }

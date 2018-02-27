@@ -130,6 +130,46 @@ public class Eventual {
   }
 
   @NotNull
+  public <S, V, R> Loop<R> joinLoops(
+      @NotNull final Joiner<S, ? super V, ? super EvaluationCollection<R>, Loop<V>> joiner,
+      @NotNull final Iterable<? extends Loop<? extends V>> loops) {
+    return loop(new JoinLoopObserver<S, V, R>(joiner, loops, loopLoggerName()));
+  }
+
+  @NotNull
+  public <S, V, R> Loop<R> joinLoops(@Nullable final Mapper<? super List<Loop<V>>, S> init,
+      @Nullable final JoinUpdater<S, ? super V, ? super EvaluationCollection<? extends R>,
+          Loop<V>> value,
+      @Nullable final JoinUpdater<S, ? super Throwable, ? super EvaluationCollection<? extends
+          R>, Loop<V>> failure,
+      @Nullable final JoinCompleter<S, ? super EvaluationCollection<? extends R>, Loop<V>> done,
+      @Nullable final JoinSettler<S, ? super EvaluationCollection<? extends R>, Loop<V>> settle,
+      @NotNull final Iterable<? extends Loop<? extends V>> loops) {
+    return joinLoops(new ComposedLoopJoiner<S, V, R>(init, value, failure, done, settle), loops);
+  }
+
+  @NotNull
+  public <S, V, R> Statement<R> joinStatements(
+      @NotNull final Joiner<S, ? super V, ? super Evaluation<R>, Statement<V>> joiner,
+      @NotNull final Iterable<? extends Statement<? extends V>> statements) {
+    return statement(new JoinStatementObserver<S, V, R>(joiner, statements, statementLoggerName()));
+  }
+
+  @NotNull
+  public <S, V, R> Statement<R> joinStatements(
+      @Nullable final Mapper<? super List<Statement<V>>, S> init,
+      @Nullable final JoinUpdater<S, ? super V, ? super Evaluation<? extends R>, Statement<V>>
+          value,
+      @Nullable final JoinUpdater<S, ? super Throwable, ? super Evaluation<? extends R>,
+          Statement<V>> failure,
+      @Nullable final JoinCompleter<S, ? super Evaluation<? extends R>, Statement<V>> done,
+      @Nullable final JoinSettler<S, ? super Evaluation<? extends R>, Statement<V>> settle,
+      @NotNull final Iterable<? extends Statement<? extends V>> statements) {
+    return joinStatements(new ComposedStatementJoiner<S, V, R>(init, value, failure, done, settle),
+        statements);
+  }
+
+  @NotNull
   public Eventual loggerName(@Nullable final String loggerName) {
     return new Eventual(mIsEvaluated, mExecutor, loggerName);
   }
@@ -154,25 +194,6 @@ public class Eventual {
   }
 
   @NotNull
-  public <S, V, R> Loop<R> loopOf(
-      @NotNull final Joiner<S, ? super V, ? super EvaluationCollection<R>, Loop<V>> joiner,
-      @NotNull final Iterable<? extends Loop<? extends V>> loops) {
-    return loop(new JoinLoopObserver<S, V, R>(joiner, loops, loopLoggerName()));
-  }
-
-  @NotNull
-  public <S, V, R> Loop<R> loopOf(@Nullable final Mapper<? super List<Loop<V>>, S> init,
-      @Nullable final JoinUpdater<S, ? super V, ? super EvaluationCollection<? extends R>,
-          Loop<V>> value,
-      @Nullable final JoinUpdater<S, ? super Throwable, ? super EvaluationCollection<? extends
-          R>, Loop<V>> failure,
-      @Nullable final JoinCompleter<S, ? super EvaluationCollection<? extends R>, Loop<V>> done,
-      @Nullable final JoinSettler<S, ? super EvaluationCollection<? extends R>, Loop<V>> settle,
-      @NotNull final Iterable<? extends Loop<? extends V>> loops) {
-    return loopOf(new ComposedLoopJoiner<S, V, R>(init, value, failure, done, settle), loops);
-  }
-
-  @NotNull
   public <V> Loop<V> loopOnce(@NotNull final Statement<? extends V> statement) {
     return loop(new SingleLoopObserver<V>(statement));
   }
@@ -184,27 +205,6 @@ public class Eventual {
     return new DefaultStatement<V>((isEvaluated) ? statementObserver
         : new UnevaluatedObserver<V, Evaluation<V>>(statementObserver), isEvaluated,
         statementLoggerName());
-  }
-
-  @NotNull
-  public <S, V, R> Statement<R> statementOf(
-      @NotNull final Joiner<S, ? super V, ? super Evaluation<R>, Statement<V>> joiner,
-      @NotNull final Iterable<? extends Statement<? extends V>> statements) {
-    return statement(new JoinStatementObserver<S, V, R>(joiner, statements, statementLoggerName()));
-  }
-
-  @NotNull
-  public <S, V, R> Statement<R> statementOf(
-      @Nullable final Mapper<? super List<Statement<V>>, S> init,
-      @Nullable final JoinUpdater<S, ? super V, ? super Evaluation<? extends R>, Statement<V>>
-          value,
-      @Nullable final JoinUpdater<S, ? super Throwable, ? super Evaluation<? extends R>,
-          Statement<V>> failure,
-      @Nullable final JoinCompleter<S, ? super Evaluation<? extends R>, Statement<V>> done,
-      @Nullable final JoinSettler<S, ? super Evaluation<? extends R>, Statement<V>> settle,
-      @NotNull final Iterable<? extends Statement<? extends V>> statements) {
-    return statementOf(new ComposedStatementJoiner<S, V, R>(init, value, failure, done, settle),
-        statements);
   }
 
   @NotNull
