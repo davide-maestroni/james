@@ -33,10 +33,10 @@ class SkipLastValuesYielder<V> implements Yielder<DoubleQueue<V>, V, V>, Seriali
 
   private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
 
-  private final int mCount;
+  private final int mMaxCount;
 
-  SkipLastValuesYielder(final int count) {
-    mCount = ConstantConditions.notNegative("count", count);
+  SkipLastValuesYielder(final int maxCount) {
+    mMaxCount = ConstantConditions.notNegative("maxCount", maxCount);
   }
 
   public void done(final DoubleQueue<V> stack, @NotNull final YieldOutputs<V> outputs) {
@@ -65,7 +65,7 @@ class SkipLastValuesYielder<V> implements Yielder<DoubleQueue<V>, V, V>, Seriali
   @NotNull
   private DoubleQueue<V> flush(@NotNull final DoubleQueue<V> stack,
       final @NotNull YieldOutputs<V> outputs) {
-    while (stack.size() > mCount) {
+    while (stack.size() > mMaxCount) {
       outputs.yieldValue(stack.removeFirst());
     }
 

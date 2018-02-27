@@ -49,6 +49,7 @@ class RepeatAfterForker<V> implements StatementForker<ForkerStack<V>, V>, Serial
   }
 
   public ForkerStack<V> done(final ForkerStack<V> stack, @NotNull final Statement<V> context) {
+    stack.evaluations = null;
     return stack;
   }
 
@@ -93,13 +94,8 @@ class RepeatAfterForker<V> implements StatementForker<ForkerStack<V>, V>, Serial
       @NotNull final Statement<V> context) {
     final TimedState<V> state = (stack.state = TimedState.ofFailure(failure));
     final ArrayList<Evaluation<V>> evaluations = stack.evaluations;
-    try {
-      for (final Evaluation<V> evaluation : evaluations) {
-        state.to(evaluation);
-      }
-
-    } finally {
-      evaluations.clear();
+    for (final Evaluation<V> evaluation : evaluations) {
+      state.to(evaluation);
     }
 
     return stack;
@@ -113,13 +109,8 @@ class RepeatAfterForker<V> implements StatementForker<ForkerStack<V>, V>, Serial
       @NotNull final Statement<V> context) {
     final TimedState<V> state = (stack.state = TimedState.ofValue(value));
     final ArrayList<Evaluation<V>> evaluations = stack.evaluations;
-    try {
-      for (final Evaluation<V> evaluation : evaluations) {
-        state.to(evaluation);
-      }
-
-    } finally {
-      evaluations.clear();
+    for (final Evaluation<V> evaluation : evaluations) {
+      state.to(evaluation);
     }
 
     return stack;
@@ -127,7 +118,7 @@ class RepeatAfterForker<V> implements StatementForker<ForkerStack<V>, V>, Serial
 
   static class ForkerStack<V> {
 
-    private final ArrayList<Evaluation<V>> evaluations = new ArrayList<Evaluation<V>>();
+    private ArrayList<Evaluation<V>> evaluations = new ArrayList<Evaluation<V>>();
 
     private TimedState<V> state;
 

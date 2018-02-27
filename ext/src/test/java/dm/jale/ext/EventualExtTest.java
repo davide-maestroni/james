@@ -39,6 +39,7 @@ public class EventualExtTest {
   }
 
   @Test
+  @SuppressWarnings("unchecked")
   public void proxyList() {
     final MyList<String> proxy =
         new EventualExt().proxy(Arrays.asList("test1", "test2"), MyList.class);

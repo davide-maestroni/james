@@ -76,11 +76,11 @@ class BufferedForker<S, V, R, C> implements Forker<ForkerStack<S, V, R, C>, V, R
 
     private final Forker<S, ? super V, ? super R, ? super C> mForker;
 
-    private final ArrayList<SimpleState<V>> mStates = new ArrayList<SimpleState<V>>();
-
     private boolean mHasEvaluation;
 
     private S mStack;
+
+    private ArrayList<SimpleState<V>> mStates = new ArrayList<SimpleState<V>>();
 
     private ForkerStack(@NotNull final Forker<S, ? super V, ? super R, ? super C> forker,
         @NotNull final C async) throws Exception {
@@ -110,7 +110,7 @@ class BufferedForker<S, V, R, C> implements Forker<ForkerStack<S, V, R, C>, V, R
           }
 
         } finally {
-          states.clear();
+          mStates = null;
         }
       }
 

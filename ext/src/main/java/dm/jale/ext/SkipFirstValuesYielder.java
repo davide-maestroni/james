@@ -33,10 +33,10 @@ class SkipFirstValuesYielder<V> implements Yielder<YielderStack, V, V>, Serializ
 
   private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
 
-  private final int mCount;
+  private final int mMaxCount;
 
-  SkipFirstValuesYielder(final int count) {
-    mCount = ConstantConditions.notNegative("count", count);
+  SkipFirstValuesYielder(final int maxCount) {
+    mMaxCount = ConstantConditions.notNegative("maxCount", maxCount);
   }
 
   public void done(final YielderStack stack, @NotNull final YieldOutputs<V> outputs) {
@@ -58,7 +58,7 @@ class SkipFirstValuesYielder<V> implements Yielder<YielderStack, V, V>, Serializ
 
   public YielderStack value(final YielderStack stack, final V value,
       @NotNull final YieldOutputs<V> outputs) {
-    if (stack.count < mCount) {
+    if (stack.count < mMaxCount) {
       outputs.yieldValue(value);
       ++stack.count;
     }

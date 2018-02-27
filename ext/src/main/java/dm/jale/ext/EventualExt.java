@@ -39,7 +39,9 @@ import dm.jale.eventual.JoinSettler;
 import dm.jale.eventual.JoinUpdater;
 import dm.jale.eventual.Joiner;
 import dm.jale.eventual.Loop;
+import dm.jale.eventual.Loop.YieldOutputs;
 import dm.jale.eventual.Loop.Yielder;
+import dm.jale.eventual.LoopForker;
 import dm.jale.eventual.Mapper;
 import dm.jale.eventual.Observer;
 import dm.jale.eventual.Provider;
@@ -72,10 +74,9 @@ import static dm.jale.executor.ExecutorPool.withThrottling;
 public class EventualExt extends Eventual {
 
   // TODO: 26/02/2018 Mappers: fallbackStatement()?
-  // TODO: 21/02/2018 Yielders: groupBy()
+  // TODO: 21/02/2018 Yielders: groupBy()?
   // TODO: 21/02/2018 Joiners:
-  // TODO: 16/02/2018 Forkers: repeat(), replayAll(), replayLast(), replayFirst(), replaySince(),
-  // TODO: 16/02/2018 - repeatAll(), repeatAllAfter()?
+  // TODO: 16/02/2018 Forkers: replaySince(), repeatAll(), repeatAllAfter()?
   // TODO: 20/02/2018 Backoff.apply(int count, long lastDelay) => BackoffUpdater
   // TODO: 20/02/2018 (Backoffers): dropFirst, dropLast, wait(backoff?)
 
@@ -127,9 +128,9 @@ public class EventualExt extends Eventual {
   }
 
   @NotNull
-  public static <V> Yielder<?, V, V> ifEmptyFallback(
-      @NotNull final Loop<? extends V> fallbackLoop) {
-    return new IfEmptyFallback<V>(fallbackLoop);
+  public static <V> Yielder<?, V, V> ifEmpty(
+      @NotNull final Observer<? super YieldOutputs<V>> observer) {
+    return new IfEmptyYielder<V>(observer);
   }
 
   @NotNull
@@ -149,6 +150,21 @@ public class EventualExt extends Eventual {
   }
 
   @NotNull
+  public static <V> LoopForker<?, V> replayAll() {
+    return ReplayAllForker.instance();
+  }
+
+  @NotNull
+  public static <V> LoopForker<?, V> replayFirst(final int maxCount) {
+    return new ReplayFirstForker<V>(maxCount);
+  }
+
+  @NotNull
+  public static <V> LoopForker<?, V> replayLast(final int maxCount) {
+    return new ReplayLastForker<V>(maxCount);
+  }
+
+  @NotNull
   public static <V> Forker<?, V, Evaluation<V>, Statement<V>> retry(final int maxCount) {
     return RetryForker.newForker(maxCount);
   }
@@ -157,6 +173,11 @@ public class EventualExt extends Eventual {
   public static <S, V> Forker<?, V, Evaluation<V>, Statement<V>> retryOn(
       @NotNull final ScheduledExecutor executor, @NotNull final BackoffUpdater<S> backoff) {
     return RetryBackoffForker.newForker(executor, backoff);
+  }
+
+  @NotNull
+  public static <V> Yielder<?, V, V> stopErrorBackPropagation() {
+    return StopErrorBackPropagationYielder.instance();
   }
 
   @NotNull
@@ -632,48 +653,48 @@ public class EventualExt extends Eventual {
   }
 
   @NotNull
-  public <V> Yielder<?, V, V> skip(final int count) {
-    return skipFirst(count);
+  public <V> Yielder<?, V, V> skip(final int maxCount) {
+    return skipFirst(maxCount);
   }
 
   @NotNull
-  public <V> Yielder<?, V, V> skipFailures(final int count) {
-    return skipFirstFailures(count);
+  public <V> Yielder<?, V, V> skipFailures(final int maxCount) {
+    return skipFirstFailures(maxCount);
   }
 
   @NotNull
-  public <V> Yielder<?, V, V> skipFirst(final int count) {
-    return new SkipFirstYielder<V>(count);
+  public <V> Yielder<?, V, V> skipFirst(final int maxCount) {
+    return new SkipFirstYielder<V>(maxCount);
   }
 
   @NotNull
-  public <V> Yielder<?, V, V> skipFirstFailures(final int count) {
-    return new SkipFirstFailuresYielder<V>(count);
+  public <V> Yielder<?, V, V> skipFirstFailures(final int maxCount) {
+    return new SkipFirstFailuresYielder<V>(maxCount);
   }
 
   @NotNull
-  public <V> Yielder<?, V, V> skipFirstValues(final int count) {
-    return new SkipFirstValuesYielder<V>(count);
+  public <V> Yielder<?, V, V> skipFirstValues(final int maxCount) {
+    return new SkipFirstValuesYielder<V>(maxCount);
   }
 
   @NotNull
-  public <V> Yielder<?, V, V> skipLast(final int count) {
-    return new SkipLastYielder<V>(count);
+  public <V> Yielder<?, V, V> skipLast(final int maxCount) {
+    return new SkipLastYielder<V>(maxCount);
   }
 
   @NotNull
-  public <V> Yielder<?, V, V> skipLastFailures(final int count) {
-    return new SkipLastFailuresYielder<V>(count);
+  public <V> Yielder<?, V, V> skipLastFailures(final int maxCount) {
+    return new SkipLastFailuresYielder<V>(maxCount);
   }
 
   @NotNull
-  public <V> Yielder<?, V, V> skipLastValues(final int count) {
-    return new SkipLastValuesYielder<V>(count);
+  public <V> Yielder<?, V, V> skipLastValues(final int maxCount) {
+    return new SkipLastValuesYielder<V>(maxCount);
   }
 
   @NotNull
-  public <V> Yielder<?, V, V> skipValues(final int count) {
-    return skipFirstValues(count);
+  public <V> Yielder<?, V, V> skipValues(final int maxCount) {
+    return skipFirstValues(maxCount);
   }
 
   @NotNull
@@ -772,6 +793,7 @@ public class EventualExt extends Eventual {
   }
 
   @NotNull
+  @SuppressWarnings("unchecked")
   public <V1, V2, R> Loop<R> zip(final V1 filler1, final V2 filler2,
       @NotNull final Loop<? extends V1> loop1, @NotNull final Loop<? extends V2> loop2,
       @NotNull final BiMapper<V1, V2, R> mapper) {
@@ -780,6 +802,7 @@ public class EventualExt extends Eventual {
   }
 
   @NotNull
+  @SuppressWarnings("unchecked")
   public <V1, V2, R> Loop<R> zip(@NotNull final Loop<? extends V1> loop1,
       @NotNull final Loop<? extends V2> loop2, @NotNull final BiMapper<V1, V2, R> mapper) {
     return joinLoops(ZipJoiner.instance(), Arrays.asList(loop1, loop2)).forEach(
@@ -787,6 +810,7 @@ public class EventualExt extends Eventual {
   }
 
   @NotNull
+  @SuppressWarnings("unchecked")
   public <V1, V2, V3, R> Loop<R> zip(final V1 filler1, final V2 filler2, final V3 filler3,
       @NotNull final Loop<? extends V1> loop1, @NotNull final Loop<? extends V2> loop2,
       @NotNull final Loop<? extends V3> loop3, @NotNull final TriMapper<V1, V2, V3, R> mapper) {
@@ -795,6 +819,7 @@ public class EventualExt extends Eventual {
   }
 
   @NotNull
+  @SuppressWarnings("unchecked")
   public <V1, V2, V3, R> Loop<R> zip(@NotNull final Loop<? extends V1> loop1,
       @NotNull final Loop<? extends V2> loop2, @NotNull final Loop<? extends V3> loop3,
       @NotNull final TriMapper<V1, V2, V3, R> mapper) {
@@ -803,6 +828,7 @@ public class EventualExt extends Eventual {
   }
 
   @NotNull
+  @SuppressWarnings("unchecked")
   public <V1, V2, V3, V4, R> Loop<R> zip(final V1 filler1, final V2 filler2, final V3 filler3,
       final V4 filler4, @NotNull final Loop<? extends V1> loop1,
       @NotNull final Loop<? extends V2> loop2, @NotNull final Loop<? extends V3> loop3,
@@ -814,6 +840,7 @@ public class EventualExt extends Eventual {
   }
 
   @NotNull
+  @SuppressWarnings("unchecked")
   public <V1, V2, V3, V4, R> Loop<R> zip(@NotNull final Loop<? extends V1> loop1,
       @NotNull final Loop<? extends V2> loop2, @NotNull final Loop<? extends V3> loop3,
       @NotNull final Loop<? extends V4> loop4,
@@ -823,6 +850,7 @@ public class EventualExt extends Eventual {
   }
 
   @NotNull
+  @SuppressWarnings("unchecked")
   public <V1, V2, R> Loop<R> zipStrict(@NotNull final Loop<? extends V1> loop1,
       @NotNull final Loop<? extends V2> loop2, @NotNull final BiMapper<V1, V2, R> mapper) {
     return joinLoops(ZipStrictJoiner.instance(), Arrays.asList(loop1, loop2)).forEach(
@@ -830,6 +858,7 @@ public class EventualExt extends Eventual {
   }
 
   @NotNull
+  @SuppressWarnings("unchecked")
   public <V1, V2, V3, R> Loop<R> zipStrict(@NotNull final Loop<? extends V1> loop1,
       @NotNull final Loop<? extends V2> loop2, @NotNull final Loop<? extends V3> loop3,
       @NotNull final TriMapper<V1, V2, V3, R> mapper) {
@@ -838,6 +867,7 @@ public class EventualExt extends Eventual {
   }
 
   @NotNull
+  @SuppressWarnings("unchecked")
   public <V1, V2, V3, V4, R> Loop<R> zipStrict(@NotNull final Loop<? extends V1> loop1,
       @NotNull final Loop<? extends V2> loop2, @NotNull final Loop<? extends V3> loop3,
       @NotNull final Loop<? extends V4> loop4,

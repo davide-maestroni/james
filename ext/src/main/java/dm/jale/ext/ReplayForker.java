@@ -48,6 +48,7 @@ class ReplayForker<V> implements StatementForker<ForkerStack<V>, V>, Serializabl
   }
 
   public ForkerStack<V> done(final ForkerStack<V> stack, @NotNull final Statement<V> context) {
+    stack.evaluations = null;
     return stack;
   }
 
@@ -68,13 +69,8 @@ class ReplayForker<V> implements StatementForker<ForkerStack<V>, V>, Serializabl
       @NotNull final Statement<V> context) {
     final SimpleState<V> state = (stack.state = SimpleState.ofFailure(failure));
     final ArrayList<Evaluation<V>> evaluations = stack.evaluations;
-    try {
-      for (final Evaluation<V> evaluation : evaluations) {
-        state.to(evaluation);
-      }
-
-    } finally {
-      evaluations.clear();
+    for (final Evaluation<V> evaluation : evaluations) {
+      state.to(evaluation);
     }
 
     return stack;
@@ -88,13 +84,8 @@ class ReplayForker<V> implements StatementForker<ForkerStack<V>, V>, Serializabl
       @NotNull final Statement<V> context) {
     final SimpleState<V> state = (stack.state = SimpleState.ofValue(value));
     final ArrayList<Evaluation<V>> evaluations = stack.evaluations;
-    try {
-      for (final Evaluation<V> evaluation : evaluations) {
-        state.to(evaluation);
-      }
-
-    } finally {
-      evaluations.clear();
+    for (final Evaluation<V> evaluation : evaluations) {
+      state.to(evaluation);
     }
 
     return stack;
@@ -107,7 +98,7 @@ class ReplayForker<V> implements StatementForker<ForkerStack<V>, V>, Serializabl
 
   static class ForkerStack<V> {
 
-    private final ArrayList<Evaluation<V>> evaluations = new ArrayList<Evaluation<V>>();
+    private ArrayList<Evaluation<V>> evaluations = new ArrayList<Evaluation<V>>();
 
     private SimpleState<V> state;
   }
