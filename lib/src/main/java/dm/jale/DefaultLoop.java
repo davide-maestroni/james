@@ -335,6 +335,7 @@ class DefaultLoop<V> implements Loop<V>, Serializable {
   }
 
   public void consume() {
+    checkEvaluated();
     propagate(new PropagationConsume<V>());
   }
 

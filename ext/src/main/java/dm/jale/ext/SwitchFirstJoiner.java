@@ -23,6 +23,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 import dm.jale.eventual.EvaluationCollection;
+import dm.jale.eventual.FailureException;
 import dm.jale.eventual.Loop;
 import dm.jale.eventual.LoopJoiner;
 import dm.jale.eventual.SimpleState;
@@ -53,7 +54,7 @@ class SwitchFirstJoiner<V> implements LoopJoiner<JoinerStack<V>, Object, V>, Ser
       @NotNull final EvaluationCollection<V> evaluation, @NotNull final List<Loop<Object>> contexts,
       final int index) {
     if (index == 0) {
-      return null;
+      throw FailureException.wrap(failure);
 
     } else {
       final Integer stackIndex = stack.index;

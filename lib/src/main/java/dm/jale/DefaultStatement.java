@@ -285,6 +285,7 @@ class DefaultStatement<V> implements Statement<V>, Serializable {
   }
 
   public void consume() {
+    checkEvaluated();
     propagate(new PropagationConsume<V>());
   }
 
