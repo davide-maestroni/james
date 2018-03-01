@@ -56,7 +56,8 @@ class RepeatAllForker<V> implements LoopForker<ForkerStack, V>, Serializable {
       ++stack.count;
 
     } else {
-      evaluation.addFailure(new IllegalStateException()).set();
+      evaluation.addFailure(new IllegalStateException("the loop evaluation cannot be propagated"))
+          .set();
     }
 
     return null;

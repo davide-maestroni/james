@@ -55,7 +55,7 @@ class ReplayForker<V> implements StatementForker<ForkerStack<V>, V>, Serializabl
       @NotNull final Evaluation<V> evaluation, @NotNull final Statement<V> context) {
     final int maxTimes = mMaxTimes;
     if ((maxTimes > 0) && (stack.count >= maxTimes)) {
-      evaluation.fail(new IllegalStateException());
+      evaluation.fail(new IllegalStateException("the statement evaluation cannot be propagated"));
       return stack;
     }
 

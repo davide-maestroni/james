@@ -94,7 +94,8 @@ class ExecutorLoopForker<V> extends BufferedForker<Stack<V>, V, EvaluationCollec
         stack.evaluation = evaluation;
 
       } else {
-        evaluation.addFailure(new IllegalStateException()).set();
+        evaluation.addFailure(new IllegalStateException("the loop evaluation cannot be propagated"))
+            .set();
       }
 
       return stack;

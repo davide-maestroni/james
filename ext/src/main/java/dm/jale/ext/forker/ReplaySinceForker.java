@@ -65,7 +65,8 @@ class ReplaySinceForker<V> implements LoopForker<ForkerStack<V>, V>, Serializabl
       @NotNull final EvaluationCollection<V> evaluation, @NotNull final Loop<V> context) {
     final int maxTimes = mMaxTimes;
     if ((maxTimes > 0) && (stack.count >= maxTimes)) {
-      evaluation.addFailure(new IllegalStateException()).set();
+      evaluation.addFailure(new IllegalStateException("the loop evaluation cannot be propagated"))
+          .set();
       return stack;
     }
 

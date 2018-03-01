@@ -56,7 +56,7 @@ class RepeatForker<V> implements StatementForker<ForkerStack, V>, Serializable {
       ++stack.count;
 
     } else {
-      evaluation.fail(new IllegalStateException());
+      evaluation.fail(new IllegalStateException("the statement evaluation cannot be propagated"));
     }
 
     return null;

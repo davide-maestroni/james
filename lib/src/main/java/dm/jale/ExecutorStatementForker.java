@@ -62,7 +62,7 @@ class ExecutorStatementForker<V>
         return evaluation;
 
       } else {
-        evaluation.fail(new IllegalStateException());
+        evaluation.fail(new IllegalStateException("the statement evaluation cannot be propagated"));
       }
 
       return stack;

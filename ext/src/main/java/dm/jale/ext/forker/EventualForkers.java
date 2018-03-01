@@ -32,10 +32,9 @@ import dm.jale.eventual.Statement;
 import dm.jale.eventual.Statement.Forker;
 import dm.jale.eventual.StatementForker;
 import dm.jale.eventual.Updater;
-import dm.jale.executor.ScheduledExecutor;
-import dm.jale.ext.backoff.BackoffUpdater;
 import dm.jale.ext.backoff.Backoffer;
 import dm.jale.ext.backoff.PendingEvaluation;
+import dm.jale.ext.eventual.BiMapper;
 import dm.jale.util.ConstantConditions;
 
 /**
@@ -149,9 +148,9 @@ public class EventualForkers {
   }
 
   @NotNull
-  public static <S, V> Forker<?, V, Evaluation<V>, Statement<V>> retryOn(
-      @NotNull final ScheduledExecutor executor, @NotNull final BackoffUpdater<S> backoff) {
-    return RetryBackoffForker.newForker(executor, backoff);
+  public static <S, V> Forker<?, V, Evaluation<V>, Statement<V>> retry(
+      @NotNull final BiMapper<S, ? super Throwable, ? extends Statement<S>> mapper) {
+    return RetryMapperForker.newForker(mapper);
   }
 
   @NotNull

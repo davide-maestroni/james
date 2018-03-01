@@ -148,7 +148,7 @@ class ComposedStatementJoiner<S, V, R>
 
     public void settle(final S stack, @NotNull final Evaluation<? extends R> evaluation,
         @NotNull final List<Statement<V>> statements) throws Exception {
-      evaluation.fail(new IllegalStateException());
+      evaluation.fail(new IllegalStateException("joiner completion has not been overwritten"));
     }
 
     @NotNull
