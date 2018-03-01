@@ -23,13 +23,13 @@ import java.io.Serializable;
 import java.util.HashSet;
 
 import dm.jale.eventual.Loop.YieldOutputs;
-import dm.jale.eventual.Loop.Yielder;
+import dm.jale.eventual.LoopYielder;
 import dm.jale.ext.config.BuildConfig;
 
 /**
  * Created by davide-maestroni on 02/19/2018.
  */
-class DistinctYielder<V> implements Yielder<HashSet<V>, V, V>, Serializable {
+class DistinctYielder<V> implements LoopYielder<HashSet<V>, V, V>, Serializable {
 
   private static final DistinctYielder<?> sInstance = new DistinctYielder<Object>();
 

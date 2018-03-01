@@ -21,7 +21,7 @@ import org.jetbrains.annotations.NotNull;
 import java.io.Serializable;
 
 import dm.jale.eventual.Loop.YieldOutputs;
-import dm.jale.eventual.Loop.Yielder;
+import dm.jale.eventual.LoopYielder;
 import dm.jale.ext.config.BuildConfig;
 import dm.jale.ext.yielder.ResizeValuesYielder.YielderStack;
 import dm.jale.util.ConstantConditions;
@@ -29,7 +29,7 @@ import dm.jale.util.ConstantConditions;
 /**
  * Created by davide-maestroni on 02/26/2018.
  */
-class ResizeValuesYielder<V> implements Yielder<YielderStack, V, V>, Serializable {
+class ResizeValuesYielder<V> implements LoopYielder<YielderStack, V, V>, Serializable {
 
   private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
 

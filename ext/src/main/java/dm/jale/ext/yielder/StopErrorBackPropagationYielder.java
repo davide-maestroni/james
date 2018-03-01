@@ -22,14 +22,14 @@ import java.io.ObjectStreamException;
 import java.io.Serializable;
 
 import dm.jale.eventual.Loop.YieldOutputs;
-import dm.jale.eventual.Loop.Yielder;
+import dm.jale.eventual.LoopYielder;
 import dm.jale.ext.config.BuildConfig;
 import dm.jale.log.Logger;
 
 /**
  * Created by davide-maestroni on 02/27/2018.
  */
-class StopErrorBackPropagationYielder<V> implements Yielder<Boolean, V, V>, Serializable {
+class StopErrorBackPropagationYielder<V> implements LoopYielder<Boolean, V, V>, Serializable {
 
   private static final StopErrorBackPropagationYielder<?> sInstance =
       new StopErrorBackPropagationYielder<Object>();

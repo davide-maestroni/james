@@ -34,10 +34,19 @@ import dm.jale.eventual.JoinSettler;
 import dm.jale.eventual.JoinUpdater;
 import dm.jale.eventual.Joiner;
 import dm.jale.eventual.Loop;
+import dm.jale.eventual.Loop.YieldOutputs;
+import dm.jale.eventual.Loop.Yielder;
+import dm.jale.eventual.LoopForker;
+import dm.jale.eventual.LoopJoiner;
+import dm.jale.eventual.LoopYielder;
 import dm.jale.eventual.Mapper;
 import dm.jale.eventual.Observer;
+import dm.jale.eventual.Provider;
+import dm.jale.eventual.Settler;
 import dm.jale.eventual.Statement;
 import dm.jale.eventual.Statement.Forker;
+import dm.jale.eventual.StatementForker;
+import dm.jale.eventual.StatementJoiner;
 import dm.jale.eventual.Updater;
 import dm.jale.util.ConstantConditions;
 import dm.jale.util.SerializableProxy;
@@ -69,30 +78,77 @@ public class Eventual {
   }
 
   @NotNull
-  public static <S, V, R, C> Forker<?, V, R, C> buffered(@NotNull final Forker<S, V, R, C> forker) {
-    return new BufferedForker<S, V, R, C>(forker);
+  public static <S, V> LoopForker<?, V> bufferedLoop(
+      @NotNull final Forker<S, ? super V, ? super EvaluationCollection<V>, ? super Loop<V>>
+          forker) {
+    return new BufferedLoopForker<S, V>(forker);
   }
 
   @NotNull
-  public static <S, V> Forker<?, V, EvaluationCollection<V>, Loop<V>> bufferedLoop(
-      @Nullable Mapper<? super Loop<V>, S> init,
-      @Nullable Updater<S, ? super V, ? super Loop<V>> value,
-      @Nullable Updater<S, ? super Throwable, ? super Loop<V>> failure,
-      @Nullable Completer<S, ? super Loop<V>> done,
-      @Nullable Updater<S, ? super EvaluationCollection<V>, ? super Loop<V>> evaluation) {
-    return new BufferedForker<S, V, EvaluationCollection<V>, Loop<V>>(
-        new ComposedLoopForker<S, V>(init, value, failure, done, evaluation));
+  public static <S, V> StatementForker<?, V> bufferedStatement(
+      @NotNull final Forker<S, ? super V, ? super Evaluation<V>, ? super Statement<V>> forker) {
+    return new BufferedStatementForker<S, V>(forker);
   }
 
   @NotNull
-  public static <S, V> Forker<?, V, Evaluation<V>, Statement<V>> bufferedStatement(
+  public static <S, V> LoopForker<S, V> loopForker(@Nullable final Mapper<? super Loop<V>, S> init,
+      @Nullable final Updater<S, ? super V, ? super Loop<V>> value,
+      @Nullable final Updater<S, ? super Throwable, ? super Loop<V>> failure,
+      @Nullable final Completer<S, ? super Loop<V>> done,
+      @Nullable final Updater<S, ? super EvaluationCollection<V>, ? super Loop<V>> evaluation) {
+    return new ComposedLoopForker<S, V>(init, value, failure, done, evaluation);
+  }
+
+  @NotNull
+  public static <S, V, R> LoopJoiner<S, V, R> loopJoiner(
+      @Nullable final Mapper<? super List<Loop<V>>, S> init,
+      @Nullable final JoinUpdater<S, ? super V, ? super EvaluationCollection<? extends R>,
+          Loop<V>> value,
+      @Nullable final JoinUpdater<S, ? super Throwable, ? super EvaluationCollection<? extends
+          R>, Loop<V>> failure,
+      @Nullable final JoinCompleter<S, ? super EvaluationCollection<? extends R>, Loop<V>> done,
+      @Nullable final JoinSettler<S, ? super EvaluationCollection<? extends R>, Loop<V>> settle) {
+    return new ComposedLoopJoiner<S, V, R>(init, value, failure, done, settle);
+  }
+
+  @NotNull
+  public static <S, V, R> LoopYielder<S, V, R> loopYielder(@Nullable final Provider<S> init,
+      @Nullable final Mapper<S, ? extends Boolean> loop,
+      @Nullable final Updater<S, ? super V, ? super YieldOutputs<R>> value,
+      @Nullable final Updater<S, ? super Throwable, ? super YieldOutputs<R>> failure,
+      @Nullable final Settler<S, ? super YieldOutputs<R>> done) {
+    return new ComposedLoopYielder<S, V, R>(init, loop, value, failure, done);
+  }
+
+  @NotNull
+  public static <S, V> StatementForker<S, V> statementForker(
       @Nullable final Mapper<? super Statement<V>, S> init,
-      @Nullable Updater<S, ? super V, ? super Statement<V>> value,
-      @Nullable Updater<S, ? super Throwable, ? super Statement<V>> failure,
-      @Nullable Completer<S, ? super Statement<V>> done,
-      @Nullable Updater<S, ? super Evaluation<V>, ? super Statement<V>> evaluation) {
-    return new BufferedForker<S, V, Evaluation<V>, Statement<V>>(
-        new ComposedStatementForker<S, V>(init, value, failure, done, evaluation));
+      @Nullable final Updater<S, ? super V, ? super Statement<V>> value,
+      @Nullable final Updater<S, ? super Throwable, ? super Statement<V>> failure,
+      @Nullable final Completer<S, ? super Statement<V>> done,
+      @Nullable final Updater<S, ? super Evaluation<V>, ? super Statement<V>> evaluation) {
+    return new ComposedStatementForker<S, V>(init, value, failure, done, evaluation);
+  }
+
+  @NotNull
+  public static <S, V, R> StatementJoiner<S, V, R> statementJoiner(
+      @Nullable final Mapper<? super List<Statement<V>>, S> init,
+      @Nullable final JoinUpdater<S, ? super V, ? super Evaluation<? extends R>, Statement<V>>
+          value,
+      @Nullable final JoinUpdater<S, ? super Throwable, ? super Evaluation<? extends R>,
+          Statement<V>> failure,
+      @Nullable final JoinCompleter<S, ? super Evaluation<? extends R>, Statement<V>> done,
+      @Nullable final JoinSettler<S, ? super Evaluation<? extends R>, Statement<V>> settle) {
+    return new ComposedStatementJoiner<S, V, R>(init, value, failure, done, settle);
+  }
+
+  @NotNull
+  public static <S, V, O> Yielder<S, V, O> yielder(@Nullable final Provider<S> init,
+      @Nullable final Mapper<S, ? extends Boolean> loop,
+      @Nullable final Updater<S, ? super V, ? super O> value,
+      @Nullable final Updater<S, ? super Throwable, ? super O> failure,
+      @Nullable final Settler<S, ? super O> done) {
+    return new ComposedYielder<S, V, O>(init, loop, value, failure, done);
   }
 
   @NotNull

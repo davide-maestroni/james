@@ -23,7 +23,7 @@ import java.io.ObjectStreamException;
 import java.io.Serializable;
 
 import dm.jale.eventual.Loop.YieldOutputs;
-import dm.jale.eventual.Loop.Yielder;
+import dm.jale.eventual.LoopYielder;
 import dm.jale.eventual.Observer;
 import dm.jale.ext.config.BuildConfig;
 import dm.jale.util.ConstantConditions;
@@ -32,7 +32,7 @@ import dm.jale.util.SerializableProxy;
 /**
  * Created by davide-maestroni on 02/27/2018.
  */
-class IfEmptyYielder<V> implements Yielder<Boolean, V, V>, Serializable {
+class IfEmptyYielder<V> implements LoopYielder<Boolean, V, V>, Serializable {
 
   private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
 

@@ -29,15 +29,17 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import dm.jale.Eventual;
 import dm.jale.eventual.EvaluationCollection;
 import dm.jale.eventual.Loop;
+import dm.jale.eventual.Loop.YieldOutputs;
+import dm.jale.eventual.Loop.Yielder;
 import dm.jale.eventual.LoopForker;
+import dm.jale.eventual.Observer;
 import dm.jale.eventual.RuntimeInterruptedException;
-import dm.jale.eventual.Statement.Forker;
+import dm.jale.eventual.Statement;
 import dm.jale.executor.EvaluationExecutor;
 import dm.jale.executor.ExecutorPool;
-import dm.jale.ext.backoff.Backoffer;
-import dm.jale.ext.backoff.PendingEvaluation;
+import dm.jale.ext.backpressure.PendingOutputs;
 import dm.jale.ext.config.BuildConfig;
-import dm.jale.ext.forker.BackoffForker.ForkerEvaluation;
+import dm.jale.ext.forker.BackPressureForker.ForkerOutputs;
 import dm.jale.util.ConstantConditions;
 import dm.jale.util.Iterables;
 import dm.jale.util.SerializableProxy;
@@ -47,33 +49,33 @@ import dm.jale.util.TimeUnits.Condition;
 /**
  * Created by davide-maestroni on 02/09/2018.
  */
-class BackoffForker<S, V> implements LoopForker<ForkerEvaluation<S, V>, V>, Serializable {
+class BackPressureForker<S, V> implements LoopForker<ForkerOutputs<S, V>, V>, Serializable {
 
   private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
 
-  private final Backoffer<S, V> mBackoffer;
-
   private final EvaluationExecutor mExecutor;
 
-  private BackoffForker(@NotNull final Backoffer<S, V> backoffer,
-      @NotNull final Executor executor) {
-    mBackoffer = ConstantConditions.notNull("backoffer", backoffer);
+  private final Yielder<S, V, ? super PendingOutputs<V>> mYielder;
+
+  private BackPressureForker(@NotNull final Executor executor,
+      @NotNull final Yielder<S, V, ? super PendingOutputs<V>> yielder) {
+    mYielder = ConstantConditions.notNull("yielder", yielder);
     mExecutor = ExecutorPool.register(executor);
   }
 
   @NotNull
-  static <S, V> Forker<?, V, EvaluationCollection<V>, Loop<V>> newForker(
-      @NotNull final Backoffer<S, V> backoffer, @NotNull final Executor executor) {
-    return Eventual.buffered(new BackoffForker<S, V>(backoffer, executor));
+  static <S, V> LoopForker<?, V> newForker(@NotNull final Executor executor,
+      @NotNull final Yielder<S, V, ? super PendingOutputs<V>> yielder) {
+    return Eventual.bufferedLoop(new BackPressureForker<S, V>(executor, yielder));
   }
 
-  public ForkerEvaluation<S, V> done(final ForkerEvaluation<S, V> stack,
+  public ForkerOutputs<S, V> done(final ForkerOutputs<S, V> stack,
       @NotNull final Loop<V> context) throws Exception {
-    mBackoffer.done(stack.getStack(), stack);
-    return stack.withStack(null);
+    mYielder.done(stack.getStack(), stack);
+    return stack.withStack(null).set();
   }
 
-  public ForkerEvaluation<S, V> evaluation(final ForkerEvaluation<S, V> stack,
+  public ForkerOutputs<S, V> evaluation(final ForkerOutputs<S, V> stack,
       @NotNull final EvaluationCollection<V> evaluation, @NotNull final Loop<V> context) throws
       Exception {
     if (!stack.setEvaluations(evaluation)) {
@@ -84,26 +86,26 @@ class BackoffForker<S, V> implements LoopForker<ForkerEvaluation<S, V>, V>, Seri
     return stack;
   }
 
-  public ForkerEvaluation<S, V> failure(final ForkerEvaluation<S, V> stack,
+  public ForkerOutputs<S, V> failure(final ForkerOutputs<S, V> stack,
       @NotNull final Throwable failure, @NotNull final Loop<V> context) throws Exception {
-    return stack.withStack(mBackoffer.failure(stack.getStack(), failure, stack));
+    return stack.withStack(mYielder.failure(stack.getStack(), failure, stack));
   }
 
-  public ForkerEvaluation<S, V> init(@NotNull final Loop<V> context) throws Exception {
-    return new ForkerEvaluation<S, V>(mExecutor, mBackoffer.init());
+  public ForkerOutputs<S, V> init(@NotNull final Loop<V> context) throws Exception {
+    return new ForkerOutputs<S, V>(mExecutor, mYielder.init());
   }
 
-  public ForkerEvaluation<S, V> value(final ForkerEvaluation<S, V> stack, final V value,
+  public ForkerOutputs<S, V> value(final ForkerOutputs<S, V> stack, final V value,
       @NotNull final Loop<V> context) throws Exception {
-    return stack.withStack(mBackoffer.value(stack.getStack(), value, stack));
+    return stack.withStack(mYielder.value(stack.getStack(), value, stack));
   }
 
   @NotNull
   private Object writeReplace() throws ObjectStreamException {
-    return new ForkerProxy<S, V>(mExecutor, mBackoffer);
+    return new ForkerProxy<S, V>(mExecutor, mYielder);
   }
 
-  static class ForkerEvaluation<S, V> implements PendingEvaluation<V> {
+  static class ForkerOutputs<S, V> implements PendingOutputs<V> {
 
     private final EvaluationExecutor mExecutor;
 
@@ -113,19 +115,75 @@ class BackoffForker<S, V> implements LoopForker<ForkerEvaluation<S, V>, V>, Seri
 
     private EvaluationCollection<V> mEvaluation;
 
-    private int mPendingTasks;
+    private int mPendingTasks = 1;
 
     private long mPendingValues;
 
     private S mStack;
 
-    private ForkerEvaluation(@NotNull final EvaluationExecutor executor, final S stack) {
+    private ForkerOutputs(@NotNull final EvaluationExecutor executor, final S stack) {
       mExecutor = executor;
       mStack = stack;
     }
 
+    public int pendingTasks() {
+      synchronized (mMutex) {
+        return mPendingTasks - 1;
+      }
+    }
+
+    public long pendingValues() {
+      synchronized (mMutex) {
+        return mPendingValues;
+      }
+    }
+
+    public void wait(final long timeout, @NotNull final TimeUnit timeUnit) {
+      checkOwner();
+      try {
+        TimeUnits.sleepAtLeast(timeout, timeUnit);
+
+      } catch (final InterruptedException e) {
+        throw new RuntimeInterruptedException(e);
+      }
+    }
+
+    public boolean waitTasks(final int maxCount, final long timeout,
+        @NotNull final TimeUnit timeUnit) {
+      ConstantConditions.notNegative("maxCount", maxCount);
+      checkOwner();
+      try {
+        return TimeUnits.waitUntil(mMutex, new Condition() {
+
+          public boolean isTrue() {
+            return (mPendingTasks - 1) <= maxCount;
+          }
+        }, timeout, timeUnit);
+
+      } catch (final InterruptedException e) {
+        throw new RuntimeInterruptedException(e);
+      }
+    }
+
+    public boolean waitValues(final long maxCount, final long timeout,
+        @NotNull final TimeUnit timeUnit) {
+      ConstantConditions.notNegative("maxCount", maxCount);
+      checkOwner();
+      try {
+        return TimeUnits.waitUntil(mMutex, new Condition() {
+
+          public boolean isTrue() {
+            return mPendingValues <= maxCount;
+          }
+        }, timeout, timeUnit);
+
+      } catch (final InterruptedException e) {
+        throw new RuntimeInterruptedException(e);
+      }
+    }
+
     @NotNull
-    public EvaluationCollection<V> addFailure(@NotNull final Throwable failure) {
+    public YieldOutputs<V> yieldFailure(@NotNull final Throwable failure) {
       checkSet();
       final EvaluationCollection<V> evaluation = mEvaluation;
       synchronized (mMutex) {
@@ -149,8 +207,7 @@ class BackoffForker<S, V> implements LoopForker<ForkerEvaluation<S, V>, V>, Seri
     }
 
     @NotNull
-    public EvaluationCollection<V> addFailures(
-        @Nullable final Iterable<? extends Throwable> failures) {
+    public YieldOutputs<V> yieldFailures(@Nullable final Iterable<Throwable> failures) {
       checkSet();
       if (failures == null) {
         return this;
@@ -180,7 +237,78 @@ class BackoffForker<S, V> implements LoopForker<ForkerEvaluation<S, V>, V>, Seri
     }
 
     @NotNull
-    public EvaluationCollection<V> addValue(final V value) {
+    public YieldOutputs<V> yieldIf(@NotNull final Statement<? extends V> statement) {
+      checkSet();
+      final EvaluationCollection<V> evaluation = mEvaluation;
+      synchronized (mMutex) {
+        ++mPendingTasks;
+        ++mPendingValues;
+      }
+
+      statement.forkOn(mExecutor).eventuallyDo(new Observer<V>() {
+
+        public void accept(final V value) throws Exception {
+          try {
+            evaluation.addValue(value);
+
+          } finally {
+            decrementPendingValues(1);
+            decrementPendingTasks();
+          }
+        }
+      }).elseDo(new Observer<Throwable>() {
+
+        public void accept(final Throwable failure) throws Exception {
+          try {
+            evaluation.addFailure(failure);
+
+          } finally {
+            decrementPendingValues(1);
+            decrementPendingTasks();
+          }
+        }
+      }).consume();
+      return this;
+    }
+
+    @NotNull
+    public YieldOutputs<V> yieldLoopIf(
+        @NotNull final Statement<? extends Iterable<? extends V>> loop) {
+      checkSet();
+      final EvaluationCollection<V> evaluation = mEvaluation;
+      synchronized (mMutex) {
+        ++mPendingTasks;
+        ++mPendingValues;
+      }
+
+      loop.forkOn(mExecutor).eventuallyDo(new Observer<Iterable<? extends V>>() {
+
+        public void accept(final Iterable<? extends V> values) throws Exception {
+          try {
+            evaluation.addValues(values);
+
+          } finally {
+            decrementPendingValues(1);
+            decrementPendingTasks();
+          }
+        }
+      }).elseDo(new Observer<Throwable>() {
+
+        public void accept(final Throwable failure) throws Exception {
+          try {
+            evaluation.addFailure(failure);
+
+          } finally {
+            decrementPendingValues(1);
+            decrementPendingTasks();
+          }
+        }
+      }).consume();
+      return this;
+    }
+
+    @NotNull
+    public YieldOutputs<V> yieldValue(final V value) {
       checkSet();
       final EvaluationCollection<V> evaluation = mEvaluation;
       synchronized (mMutex) {
@@ -204,7 +332,7 @@ class BackoffForker<S, V> implements LoopForker<ForkerEvaluation<S, V>, V>, Seri
     }
 
     @NotNull
-    public EvaluationCollection<V> addValues(@Nullable final Iterable<? extends V> values) {
+    public YieldOutputs<V> yieldValues(@Nullable final Iterable<V> values) {
       checkSet();
       if (values == null) {
         return this;
@@ -232,85 +360,6 @@ class BackoffForker<S, V> implements LoopForker<ForkerEvaluation<S, V>, V>, Seri
       return this;
     }
 
-    public void set() {
-      if (mIsSet.getAndSet(true)) {
-        checkSet();
-      }
-
-      final EvaluationCollection<V> evaluation = mEvaluation;
-      synchronized (mMutex) {
-        ++mPendingTasks;
-      }
-
-      mExecutor.execute(new Runnable() {
-
-        public void run() {
-          try {
-            evaluation.set();
-
-          } finally {
-            decrementPendingTasks();
-          }
-        }
-      });
-    }
-
-    public int pendingTasks() {
-      synchronized (mMutex) {
-        return mPendingTasks;
-      }
-    }
-
-    public long pendingValues() {
-      synchronized (mMutex) {
-        return mPendingValues;
-      }
-    }
-
-    public void wait(final long timeout, @NotNull final TimeUnit timeUnit) {
-      checkOwner();
-      try {
-        TimeUnits.sleepAtLeast(timeout, timeUnit);
-
-      } catch (final InterruptedException e) {
-        throw new RuntimeInterruptedException(e);
-      }
-    }
-
-    public boolean waitTasks(final int maxCount, final long timeout,
-        @NotNull final TimeUnit timeUnit) {
-      ConstantConditions.notNegative("maxCount", maxCount);
-      checkOwner();
-      try {
-        return TimeUnits.waitUntil(mMutex, new Condition() {
-
-          public boolean isTrue() {
-            return mPendingTasks <= maxCount;
-          }
-        }, timeout, timeUnit);
-
-      } catch (final InterruptedException e) {
-        throw new RuntimeInterruptedException(e);
-      }
-    }
-
-    public boolean waitValues(final long maxCount, final long timeout,
-        @NotNull final TimeUnit timeUnit) {
-      ConstantConditions.notNegative("maxCount", maxCount);
-      checkOwner();
-      try {
-        return TimeUnits.waitUntil(mMutex, new Condition() {
-
-          public boolean isTrue() {
-            return mPendingValues <= maxCount;
-          }
-        }, timeout, timeUnit);
-
-      } catch (final InterruptedException e) {
-        throw new RuntimeInterruptedException(e);
-      }
-    }
-
     private void checkOwner() {
       final EvaluationExecutor executor = mExecutor;
       if (executor.isOwnedThread()) {
@@ -326,9 +375,14 @@ class BackoffForker<S, V> implements LoopForker<ForkerEvaluation<S, V>, V>, Seri
     }
 
     private void decrementPendingTasks() {
+      final int pendingTasks;
       synchronized (mMutex) {
-        --mPendingTasks;
+        pendingTasks = --mPendingTasks;
         mMutex.notifyAll();
+      }
+
+      if (pendingTasks == 0) {
+        mEvaluation.set();
       }
     }
 
@@ -343,6 +397,18 @@ class BackoffForker<S, V> implements LoopForker<ForkerEvaluation<S, V>, V>, Seri
       return mStack;
     }
 
+    @NotNull
+    private ForkerOutputs<S, V> set() {
+      mIsSet.set(true);
+      mExecutor.execute(new Runnable() {
+
+        public void run() {
+          decrementPendingTasks();
+        }
+      });
+      return this;
+    }
+
     private boolean setEvaluations(@NotNull final EvaluationCollection<V> evaluation) {
       if (mEvaluation == null) {
         mEvaluation = evaluation;
@@ -352,7 +418,7 @@ class BackoffForker<S, V> implements LoopForker<ForkerEvaluation<S, V>, V>, Seri
       return false;
     }
 
-    private ForkerEvaluation<S, V> withStack(final S stack) {
+    private ForkerOutputs<S, V> withStack(final S stack) {
       mStack = stack;
       return this;
     }
@@ -362,8 +428,9 @@ class BackoffForker<S, V> implements LoopForker<ForkerEvaluation<S, V>, V>, Seri
 
     private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
 
-    private ForkerProxy(final Executor executor, final Backoffer<S, V> backoffer) {
-      super(executor, proxy(backoffer));
+    private ForkerProxy(final Executor executor,
+        final Yielder<S, V, ? super PendingOutputs<V>> yielder) {
+      super(executor, proxy(yielder));
     }
 
     @NotNull
@@ -371,7 +438,8 @@ class BackoffForker<S, V> implements LoopForker<ForkerEvaluation<S, V>, V>, Seri
     private Object readResolve() throws ObjectStreamException {
       try {
         final Object[] args = deserializeArgs();
-        return new BackoffForker<S, V>((Backoffer<S, V>) args[1], (Executor) args[0]);
+        return new BackPressureForker<S, V>((Executor) args[0],
+            (Yielder<S, V, ? super PendingOutputs<V>>) args[1]);
 
       } catch (final Throwable t) {
         throw new InvalidObjectException(t.getMessage());

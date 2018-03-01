@@ -17,23 +17,15 @@
 package dm.jale.ext.forker;
 
 import org.jetbrains.annotations.NotNull;
-import org.jetbrains.annotations.Nullable;
 
 import java.util.concurrent.Executor;
 import java.util.concurrent.TimeUnit;
 
-import dm.jale.eventual.Evaluation;
-import dm.jale.eventual.EvaluationCollection;
-import dm.jale.eventual.Loop;
+import dm.jale.eventual.Loop.Yielder;
 import dm.jale.eventual.LoopForker;
-import dm.jale.eventual.Provider;
-import dm.jale.eventual.Settler;
 import dm.jale.eventual.Statement;
-import dm.jale.eventual.Statement.Forker;
 import dm.jale.eventual.StatementForker;
-import dm.jale.eventual.Updater;
-import dm.jale.ext.backoff.Backoffer;
-import dm.jale.ext.backoff.PendingEvaluation;
+import dm.jale.ext.backpressure.PendingOutputs;
 import dm.jale.ext.eventual.BiMapper;
 import dm.jale.util.ConstantConditions;
 
@@ -143,29 +135,19 @@ public class EventualForkers {
   }
 
   @NotNull
-  public static <V> Forker<?, V, Evaluation<V>, Statement<V>> retry(final int maxCount) {
+  public static <V> StatementForker<?, V> retry(final int maxCount) {
     return RetryForker.newForker(maxCount);
   }
 
   @NotNull
-  public static <S, V> Forker<?, V, Evaluation<V>, Statement<V>> retry(
+  public static <S, V> StatementForker<?, V> retryIf(
       @NotNull final BiMapper<S, ? super Throwable, ? extends Statement<S>> mapper) {
     return RetryMapperForker.newForker(mapper);
   }
 
   @NotNull
-  public static <S, V> Forker<?, V, EvaluationCollection<V>, Loop<V>> withBackoff(
-      @NotNull final Backoffer<S, V> backoffer, @NotNull final Executor executor) {
-    return BackoffForker.newForker(backoffer, executor);
-  }
-
-  @NotNull
-  public static <S, V> Forker<?, V, EvaluationCollection<V>, Loop<V>> withBackoff(
-      @Nullable final Provider<S> init,
-      @Nullable final Updater<S, ? super V, ? super PendingEvaluation<V>> value,
-      @Nullable final Updater<S, ? super Throwable, ? super PendingEvaluation<V>> failure,
-      @Nullable final Settler<S, ? super PendingEvaluation<V>> done,
-      @NotNull final Executor executor) {
-    return withBackoff(new ComposedBackoffer<S, V>(init, value, failure, done), executor);
+  public static <S, V> LoopForker<?, V> withBackPressure(@NotNull final Executor executor,
+      @NotNull final Yielder<S, V, ? super PendingOutputs<V>> yielder) {
+    return BackPressureForker.newForker(executor, yielder);
   }
 }

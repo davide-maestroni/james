@@ -23,7 +23,7 @@ import java.io.ObjectStreamException;
 import java.io.Serializable;
 
 import dm.jale.eventual.Loop.YieldOutputs;
-import dm.jale.eventual.Loop.Yielder;
+import dm.jale.eventual.LoopYielder;
 import dm.jale.ext.config.BuildConfig;
 import dm.jale.ext.eventual.BiMapper;
 import dm.jale.ext.yielder.AccumulateYielder.YielderStack;
@@ -33,7 +33,7 @@ import dm.jale.util.SerializableProxy;
 /**
  * Created by davide-maestroni on 02/26/2018.
  */
-class AccumulateYielder<V> implements Yielder<YielderStack<V>, V, V>, Serializable {
+class AccumulateYielder<V> implements LoopYielder<YielderStack<V>, V, V>, Serializable {
 
   private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
 

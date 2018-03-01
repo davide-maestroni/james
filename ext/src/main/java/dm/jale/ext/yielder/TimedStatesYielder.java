@@ -22,14 +22,14 @@ import java.io.ObjectStreamException;
 import java.io.Serializable;
 
 import dm.jale.eventual.Loop.YieldOutputs;
-import dm.jale.eventual.Loop.Yielder;
+import dm.jale.eventual.LoopYielder;
 import dm.jale.ext.config.BuildConfig;
 import dm.jale.ext.eventual.TimedState;
 
 /**
  * Created by davide-maestroni on 02/19/2018.
  */
-class TimedStatesYielder<V> implements Yielder<Void, V, TimedState<V>>, Serializable {
+class TimedStatesYielder<V> implements LoopYielder<Void, V, TimedState<V>>, Serializable {
 
   private static final TimedStatesYielder<?> sInstance = new TimedStatesYielder<Object>();
 

@@ -26,7 +26,6 @@ import dm.jale.Eventual;
 import dm.jale.eventual.Evaluation;
 import dm.jale.eventual.Observer;
 import dm.jale.eventual.Statement;
-import dm.jale.eventual.Statement.Forker;
 import dm.jale.eventual.StatementForker;
 import dm.jale.ext.config.BuildConfig;
 import dm.jale.ext.eventual.BiMapper;
@@ -52,9 +51,9 @@ class RetryMapperForker<S, V> implements StatementForker<ForkerStack<S, V>, V>, 
   }
 
   @NotNull
-  static <S, V> Forker<?, V, Evaluation<V>, Statement<V>> newForker(
+  static <S, V> StatementForker<?, V> newForker(
       @NotNull final BiMapper<S, ? super Throwable, ? extends Statement<S>> mapper) {
-    return Eventual.buffered(new RetryMapperForker<S, V>(mapper, null));
+    return Eventual.bufferedStatement(new RetryMapperForker<S, V>(mapper, null));
   }
 
   public ForkerStack<S, V> done(final ForkerStack<S, V> stack,

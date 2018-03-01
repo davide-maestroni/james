@@ -29,16 +29,15 @@ import dm.jale.eventual.EvaluationCollection;
 import dm.jale.eventual.JoinCompleter;
 import dm.jale.eventual.JoinSettler;
 import dm.jale.eventual.JoinUpdater;
-import dm.jale.eventual.Joiner;
 import dm.jale.eventual.Loop;
+import dm.jale.eventual.LoopJoiner;
 import dm.jale.eventual.Mapper;
 import dm.jale.util.SerializableProxy;
 
 /**
  * Created by davide-maestroni on 02/14/2018.
  */
-class ComposedLoopJoiner<S, V, R>
-    implements Joiner<S, V, EvaluationCollection<R>, Loop<V>>, Serializable {
+class ComposedLoopJoiner<S, V, R> implements LoopJoiner<S, V, R>, Serializable {
 
   private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
 

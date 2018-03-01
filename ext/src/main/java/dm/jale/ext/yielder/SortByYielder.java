@@ -26,7 +26,7 @@ import java.util.Collections;
 import java.util.Comparator;
 
 import dm.jale.eventual.Loop.YieldOutputs;
-import dm.jale.eventual.Loop.Yielder;
+import dm.jale.eventual.LoopYielder;
 import dm.jale.ext.config.BuildConfig;
 import dm.jale.util.ConstantConditions;
 import dm.jale.util.SerializableProxy;
@@ -34,7 +34,7 @@ import dm.jale.util.SerializableProxy;
 /**
  * Created by davide-maestroni on 02/19/2018.
  */
-class SortByYielder<V> implements Yielder<ArrayList<V>, V, V>, Serializable {
+class SortByYielder<V> implements LoopYielder<ArrayList<V>, V, V>, Serializable {
 
   private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
 

@@ -53,7 +53,7 @@ class YieldLoopExpression<S, V, R> extends LoopExpression<V, R> implements Seria
 
   private final Logger mLogger;
 
-  private final Yielder<S, ? super V, R> mYielder;
+  private final Yielder<S, ? super V, ? super YieldOutputs<R>> mYielder;
 
   private final YielderOutputs<R> mYielderOutputs = new YielderOutputs<R>();
 
@@ -63,7 +63,7 @@ class YieldLoopExpression<S, V, R> extends LoopExpression<V, R> implements Seria
 
   private S mStack;
 
-  YieldLoopExpression(@NotNull final Yielder<S, ? super V, R> yielder,
+  YieldLoopExpression(@NotNull final Yielder<S, ? super V, ? super YieldOutputs<R>> yielder,
       @Nullable final String loggerName) {
     mYielder = ConstantConditions.notNull("yielder", yielder);
     mExecutor = withThrottling(1, immediateExecutor());
@@ -95,8 +95,9 @@ class YieldLoopExpression<S, V, R> extends LoopExpression<V, R> implements Seria
 
       @Override
       protected void innerRun(@NotNull final YielderOutputs<R> outputs) throws Exception {
-        @SuppressWarnings("UnnecessaryLocalVariable") final Yielder<S, ? super V, R> yielder =
-            mYielder;
+        @SuppressWarnings(
+            "UnnecessaryLocalVariable") final Yielder<S, ? super V, ? super YieldOutputs<R>>
+            yielder = mYielder;
         for (final Throwable failure : failures) {
           mStack = yielder.failure(mStack, failure, outputs);
         }
@@ -128,8 +129,9 @@ class YieldLoopExpression<S, V, R> extends LoopExpression<V, R> implements Seria
 
       @Override
       protected void innerRun(@NotNull final YielderOutputs<R> outputs) throws Exception {
-        @SuppressWarnings("UnnecessaryLocalVariable") final Yielder<S, ? super V, R> yielder =
-            mYielder;
+        @SuppressWarnings(
+            "UnnecessaryLocalVariable") final Yielder<S, ? super V, ? super YieldOutputs<R>>
+            yielder = mYielder;
         for (final V value : values) {
           mStack = yielder.value(mStack, value, outputs);
         }
@@ -182,7 +184,8 @@ class YieldLoopExpression<S, V, R> extends LoopExpression<V, R> implements Seria
 
     private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
 
-    private HandlerProxy(final Yielder<S, ? super V, R> yielder, final String loggerName) {
+    private HandlerProxy(final Yielder<S, ? super V, ? super YieldOutputs<R>> yielder,
+        final String loggerName) {
       super(proxy(yielder), loggerName);
     }
 
@@ -191,8 +194,8 @@ class YieldLoopExpression<S, V, R> extends LoopExpression<V, R> implements Seria
     private Object readResolve() throws ObjectStreamException {
       try {
         final Object[] args = deserializeArgs();
-        return new YieldLoopExpression<S, V, R>((Yielder<S, ? super V, R>) args[0],
-            (String) args[1]);
+        return new YieldLoopExpression<S, V, R>(
+            (Yielder<S, ? super V, ? super YieldOutputs<R>>) args[0], (String) args[1]);
 
       } catch (final Throwable t) {
         throw new InvalidObjectException(t.getMessage());

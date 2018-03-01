@@ -24,7 +24,7 @@ import java.io.Serializable;
 import java.util.Comparator;
 
 import dm.jale.eventual.Loop.YieldOutputs;
-import dm.jale.eventual.Loop.Yielder;
+import dm.jale.eventual.LoopYielder;
 import dm.jale.ext.config.BuildConfig;
 import dm.jale.ext.yielder.MaxByYielder.YielderStack;
 import dm.jale.util.ConstantConditions;
@@ -33,7 +33,7 @@ import dm.jale.util.SerializableProxy;
 /**
  * Created by davide-maestroni on 02/19/2018.
  */
-class MaxByYielder<V> implements Yielder<YielderStack<V>, V, V>, Serializable {
+class MaxByYielder<V> implements LoopYielder<YielderStack<V>, V, V>, Serializable {
 
   private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
 

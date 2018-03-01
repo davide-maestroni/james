@@ -23,14 +23,14 @@ import java.io.Serializable;
 
 import dm.jale.eventual.EvaluationState;
 import dm.jale.eventual.Loop.YieldOutputs;
-import dm.jale.eventual.Loop.Yielder;
+import dm.jale.eventual.LoopYielder;
 import dm.jale.eventual.SimpleState;
 import dm.jale.ext.config.BuildConfig;
 
 /**
  * Created by davide-maestroni on 02/19/2018.
  */
-class StatesYielder<V> implements Yielder<Void, V, EvaluationState<V>>, Serializable {
+class StatesYielder<V> implements LoopYielder<Void, V, EvaluationState<V>>, Serializable {
 
   private static final StatesYielder<?> sInstance = new StatesYielder<Object>();
 

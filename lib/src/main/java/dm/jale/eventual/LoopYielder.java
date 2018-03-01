@@ -14,26 +14,14 @@
  * limitations under the License.
  */
 
-package dm.jale.ext.backoff;
+package dm.jale.eventual;
 
-import org.jetbrains.annotations.NotNull;
-
-import java.util.concurrent.TimeUnit;
-
-import dm.jale.eventual.EvaluationCollection;
+import dm.jale.eventual.Loop.YieldOutputs;
+import dm.jale.eventual.Loop.Yielder;
 
 /**
- * Created by davide-maestroni on 02/09/2018.
+ * Created by davide-maestroni on 03/01/2018.
  */
-public interface PendingEvaluation<V> extends EvaluationCollection<V> {
+public interface LoopYielder<S, V, R> extends Yielder<S, V, YieldOutputs<R>> {
 
-  int pendingTasks();
-
-  long pendingValues();
-
-  void wait(long timeout, @NotNull TimeUnit timeUnit);
-
-  boolean waitTasks(int maxCount, long timeout, @NotNull TimeUnit timeUnit);
-
-  boolean waitValues(long maxCount, long timeout, @NotNull TimeUnit timeUnit);
 }

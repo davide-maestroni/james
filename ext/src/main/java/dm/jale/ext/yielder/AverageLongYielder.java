@@ -22,14 +22,14 @@ import java.io.ObjectStreamException;
 import java.io.Serializable;
 
 import dm.jale.eventual.Loop.YieldOutputs;
-import dm.jale.eventual.Loop.Yielder;
+import dm.jale.eventual.LoopYielder;
 import dm.jale.ext.config.BuildConfig;
 import dm.jale.ext.yielder.AverageLongYielder.YielderStack;
 
 /**
  * Created by davide-maestroni on 02/19/2018.
  */
-class AverageLongYielder implements Yielder<YielderStack, Number, Long>, Serializable {
+class AverageLongYielder implements LoopYielder<YielderStack, Number, Long>, Serializable {
 
   private static final AverageLongYielder sInstance = new AverageLongYielder();
 

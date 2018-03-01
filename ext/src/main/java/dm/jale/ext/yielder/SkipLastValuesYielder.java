@@ -21,7 +21,7 @@ import org.jetbrains.annotations.NotNull;
 import java.io.Serializable;
 
 import dm.jale.eventual.Loop.YieldOutputs;
-import dm.jale.eventual.Loop.Yielder;
+import dm.jale.eventual.LoopYielder;
 import dm.jale.ext.config.BuildConfig;
 import dm.jale.util.ConstantConditions;
 import dm.jale.util.DoubleQueue;
@@ -29,7 +29,7 @@ import dm.jale.util.DoubleQueue;
 /**
  * Created by davide-maestroni on 02/27/2018.
  */
-class SkipLastValuesYielder<V> implements Yielder<DoubleQueue<V>, V, V>, Serializable {
+class SkipLastValuesYielder<V> implements LoopYielder<DoubleQueue<V>, V, V>, Serializable {
 
   private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
 

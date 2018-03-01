@@ -25,7 +25,7 @@ import java.util.Collections;
 import java.util.List;
 
 import dm.jale.eventual.Loop.YieldOutputs;
-import dm.jale.eventual.Loop.Yielder;
+import dm.jale.eventual.LoopYielder;
 import dm.jale.ext.config.BuildConfig;
 import dm.jale.ext.yielder.BatchYielder.YielderStack;
 import dm.jale.util.ConstantConditions;
@@ -33,7 +33,7 @@ import dm.jale.util.ConstantConditions;
 /**
  * Created by davide-maestroni on 02/19/2018.
  */
-class BatchYielder<V> implements Yielder<YielderStack<V>, V, V>, Serializable {
+class BatchYielder<V> implements LoopYielder<YielderStack<V>, V, V>, Serializable {
 
   private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
 

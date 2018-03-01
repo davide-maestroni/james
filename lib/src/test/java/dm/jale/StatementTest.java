@@ -44,7 +44,7 @@ import dm.jale.eventual.Observer;
 import dm.jale.eventual.RuntimeTimeoutException;
 import dm.jale.eventual.SimpleState;
 import dm.jale.eventual.Statement;
-import dm.jale.eventual.Statement.Forker;
+import dm.jale.eventual.StatementForker;
 import dm.jale.eventual.Updater;
 import dm.jale.log.Logger;
 import dm.jale.util.ConstantConditions;
@@ -93,42 +93,40 @@ public class StatementTest {
 
   @NotNull
   private static <V> Statement<V> fork(@NotNull final Statement<V> statement) {
-    return statement.fork(
-        Eventual.buffered(new Forker<Evaluation<V>, V, Evaluation<V>, Statement<V>>() {
+    return statement.fork(Eventual.bufferedStatement(new StatementForker<Evaluation<V>, V>() {
 
-          public Evaluation<V> done(final Evaluation<V> stack,
-              @NotNull final Statement<V> context) {
-            return stack;
-          }
+      public Evaluation<V> done(final Evaluation<V> stack, @NotNull final Statement<V> context) {
+        return stack;
+      }
 
-          public Evaluation<V> evaluation(final Evaluation<V> stack,
-              @NotNull final Evaluation<V> evaluation, @NotNull final Statement<V> context) {
-            if (stack != null) {
-              evaluation.fail(new IllegalStateException());
+      public Evaluation<V> evaluation(final Evaluation<V> stack,
+          @NotNull final Evaluation<V> evaluation, @NotNull final Statement<V> context) {
+        if (stack != null) {
+          evaluation.fail(new IllegalStateException());
 
-            } else {
-              return evaluation;
-            }
+        } else {
+          return evaluation;
+        }
 
-            return stack;
-          }
+        return stack;
+      }
 
-          public Evaluation<V> failure(final Evaluation<V> stack, @NotNull final Throwable failure,
-              @NotNull final Statement<V> context) {
-            stack.fail(failure);
-            return stack;
-          }
+      public Evaluation<V> failure(final Evaluation<V> stack, @NotNull final Throwable failure,
+          @NotNull final Statement<V> context) {
+        stack.fail(failure);
+        return stack;
+      }
 
-          public Evaluation<V> init(@NotNull final Statement<V> context) {
-            return null;
-          }
+      public Evaluation<V> init(@NotNull final Statement<V> context) {
+        return null;
+      }
 
-          public Evaluation<V> value(final Evaluation<V> stack, final V value,
-              @NotNull final Statement<V> context) {
-            stack.set(value);
-            return stack;
-          }
-        }));
+      public Evaluation<V> value(final Evaluation<V> stack, final V value,
+          @NotNull final Statement<V> context) {
+        stack.set(value);
+        return stack;
+      }
+    }));
   }
 
   @Test

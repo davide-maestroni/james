@@ -25,8 +25,8 @@ import java.util.concurrent.TimeUnit;
 import dm.jale.eventual.EvaluationCollection;
 import dm.jale.eventual.Loop;
 import dm.jale.eventual.Loop.YieldOutputs;
-import dm.jale.eventual.Loop.Yielder;
 import dm.jale.eventual.LoopForker;
+import dm.jale.eventual.LoopYielder;
 import dm.jale.eventual.Mapper;
 import dm.jale.eventual.SimpleState;
 import dm.jale.eventual.Statement;
@@ -174,7 +174,7 @@ class RepeatAllAfterForker<V> implements LoopForker<ForkerStack<V>, V>, Serializ
     private long timestamp;
   }
 
-  private static class ToSimpleStateYielder<V> implements Yielder<Void, V, SimpleState<V>> {
+  private static class ToSimpleStateYielder<V> implements LoopYielder<Void, V, SimpleState<V>> {
 
     public void done(final Void stack, @NotNull final YieldOutputs<SimpleState<V>> outputs) {
     }

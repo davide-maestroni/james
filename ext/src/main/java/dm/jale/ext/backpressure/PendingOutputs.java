@@ -14,21 +14,26 @@
  * limitations under the License.
  */
 
-package dm.jale.ext.backoff;
+package dm.jale.ext.backpressure;
 
 import org.jetbrains.annotations.NotNull;
 
+import java.util.concurrent.TimeUnit;
+
+import dm.jale.eventual.Loop.YieldOutputs;
+
 /**
- * Created by davide-maestroni on 02/09/2018.
+ * Created by davide-maestroni on 03/01/2018.
  */
-public interface Backoffer<S, V> {
+public interface PendingOutputs<V> extends YieldOutputs<V> {
 
-  void done(S stack, @NotNull PendingEvaluation<V> evaluation) throws Exception;
+  int pendingTasks();
 
-  S failure(S stack, @NotNull Throwable failure, @NotNull PendingEvaluation<V> evaluation) throws
-      Exception;
+  long pendingValues();
 
-  S init() throws Exception;
+  void wait(long timeout, @NotNull TimeUnit timeUnit);
 
-  S value(S stack, V value, @NotNull PendingEvaluation<V> evaluation) throws Exception;
+  boolean waitTasks(int maxCount, long timeout, @NotNull TimeUnit timeUnit);
+
+  boolean waitValues(long maxCount, long timeout, @NotNull TimeUnit timeUnit);
 }

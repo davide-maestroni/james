@@ -855,7 +855,8 @@ class DefaultLoop<V> implements Loop<V>, Serializable {
   }
 
   @NotNull
-  public <S, R> Loop<R> yield(@NotNull final Yielder<S, ? super V, R> yielder) {
+  public <S, R> Loop<R> yield(
+      @NotNull final Yielder<S, ? super V, ? super YieldOutputs<R>> yielder) {
     return propagate(new YieldLoopExpression<S, V, R>(yielder, mLogger.getName()));
   }
 
@@ -865,11 +866,12 @@ class DefaultLoop<V> implements Loop<V>, Serializable {
       @Nullable final Updater<S, ? super V, ? super YieldOutputs<R>> value,
       @Nullable final Updater<S, ? super Throwable, ? super YieldOutputs<R>> failure,
       @Nullable final Settler<S, ? super YieldOutputs<R>> done) {
-    return yield(new ComposedYielder<S, V, R>(init, loop, value, failure, done));
+    return yield(new ComposedYielder<S, V, YieldOutputs<R>>(init, loop, value, failure, done));
   }
 
   @NotNull
-  public <S, R> Loop<R> yieldOrdered(@NotNull final Yielder<S, ? super V, R> yielder) {
+  public <S, R> Loop<R> yieldOrdered(
+      @NotNull final Yielder<S, ? super V, ? super YieldOutputs<R>> yielder) {
     return propagateOrdered(new YieldLoopExpression<S, V, R>(yielder, mLogger.getName()));
   }
 
@@ -879,7 +881,8 @@ class DefaultLoop<V> implements Loop<V>, Serializable {
       @Nullable final Updater<S, ? super V, ? super YieldOutputs<R>> value,
       @Nullable final Updater<S, ? super Throwable, ? super YieldOutputs<R>> failure,
       @Nullable final Settler<S, ? super YieldOutputs<R>> done) {
-    return yieldOrdered(new ComposedYielder<S, V, R>(init, loop, value, failure, done));
+    return yieldOrdered(
+        new ComposedYielder<S, V, YieldOutputs<R>>(init, loop, value, failure, done));
   }
 
   @NotNull

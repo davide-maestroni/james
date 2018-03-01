@@ -23,13 +23,13 @@ import java.io.Serializable;
 import java.util.IdentityHashMap;
 
 import dm.jale.eventual.Loop.YieldOutputs;
-import dm.jale.eventual.Loop.Yielder;
+import dm.jale.eventual.LoopYielder;
 import dm.jale.ext.config.BuildConfig;
 
 /**
  * Created by davide-maestroni on 02/19/2018.
  */
-class UniqueYielder<V> implements Yielder<IdentityHashMap<V, Boolean>, V, V>, Serializable {
+class UniqueYielder<V> implements LoopYielder<IdentityHashMap<V, Boolean>, V, V>, Serializable {
 
   private static final UniqueYielder<?> sInstance = new UniqueYielder<Object>();
 

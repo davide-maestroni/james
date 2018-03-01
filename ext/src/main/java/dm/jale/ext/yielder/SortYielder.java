@@ -24,14 +24,14 @@ import java.util.ArrayList;
 import java.util.Collections;
 
 import dm.jale.eventual.Loop.YieldOutputs;
-import dm.jale.eventual.Loop.Yielder;
+import dm.jale.eventual.LoopYielder;
 import dm.jale.ext.config.BuildConfig;
 
 /**
  * Created by davide-maestroni on 02/19/2018.
  */
 class SortYielder<V extends Comparable<? super V>>
-    implements Yielder<ArrayList<V>, V, V>, Serializable {
+    implements LoopYielder<ArrayList<V>, V, V>, Serializable {
 
   private static final SortYielder<?> sInstance = new SortYielder();
 

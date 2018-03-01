@@ -23,13 +23,13 @@ import java.io.Serializable;
 import java.util.ArrayList;
 
 import dm.jale.eventual.Loop.YieldOutputs;
-import dm.jale.eventual.Loop.Yielder;
+import dm.jale.eventual.LoopYielder;
 import dm.jale.ext.config.BuildConfig;
 
 /**
  * Created by davide-maestroni on 02/19/2018.
  */
-class DelayedFailuresYielder<V> implements Yielder<ArrayList<Throwable>, V, V>, Serializable {
+class DelayedFailuresYielder<V> implements LoopYielder<ArrayList<Throwable>, V, V>, Serializable {
 
   private static final DelayedFailuresYielder<?> sInstance = new DelayedFailuresYielder<Object>();
 

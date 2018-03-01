@@ -42,17 +42,16 @@ import dm.jale.eventual.Loop;
 import dm.jale.eventual.Loop.YieldOutputs;
 import dm.jale.eventual.Loop.Yielder;
 import dm.jale.eventual.LoopForker;
+import dm.jale.eventual.LoopYielder;
 import dm.jale.eventual.Mapper;
 import dm.jale.eventual.Observer;
 import dm.jale.eventual.Provider;
 import dm.jale.eventual.Settler;
 import dm.jale.eventual.SimpleState;
 import dm.jale.eventual.Statement;
-import dm.jale.eventual.Statement.Forker;
 import dm.jale.eventual.StatementForker;
 import dm.jale.eventual.Updater;
-import dm.jale.ext.backoff.Backoffer;
-import dm.jale.ext.backoff.PendingEvaluation;
+import dm.jale.ext.backpressure.PendingOutputs;
 import dm.jale.ext.eventual.BiMapper;
 import dm.jale.ext.eventual.QuadriMapper;
 import dm.jale.ext.eventual.Tester;
@@ -77,8 +76,7 @@ public class EventualExt extends Eventual {
   // TODO: 21/02/2018 Yielders: throttle(), throttleValues(), debounce(), groupBy()?
   // TODO: 21/02/2018 Joiners:
   // TODO: 16/02/2018 Forkers:
-  // TODO: 20/02/2018 Backoff.apply(int count, long lastDelay) => BackoffUpdater
-  // TODO: 20/02/2018 (Backoffers): dropFirst, dropLast, wait(backoff?)
+  // TODO: 20/02/2018 (BackPressure): dropFirst, dropLast, wait(backoff?)
 
   private final Eventual mEventual;
 
@@ -91,95 +89,95 @@ public class EventualExt extends Eventual {
   }
 
   @NotNull
-  public static <V> Yielder<?, V, V> accumulate(
+  public static <V> LoopYielder<?, V, V> accumulate(
       @NotNull final BiMapper<? super V, ? super V, ? extends V> accumulator) {
     return EventualYielders.accumulate(accumulator);
   }
 
   @NotNull
-  public static <V> Yielder<?, V, V> accumulate(final V initialValue,
+  public static <V> LoopYielder<?, V, V> accumulate(final V initialValue,
       @NotNull final BiMapper<? super V, ? super V, ? extends V> accumulator) {
     return EventualYielders.accumulate(initialValue, accumulator);
   }
 
   @NotNull
-  public static Yielder<?, Number, Float> average() {
+  public static LoopYielder<?, Number, Float> average() {
     return averageFloat();
   }
 
   @NotNull
-  public static Yielder<?, Number, Double> averageDouble() {
+  public static LoopYielder<?, Number, Double> averageDouble() {
     return EventualYielders.averageDouble();
   }
 
   @NotNull
-  public static Yielder<?, Number, Float> averageFloat() {
+  public static LoopYielder<?, Number, Float> averageFloat() {
     return EventualYielders.averageFloat();
   }
 
   @NotNull
-  public static Yielder<?, Number, Integer> averageInteger() {
+  public static LoopYielder<?, Number, Integer> averageInteger() {
     return EventualYielders.averageInteger();
   }
 
   @NotNull
-  public static Yielder<?, Number, Long> averageLong() {
+  public static LoopYielder<?, Number, Long> averageLong() {
     return EventualYielders.averageLong();
   }
 
   @NotNull
-  public static <V> Yielder<?, V, V> batch(final int maxValues, final int maxFailures) {
+  public static <V> LoopYielder<?, V, V> batch(final int maxValues, final int maxFailures) {
     return EventualYielders.batch(maxValues, maxFailures);
   }
 
   @NotNull
-  public static <V> Yielder<?, V, V> delayedFailures() {
+  public static <V> LoopYielder<?, V, V> delayedFailures() {
     return EventualYielders.delayedFailures();
   }
 
   @NotNull
-  public static <V> Yielder<?, V, V> distinct() {
+  public static <V> LoopYielder<?, V, V> distinct() {
     return EventualYielders.distinct();
   }
 
   @NotNull
-  public static <V> Yielder<?, V, EvaluationState<V>> evaluationStates() {
+  public static <V> LoopYielder<?, V, EvaluationState<V>> evaluationStates() {
     return EventualYielders.evaluationStates();
   }
 
   @NotNull
-  public static <V> Yielder<?, V, TimedState<V>> evaluationStatesTimed() {
+  public static <V> LoopYielder<?, V, TimedState<V>> evaluationStatesTimed() {
     return EventualYielders.evaluationStatesTimed();
   }
 
   @NotNull
-  public static <V> Yielder<?, V, V> filter(@NotNull final Tester<V> tester) {
+  public static <V> LoopYielder<?, V, V> filter(@NotNull final Tester<V> tester) {
     return EventualYielders.filter(tester);
   }
 
   @NotNull
-  public static <V> Yielder<?, V, V> ifEmpty(
+  public static <V> LoopYielder<?, V, V> ifEmpty(
       @NotNull final Observer<? super YieldOutputs<V>> observer) {
     return EventualYielders.ifEmpty(observer);
   }
 
   @NotNull
-  public static <V extends Comparable<? super V>> Yielder<?, V, V> max() {
+  public static <V extends Comparable<? super V>> LoopYielder<?, V, V> max() {
     return EventualYielders.max();
   }
 
   @NotNull
-  public static <V> Yielder<?, V, V> maxBy(@NotNull final Comparator<? super V> comparator) {
+  public static <V> LoopYielder<?, V, V> maxBy(@NotNull final Comparator<? super V> comparator) {
     return EventualYielders.maxBy(comparator);
   }
 
   @NotNull
-  public static <V extends Comparable<? super V>> Yielder<?, V, V> min() {
+  public static <V extends Comparable<? super V>> LoopYielder<?, V, V> min() {
     return EventualYielders.min();
   }
 
   @NotNull
-  public static <V> Yielder<?, V, V> minBy(@NotNull final Comparator<? super V> comparator) {
+  public static <V> LoopYielder<?, V, V> minBy(@NotNull final Comparator<? super V> comparator) {
     return EventualYielders.minBy(comparator);
   }
 
@@ -280,147 +278,147 @@ public class EventualExt extends Eventual {
   }
 
   @NotNull
-  public static <V> Yielder<?, V, V> resize(final long size) {
+  public static <V> LoopYielder<?, V, V> resize(final long size) {
     return resize(size, SimpleState.<V>ofValue(null));
   }
 
   @NotNull
-  public static <V> Yielder<?, V, V> resize(final long size,
+  public static <V> LoopYielder<?, V, V> resize(final long size,
       @NotNull final EvaluationState<V> padding) {
     return EventualYielders.resize(size, padding);
   }
 
   @NotNull
-  public static <V> Yielder<?, V, V> resizeFailures(final long size,
+  public static <V> LoopYielder<?, V, V> resizeFailures(final long size,
       @NotNull final Throwable failure) {
     return EventualYielders.resizeFailures(size, failure);
   }
 
   @NotNull
-  public static <V> Yielder<?, V, V> resizeValues(final long size) {
+  public static <V> LoopYielder<?, V, V> resizeValues(final long size) {
     return resizeValues(size, null);
   }
 
   @NotNull
-  public static <V> Yielder<?, V, V> resizeValues(final long size, final V padding) {
+  public static <V> LoopYielder<?, V, V> resizeValues(final long size, final V padding) {
     return EventualYielders.resizeValues(size, padding);
   }
 
   @NotNull
-  public static <V> Forker<?, V, Evaluation<V>, Statement<V>> retry(final int maxCount) {
+  public static <V> StatementForker<?, V> retry(final int maxCount) {
     return EventualForkers.retry(maxCount);
   }
 
   @NotNull
-  public static <S, V> Forker<?, V, Evaluation<V>, Statement<V>> retry(
+  public static <S, V> StatementForker<?, V> retryIf(
       @NotNull final BiMapper<S, ? super Throwable, ? extends Statement<S>> mapper) {
-    return EventualForkers.retry(mapper);
+    return EventualForkers.retryIf(mapper);
   }
 
   @NotNull
-  public static <V> Yielder<?, V, V> skip(final int maxCount) {
+  public static <V> LoopYielder<?, V, V> skip(final int maxCount) {
     return skipFirst(maxCount);
   }
 
   @NotNull
-  public static <V> Yielder<?, V, V> skipFailures(final int maxCount) {
+  public static <V> LoopYielder<?, V, V> skipFailures(final int maxCount) {
     return skipFirstFailures(maxCount);
   }
 
   @NotNull
-  public static <V> Yielder<?, V, V> skipFirst(final int maxCount) {
+  public static <V> LoopYielder<?, V, V> skipFirst(final int maxCount) {
     return EventualYielders.skipFirst(maxCount);
   }
 
   @NotNull
-  public static <V> Yielder<?, V, V> skipFirstFailures(final int maxCount) {
+  public static <V> LoopYielder<?, V, V> skipFirstFailures(final int maxCount) {
     return EventualYielders.skipFirstFailures(maxCount);
   }
 
   @NotNull
-  public static <V> Yielder<?, V, V> skipFirstValues(final int maxCount) {
+  public static <V> LoopYielder<?, V, V> skipFirstValues(final int maxCount) {
     return EventualYielders.skipFirstValues(maxCount);
   }
 
   @NotNull
-  public static <V> Yielder<?, V, V> skipLast(final int maxCount) {
+  public static <V> LoopYielder<?, V, V> skipLast(final int maxCount) {
     return EventualYielders.skipLast(maxCount);
   }
 
   @NotNull
-  public static <V> Yielder<?, V, V> skipLastFailures(final int maxCount) {
+  public static <V> LoopYielder<?, V, V> skipLastFailures(final int maxCount) {
     return EventualYielders.skipLastFailures(maxCount);
   }
 
   @NotNull
-  public static <V> Yielder<?, V, V> skipLastValues(final int maxCount) {
+  public static <V> LoopYielder<?, V, V> skipLastValues(final int maxCount) {
     return EventualYielders.skipLastValues(maxCount);
   }
 
   @NotNull
-  public static <V> Yielder<?, V, V> skipValues(final int maxCount) {
+  public static <V> LoopYielder<?, V, V> skipValues(final int maxCount) {
     return skipFirstValues(maxCount);
   }
 
   @NotNull
-  public static <V extends Comparable<? super V>> Yielder<?, V, V> sort() {
+  public static <V extends Comparable<? super V>> LoopYielder<?, V, V> sort() {
     return EventualYielders.sort();
   }
 
   @NotNull
-  public static <V> Yielder<?, V, V> sortBy(@NotNull final Comparator<? super V> comparator) {
+  public static <V> LoopYielder<?, V, V> sortBy(@NotNull final Comparator<? super V> comparator) {
     return EventualYielders.sortBy(comparator);
   }
 
   @NotNull
-  public static <V> Yielder<?, V, V> stopErrorBackPropagation() {
+  public static <V> LoopYielder<?, V, V> stopErrorBackPropagation() {
     return EventualYielders.stopErrorBackPropagation();
   }
 
   @NotNull
-  public static Yielder<?, Number, Integer> sum() {
+  public static LoopYielder<?, Number, Integer> sum() {
     return sumInteger();
   }
 
   @NotNull
-  public static Yielder<?, Number, Double> sumDouble() {
+  public static LoopYielder<?, Number, Double> sumDouble() {
     return EventualYielders.sumDouble();
   }
 
   @NotNull
-  public static Yielder<?, Number, Float> sumFloat() {
+  public static LoopYielder<?, Number, Float> sumFloat() {
     return EventualYielders.sumFloat();
   }
 
   @NotNull
-  public static Yielder<?, Number, Integer> sumInteger() {
+  public static LoopYielder<?, Number, Integer> sumInteger() {
     return EventualYielders.sumInteger();
   }
 
   @NotNull
-  public static Yielder<?, Number, Long> sumLong() {
+  public static LoopYielder<?, Number, Long> sumLong() {
     return EventualYielders.sumLong();
   }
 
   @NotNull
-  public static <V> Yielder<?, V, V> unique() {
+  public static <V> LoopYielder<?, V, V> unique() {
     return EventualYielders.unique();
   }
 
   @NotNull
-  public static <S, V> Forker<?, V, EvaluationCollection<V>, Loop<V>> withBackoff(
-      @NotNull final Backoffer<S, V> backoffer, @NotNull final Executor executor) {
-    return EventualForkers.withBackoff(backoffer, executor);
+  public static <S, V> LoopForker<?, V> withBackPressure(@NotNull final Executor executor,
+      @NotNull final Yielder<S, V, ? super PendingOutputs<V>> yielder) {
+    return EventualForkers.withBackPressure(executor, yielder);
   }
 
   @NotNull
-  public static <S, V> Forker<?, V, EvaluationCollection<V>, Loop<V>> withBackoff(
-      @Nullable final Provider<S> init,
-      @Nullable final Updater<S, ? super V, ? super PendingEvaluation<V>> value,
-      @Nullable final Updater<S, ? super Throwable, ? super PendingEvaluation<V>> failure,
-      @Nullable final Settler<S, ? super PendingEvaluation<V>> done,
-      @NotNull final Executor executor) {
-    return EventualForkers.withBackoff(init, value, failure, done, executor);
+  public static <S, V> LoopForker<?, V> withBackPressure(@NotNull final Executor executor,
+      @Nullable final Provider<S> init, @Nullable final Mapper<S, ? extends Boolean> loop,
+      @Nullable final Updater<S, ? super V, ? super PendingOutputs<V>> value,
+      @Nullable final Updater<S, ? super Throwable, ? super PendingOutputs<V>> failure,
+      @Nullable final Settler<S, ? super PendingOutputs<V>> done) {
+    return EventualForkers.withBackPressure(executor,
+        Eventual.yielder(init, loop, value, failure, done));
   }
 
   @NotNull

@@ -203,7 +203,7 @@ public interface Loop<V> extends Statement<Iterable<V>>, Serializable {
   void to(@NotNull EvaluationCollection<? super V> evaluation);
 
   @NotNull
-  <S, R> Loop<R> yield(@NotNull Yielder<S, ? super V, R> yielder);
+  <S, R> Loop<R> yield(@NotNull Yielder<S, ? super V, ? super YieldOutputs<R>> yielder);
 
   @NotNull
   <S, R> Loop<R> yield(@Nullable Provider<S> init, @Nullable Mapper<S, ? extends Boolean> loop,
@@ -212,7 +212,7 @@ public interface Loop<V> extends Statement<Iterable<V>>, Serializable {
       @Nullable Settler<S, ? super YieldOutputs<R>> done);
 
   @NotNull
-  <S, R> Loop<R> yieldOrdered(@NotNull Yielder<S, ? super V, R> yielder);
+  <S, R> Loop<R> yieldOrdered(@NotNull Yielder<S, ? super V, ? super YieldOutputs<R>> yielder);
 
   @NotNull
   <S, R> Loop<R> yieldOrdered(@Nullable Provider<S> init,
@@ -262,17 +262,16 @@ public interface Loop<V> extends Statement<Iterable<V>>, Serializable {
     YieldOutputs<V> yieldValues(@Nullable Iterable<V> value);
   }
 
-  interface Yielder<S, V, R> {
+  interface Yielder<S, V, O> {
 
-    void done(S stack, @NotNull YieldOutputs<R> outputs) throws Exception;
+    void done(S stack, @NotNull O outputs) throws Exception;
 
-    S failure(S stack, @NotNull Throwable failure, @NotNull YieldOutputs<R> outputs) throws
-        Exception;
+    S failure(S stack, @NotNull Throwable failure, @NotNull O outputs) throws Exception;
 
     S init() throws Exception;
 
     boolean loop(S stack) throws Exception;
 
-    S value(S stack, V value, @NotNull YieldOutputs<R> outputs) throws Exception;
+    S value(S stack, V value, @NotNull O outputs) throws Exception;
   }
 }

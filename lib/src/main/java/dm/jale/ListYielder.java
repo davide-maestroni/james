@@ -24,12 +24,12 @@ import java.util.ArrayList;
 
 import dm.jale.config.BuildConfig;
 import dm.jale.eventual.Loop.YieldOutputs;
-import dm.jale.eventual.Loop.Yielder;
+import dm.jale.eventual.LoopYielder;
 
 /**
  * Created by davide-maestroni on 02/23/2018.
  */
-class ListYielder<V> implements Yielder<ArrayList<V>, V, ArrayList<V>>, Serializable {
+class ListYielder<V> implements LoopYielder<ArrayList<V>, V, ArrayList<V>>, Serializable {
 
   private static final ListYielder<?> sInstance = new ListYielder();
 

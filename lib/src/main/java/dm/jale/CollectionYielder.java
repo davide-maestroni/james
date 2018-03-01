@@ -21,12 +21,12 @@ import org.jetbrains.annotations.NotNull;
 import java.util.ArrayList;
 
 import dm.jale.eventual.Loop.YieldOutputs;
-import dm.jale.eventual.Loop.Yielder;
+import dm.jale.eventual.LoopYielder;
 
 /**
  * Created by davide-maestroni on 02/05/2018.
  */
-class CollectionYielder<V> implements Yielder<ArrayList<V>, V, V> {
+class CollectionYielder<V> implements LoopYielder<ArrayList<V>, V, V> {
 
   public void done(final ArrayList<V> stack, @NotNull final YieldOutputs<V> outputs) throws
       Exception {

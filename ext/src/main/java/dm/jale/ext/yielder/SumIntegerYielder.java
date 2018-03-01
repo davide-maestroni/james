@@ -22,14 +22,14 @@ import java.io.ObjectStreamException;
 import java.io.Serializable;
 
 import dm.jale.eventual.Loop.YieldOutputs;
-import dm.jale.eventual.Loop.Yielder;
+import dm.jale.eventual.LoopYielder;
 import dm.jale.ext.config.BuildConfig;
 import dm.jale.ext.yielder.SumIntegerYielder.YielderStack;
 
 /**
  * Created by davide-maestroni on 02/19/2018.
  */
-class SumIntegerYielder implements Yielder<YielderStack, Number, Integer>, Serializable {
+class SumIntegerYielder implements LoopYielder<YielderStack, Number, Integer>, Serializable {
 
   private static final SumIntegerYielder sInstance = new SumIntegerYielder();
 
