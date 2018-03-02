@@ -44,9 +44,9 @@ class ScheduledExecutorDecorator implements ScheduledExecutor, ExecutorDecorator
     mExecutor.execute(command);
   }
 
-  public void execute(@NotNull final Runnable runnable, final long delay,
+  public void execute(@NotNull final Runnable command, final long delay,
       @NotNull final TimeUnit timeUnit) {
-    mExecutor.execute(runnable, delay, timeUnit);
+    mExecutor.execute(command, delay, timeUnit);
   }
 
   @NotNull

@@ -46,6 +46,7 @@ import dm.jale.eventual.RuntimeTimeoutException;
 import dm.jale.eventual.Statement;
 import dm.jale.eventual.Updater;
 import dm.jale.executor.ExecutorPool;
+import dm.jale.executor.FailingRunnable;
 import dm.jale.log.Logger;
 import dm.jale.util.ConstantConditions;
 import dm.jale.util.SerializableProxy;
@@ -53,6 +54,7 @@ import dm.jale.util.TimeUnits;
 import dm.jale.util.TimeUnits.Condition;
 
 import static dm.jale.executor.ExecutorPool.loopExecutor;
+import static dm.jale.executor.ExecutorPool.withErrorBackPropagation;
 import static dm.jale.executor.ExecutorPool.withThrottling;
 
 /**
@@ -698,7 +700,7 @@ class DefaultStatement<V> implements Statement<V>, Serializable {
 
     private final Forker<S, V, Evaluation<V>, Statement<V>> mForker;
 
-    private Throwable mFailure;
+    private final Executor mThrottlingExecutor;
 
     private S mStack;
 
@@ -709,7 +711,8 @@ class DefaultStatement<V> implements Statement<V>, Serializable {
         @NotNull final Forker<S, ? super V, ? super Evaluation<V>, ? super Statement<V>> forker) {
       mForker =
           (Forker<S, V, Evaluation<V>, Statement<V>>) ConstantConditions.notNull("forker", forker);
-      mExecutor = withThrottling(1, loopExecutor());
+      mThrottlingExecutor = withThrottling(1, loopExecutor());
+      mExecutor = withErrorBackPropagation(mThrottlingExecutor);
       mStatement = statement;
     }
 
@@ -727,7 +730,7 @@ class DefaultStatement<V> implements Statement<V>, Serializable {
             }
 
           } catch (final Throwable t) {
-            mFailure = t;
+            throw FailureException.wrapIfNot(RuntimeException.class, t);
           }
         }
       });
@@ -739,24 +742,18 @@ class DefaultStatement<V> implements Statement<V>, Serializable {
 
     @Override
     void failure(@NotNull final Throwable failure, @NotNull final Evaluation<V> evaluation) {
-      checkFailed();
       mExecutor.execute(new Runnable() {
 
         public void run() {
-          final DefaultStatement<V> statement = mStatement;
-          if (mFailure != null) {
-            statement.mLogger.wrn("Ignoring failure: %s", failure);
-            return;
-          }
-
           try {
+            final DefaultStatement<V> statement = mStatement;
             final Forker<S, V, Evaluation<V>, Statement<V>> forker = mForker;
             final S stack = forker.failure(mStack, failure, statement);
             mStack = forker.done(stack, statement);
 
           } catch (final Throwable t) {
-            mFailure = t;
             clearEvaluations(t);
+            throw FailureException.wrapIfNot(RuntimeException.class, t);
           }
         }
       });
@@ -769,24 +766,18 @@ class DefaultStatement<V> implements Statement<V>, Serializable {
 
     @Override
     void value(final V value, @NotNull final Evaluation<V> evaluation) {
-      checkFailed();
       mExecutor.execute(new Runnable() {
 
         public void run() {
-          final DefaultStatement<V> statement = mStatement;
-          if (mFailure != null) {
-            statement.mLogger.wrn("Ignoring value: %s", value);
-            return;
-          }
-
           try {
+            final DefaultStatement<V> statement = mStatement;
             final Forker<S, V, Evaluation<V>, Statement<V>> forker = mForker;
             final S stack = forker.value(mStack, value, statement);
             mStack = forker.done(stack, statement);
 
           } catch (final Throwable t) {
-            mFailure = t;
             clearEvaluations(t);
+            throw FailureException.wrapIfNot(RuntimeException.class, t);
           }
         }
       });
@@ -798,41 +789,32 @@ class DefaultStatement<V> implements Statement<V>, Serializable {
     }
 
     void propagate(final Evaluation<V> evaluation) {
-      mExecutor.execute(new Runnable() {
+      mExecutor.execute(new FailingRunnable() {
+
+        public void fail(@NotNull final Throwable error) {
+          Eventuals.failSafe(evaluation, error);
+        }
 
         public void run() {
-          final Throwable failure = mFailure;
-          if (failure != null) {
-            Eventuals.failSafe(evaluation, failure);
-            return;
-          }
-
           mEvaluations.add(evaluation);
           try {
             mStack = mForker.evaluation(mStack, evaluation, mStatement);
 
           } catch (final Throwable t) {
-            mFailure = t;
             clearEvaluations(t);
+            throw FailureException.wrapIfNot(RuntimeException.class, t);
           }
         }
       });
     }
 
     void stopPropagation(final Evaluation<V> evaluation) {
-      mExecutor.execute(new Runnable() {
+      mThrottlingExecutor.execute(new Runnable() {
 
         public void run() {
           mEvaluations.remove(evaluation);
         }
       });
-    }
-
-    private void checkFailed() {
-      final Throwable failure = mFailure;
-      if (failure != null) {
-        throw FailureException.wrap(failure);
-      }
     }
 
     private void clearEvaluations(@NotNull final Throwable failure) {

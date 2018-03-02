@@ -331,9 +331,9 @@ class PriorityExecutor {
     }
 
     @Override
-    public void execute(@NotNull final Runnable runnable, final long delay,
+    public void execute(@NotNull final Runnable command, final long delay,
         @NotNull final TimeUnit timeUnit) {
-      final PriorityCommand priorityCommand = getPriorityCommand(runnable);
+      final PriorityCommand priorityCommand = getPriorityCommand(command);
       if (delay == 0) {
         final ImmediateCommand immediateCommand = new ImmediateCommand(priorityCommand);
         mImmediateCommands.put(priorityCommand, immediateCommand);

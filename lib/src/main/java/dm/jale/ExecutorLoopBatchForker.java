@@ -25,8 +25,6 @@ import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
-import java.util.Locale;
-import java.util.concurrent.CancellationException;
 import java.util.concurrent.Executor;
 import java.util.concurrent.atomic.AtomicLong;
 
@@ -38,8 +36,9 @@ import dm.jale.eventual.Loop;
 import dm.jale.eventual.LoopForker;
 import dm.jale.executor.EvaluationExecutor;
 import dm.jale.executor.ExecutorPool;
-import dm.jale.log.Logger;
 import dm.jale.util.ConstantConditions;
+
+import static dm.jale.executor.ExecutorPool.withErrorBackPropagation;
 
 /**
  * Created by davide-maestroni on 02/12/2018.
@@ -50,8 +49,8 @@ class ExecutorLoopBatchForker<V>
   private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
 
   ExecutorLoopBatchForker(@NotNull final Executor executor, final int maxValues,
-      final int maxFailures, @Nullable final String loggerName) {
-    super(new InnerForker<V>(executor, maxValues, maxFailures, loggerName));
+      final int maxFailures) {
+    super(new InnerForker<V>(executor, maxValues, maxFailures));
   }
 
   @Nullable
@@ -61,9 +60,11 @@ class ExecutorLoopBatchForker<V>
         : (size == 1) ? Collections.singletonList(list.get(0)) : new ArrayList<E>(list);
   }
 
-  static class Stack<V> {
+  static class Stack<V> implements Executor {
 
     private final ArrayList<Throwable> failures = new ArrayList<Throwable>();
+
+    private final Executor mExecutor;
 
     private final AtomicLong pendingCount = new AtomicLong(1);
 
@@ -71,7 +72,13 @@ class ExecutorLoopBatchForker<V>
 
     private EvaluationCollection<V> evaluation;
 
-    private volatile Throwable failure;
+    private Stack(@NotNull final EvaluationExecutor executor) {
+      mExecutor = withErrorBackPropagation(executor);
+    }
+
+    public void execute(@NotNull final Runnable runnable) {
+      mExecutor.execute(runnable);
+    }
   }
 
   private static class InnerForker<V> implements LoopForker<Stack<V>, V>, Serializable {
@@ -80,30 +87,19 @@ class ExecutorLoopBatchForker<V>
 
     private final EvaluationExecutor mExecutor;
 
-    private final Logger mLogger;
-
     private final int mMaxFailures;
 
     private final int mMaxValues;
 
     private InnerForker(@NotNull final Executor executor, final int maxValues,
-        final int maxFailures, @Nullable final String loggerName) {
+        final int maxFailures) {
       mExecutor = ExecutorPool.register(executor);
       mMaxValues = ConstantConditions.positive("maxValues", maxValues);
       mMaxFailures = ConstantConditions.positive("maxFailures", maxFailures);
-      mLogger = Logger.newLogger(this, loggerName, Locale.ENGLISH);
-    }
-
-    private static void checkFailed(@NotNull final Stack<?> stack) {
-      final Throwable failure = stack.failure;
-      if (failure != null) {
-        throw FailureException.wrap(failure);
-      }
     }
 
     public Stack<V> done(final Stack<V> stack, @NotNull final Loop<V> context) {
-      checkFailed(stack);
-      mExecutor.execute(new ForkerRunnable(stack) {
+      stack.execute(new ForkerRunnable(stack) {
 
         protected void innerRun(@NotNull final EvaluationCollection<V> evaluation) {
           evaluation.addFailures(stack.failures).addValues(stack.values);
@@ -114,7 +110,6 @@ class ExecutorLoopBatchForker<V>
 
     public Stack<V> evaluation(final Stack<V> stack,
         @NotNull final EvaluationCollection<V> evaluation, @NotNull final Loop<V> context) {
-      checkFailed(stack);
       if (stack.evaluation == null) {
         stack.evaluation = evaluation;
 
@@ -128,7 +123,6 @@ class ExecutorLoopBatchForker<V>
 
     public Stack<V> failure(final Stack<V> stack, @NotNull final Throwable failure,
         @NotNull final Loop<V> context) {
-      checkFailed(stack);
       final AtomicLong pendingCount = stack.pendingCount;
       final ArrayList<V> values = stack.values;
       final List<V> valueList = copyOrNull(values);
@@ -145,7 +139,7 @@ class ExecutorLoopBatchForker<V>
       }
 
       pendingCount.incrementAndGet();
-      mExecutor.execute(new ForkerRunnable(stack) {
+      stack.execute(new ForkerRunnable(stack) {
 
         protected void innerRun(@NotNull final EvaluationCollection<V> evaluation) {
           evaluation.addValues(valueList).addFailures(failureList);
@@ -155,12 +149,11 @@ class ExecutorLoopBatchForker<V>
     }
 
     public Stack<V> init(@NotNull final Loop<V> context) throws Exception {
-      return new Stack<V>();
+      return new Stack<V>(mExecutor);
     }
 
     public Stack<V> value(final Stack<V> stack, final V value,
         @NotNull final Loop<V> context) throws Exception {
-      checkFailed(stack);
       final AtomicLong pendingCount = stack.pendingCount;
       final ArrayList<Throwable> failures = stack.failures;
       final List<Throwable> failureList = copyOrNull(failures);
@@ -177,7 +170,7 @@ class ExecutorLoopBatchForker<V>
       }
 
       pendingCount.incrementAndGet();
-      mExecutor.execute(new ForkerRunnable(stack) {
+      stack.execute(new ForkerRunnable(stack) {
 
         protected void innerRun(@NotNull final EvaluationCollection<V> evaluation) {
           evaluation.addFailures(failureList).addValues(valueList);
@@ -188,7 +181,7 @@ class ExecutorLoopBatchForker<V>
 
     @NotNull
     private Object writeReplace() throws ObjectStreamException {
-      return new ForkerProxy<V>(mExecutor, mMaxValues, mMaxFailures, mLogger.getName());
+      return new ForkerProxy<V>(mExecutor, mMaxValues, mMaxFailures);
     }
 
     private static class ForkerProxy<V> implements Serializable {
@@ -197,24 +190,20 @@ class ExecutorLoopBatchForker<V>
 
       private final Executor mExecutor;
 
-      private final String mLoggerName;
-
       private final int mMaxFailures;
 
       private final int mMaxValues;
 
-      private ForkerProxy(final Executor executor, final int maxValues, final int maxFailures,
-          final String loggerName) {
+      private ForkerProxy(final Executor executor, final int maxValues, final int maxFailures) {
         mExecutor = executor;
         mMaxValues = maxValues;
         mMaxFailures = maxFailures;
-        mLoggerName = loggerName;
       }
 
       @NotNull
       private Object readResolve() throws ObjectStreamException {
         try {
-          return new ExecutorLoopBatchForker<V>(mExecutor, mMaxValues, mMaxFailures, mLoggerName);
+          return new ExecutorLoopBatchForker<V>(mExecutor, mMaxValues, mMaxFailures);
 
         } catch (final Throwable t) {
           throw new InvalidObjectException(t.getMessage());
@@ -234,23 +223,13 @@ class ExecutorLoopBatchForker<V>
         final Stack<V> stack = mStack;
         final EvaluationCollection<V> evaluation = stack.evaluation;
         try {
-          if (stack.failure != null) {
-            mLogger.wrn("Ignoring evaluation");
-            return;
-          }
-
           innerRun(evaluation);
           if (stack.pendingCount.decrementAndGet() == 0) {
             evaluation.set();
           }
 
-        } catch (final CancellationException e) {
-          mLogger.wrn(e, "Loop has been cancelled");
-          stack.failure = e;
-
         } catch (final Throwable t) {
-          mLogger.err(t, "Loop has failed");
-          stack.failure = t;
+          throw FailureException.wrapIfNot(RuntimeException.class, t);
         }
       }
 

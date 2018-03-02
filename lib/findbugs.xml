@@ -18,7 +18,7 @@
 <FindBugsFilter>
     <Match>
         <Package name="~dm\.jale.*"/>
-        <Bug pattern="SE_BAD_FIELD,SE_BAD_FIELD_STORE,SE_NO_SUITABLE_CONSTRUCTOR"/>
+        <Bug pattern="SE_BAD_FIELD,SE_BAD_FIELD_STORE,SE_NO_SUITABLE_CONSTRUCTOR,SE_TRANSIENT_FIELD_NOT_RESTORED"/>
         <!--
         writeReplace makes objects serializable. This is a limitation of FindBugs as discussed here:
         http://stackoverflow.com/questions/26156523/is-writeobject-not-neccesary-using-the-serialization-proxy-pattern

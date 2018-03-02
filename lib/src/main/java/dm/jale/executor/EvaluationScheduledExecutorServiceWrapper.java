@@ -93,9 +93,9 @@ class EvaluationScheduledExecutorServiceWrapper
     return new UnstoppableScheduledServiceExecutor(service);
   }
 
-  public void execute(@NotNull final Runnable runnable, final long delay,
+  public void execute(@NotNull final Runnable command, final long delay,
       @NotNull final TimeUnit timeUnit) {
-    mService.schedule(new RunnableWrapper(runnable), delay, timeUnit);
+    mService.schedule(new RunnableWrapper(command), delay, timeUnit);
   }
 
   public void execute(@NotNull final Runnable runnable) {

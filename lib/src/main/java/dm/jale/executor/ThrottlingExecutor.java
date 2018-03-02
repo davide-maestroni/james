@@ -99,17 +99,17 @@ class ThrottlingExecutor extends ScheduledExecutorDecorator implements Serializa
   }
 
   @Override
-  public void execute(@NotNull final Runnable runnable, final long delay,
+  public void execute(@NotNull final Runnable command, final long delay,
       @NotNull final TimeUnit timeUnit) {
     final ThrottlingCommand throttlingCommand;
     synchronized (mMutex) {
       final DoubleQueue<PendingCommand> queue = mQueue;
       if ((mRunningCount + queue.size()) >= mMaxRunning) {
-        queue.add(new PendingCommand(runnable, delay, timeUnit));
+        queue.add(new PendingCommand(command, delay, timeUnit));
         return;
       }
 
-      throttlingCommand = getThrottlingCommand(runnable);
+      throttlingCommand = getThrottlingCommand(command);
     }
 
     super.execute(throttlingCommand, delay, timeUnit);

@@ -64,7 +64,7 @@ class DelayedExecutor extends ScheduledExecutorDecorator implements Serializable
   }
 
   @Override
-  public void execute(@NotNull final Runnable runnable, final long delay,
+  public void execute(@NotNull final Runnable command, final long delay,
       @NotNull final TimeUnit timeUnit) {
     ConstantConditions.notNegative("delay", delay);
     final TimeUnit currentUnit = mTimeUnit;
@@ -79,7 +79,7 @@ class DelayedExecutor extends ScheduledExecutorDecorator implements Serializable
       newUnit = currentUnit;
     }
 
-    super.execute(runnable, newDelay, newUnit);
+    super.execute(command, newDelay, newUnit);
   }
 
   @NotNull

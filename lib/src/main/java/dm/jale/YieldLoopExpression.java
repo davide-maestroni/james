@@ -22,8 +22,6 @@ import org.jetbrains.annotations.Nullable;
 import java.io.InvalidObjectException;
 import java.io.ObjectStreamException;
 import java.io.Serializable;
-import java.util.Locale;
-import java.util.concurrent.CancellationException;
 import java.util.concurrent.Executor;
 import java.util.concurrent.atomic.AtomicBoolean;
 
@@ -35,11 +33,11 @@ import dm.jale.eventual.Loop;
 import dm.jale.eventual.Loop.YieldOutputs;
 import dm.jale.eventual.Loop.Yielder;
 import dm.jale.eventual.Statement;
-import dm.jale.log.Logger;
 import dm.jale.util.ConstantConditions;
 import dm.jale.util.SerializableProxy;
 
 import static dm.jale.executor.ExecutorPool.immediateExecutor;
+import static dm.jale.executor.ExecutorPool.withErrorBackPropagation;
 import static dm.jale.executor.ExecutorPool.withThrottling;
 
 /**
@@ -51,29 +49,22 @@ class YieldLoopExpression<S, V, R> extends LoopExpression<V, R> implements Seria
 
   private final Executor mExecutor;
 
-  private final Logger mLogger;
-
   private final Yielder<S, ? super V, ? super YieldOutputs<R>> mYielder;
 
   private final YielderOutputs<R> mYielderOutputs = new YielderOutputs<R>();
-
-  private volatile Throwable mFailure;
 
   private boolean mIsInitialized;
 
   private S mStack;
 
-  YieldLoopExpression(@NotNull final Yielder<S, ? super V, ? super YieldOutputs<R>> yielder,
-      @Nullable final String loggerName) {
+  YieldLoopExpression(@NotNull final Yielder<S, ? super V, ? super YieldOutputs<R>> yielder) {
     mYielder = ConstantConditions.notNull("yielder", yielder);
-    mExecutor = withThrottling(1, immediateExecutor());
-    mLogger = Logger.newLogger(this, loggerName, Locale.ENGLISH);
+    mExecutor = withErrorBackPropagation(withThrottling(1, immediateExecutor()));
   }
 
   @Override
   void addFailure(@NotNull final Throwable failure,
       @NotNull final EvaluationCollection<R> evaluation) {
-    checkFailed();
     mExecutor.execute(new YielderRunnable(evaluation) {
 
       @Override
@@ -86,20 +77,17 @@ class YieldLoopExpression<S, V, R> extends LoopExpression<V, R> implements Seria
   @Override
   void addFailures(@Nullable final Iterable<? extends Throwable> failures,
       @NotNull final EvaluationCollection<R> evaluation) {
-    checkFailed();
-    if (failures == null) {
-      return;
-    }
-
     mExecutor.execute(new YielderRunnable(evaluation) {
 
       @Override
       protected void innerRun(@NotNull final YielderOutputs<R> outputs) throws Exception {
-        @SuppressWarnings(
-            "UnnecessaryLocalVariable") final Yielder<S, ? super V, ? super YieldOutputs<R>>
-            yielder = mYielder;
-        for (final Throwable failure : failures) {
-          mStack = yielder.failure(mStack, failure, outputs);
+        if (failures != null) {
+          @SuppressWarnings(
+              "UnnecessaryLocalVariable") final Yielder<S, ? super V, ? super YieldOutputs<R>>
+              yielder = mYielder;
+          for (final Throwable failure : failures) {
+            mStack = yielder.failure(mStack, failure, outputs);
+          }
         }
       }
     });
@@ -107,7 +95,6 @@ class YieldLoopExpression<S, V, R> extends LoopExpression<V, R> implements Seria
 
   @Override
   void addValue(final V value, @NotNull final EvaluationCollection<R> evaluation) {
-    checkFailed();
     mExecutor.execute(new YielderRunnable(evaluation) {
 
       @Override
@@ -120,20 +107,17 @@ class YieldLoopExpression<S, V, R> extends LoopExpression<V, R> implements Seria
   @Override
   void addValues(@Nullable final Iterable<? extends V> values,
       @NotNull final EvaluationCollection<R> evaluation) {
-    checkFailed();
-    if (values == null) {
-      return;
-    }
-
     mExecutor.execute(new YielderRunnable(evaluation) {
 
       @Override
       protected void innerRun(@NotNull final YielderOutputs<R> outputs) throws Exception {
-        @SuppressWarnings(
-            "UnnecessaryLocalVariable") final Yielder<S, ? super V, ? super YieldOutputs<R>>
-            yielder = mYielder;
-        for (final V value : values) {
-          mStack = yielder.value(mStack, value, outputs);
+        if (values != null) {
+          @SuppressWarnings(
+              "UnnecessaryLocalVariable") final Yielder<S, ? super V, ? super YieldOutputs<R>>
+              yielder = mYielder;
+          for (final V value : values) {
+            mStack = yielder.value(mStack, value, outputs);
+          }
         }
       }
     });
@@ -142,12 +126,11 @@ class YieldLoopExpression<S, V, R> extends LoopExpression<V, R> implements Seria
   @NotNull
   @Override
   LoopExpression<V, R> renew() {
-    return new YieldLoopExpression<S, V, R>(mYielder, mLogger.getName());
+    return new YieldLoopExpression<S, V, R>(mYielder);
   }
 
   @Override
   void set(@NotNull final EvaluationCollection<R> evaluation) {
-    checkFailed();
     mExecutor.execute(new YielderRunnable(evaluation) {
 
       @Override
@@ -156,12 +139,6 @@ class YieldLoopExpression<S, V, R> extends LoopExpression<V, R> implements Seria
         outputs.set();
       }
     });
-  }
-
-  private void checkFailed() {
-    if (mFailure != null) {
-      throw FailureException.wrap(mFailure);
-    }
   }
 
   private void failSafe(@NotNull final EvaluationCollection<R> evaluation,
@@ -177,16 +154,15 @@ class YieldLoopExpression<S, V, R> extends LoopExpression<V, R> implements Seria
 
   @NotNull
   private Object writeReplace() throws ObjectStreamException {
-    return new HandlerProxy<S, V, R>(mYielder, mLogger.getName());
+    return new HandlerProxy<S, V, R>(mYielder);
   }
 
   private static class HandlerProxy<S, V, R> extends SerializableProxy {
 
     private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
 
-    private HandlerProxy(final Yielder<S, ? super V, ? super YieldOutputs<R>> yielder,
-        final String loggerName) {
-      super(proxy(yielder), loggerName);
+    private HandlerProxy(final Yielder<S, ? super V, ? super YieldOutputs<R>> yielder) {
+      super(proxy(yielder));
     }
 
     @NotNull
@@ -195,7 +171,7 @@ class YieldLoopExpression<S, V, R> extends LoopExpression<V, R> implements Seria
       try {
         final Object[] args = deserializeArgs();
         return new YieldLoopExpression<S, V, R>(
-            (Yielder<S, ? super V, ? super YieldOutputs<R>>) args[0], (String) args[1]);
+            (Yielder<S, ? super V, ? super YieldOutputs<R>>) args[0]);
 
       } catch (final Throwable t) {
         throw new InvalidObjectException(t.getMessage());
@@ -336,11 +312,6 @@ class YieldLoopExpression<S, V, R> extends LoopExpression<V, R> implements Seria
     public void run() {
       final EvaluationCollection<R> evaluation = mEvaluation;
       try {
-        if (mFailure != null) {
-          mLogger.wrn("Ignoring evaluation");
-          return;
-        }
-
         if (!mIsInitialized) {
           mIsInitialized = true;
           mStack = mYielder.init();
@@ -349,15 +320,9 @@ class YieldLoopExpression<S, V, R> extends LoopExpression<V, R> implements Seria
         innerRun(mYielderOutputs.withEvaluations(evaluation));
         evaluation.set();
 
-      } catch (final CancellationException e) {
-        mLogger.wrn(e, "Loop has been cancelled");
-        mFailure = e;
-        failSafe(evaluation, e);
-
       } catch (final Throwable t) {
-        mLogger.err(t, "Error while completing loop");
-        mFailure = t;
         failSafe(evaluation, t);
+        throw FailureException.wrapIfNot(RuntimeException.class, t);
       }
     }
 

@@ -46,6 +46,8 @@ import dm.jale.util.SerializableProxy;
 import dm.jale.util.TimeUnits;
 import dm.jale.util.TimeUnits.Condition;
 
+import static dm.jale.executor.ExecutorPool.NO_OP;
+
 /**
  * Created by davide-maestroni on 02/09/2018.
  */
@@ -107,7 +109,9 @@ class BackPressureForker<S, V> implements LoopForker<ForkerOutputs<S, V>, V>, Se
 
   static class ForkerOutputs<S, V> implements PendingOutputs<V> {
 
-    private final EvaluationExecutor mExecutor;
+    private final EvaluationExecutor mEvaluationExecutor;
+
+    private final Executor mExecutor;
 
     private final AtomicBoolean mIsSet = new AtomicBoolean(false);
 
@@ -122,7 +126,8 @@ class BackPressureForker<S, V> implements LoopForker<ForkerOutputs<S, V>, V>, Se
     private S mStack;
 
     private ForkerOutputs(@NotNull final EvaluationExecutor executor, final S stack) {
-      mExecutor = executor;
+      mExecutor = ExecutorPool.withErrorBackPropagation(executor);
+      mEvaluationExecutor = executor;
       mStack = stack;
     }
 
@@ -185,12 +190,12 @@ class BackPressureForker<S, V> implements LoopForker<ForkerOutputs<S, V>, V>, Se
     @NotNull
     public YieldOutputs<V> yieldFailure(@NotNull final Throwable failure) {
       checkSet();
-      final EvaluationCollection<V> evaluation = mEvaluation;
       synchronized (mMutex) {
         ++mPendingTasks;
         ++mPendingValues;
       }
 
+      final EvaluationCollection<V> evaluation = mEvaluation;
       mExecutor.execute(new Runnable() {
 
         public void run() {
@@ -209,18 +214,21 @@ class BackPressureForker<S, V> implements LoopForker<ForkerOutputs<S, V>, V>, Se
     @NotNull
     public YieldOutputs<V> yieldFailures(@Nullable final Iterable<Throwable> failures) {
       checkSet();
-      if (failures == null) {
-        return this;
+      final int size;
+      if (failures != null) {
+        ConstantConditions.notNullElements("failures", failures);
+        size = Iterables.size(failures);
+
+      } else {
+        size = 0;
       }
 
-      ConstantConditions.notNullElements("failures", failures);
-      final EvaluationCollection<V> evaluation = mEvaluation;
-      final int size = Iterables.size(failures);
       synchronized (mMutex) {
         ++mPendingTasks;
         mPendingValues += size;
       }
 
+      final EvaluationCollection<V> evaluation = mEvaluation;
       mExecutor.execute(new Runnable() {
 
         public void run() {
@@ -239,13 +247,15 @@ class BackPressureForker<S, V> implements LoopForker<ForkerOutputs<S, V>, V>, Se
     @NotNull
     public YieldOutputs<V> yieldIf(@NotNull final Statement<? extends V> statement) {
       checkSet();
-      final EvaluationCollection<V> evaluation = mEvaluation;
       synchronized (mMutex) {
         ++mPendingTasks;
         ++mPendingValues;
       }
 
-      statement.forkOn(mExecutor).eventuallyDo(new Observer<V>() {
+      final Executor executor = mExecutor;
+      executor.execute(NO_OP);
+      final EvaluationCollection<V> evaluation = mEvaluation;
+      statement.forkOn(executor).eventuallyDo(new Observer<V>() {
 
         public void accept(final V value) throws Exception {
           try {
@@ -275,13 +285,15 @@ class BackPressureForker<S, V> implements LoopForker<ForkerOutputs<S, V>, V>, Se
     public YieldOutputs<V> yieldLoopIf(
         @NotNull final Statement<? extends Iterable<? extends V>> loop) {
       checkSet();
-      final EvaluationCollection<V> evaluation = mEvaluation;
       synchronized (mMutex) {
         ++mPendingTasks;
         ++mPendingValues;
       }
 
-      loop.forkOn(mExecutor).eventuallyDo(new Observer<Iterable<? extends V>>() {
+      final Executor executor = mExecutor;
+      executor.execute(NO_OP);
+      final EvaluationCollection<V> evaluation = mEvaluation;
+      loop.forkOn(executor).eventuallyDo(new Observer<Iterable<? extends V>>() {
 
         public void accept(final Iterable<? extends V> values) throws Exception {
           try {
@@ -310,12 +322,12 @@ class BackPressureForker<S, V> implements LoopForker<ForkerOutputs<S, V>, V>, Se
     @NotNull
     public YieldOutputs<V> yieldValue(final V value) {
       checkSet();
-      final EvaluationCollection<V> evaluation = mEvaluation;
       synchronized (mMutex) {
         ++mPendingTasks;
         ++mPendingValues;
       }
 
+      final EvaluationCollection<V> evaluation = mEvaluation;
       mExecutor.execute(new Runnable() {
 
         public void run() {
@@ -334,17 +346,13 @@ class BackPressureForker<S, V> implements LoopForker<ForkerOutputs<S, V>, V>, Se
     @NotNull
     public YieldOutputs<V> yieldValues(@Nullable final Iterable<V> values) {
       checkSet();
-      if (values == null) {
-        return this;
-      }
-
-      final EvaluationCollection<V> evaluation = mEvaluation;
-      final int size = Iterables.size(values);
+      final int size = (values != null) ? Iterables.size(values) : 0;
       synchronized (mMutex) {
         ++mPendingTasks;
         mPendingValues += size;
       }
 
+      final EvaluationCollection<V> evaluation = mEvaluation;
       mExecutor.execute(new Runnable() {
 
         public void run() {
@@ -361,7 +369,7 @@ class BackPressureForker<S, V> implements LoopForker<ForkerOutputs<S, V>, V>, Se
     }
 
     private void checkOwner() {
-      final EvaluationExecutor executor = mExecutor;
+      final EvaluationExecutor executor = mEvaluationExecutor;
       if (executor.isOwnedThread()) {
         throw new IllegalStateException(
             "cannot wait on executor thread [" + Thread.currentThread() + " " + executor + "]");

@@ -58,7 +58,7 @@ import dm.jale.util.Threads;
 public class Eventual {
 
   // TODO: 17/02/2018 failure back-propagation
-  // TODO: 21/02/2018 jaf
+  // TODO: 21/02/2018 jaf, fates
 
   private final Executor mExecutor;
 

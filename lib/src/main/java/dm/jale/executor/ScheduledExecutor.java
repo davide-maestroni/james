@@ -51,12 +51,12 @@ public interface ScheduledExecutor extends StoppableExecutor {
    * Executes the specified command (that is, it calls the {@link Runnable#run()} method inside
    * the executor thread) after the specified delay.
    *
-   * @param runnable the command.
+   * @param command  the command.
    * @param delay    the command delay.
    * @param timeUnit the delay time unit.
    * @throws java.util.concurrent.RejectedExecutionException it the executor is currently unable to
    *                                                         fulfill the command (for instance,
    *                                                         after being stopped).
    */
-  void execute(@NotNull Runnable runnable, long delay, @NotNull TimeUnit timeUnit);
+  void execute(@NotNull Runnable command, long delay, @NotNull TimeUnit timeUnit);
 }

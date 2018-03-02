@@ -92,13 +92,13 @@ class NoDelayExecutor extends ScheduledExecutorDecorator implements Serializable
   }
 
   @Override
-  public void execute(@NotNull final Runnable runnable, final long delay,
+  public void execute(@NotNull final Runnable command, final long delay,
       @NotNull final TimeUnit timeUnit) {
     if (delay == 0) {
-      execute(runnable);
+      execute(command);
 
     } else {
-      super.execute(runnable, delay, timeUnit);
+      super.execute(command, delay, timeUnit);
     }
   }
 

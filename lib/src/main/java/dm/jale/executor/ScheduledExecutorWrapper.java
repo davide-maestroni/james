@@ -37,7 +37,7 @@ class ScheduledExecutorWrapper implements ScheduledExecutor, ExecutorDecorator, 
     mExecutor = ConstantConditions.notNull("executor", executor);
   }
 
-  public void execute(@NotNull final Runnable runnable, final long delay,
+  public void execute(@NotNull final Runnable command, final long delay,
       @NotNull final TimeUnit timeUnit) {
     ConstantConditions.unsupported();
   }

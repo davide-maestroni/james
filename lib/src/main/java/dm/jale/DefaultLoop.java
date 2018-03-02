@@ -55,6 +55,7 @@ import dm.jale.eventual.SimpleState;
 import dm.jale.eventual.Statement;
 import dm.jale.eventual.Updater;
 import dm.jale.executor.ExecutorPool;
+import dm.jale.executor.FailingRunnable;
 import dm.jale.log.Logger;
 import dm.jale.util.ConstantConditions;
 import dm.jale.util.DoubleQueue;
@@ -63,7 +64,9 @@ import dm.jale.util.SerializableProxy;
 import dm.jale.util.TimeUnits;
 import dm.jale.util.TimeUnits.Condition;
 
+import static dm.jale.executor.ExecutorPool.NO_OP;
 import static dm.jale.executor.ExecutorPool.loopExecutor;
+import static dm.jale.executor.ExecutorPool.withErrorBackPropagation;
 import static dm.jale.executor.ExecutorPool.withThrottling;
 
 /**
@@ -541,7 +544,7 @@ class DefaultLoop<V> implements Loop<V>, Serializable {
 
   @NotNull
   public Loop<V> forkOn(@NotNull final Executor executor) {
-    return forkLoop(new ExecutorLoopForker<V>(withThrottling(1, executor), mLogger.getName()));
+    return forkLoop(new ExecutorLoopForker<V>(withThrottling(1, executor)));
   }
 
   @NotNull
@@ -724,20 +727,18 @@ class DefaultLoop<V> implements Loop<V>, Serializable {
   public Loop<V> forkOn(@NotNull final Executor executor, final int maxValues,
       final int maxFailures) {
     return forkLoop(
-        new ExecutorLoopBatchForker<V>(withThrottling(1, executor), maxValues, maxFailures,
-            mLogger.getName()));
+        new ExecutorLoopBatchForker<V>(withThrottling(1, executor), maxValues, maxFailures));
   }
 
   @NotNull
   public Loop<V> forkOnParallel(@NotNull final Executor executor, final int maxValues,
       final int maxFailures) {
-    return forkLoop(
-        new ExecutorLoopBatchForker<V>(executor, maxValues, maxFailures, mLogger.getName()));
+    return forkLoop(new ExecutorLoopBatchForker<V>(executor, maxValues, maxFailures));
   }
 
   @NotNull
   public Loop<V> forkOnParallel(@NotNull final Executor executor) {
-    return forkLoop(new ExecutorLoopForker<V>(executor, mLogger.getName()));
+    return forkLoop(new ExecutorLoopForker<V>(executor));
   }
 
   @NotNull
@@ -857,7 +858,7 @@ class DefaultLoop<V> implements Loop<V>, Serializable {
   @NotNull
   public <S, R> Loop<R> yield(
       @NotNull final Yielder<S, ? super V, ? super YieldOutputs<R>> yielder) {
-    return propagate(new YieldLoopExpression<S, V, R>(yielder, mLogger.getName()));
+    return propagate(new YieldLoopExpression<S, V, R>(yielder));
   }
 
   @NotNull
@@ -872,7 +873,7 @@ class DefaultLoop<V> implements Loop<V>, Serializable {
   @NotNull
   public <S, R> Loop<R> yieldOrdered(
       @NotNull final Yielder<S, ? super V, ? super YieldOutputs<R>> yielder) {
-    return propagateOrdered(new YieldLoopExpression<S, V, R>(yielder, mLogger.getName()));
+    return propagateOrdered(new YieldLoopExpression<S, V, R>(yielder));
   }
 
   @NotNull
@@ -1106,7 +1107,7 @@ class DefaultLoop<V> implements Loop<V>, Serializable {
 
     private final Forker<S, V, EvaluationCollection<V>, Loop<V>> mForker;
 
-    private volatile Throwable mFailure;
+    private final Executor mThrottlingExecutor;
 
     private DefaultLoop<V> mLoop;
 
@@ -1119,7 +1120,8 @@ class DefaultLoop<V> implements Loop<V>, Serializable {
       mForker =
           (Forker<S, V, EvaluationCollection<V>, Loop<V>>) ConstantConditions.notNull("forker",
               forker);
-      mExecutor = withThrottling(1, loopExecutor());
+      mThrottlingExecutor = withThrottling(1, loopExecutor());
+      mExecutor = withErrorBackPropagation(mThrottlingExecutor);
       mLoop = loop;
     }
 
@@ -1137,7 +1139,7 @@ class DefaultLoop<V> implements Loop<V>, Serializable {
             }
 
           } catch (final Throwable t) {
-            mFailure = t;
+            throw FailureException.wrapIfNot(RuntimeException.class, t);
           }
         }
       });
@@ -1146,22 +1148,15 @@ class DefaultLoop<V> implements Loop<V>, Serializable {
     @Override
     void addFailure(@NotNull final Throwable failure,
         @NotNull final EvaluationCollection<V> evaluation) {
-      checkFailed();
       mExecutor.execute(new Runnable() {
 
         public void run() {
-          final DefaultLoop<V> loop = mLoop;
-          if (mFailure != null) {
-            loop.mLogger.wrn("Ignoring failure: %s", failure);
-            return;
-          }
-
           try {
-            mStack = mForker.failure(mStack, failure, loop);
+            mStack = mForker.failure(mStack, failure, mLoop);
 
           } catch (final Throwable t) {
-            mFailure = t;
             clearEvaluations(t);
+            throw FailureException.wrapIfNot(RuntimeException.class, t);
           }
         }
       });
@@ -1170,18 +1165,12 @@ class DefaultLoop<V> implements Loop<V>, Serializable {
     @Override
     void addFailures(@Nullable final Iterable<? extends Throwable> failures,
         @NotNull final EvaluationCollection<V> evaluation) {
-      checkFailed();
       mExecutor.execute(new Runnable() {
 
         public void run() {
-          final DefaultLoop<V> loop = mLoop;
-          if (mFailure != null) {
-            loop.mLogger.wrn("Ignoring failures: %s", Iterables.toString(failures));
-            return;
-          }
-
           if (failures != null) {
             try {
+              final DefaultLoop<V> loop = mLoop;
               @SuppressWarnings(
                   "UnnecessaryLocalVariable") final Forker<S, V, EvaluationCollection<V>, Loop<V>>
                   forker = mForker;
@@ -1190,8 +1179,8 @@ class DefaultLoop<V> implements Loop<V>, Serializable {
               }
 
             } catch (final Throwable t) {
-              mFailure = t;
               clearEvaluations(t);
+              throw FailureException.wrapIfNot(RuntimeException.class, t);
             }
           }
         }
@@ -1200,22 +1189,15 @@ class DefaultLoop<V> implements Loop<V>, Serializable {
 
     @Override
     void addValue(final V value, @NotNull final EvaluationCollection<V> evaluation) {
-      checkFailed();
       mExecutor.execute(new Runnable() {
 
         public void run() {
-          final DefaultLoop<V> loop = mLoop;
-          if (mFailure != null) {
-            loop.mLogger.wrn("Ignoring value: %s", value);
-            return;
-          }
-
           try {
-            mStack = mForker.value(mStack, value, loop);
+            mStack = mForker.value(mStack, value, mLoop);
 
           } catch (final Throwable t) {
-            mFailure = t;
             clearEvaluations(t);
+            throw FailureException.wrapIfNot(RuntimeException.class, t);
           }
         }
       });
@@ -1224,18 +1206,12 @@ class DefaultLoop<V> implements Loop<V>, Serializable {
     @Override
     void addValues(@Nullable final Iterable<? extends V> values,
         @NotNull final EvaluationCollection<V> evaluation) {
-      checkFailed();
       mExecutor.execute(new Runnable() {
 
         public void run() {
-          final DefaultLoop<V> loop = mLoop;
-          if (mFailure != null) {
-            loop.mLogger.wrn("Ignoring values: %s", Iterables.toString(values));
-            return;
-          }
-
           if (values != null) {
             try {
+              final DefaultLoop<V> loop = mLoop;
               @SuppressWarnings(
                   "UnnecessaryLocalVariable") final Forker<S, V, EvaluationCollection<V>, Loop<V>>
                   forker = mForker;
@@ -1244,8 +1220,8 @@ class DefaultLoop<V> implements Loop<V>, Serializable {
               }
 
             } catch (final Throwable t) {
-              mFailure = t;
               clearEvaluations(t);
+              throw FailureException.wrapIfNot(RuntimeException.class, t);
             }
           }
         }
@@ -1259,22 +1235,15 @@ class DefaultLoop<V> implements Loop<V>, Serializable {
 
     @Override
     void set(@NotNull final EvaluationCollection<V> evaluation) {
-      checkFailed();
       mExecutor.execute(new Runnable() {
 
         public void run() {
-          final DefaultLoop<V> loop = mLoop;
-          if (mFailure != null) {
-            loop.mLogger.wrn("Ignoring completion");
-            return;
-          }
-
           try {
-            mStack = mForker.done(mStack, loop);
+            mStack = mForker.done(mStack, mLoop);
 
           } catch (final Throwable t) {
-            mFailure = t;
             clearEvaluations(t);
+            throw FailureException.wrapIfNot(RuntimeException.class, t);
           }
         }
       });
@@ -1290,41 +1259,32 @@ class DefaultLoop<V> implements Loop<V>, Serializable {
     }
 
     void propagate(final EvaluationCollection<V> evaluation) {
-      mExecutor.execute(new Runnable() {
+      mExecutor.execute(new FailingRunnable() {
+
+        public void fail(@NotNull final Throwable error) {
+          Eventuals.failSafe(evaluation, error);
+        }
 
         public void run() {
-          final Throwable failure = mFailure;
-          if (failure != null) {
-            Eventuals.failSafe(evaluation, failure);
-            return;
-          }
-
           mEvaluations.add(evaluation);
           try {
             mStack = mForker.evaluation(mStack, evaluation, mLoop);
 
           } catch (final Throwable t) {
-            mFailure = t;
             clearEvaluations(t);
+            throw FailureException.wrapIfNot(RuntimeException.class, t);
           }
         }
       });
     }
 
     void stopPropagation(final EvaluationCollection<V> evaluation) {
-      mExecutor.execute(new Runnable() {
+      mThrottlingExecutor.execute(new Runnable() {
 
         public void run() {
           mEvaluations.remove(evaluation);
         }
       });
-    }
-
-    private void checkFailed() {
-      final Throwable failure = mFailure;
-      if (failure != null) {
-        throw FailureException.wrap(failure);
-      }
     }
 
     private void clearEvaluations(@NotNull final Throwable failure) {
@@ -1366,12 +1326,6 @@ class DefaultLoop<V> implements Loop<V>, Serializable {
   }
 
   private static abstract class LoopPropagation<V, R> implements EvaluationCollection<V> {
-
-    private static final Runnable NO_OP = new Runnable() {
-
-      public void run() {
-      }
-    };
 
     private final Object mMutex = new Object();
 

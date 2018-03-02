@@ -39,6 +39,11 @@ import dm.jale.util.WeakIdentityHashMap;
 public class ExecutorPool {
 
   // TODO: 14/02/2018 ExecutorPool.withBackoff()?
+  public static final Runnable NO_OP = new Runnable() {
+
+    public void run() {
+    }
+  };
 
   private static final Object sMutex = new Object();
 
@@ -270,6 +275,17 @@ public class ExecutorPool {
     return DelayedExecutor.of(executor, delay, timeUnit);
   }
 
+  @NotNull
+  public static ScheduledExecutor withErrorBackPropagation(
+      @NotNull final ScheduledExecutor executor) {
+    return new BackPropagationErrorExecutor(executor);
+  }
+
+  @NotNull
+  public static Executor withErrorBackPropagation(@NotNull final Executor executor) {
+    return withErrorBackPropagation(new ScheduledExecutorWrapper(asOwner(executor)));
+  }
+
   /**
    * Returns an executor employing a synchronous one when executions are enqueued with a 0 delay on
    * one of the managed threads.
@@ -284,7 +300,7 @@ public class ExecutorPool {
 
   @NotNull
   public static Executor withNoDelay(@NotNull final Executor executor) {
-    return NoDelayExecutor.of(new ScheduledExecutorWrapper(asOwner(executor)));
+    return withNoDelay(new ScheduledExecutorWrapper(asOwner(executor)));
   }
 
   /**
@@ -313,7 +329,7 @@ public class ExecutorPool {
 
   @NotNull
   public static Executor withPriority(final int priority, @NotNull final Executor executor) {
-    return PriorityExecutor.of(new ScheduledExecutorWrapper(asOwner(executor)), priority);
+    return withPriority(priority, new ScheduledExecutorWrapper(asOwner(executor)));
   }
 
   /**
@@ -337,7 +353,7 @@ public class ExecutorPool {
 
   @NotNull
   public static Executor withThrottling(final int maxExecutions, @NotNull final Executor executor) {
-    return ThrottlingExecutor.of(new ScheduledExecutorWrapper(asOwner(executor)), maxExecutions);
+    return withThrottling(maxExecutions, new ScheduledExecutorWrapper(asOwner(executor)));
   }
 
   @NotNull

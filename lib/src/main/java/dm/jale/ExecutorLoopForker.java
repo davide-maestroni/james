@@ -17,13 +17,10 @@
 package dm.jale;
 
 import org.jetbrains.annotations.NotNull;
-import org.jetbrains.annotations.Nullable;
 
 import java.io.InvalidObjectException;
 import java.io.ObjectStreamException;
 import java.io.Serializable;
-import java.util.Locale;
-import java.util.concurrent.CancellationException;
 import java.util.concurrent.Executor;
 import java.util.concurrent.atomic.AtomicLong;
 
@@ -35,7 +32,8 @@ import dm.jale.eventual.Loop;
 import dm.jale.eventual.LoopForker;
 import dm.jale.executor.EvaluationExecutor;
 import dm.jale.executor.ExecutorPool;
-import dm.jale.log.Logger;
+
+import static dm.jale.executor.ExecutorPool.withErrorBackPropagation;
 
 /**
  * Created by davide-maestroni on 02/12/2018.
@@ -44,17 +42,25 @@ class ExecutorLoopForker<V> extends BufferedForker<Stack<V>, V, EvaluationCollec
 
   private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
 
-  ExecutorLoopForker(@NotNull final Executor executor, @Nullable final String loggerName) {
-    super(new InnerForker<V>(executor, loggerName));
+  ExecutorLoopForker(@NotNull final Executor executor) {
+    super(new InnerForker<V>(executor));
   }
 
-  static class Stack<V> {
+  static class Stack<V> implements Executor {
+
+    private final Executor mExecutor;
 
     private final AtomicLong pendingCount = new AtomicLong(1);
 
     private EvaluationCollection<V> evaluation;
 
-    private volatile Throwable failure;
+    private Stack(@NotNull final EvaluationExecutor executor) {
+      mExecutor = withErrorBackPropagation(executor);
+    }
+
+    public void execute(@NotNull final Runnable runnable) {
+      mExecutor.execute(runnable);
+    }
   }
 
   private static class InnerForker<V> implements LoopForker<Stack<V>, V>, Serializable {
@@ -63,23 +69,12 @@ class ExecutorLoopForker<V> extends BufferedForker<Stack<V>, V, EvaluationCollec
 
     private final EvaluationExecutor mExecutor;
 
-    private final Logger mLogger;
-
-    private InnerForker(@NotNull final Executor executor, @Nullable final String loggerName) {
+    private InnerForker(@NotNull final Executor executor) {
       mExecutor = ExecutorPool.register(executor);
-      mLogger = Logger.newLogger(this, loggerName, Locale.ENGLISH);
-    }
-
-    private static void checkFailed(@NotNull final Stack<?> stack) {
-      final Throwable failure = stack.failure;
-      if (failure != null) {
-        throw FailureException.wrap(failure);
-      }
     }
 
     public Stack<V> done(final Stack<V> stack, @NotNull final Loop<V> context) {
-      checkFailed(stack);
-      mExecutor.execute(new ForkerRunnable(stack) {
+      stack.execute(new ForkerRunnable(stack) {
 
         protected void innerRun(@NotNull final EvaluationCollection<V> evaluation) {
         }
@@ -89,7 +84,6 @@ class ExecutorLoopForker<V> extends BufferedForker<Stack<V>, V, EvaluationCollec
 
     public Stack<V> evaluation(final Stack<V> stack,
         @NotNull final EvaluationCollection<V> evaluation, @NotNull final Loop<V> context) {
-      checkFailed(stack);
       if (stack.evaluation == null) {
         stack.evaluation = evaluation;
 
@@ -103,9 +97,8 @@ class ExecutorLoopForker<V> extends BufferedForker<Stack<V>, V, EvaluationCollec
 
     public Stack<V> failure(final Stack<V> stack, @NotNull final Throwable failure,
         @NotNull final Loop<V> context) {
-      checkFailed(stack);
       stack.pendingCount.incrementAndGet();
-      mExecutor.execute(new ForkerRunnable(stack) {
+      stack.execute(new ForkerRunnable(stack) {
 
         protected void innerRun(@NotNull final EvaluationCollection<V> evaluation) {
           evaluation.addFailure(failure);
@@ -115,14 +108,13 @@ class ExecutorLoopForker<V> extends BufferedForker<Stack<V>, V, EvaluationCollec
     }
 
     public Stack<V> init(@NotNull final Loop<V> context) throws Exception {
-      return new Stack<V>();
+      return new Stack<V>(mExecutor);
     }
 
     public Stack<V> value(final Stack<V> stack, final V value,
         @NotNull final Loop<V> context) throws Exception {
-      checkFailed(stack);
       stack.pendingCount.incrementAndGet();
-      mExecutor.execute(new ForkerRunnable(stack) {
+      stack.execute(new ForkerRunnable(stack) {
 
         protected void innerRun(@NotNull final EvaluationCollection<V> evaluation) {
           evaluation.addValue(value);
@@ -133,7 +125,7 @@ class ExecutorLoopForker<V> extends BufferedForker<Stack<V>, V, EvaluationCollec
 
     @NotNull
     private Object writeReplace() throws ObjectStreamException {
-      return new ForkerProxy<V>(mExecutor, mLogger.getName());
+      return new ForkerProxy<V>(mExecutor);
     }
 
     private static class ForkerProxy<V> implements Serializable {
@@ -142,17 +134,14 @@ class ExecutorLoopForker<V> extends BufferedForker<Stack<V>, V, EvaluationCollec
 
       private final Executor mExecutor;
 
-      private final String mLoggerName;
-
-      private ForkerProxy(final Executor executor, final String loggerName) {
+      private ForkerProxy(final Executor executor) {
         mExecutor = executor;
-        mLoggerName = loggerName;
       }
 
       @NotNull
       private Object readResolve() throws ObjectStreamException {
         try {
-          return new ExecutorLoopForker<V>(mExecutor, mLoggerName);
+          return new ExecutorLoopForker<V>(mExecutor);
 
         } catch (final Throwable t) {
           throw new InvalidObjectException(t.getMessage());
@@ -172,23 +161,13 @@ class ExecutorLoopForker<V> extends BufferedForker<Stack<V>, V, EvaluationCollec
         final Stack<V> stack = mStack;
         final EvaluationCollection<V> evaluation = stack.evaluation;
         try {
-          if (stack.failure != null) {
-            mLogger.wrn("Ignoring evaluation");
-            return;
-          }
-
           innerRun(evaluation);
           if (stack.pendingCount.decrementAndGet() == 0) {
             evaluation.set();
           }
 
-        } catch (final CancellationException e) {
-          mLogger.wrn(e, "Loop has been cancelled");
-          stack.failure = e;
-
         } catch (final Throwable t) {
-          mLogger.err(t, "Loop has failed");
-          stack.failure = t;
+          throw FailureException.wrapIfNot(RuntimeException.class, t);
         }
       }
 
