@@ -18,6 +18,7 @@ package dm.jale.ext.backoff;
 
 import org.jetbrains.annotations.NotNull;
 
+import java.io.ObjectStreamException;
 import java.util.concurrent.TimeUnit;
 
 import dm.jale.util.ConstantConditions;
@@ -33,53 +34,67 @@ public class BackoffPool {
 
   @NotNull
   public static Backoff constant(final long delay, @NotNull final TimeUnit timeUnit) {
-    return null;
+    return new ConstantBackoff(delay, timeUnit);
   }
 
   @NotNull
-  public static Backoff decorrelatedJitter(final long delay, @NotNull final TimeUnit timeUnit) {
-    return null;
+  public static Backoff decorrelatedJitter(final long baseDelay, @NotNull final TimeUnit timeUnit) {
+    return new DecorrelatedJitterBackoff(baseDelay, timeUnit);
   }
 
   @NotNull
-  public static Backoff exponential(final long delay, @NotNull final TimeUnit timeUnit) {
-    return null;
+  public static Backoff exponential(final long baseDelay, @NotNull final TimeUnit timeUnit) {
+    return new ExponentialBackoff(baseDelay, timeUnit);
   }
 
   @NotNull
-  public static Backoff linear(final long delay, @NotNull final TimeUnit timeUnit) {
-    return null;
+  public static Backoff linear(final long baseDelay, @NotNull final TimeUnit timeUnit) {
+    return new LinearBackoff(baseDelay, timeUnit);
   }
 
   @NotNull
   public static Backoff none() {
-    return null;
+    return NoBackoff.sInstance;
   }
 
   @NotNull
   public static Backoff sum(@NotNull final Backoff first, @NotNull final Backoff second) {
-    return null;
+    return new SumBackoff(first, second);
   }
 
   @NotNull
-  public static Backoff withCap(final long offset, @NotNull final TimeUnit timeUnit,
+  public static Backoff withCap(final long cap, @NotNull final TimeUnit timeUnit,
       @NotNull final Backoff backoff) {
-    return null;
+    return new CappedBackoff(cap, timeUnit, backoff);
   }
 
   @NotNull
   public static Backoff withCountOffset(final int offset, @NotNull final Backoff backoff) {
-    return null;
+    return new CountOffsetBackoff(offset, backoff);
   }
 
   @NotNull
   public static Backoff withJitter(final float percentage, @NotNull final Backoff backoff) {
-    return null;
+    return new JitteredBackoff(percentage, backoff);
   }
 
   @NotNull
   public static Backoff withTimeOffset(final long offset, @NotNull final TimeUnit timeUnit,
       @NotNull final Backoff backoff) {
-    return null;
+    return new TimeOffsetBackoff(offset, timeUnit, backoff);
+  }
+
+  private static class NoBackoff extends ConstantBackoff {
+
+    private static final NoBackoff sInstance = new NoBackoff();
+
+    NoBackoff() {
+      super(0, TimeUnit.MILLISECONDS);
+    }
+
+    @NotNull
+    private Object readResolve() throws ObjectStreamException {
+      return sInstance;
+    }
   }
 }
