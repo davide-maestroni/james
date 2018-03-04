@@ -35,6 +35,6 @@ class LinearBackoff implements Backoff, Serializable {
   }
 
   public long apply(final int count, final long lastDelay) {
-    return mDelayMillis * (count + 1);
+    return mDelayMillis * count;
   }
 }

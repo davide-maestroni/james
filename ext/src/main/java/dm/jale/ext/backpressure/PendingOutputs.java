@@ -27,13 +27,9 @@ import dm.jale.eventual.Loop.YieldOutputs;
  */
 public interface PendingOutputs<V> extends YieldOutputs<V> {
 
-  int pendingTasks();
-
-  long pendingValues();
+  int pendingCount();
 
   void wait(long timeout, @NotNull TimeUnit timeUnit);
 
-  boolean waitTasks(int maxCount, long timeout, @NotNull TimeUnit timeUnit);
-
-  boolean waitValues(long maxCount, long timeout, @NotNull TimeUnit timeUnit);
+  boolean wait(int maxCount, long timeout, @NotNull TimeUnit timeUnit);
 }

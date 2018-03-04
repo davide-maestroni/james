@@ -17,6 +17,7 @@
 package dm.jale.ext.yielder;
 
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 
 import java.io.InvalidObjectException;
 import java.io.ObjectStreamException;
@@ -24,6 +25,7 @@ import java.io.Serializable;
 
 import dm.jale.eventual.Loop.YieldOutputs;
 import dm.jale.eventual.LoopYielder;
+import dm.jale.eventual.Provider;
 import dm.jale.ext.config.BuildConfig;
 import dm.jale.ext.eventual.BiMapper;
 import dm.jale.ext.yielder.AccumulateYielder.YielderStack;
@@ -33,62 +35,64 @@ import dm.jale.util.SerializableProxy;
 /**
  * Created by davide-maestroni on 02/26/2018.
  */
-class AccumulateYielder<V> implements LoopYielder<YielderStack<V>, V, V>, Serializable {
+class AccumulateYielder<V, R> implements LoopYielder<YielderStack<R>, V, R>, Serializable {
 
   private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
 
-  private final BiMapper<? super V, ? super V, ? extends V> mAccumulator;
+  private final BiMapper<? super R, ? super V, ? extends R> mAccumulator;
 
-  private final boolean mHasInitial;
+  private final boolean mHasInit;
 
-  private final V mInitialValue;
+  private final Provider<R> mInit;
 
+  @SuppressWarnings("unchecked")
   AccumulateYielder(@NotNull final BiMapper<? super V, ? super V, ? extends V> accumulator) {
-    this(false, null, accumulator);
+    this(false, null, (BiMapper<? super R, ? super V, ? extends R>) accumulator);
   }
 
-  AccumulateYielder(final V initialValue,
-      @NotNull final BiMapper<? super V, ? super V, ? extends V> accumulator) {
-    this(true, initialValue, accumulator);
+  AccumulateYielder(@NotNull final Provider<R> init,
+      @NotNull final BiMapper<? super R, ? super V, ? extends R> accumulator) {
+    this(true, ConstantConditions.notNull("init", init), accumulator);
   }
 
-  private AccumulateYielder(final boolean hasInitial, final V initialValue,
-      @NotNull final BiMapper<? super V, ? super V, ? extends V> accumulator) {
+  private AccumulateYielder(final boolean hasInit, @Nullable final Provider<R> init,
+      @NotNull final BiMapper<? super R, ? super V, ? extends R> accumulator) {
     mAccumulator = ConstantConditions.notNull("accumulator", accumulator);
-    mInitialValue = initialValue;
-    mHasInitial = hasInitial;
+    mInit = init;
+    mHasInit = hasInit;
   }
 
-  public void done(final YielderStack<V> stack, @NotNull final YieldOutputs<V> outputs) {
+  public void done(final YielderStack<R> stack, @NotNull final YieldOutputs<R> outputs) {
     if (stack != null) {
       outputs.yieldValue(stack.accumulated);
     }
   }
 
-  public YielderStack<V> failure(final YielderStack<V> stack, @NotNull final Throwable failure,
-      @NotNull final YieldOutputs<V> outputs) {
+  public YielderStack<R> failure(final YielderStack<R> stack, @NotNull final Throwable failure,
+      @NotNull final YieldOutputs<R> outputs) {
     outputs.yieldFailure(failure);
     return null;
   }
 
-  public YielderStack<V> init() {
-    final YielderStack<V> stack = new YielderStack<V>();
-    if (mHasInitial) {
-      stack.accumulated = mInitialValue;
+  public YielderStack<R> init() throws Exception {
+    final YielderStack<R> stack = new YielderStack<R>();
+    if (mHasInit) {
+      stack.accumulated = mInit.get();
       stack.isAccumulated = true;
     }
 
     return stack;
   }
 
-  public boolean loop(final YielderStack<V> stack) {
+  public boolean loop(final YielderStack<R> stack) {
     return (stack != null);
   }
 
-  public YielderStack<V> value(final YielderStack<V> stack, final V value,
-      @NotNull final YieldOutputs<V> outputs) throws Exception {
+  @SuppressWarnings("unchecked")
+  public YielderStack<R> value(final YielderStack<R> stack, final V value,
+      @NotNull final YieldOutputs<R> outputs) throws Exception {
     if (!stack.isAccumulated) {
-      stack.accumulated = value;
+      stack.accumulated = (R) value;
       stack.isAccumulated = true;
 
     } else {
@@ -100,23 +104,23 @@ class AccumulateYielder<V> implements LoopYielder<YielderStack<V>, V, V>, Serial
 
   @NotNull
   private Object writeReplace() throws ObjectStreamException {
-    return new YielderProxy<V>(mHasInitial, mInitialValue, mAccumulator);
+    return new YielderProxy<V, R>(mHasInit, mInit, mAccumulator);
   }
 
-  static class YielderStack<V> {
+  static class YielderStack<R> {
 
-    private V accumulated;
+    private R accumulated;
 
     private boolean isAccumulated;
   }
 
-  private static class YielderProxy<V> extends SerializableProxy {
+  private static class YielderProxy<V, R> extends SerializableProxy {
 
     private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
 
-    private YielderProxy(final boolean hasInitial, final V initialValue,
-        @NotNull final BiMapper<? super V, ? super V, ? extends V> accumulator) {
-      super(hasInitial, initialValue, proxy(accumulator));
+    private YielderProxy(final boolean hasInit, final Provider<R> initialValue,
+        final BiMapper<? super R, ? super V, ? extends R> accumulator) {
+      super(hasInit, proxy(initialValue), proxy(accumulator));
     }
 
     @NotNull
@@ -124,8 +128,8 @@ class AccumulateYielder<V> implements LoopYielder<YielderStack<V>, V, V>, Serial
     private Object readResolve() throws ObjectStreamException {
       try {
         final Object[] args = deserializeArgs();
-        return new AccumulateYielder<V>((Boolean) args[0], (V) args[1],
-            (BiMapper<? super V, ? super V, ? extends V>) args[2]);
+        return new AccumulateYielder<V, R>((Boolean) args[0], (Provider<R>) args[1],
+            (BiMapper<? super R, ? super V, ? extends R>) args[2]);
 
       } catch (final Throwable t) {
         throw new InvalidObjectException(t.getMessage());

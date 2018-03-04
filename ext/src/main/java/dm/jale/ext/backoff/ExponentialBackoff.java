@@ -35,6 +35,6 @@ class ExponentialBackoff implements Backoff, Serializable {
   }
 
   public long apply(final int count, final long lastDelay) {
-    return mDelayMillis * (1 << count);
+    return (count > 0) ? mDelayMillis * (1 << (count - 1)) : 0;
   }
 }

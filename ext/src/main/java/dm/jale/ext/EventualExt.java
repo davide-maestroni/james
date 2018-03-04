@@ -73,10 +73,11 @@ import static dm.jale.executor.ExecutorPool.withThrottling;
 public class EventualExt extends Eventual {
 
   // TODO: 26/02/2018 Mappers: fallbackStatement()?
-  // TODO: 21/02/2018 Yielders: throttle(), throttleValues(), debounce(), groupBy()?
+  // TODO: 21/02/2018 Yielders: replace(), match(), count(), throttle(),
+  // throttleValues(), debounce(), groupBy()?
   // TODO: 21/02/2018 Joiners:
-  // TODO: 16/02/2018 Forkers:
-  // TODO: 20/02/2018 (BackPressure): dropFirst, dropLast, wait(backoff?)
+  // TODO: 16/02/2018 Forkers: retry(Backoff)
+  // TODO: 20/02/2018 (BackPressure): withBackPressure(Backoff, Executor)
 
   private final Eventual mEventual;
 
@@ -95,8 +96,8 @@ public class EventualExt extends Eventual {
   }
 
   @NotNull
-  public static <V> LoopYielder<?, V, V> accumulate(final V initialValue,
-      @NotNull final BiMapper<? super V, ? super V, ? extends V> accumulator) {
+  public static <V, R> LoopYielder<?, V, R> accumulate(@NotNull final Provider<R> initialValue,
+      @NotNull final BiMapper<? super R, ? super V, ? extends R> accumulator) {
     return EventualYielders.accumulate(initialValue, accumulator);
   }
 
@@ -138,6 +139,12 @@ public class EventualExt extends Eventual {
   @NotNull
   public static <V> LoopYielder<?, V, V> distinct() {
     return EventualYielders.distinct();
+  }
+
+  @NotNull
+  public static <V> LoopYielder<?, V, V> distinctBy(
+      @NotNull final Comparator<? super V> comparator) {
+    return EventualYielders.distinctBy(comparator);
   }
 
   @NotNull
@@ -406,19 +413,21 @@ public class EventualExt extends Eventual {
   }
 
   @NotNull
-  public static <S, V> LoopForker<?, V> withBackPressure(@NotNull final Executor executor,
-      @NotNull final Yielder<S, V, ? super PendingOutputs<V>> yielder) {
-    return EventualForkers.withBackPressure(executor, yielder);
+  public static <S, V> LoopForker<?, V> withBackPressure(
+      @NotNull final Yielder<S, V, ? super PendingOutputs<V>> yielder,
+      @NotNull final Executor executor) {
+    return EventualForkers.withBackPressure(yielder, executor);
   }
 
   @NotNull
-  public static <S, V> LoopForker<?, V> withBackPressure(@NotNull final Executor executor,
-      @Nullable final Provider<S> init, @Nullable final Mapper<S, ? extends Boolean> loop,
+  public static <S, V> LoopForker<?, V> withBackPressure(@Nullable final Provider<S> init,
+      @Nullable final Mapper<S, ? extends Boolean> loop,
       @Nullable final Updater<S, ? super V, ? super PendingOutputs<V>> value,
       @Nullable final Updater<S, ? super Throwable, ? super PendingOutputs<V>> failure,
-      @Nullable final Settler<S, ? super PendingOutputs<V>> done) {
-    return EventualForkers.withBackPressure(executor,
-        Eventual.yielder(init, loop, value, failure, done));
+      @Nullable final Settler<S, ? super PendingOutputs<V>> done,
+      @NotNull final Executor executor) {
+    return EventualForkers.withBackPressure(Eventual.yielder(init, loop, value, failure, done),
+        executor);
   }
 
   @NotNull

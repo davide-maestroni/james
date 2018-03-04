@@ -41,7 +41,6 @@ import dm.jale.ext.backpressure.PendingOutputs;
 import dm.jale.ext.config.BuildConfig;
 import dm.jale.ext.forker.BackPressureForker.ForkerOutputs;
 import dm.jale.util.ConstantConditions;
-import dm.jale.util.Iterables;
 import dm.jale.util.SerializableProxy;
 import dm.jale.util.TimeUnits;
 import dm.jale.util.TimeUnits.Condition;
@@ -119,9 +118,7 @@ class BackPressureForker<S, V> implements LoopForker<ForkerOutputs<S, V>, V>, Se
 
     private EvaluationCollection<V> mEvaluation;
 
-    private int mPendingTasks = 1;
-
-    private long mPendingValues;
+    private int mPendingCount = 1;
 
     private S mStack;
 
@@ -131,15 +128,9 @@ class BackPressureForker<S, V> implements LoopForker<ForkerOutputs<S, V>, V>, Se
       mStack = stack;
     }
 
-    public int pendingTasks() {
+    public int pendingCount() {
       synchronized (mMutex) {
-        return mPendingTasks - 1;
-      }
-    }
-
-    public long pendingValues() {
-      synchronized (mMutex) {
-        return mPendingValues;
+        return mPendingCount - 1;
       }
     }
 
@@ -153,32 +144,14 @@ class BackPressureForker<S, V> implements LoopForker<ForkerOutputs<S, V>, V>, Se
       }
     }
 
-    public boolean waitTasks(final int maxCount, final long timeout,
-        @NotNull final TimeUnit timeUnit) {
+    public boolean wait(final int maxCount, final long timeout, @NotNull final TimeUnit timeUnit) {
       ConstantConditions.notNegative("maxCount", maxCount);
       checkOwner();
       try {
         return TimeUnits.waitUntil(mMutex, new Condition() {
 
           public boolean isTrue() {
-            return (mPendingTasks - 1) <= maxCount;
-          }
-        }, timeout, timeUnit);
-
-      } catch (final InterruptedException e) {
-        throw new RuntimeInterruptedException(e);
-      }
-    }
-
-    public boolean waitValues(final long maxCount, final long timeout,
-        @NotNull final TimeUnit timeUnit) {
-      ConstantConditions.notNegative("maxCount", maxCount);
-      checkOwner();
-      try {
-        return TimeUnits.waitUntil(mMutex, new Condition() {
-
-          public boolean isTrue() {
-            return mPendingValues <= maxCount;
+            return (mPendingCount - 1) <= maxCount;
           }
         }, timeout, timeUnit);
 
@@ -191,8 +164,7 @@ class BackPressureForker<S, V> implements LoopForker<ForkerOutputs<S, V>, V>, Se
     public YieldOutputs<V> yieldFailure(@NotNull final Throwable failure) {
       checkSet();
       synchronized (mMutex) {
-        ++mPendingTasks;
-        ++mPendingValues;
+        ++mPendingCount;
       }
 
       final EvaluationCollection<V> evaluation = mEvaluation;
@@ -203,8 +175,7 @@ class BackPressureForker<S, V> implements LoopForker<ForkerOutputs<S, V>, V>, Se
             evaluation.addFailure(failure);
 
           } finally {
-            decrementPendingValues(1);
-            decrementPendingTasks();
+            decrementPendingCount();
           }
         }
       });
@@ -214,18 +185,12 @@ class BackPressureForker<S, V> implements LoopForker<ForkerOutputs<S, V>, V>, Se
     @NotNull
     public YieldOutputs<V> yieldFailures(@Nullable final Iterable<Throwable> failures) {
       checkSet();
-      final int size;
       if (failures != null) {
         ConstantConditions.notNullElements("failures", failures);
-        size = Iterables.size(failures);
-
-      } else {
-        size = 0;
       }
 
       synchronized (mMutex) {
-        ++mPendingTasks;
-        mPendingValues += size;
+        ++mPendingCount;
       }
 
       final EvaluationCollection<V> evaluation = mEvaluation;
@@ -236,8 +201,7 @@ class BackPressureForker<S, V> implements LoopForker<ForkerOutputs<S, V>, V>, Se
             evaluation.addFailures(failures);
 
           } finally {
-            decrementPendingValues(size);
-            decrementPendingTasks();
+            decrementPendingCount();
           }
         }
       });
@@ -248,8 +212,7 @@ class BackPressureForker<S, V> implements LoopForker<ForkerOutputs<S, V>, V>, Se
     public YieldOutputs<V> yieldIf(@NotNull final Statement<? extends V> statement) {
       checkSet();
       synchronized (mMutex) {
-        ++mPendingTasks;
-        ++mPendingValues;
+        ++mPendingCount;
       }
 
       final Executor executor = mExecutor;
@@ -262,8 +225,7 @@ class BackPressureForker<S, V> implements LoopForker<ForkerOutputs<S, V>, V>, Se
             evaluation.addValue(value);
 
           } finally {
-            decrementPendingValues(1);
-            decrementPendingTasks();
+            decrementPendingCount();
           }
         }
       }).elseDo(new Observer<Throwable>() {
@@ -273,8 +235,7 @@ class BackPressureForker<S, V> implements LoopForker<ForkerOutputs<S, V>, V>, Se
             evaluation.addFailure(failure);
 
           } finally {
-            decrementPendingValues(1);
-            decrementPendingTasks();
+            decrementPendingCount();
           }
         }
       }).consume();
@@ -286,8 +247,7 @@ class BackPressureForker<S, V> implements LoopForker<ForkerOutputs<S, V>, V>, Se
         @NotNull final Statement<? extends Iterable<? extends V>> loop) {
       checkSet();
       synchronized (mMutex) {
-        ++mPendingTasks;
-        ++mPendingValues;
+        ++mPendingCount;
       }
 
       final Executor executor = mExecutor;
@@ -300,8 +260,7 @@ class BackPressureForker<S, V> implements LoopForker<ForkerOutputs<S, V>, V>, Se
             evaluation.addValues(values);
 
           } finally {
-            decrementPendingValues(1);
-            decrementPendingTasks();
+            decrementPendingCount();
           }
         }
       }).elseDo(new Observer<Throwable>() {
@@ -311,8 +270,7 @@ class BackPressureForker<S, V> implements LoopForker<ForkerOutputs<S, V>, V>, Se
             evaluation.addFailure(failure);
 
           } finally {
-            decrementPendingValues(1);
-            decrementPendingTasks();
+            decrementPendingCount();
           }
         }
       }).consume();
@@ -323,8 +281,7 @@ class BackPressureForker<S, V> implements LoopForker<ForkerOutputs<S, V>, V>, Se
     public YieldOutputs<V> yieldValue(final V value) {
       checkSet();
       synchronized (mMutex) {
-        ++mPendingTasks;
-        ++mPendingValues;
+        ++mPendingCount;
       }
 
       final EvaluationCollection<V> evaluation = mEvaluation;
@@ -335,8 +292,7 @@ class BackPressureForker<S, V> implements LoopForker<ForkerOutputs<S, V>, V>, Se
             evaluation.addValue(value);
 
           } finally {
-            decrementPendingValues(1);
-            decrementPendingTasks();
+            decrementPendingCount();
           }
         }
       });
@@ -346,10 +302,8 @@ class BackPressureForker<S, V> implements LoopForker<ForkerOutputs<S, V>, V>, Se
     @NotNull
     public YieldOutputs<V> yieldValues(@Nullable final Iterable<V> values) {
       checkSet();
-      final int size = (values != null) ? Iterables.size(values) : 0;
       synchronized (mMutex) {
-        ++mPendingTasks;
-        mPendingValues += size;
+        ++mPendingCount;
       }
 
       final EvaluationCollection<V> evaluation = mEvaluation;
@@ -360,8 +314,7 @@ class BackPressureForker<S, V> implements LoopForker<ForkerOutputs<S, V>, V>, Se
             evaluation.addValues(values);
 
           } finally {
-            decrementPendingValues(size);
-            decrementPendingTasks();
+            decrementPendingCount();
           }
         }
       });
@@ -382,22 +335,15 @@ class BackPressureForker<S, V> implements LoopForker<ForkerOutputs<S, V>, V>, Se
       }
     }
 
-    private void decrementPendingTasks() {
+    private void decrementPendingCount() {
       final int pendingTasks;
       synchronized (mMutex) {
-        pendingTasks = --mPendingTasks;
+        pendingTasks = --mPendingCount;
         mMutex.notifyAll();
       }
 
       if (pendingTasks == 0) {
         mEvaluation.set();
-      }
-    }
-
-    private void decrementPendingValues(final int count) {
-      synchronized (mMutex) {
-        mPendingValues -= count;
-        mMutex.notifyAll();
       }
     }
 
@@ -411,7 +357,7 @@ class BackPressureForker<S, V> implements LoopForker<ForkerOutputs<S, V>, V>, Se
       mExecutor.execute(new Runnable() {
 
         public void run() {
-          decrementPendingTasks();
+          decrementPendingCount();
         }
       });
       return this;

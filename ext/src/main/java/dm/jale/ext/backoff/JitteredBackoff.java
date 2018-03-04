@@ -28,24 +28,24 @@ import dm.jale.util.ConstantConditions;
  */
 class JitteredBackoff implements Backoff, Serializable {
 
-  private final Backoff mBackoff;
+  private final float mAlpha;
 
-  private final float mPercentage;
+  private final Backoff mBackoff;
 
   private final Random mRandom = new Random();
 
   JitteredBackoff(final float percentage, @NotNull final Backoff backoff) {
     mBackoff = ConstantConditions.notNull("backoff", backoff);
-    if ((percentage < 0) || (percentage > 1)) {
-      throw new IllegalArgumentException("the percentage must be in the range [0, 1]");
+    if ((percentage < 0) || (percentage > 100)) {
+      throw new IllegalArgumentException("the percentage must be in the range [0, 100]");
     }
 
-    mPercentage = percentage;
+    mAlpha = percentage / 100;
   }
 
   public long apply(final int count, final long lastDelay) {
-    final float percentage = mPercentage;
+    final float alpha = mAlpha;
     final long delay = mBackoff.apply(count, lastDelay);
-    return Math.round((delay * (1 - percentage)) + (delay * percentage * mRandom.nextDouble()));
+    return Math.round((delay * (1 - alpha)) + (delay * alpha * mRandom.nextDouble()));
   }
 }

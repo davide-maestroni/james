@@ -37,7 +37,7 @@ class CountOffsetBackoff implements Backoff, Serializable {
   }
 
   public long apply(final int count, final long lastDelay) {
-    final int offset = count + mOffset;
+    final int offset = count - mOffset;
     return (offset >= 0) ? mBackoff.apply(offset, lastDelay) : 0;
   }
 }

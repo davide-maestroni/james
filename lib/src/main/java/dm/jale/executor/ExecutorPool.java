@@ -268,6 +268,7 @@ public class ExecutorPool {
   @NotNull
   public static ScheduledExecutor withDelay(final long delay, @NotNull final TimeUnit timeUnit,
       @NotNull final ScheduledExecutor executor) {
+    // TODO: 02/03/2018 withInterval OR withThrottling(tasks/timeUnit)
     if (ConstantConditions.notNegative("delay", delay) == 0) {
       return executor;
     }

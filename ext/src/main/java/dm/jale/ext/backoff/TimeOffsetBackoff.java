@@ -40,6 +40,6 @@ class TimeOffsetBackoff implements Backoff, Serializable {
 
   public long apply(final int count, final long lastDelay) {
     final long delay = mBackoff.apply(count, lastDelay);
-    return (delay > 0) ? delay : Math.max(0, mOffsetMillis + delay);
+    return (delay > 0) ? Math.max(0, mOffsetMillis + delay) : delay;
   }
 }

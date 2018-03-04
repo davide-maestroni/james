@@ -24,6 +24,7 @@ import dm.jale.eventual.EvaluationState;
 import dm.jale.eventual.Loop.YieldOutputs;
 import dm.jale.eventual.LoopYielder;
 import dm.jale.eventual.Observer;
+import dm.jale.eventual.Provider;
 import dm.jale.ext.eventual.BiMapper;
 import dm.jale.ext.eventual.Tester;
 import dm.jale.ext.eventual.TimedState;
@@ -41,13 +42,13 @@ public class EventualYielders {
   @NotNull
   public static <V> LoopYielder<?, V, V> accumulate(
       @NotNull final BiMapper<? super V, ? super V, ? extends V> accumulator) {
-    return new AccumulateYielder<V>(accumulator);
+    return new AccumulateYielder<V, V>(accumulator);
   }
 
   @NotNull
-  public static <V> LoopYielder<?, V, V> accumulate(final V initialValue,
-      @NotNull final BiMapper<? super V, ? super V, ? extends V> accumulator) {
-    return new AccumulateYielder<V>(initialValue, accumulator);
+  public static <V, R> LoopYielder<?, V, R> accumulate(@NotNull final Provider<R> init,
+      @NotNull final BiMapper<? super R, ? super V, ? extends R> accumulator) {
+    return new AccumulateYielder<V, R>(init, accumulator);
   }
 
   @NotNull
@@ -83,6 +84,12 @@ public class EventualYielders {
   @NotNull
   public static <V> LoopYielder<?, V, V> distinct() {
     return DistinctYielder.instance();
+  }
+
+  @NotNull
+  public static <V> LoopYielder<?, V, V> distinctBy(
+      @NotNull final Comparator<? super V> comparator) {
+    return new DistinctByYielder<V>(comparator);
   }
 
   @NotNull
