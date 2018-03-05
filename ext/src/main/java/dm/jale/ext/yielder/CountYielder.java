@@ -18,40 +18,42 @@ package dm.jale.ext.yielder;
 
 import org.jetbrains.annotations.NotNull;
 
+import java.io.ObjectStreamException;
 import java.io.Serializable;
 
 import dm.jale.eventual.Loop.YieldOutputs;
 import dm.jale.eventual.LoopYielder;
 import dm.jale.ext.config.BuildConfig;
-import dm.jale.ext.yielder.SkipFirstFailuresYielder.YielderStack;
-import dm.jale.util.ConstantConditions;
+import dm.jale.ext.yielder.CountYielder.YielderStack;
 
 /**
- * Created by davide-maestroni on 02/27/2018.
+ * Created by davide-maestroni on 02/19/2018.
  */
-class SkipFirstFailuresYielder<V> implements LoopYielder<YielderStack, V, V>, Serializable {
+class CountYielder<V> implements LoopYielder<YielderStack, V, Integer>, Serializable {
+
+  private static final CountYielder<?> sInstance = new CountYielder<Object>();
 
   private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
 
-  private final int mMaxCount;
-
-  SkipFirstFailuresYielder(final int maxCount) {
-    mMaxCount = ConstantConditions.notNegative("maxCount", maxCount);
+  private CountYielder() {
   }
 
-  public void done(final YielderStack stack, @NotNull final YieldOutputs<V> outputs) {
+  @NotNull
+  @SuppressWarnings("unchecked")
+  static <V> CountYielder<V> instance() {
+    return (CountYielder<V>) sInstance;
+  }
+
+  public void done(final YielderStack stack, @NotNull final YieldOutputs<Integer> outputs) {
+    if (stack != null) {
+      outputs.yieldValue(stack.count);
+    }
   }
 
   public YielderStack failure(final YielderStack stack, @NotNull final Throwable failure,
-      @NotNull final YieldOutputs<V> outputs) {
-    if (stack.count < mMaxCount) {
-      ++stack.count;
-
-    } else {
-      outputs.yieldFailure(failure);
-    }
-
-    return stack;
+      @NotNull final YieldOutputs<Integer> outputs) {
+    outputs.yieldFailure(failure);
+    return null;
   }
 
   public YielderStack init() {
@@ -59,13 +61,18 @@ class SkipFirstFailuresYielder<V> implements LoopYielder<YielderStack, V, V>, Se
   }
 
   public boolean loop(final YielderStack stack) {
-    return true;
+    return (stack != null);
   }
 
   public YielderStack value(final YielderStack stack, final V value,
-      @NotNull final YieldOutputs<V> outputs) {
-    outputs.yieldValue(value);
+      @NotNull final YieldOutputs<Integer> outputs) {
+    ++stack.count;
     return stack;
+  }
+
+  @NotNull
+  private Object readResolve() throws ObjectStreamException {
+    return sInstance;
   }
 
   static class YielderStack {

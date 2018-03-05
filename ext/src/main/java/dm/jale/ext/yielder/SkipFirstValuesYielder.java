@@ -59,8 +59,10 @@ class SkipFirstValuesYielder<V> implements LoopYielder<YielderStack, V, V>, Seri
   public YielderStack value(final YielderStack stack, final V value,
       @NotNull final YieldOutputs<V> outputs) {
     if (stack.count < mMaxCount) {
-      outputs.yieldValue(value);
       ++stack.count;
+
+    } else {
+      outputs.yieldValue(value);
     }
 
     return stack;

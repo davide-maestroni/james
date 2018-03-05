@@ -45,8 +45,10 @@ class SkipFirstYielder<V> implements LoopYielder<YielderStack, V, V>, Serializab
   public YielderStack failure(final YielderStack stack, @NotNull final Throwable failure,
       @NotNull final YieldOutputs<V> outputs) {
     if (stack.count < mMaxCount) {
-      outputs.yieldFailure(failure);
       ++stack.count;
+
+    } else {
+      outputs.yieldFailure(failure);
     }
 
     return stack;
@@ -63,8 +65,10 @@ class SkipFirstYielder<V> implements LoopYielder<YielderStack, V, V>, Serializab
   public YielderStack value(final YielderStack stack, final V value,
       @NotNull final YieldOutputs<V> outputs) {
     if (stack.count < mMaxCount) {
-      outputs.yieldValue(value);
       ++stack.count;
+
+    } else {
+      outputs.yieldValue(value);
     }
 
     return stack;

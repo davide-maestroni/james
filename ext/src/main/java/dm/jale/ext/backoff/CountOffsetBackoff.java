@@ -20,12 +20,15 @@ import org.jetbrains.annotations.NotNull;
 
 import java.io.Serializable;
 
+import dm.jale.ext.config.BuildConfig;
 import dm.jale.util.ConstantConditions;
 
 /**
  * Created by davide-maestroni on 03/02/2018.
  */
 class CountOffsetBackoff implements Backoff, Serializable {
+
+  private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
 
   private final Backoff mBackoff;
 

@@ -23,53 +23,52 @@ import java.io.Serializable;
 import dm.jale.eventual.Loop.YieldOutputs;
 import dm.jale.eventual.LoopYielder;
 import dm.jale.ext.config.BuildConfig;
-import dm.jale.ext.yielder.SkipFirstFailuresYielder.YielderStack;
 import dm.jale.util.ConstantConditions;
+import dm.jale.util.DoubleQueue;
 
 /**
  * Created by davide-maestroni on 02/27/2018.
  */
-class SkipFirstFailuresYielder<V> implements LoopYielder<YielderStack, V, V>, Serializable {
+class TakeLastValuesYielder<V> implements LoopYielder<DoubleQueue<V>, V, V>, Serializable {
 
   private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
 
   private final int mMaxCount;
 
-  SkipFirstFailuresYielder(final int maxCount) {
+  TakeLastValuesYielder(final int maxCount) {
     mMaxCount = ConstantConditions.notNegative("maxCount", maxCount);
   }
 
-  public void done(final YielderStack stack, @NotNull final YieldOutputs<V> outputs) {
+  public void done(final DoubleQueue<V> stack, @NotNull final YieldOutputs<V> outputs) {
+    outputs.yieldValues(stack);
   }
 
-  public YielderStack failure(final YielderStack stack, @NotNull final Throwable failure,
+  public DoubleQueue<V> failure(final DoubleQueue<V> stack, @NotNull final Throwable failure,
       @NotNull final YieldOutputs<V> outputs) {
-    if (stack.count < mMaxCount) {
-      ++stack.count;
-
-    } else {
-      outputs.yieldFailure(failure);
-    }
-
+    outputs.yieldFailure(failure);
     return stack;
   }
 
-  public YielderStack init() {
-    return new YielderStack();
+  public DoubleQueue<V> init() {
+    return new DoubleQueue<V>();
   }
 
-  public boolean loop(final YielderStack stack) {
+  public boolean loop(final DoubleQueue<V> stack) {
     return true;
   }
 
-  public YielderStack value(final YielderStack stack, final V value,
+  public DoubleQueue<V> value(final DoubleQueue<V> stack, final V value,
       @NotNull final YieldOutputs<V> outputs) {
-    outputs.yieldValue(value);
-    return stack;
+    stack.add(value);
+    return flush(stack);
   }
 
-  static class YielderStack {
+  @NotNull
+  private DoubleQueue<V> flush(@NotNull final DoubleQueue<V> stack) {
+    while (stack.size() > mMaxCount) {
+      stack.removeFirst();
+    }
 
-    private int count;
+    return stack;
   }
 }

@@ -52,6 +52,16 @@ public class EventualYielders {
   }
 
   @NotNull
+  public static <V> LoopYielder<?, V, Boolean> allMatch(@NotNull final Tester<V> tester) {
+    return new AllMatchYielder<V>(tester);
+  }
+
+  @NotNull
+  public static <V> LoopYielder<?, V, Boolean> anyMatch(@NotNull final Tester<V> tester) {
+    return new AnyMatchYielder<V>(tester);
+  }
+
+  @NotNull
   public static LoopYielder<?, Number, Double> averageDouble() {
     return AverageDoubleYielder.instance();
   }
@@ -74,6 +84,11 @@ public class EventualYielders {
   @NotNull
   public static <V> LoopYielder<?, V, V> batch(final int maxValues, final int maxFailures) {
     return new BatchYielder<V>(maxValues, maxFailures);
+  }
+
+  @NotNull
+  public static <V> LoopYielder<?, V, Integer> count() {
+    return CountYielder.instance();
   }
 
   @NotNull
@@ -213,6 +228,36 @@ public class EventualYielders {
   @NotNull
   public static LoopYielder<?, Number, Long> sumLong() {
     return SumLongYielder.instance();
+  }
+
+  @NotNull
+  public static <V> LoopYielder<?, V, V> takeFirst(final int maxCount) {
+    return new TakeFirstYielder<V>(maxCount);
+  }
+
+  @NotNull
+  public static <V> LoopYielder<?, V, V> takeFirstFailures(final int maxCount) {
+    return new TakeFirstFailuresYielder<V>(maxCount);
+  }
+
+  @NotNull
+  public static <V> LoopYielder<?, V, V> takeFirstValues(final int maxCount) {
+    return new TakeFirstValuesYielder<V>(maxCount);
+  }
+
+  @NotNull
+  public static <V> LoopYielder<?, V, V> takeLast(final int maxCount) {
+    return new TakeLastYielder<V>(maxCount);
+  }
+
+  @NotNull
+  public static <V> LoopYielder<?, V, V> takeLastFailures(final int maxCount) {
+    return new TakeLastFailuresYielder<V>(maxCount);
+  }
+
+  @NotNull
+  public static <V> LoopYielder<?, V, V> takeLastValues(final int maxCount) {
+    return new TakeLastValuesYielder<V>(maxCount);
   }
 
   @NotNull

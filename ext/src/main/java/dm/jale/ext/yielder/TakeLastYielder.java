@@ -22,54 +22,62 @@ import java.io.Serializable;
 
 import dm.jale.eventual.Loop.YieldOutputs;
 import dm.jale.eventual.LoopYielder;
+import dm.jale.eventual.SimpleState;
 import dm.jale.ext.config.BuildConfig;
-import dm.jale.ext.yielder.SkipFirstFailuresYielder.YielderStack;
 import dm.jale.util.ConstantConditions;
+import dm.jale.util.DoubleQueue;
 
 /**
  * Created by davide-maestroni on 02/27/2018.
  */
-class SkipFirstFailuresYielder<V> implements LoopYielder<YielderStack, V, V>, Serializable {
+class TakeLastYielder<V> implements LoopYielder<DoubleQueue<SimpleState<V>>, V, V>, Serializable {
 
   private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
 
   private final int mMaxCount;
 
-  SkipFirstFailuresYielder(final int maxCount) {
+  TakeLastYielder(final int maxCount) {
     mMaxCount = ConstantConditions.notNegative("maxCount", maxCount);
   }
 
-  public void done(final YielderStack stack, @NotNull final YieldOutputs<V> outputs) {
-  }
-
-  public YielderStack failure(final YielderStack stack, @NotNull final Throwable failure,
+  public void done(final DoubleQueue<SimpleState<V>> stack,
       @NotNull final YieldOutputs<V> outputs) {
-    if (stack.count < mMaxCount) {
-      ++stack.count;
+    for (final SimpleState<V> state : stack) {
+      if (state.isSet()) {
+        outputs.yieldValue(state.value());
 
-    } else {
-      outputs.yieldFailure(failure);
+      } else {
+        outputs.yieldFailure(state.failure());
+      }
     }
-
-    return stack;
   }
 
-  public YielderStack init() {
-    return new YielderStack();
+  public DoubleQueue<SimpleState<V>> failure(final DoubleQueue<SimpleState<V>> stack,
+      @NotNull final Throwable failure, @NotNull final YieldOutputs<V> outputs) {
+    stack.add(SimpleState.<V>ofFailure(failure));
+    return flush(stack);
   }
 
-  public boolean loop(final YielderStack stack) {
+  public DoubleQueue<SimpleState<V>> init() {
+    return new DoubleQueue<SimpleState<V>>();
+  }
+
+  public boolean loop(final DoubleQueue<SimpleState<V>> stack) {
     return true;
   }
 
-  public YielderStack value(final YielderStack stack, final V value,
+  public DoubleQueue<SimpleState<V>> value(final DoubleQueue<SimpleState<V>> stack, final V value,
       @NotNull final YieldOutputs<V> outputs) {
-    outputs.yieldValue(value);
-    return stack;
+    stack.add(SimpleState.ofValue(value));
+    return flush(stack);
   }
 
-  static class YielderStack {
+  @NotNull
+  private DoubleQueue<SimpleState<V>> flush(@NotNull final DoubleQueue<SimpleState<V>> stack) {
+    while (stack.size() > mMaxCount) {
+      stack.removeFirst();
+    }
 
-    private int count;
+    return stack;
   }
 }

@@ -21,6 +21,7 @@ import org.jetbrains.annotations.NotNull;
 import java.io.ObjectStreamException;
 import java.util.concurrent.TimeUnit;
 
+import dm.jale.ext.config.BuildConfig;
 import dm.jale.util.ConstantConditions;
 
 /**
@@ -87,6 +88,8 @@ public class BackoffPool {
   private static class NoBackoff extends ConstantBackoff {
 
     private static final NoBackoff sInstance = new NoBackoff();
+
+    private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
 
     NoBackoff() {
       super(0, TimeUnit.MILLISECONDS);

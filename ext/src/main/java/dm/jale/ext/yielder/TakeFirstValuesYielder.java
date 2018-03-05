@@ -23,19 +23,19 @@ import java.io.Serializable;
 import dm.jale.eventual.Loop.YieldOutputs;
 import dm.jale.eventual.LoopYielder;
 import dm.jale.ext.config.BuildConfig;
-import dm.jale.ext.yielder.SkipFirstFailuresYielder.YielderStack;
+import dm.jale.ext.yielder.TakeFirstValuesYielder.YielderStack;
 import dm.jale.util.ConstantConditions;
 
 /**
  * Created by davide-maestroni on 02/27/2018.
  */
-class SkipFirstFailuresYielder<V> implements LoopYielder<YielderStack, V, V>, Serializable {
+class TakeFirstValuesYielder<V> implements LoopYielder<YielderStack, V, V>, Serializable {
 
   private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
 
   private final int mMaxCount;
 
-  SkipFirstFailuresYielder(final int maxCount) {
+  TakeFirstValuesYielder(final int maxCount) {
     mMaxCount = ConstantConditions.notNegative("maxCount", maxCount);
   }
 
@@ -44,13 +44,7 @@ class SkipFirstFailuresYielder<V> implements LoopYielder<YielderStack, V, V>, Se
 
   public YielderStack failure(final YielderStack stack, @NotNull final Throwable failure,
       @NotNull final YieldOutputs<V> outputs) {
-    if (stack.count < mMaxCount) {
-      ++stack.count;
-
-    } else {
-      outputs.yieldFailure(failure);
-    }
-
+    outputs.yieldFailure(failure);
     return stack;
   }
 
@@ -64,7 +58,11 @@ class SkipFirstFailuresYielder<V> implements LoopYielder<YielderStack, V, V>, Se
 
   public YielderStack value(final YielderStack stack, final V value,
       @NotNull final YieldOutputs<V> outputs) {
-    outputs.yieldValue(value);
+    if (stack.count < mMaxCount) {
+      outputs.yieldValue(value);
+      ++stack.count;
+    }
+
     return stack;
   }
 

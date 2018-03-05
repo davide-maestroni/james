@@ -27,7 +27,7 @@ import java.util.Arrays;
 import dm.jale.Eventual;
 import dm.jale.eventual.Evaluation;
 import dm.jale.eventual.Observer;
-import dm.jale.eventual.Statement;
+import dm.jale.ext.proxy.ProxyMapper;
 import dm.jale.util.ConstantConditions;
 
 import static dm.jale.util.Reflections.cloneArgs;
@@ -46,32 +46,14 @@ class EventualInvocationHandler implements InvocationHandler {
     mTarget = ConstantConditions.notNull("target", target);
   }
 
-  private static boolean canReturnStatement(@NotNull final Method method,
-      @NotNull final Method targetMethod) {
-    final Class<?> targetReturnType = targetMethod.getReturnType();
-    if (Statement.class.equals(method.getReturnType()) && !Statement.class.equals(
-        targetReturnType)) {
-      final Type genericReturnType = method.getGenericReturnType();
-      if (genericReturnType instanceof ParameterizedType) {
-        final Type[] typeArguments =
-            ((ParameterizedType) genericReturnType).getActualTypeArguments();
-        // TODO: 28/02/2018 rawType only?
-        if (typeArguments[0].toString().equals(targetMethod.getGenericReturnType().toString())) {
-          return true;
-        }
-      }
-    }
-
-    return false;
-  }
-
   public Object invoke(final Object object, final Method method, final Object[] args) throws
       Throwable {
     final String methodName = method.getName();
     final Class<?> returnType = method.getReturnType();
+    final Class<?>[] parameterTypes = method.getParameterTypes();
     final Method[] targetMethods = mTarget.getClass().getMethods();
     for (final Method targetMethod : targetMethods) {
-      if (methodName.equals(targetMethod.getName()) && Arrays.equals(method.getParameterTypes(),
+      if (methodName.equals(targetMethod.getName()) && Arrays.equals(parameterTypes,
           targetMethod.getParameterTypes()) && returnType.isAssignableFrom(
           targetMethod.getReturnType())) {
         return mEventual.statement(new InvocationHandlerObserver(mTarget, targetMethod, args))
@@ -79,11 +61,44 @@ class EventualInvocationHandler implements InvocationHandler {
       }
     }
 
-    for (final Method targetMethod : targetMethods) {
-      if (methodName.equals(targetMethod.getName() + "Statement") && Arrays.equals(
-          method.getParameterTypes(), targetMethod.getParameterTypes()) && canReturnStatement(
-          method, targetMethod)) {
-        return mEventual.statement(new InvocationHandlerObserver(mTarget, targetMethod, args));
+    if (parameterTypes.length > 0) {
+      final Class<?> parameterType = parameterTypes[0];
+      if (ProxyMapper.class.isAssignableFrom(parameterType)) {
+        final Class<?>[] normalizedParameterTypes = new Class[parameterTypes.length - 1];
+        System.arraycopy(parameterTypes, 1, normalizedParameterTypes, 0,
+            normalizedParameterTypes.length);
+        final ProxyMapper<?> mapper = (ProxyMapper<?>) args[0];
+        final Type expectedReturnType;
+        if (ProxyMapper.class.equals(parameterType)) {
+          expectedReturnType = null;
+
+        } else {
+          final Type genericSuperclass = parameterType.getGenericSuperclass();
+          if (genericSuperclass instanceof ParameterizedType) {
+            expectedReturnType =
+                ((ParameterizedType) genericSuperclass).getActualTypeArguments()[0];
+
+          } else {
+            expectedReturnType = null;
+          }
+        }
+
+        Method invokeMethod = null;
+        for (final Method targetMethod : targetMethods) {
+          if (methodName.equals(targetMethod.getName()) && Arrays.equals(normalizedParameterTypes,
+              targetMethod.getParameterTypes()) && ((expectedReturnType == null)
+              || expectedReturnType.toString().equals(method.getGenericReturnType().toString()))) {
+            invokeMethod = targetMethod;
+          }
+        }
+
+        if (invokeMethod != null) {
+          final Object[] normalizedArgs = new Object[args.length - 1];
+          System.arraycopy(args, 1, normalizedArgs, 0, normalizedArgs.length);
+          return mapper.apply(mEventual.statement(
+              new InvocationHandlerObserver(mTarget, invokeMethod, normalizedArgs)),
+              method.getGenericReturnType(), invokeMethod.getGenericReturnType());
+        }
       }
     }
 

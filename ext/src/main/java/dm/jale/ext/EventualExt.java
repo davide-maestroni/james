@@ -73,8 +73,7 @@ import static dm.jale.executor.ExecutorPool.withThrottling;
 public class EventualExt extends Eventual {
 
   // TODO: 26/02/2018 Mappers: fallbackStatement()?
-  // TODO: 21/02/2018 Yielders: replace(), match(), count(), throttle(),
-  // throttleValues(), debounce(), groupBy()?
+  // TODO: 21/02/2018 Yielders: throttle(), throttleValues(), debounce(), groupBy()?
   // TODO: 21/02/2018 Joiners:
   // TODO: 16/02/2018 Forkers: retry(Backoff)
   // TODO: 20/02/2018 (BackPressure): withBackPressure(Backoff, Executor)
@@ -96,9 +95,14 @@ public class EventualExt extends Eventual {
   }
 
   @NotNull
-  public static <V, R> LoopYielder<?, V, R> accumulate(@NotNull final Provider<R> initialValue,
+  public static <V, R> LoopYielder<?, V, R> accumulate(@NotNull final Provider<R> init,
       @NotNull final BiMapper<? super R, ? super V, ? extends R> accumulator) {
-    return EventualYielders.accumulate(initialValue, accumulator);
+    return EventualYielders.accumulate(init, accumulator);
+  }
+
+  @NotNull
+  public static <V> LoopYielder<?, V, Boolean> allMatch(@NotNull final Tester<V> tester) {
+    return EventualYielders.allMatch(tester);
   }
 
   @NotNull
@@ -129,6 +133,11 @@ public class EventualExt extends Eventual {
   @NotNull
   public static <V> LoopYielder<?, V, V> batch(final int maxValues, final int maxFailures) {
     return EventualYielders.batch(maxValues, maxFailures);
+  }
+
+  @NotNull
+  public static <V> LoopYielder<?, V, Integer> count() {
+    return EventualYielders.count();
   }
 
   @NotNull
@@ -186,6 +195,16 @@ public class EventualExt extends Eventual {
   @NotNull
   public static <V> LoopYielder<?, V, V> minBy(@NotNull final Comparator<? super V> comparator) {
     return EventualYielders.minBy(comparator);
+  }
+
+  @NotNull
+  public static <V> LoopYielder<?, V, Boolean> noneMatch(@NotNull final Tester<V> tester) {
+    return EventualYielders.allMatch(new NegatedTester<V>(tester));
+  }
+
+  @NotNull
+  public static <V> LoopYielder<?, V, Boolean> notAllMatch(@NotNull final Tester<V> tester) {
+    return EventualYielders.anyMatch(new NegatedTester<V>(tester));
   }
 
   @NotNull
@@ -405,6 +424,46 @@ public class EventualExt extends Eventual {
   @NotNull
   public static LoopYielder<?, Number, Long> sumLong() {
     return EventualYielders.sumLong();
+  }
+
+  @NotNull
+  public static <V> LoopYielder<?, V, V> take(final int maxCount) {
+    return takeFirst(maxCount);
+  }
+
+  @NotNull
+  public static <V> LoopYielder<?, V, V> takeFailures(final int maxCount) {
+    return takeFirstFailures(maxCount);
+  }
+
+  @NotNull
+  public static <V> LoopYielder<?, V, V> takeFirst(final int maxCount) {
+    return EventualYielders.takeFirst(maxCount);
+  }
+
+  @NotNull
+  public static <V> LoopYielder<?, V, V> takeFirstFailures(final int maxCount) {
+    return EventualYielders.takeFirstFailures(maxCount);
+  }
+
+  @NotNull
+  public static <V> LoopYielder<?, V, V> takeFirstValues(final int maxCount) {
+    return EventualYielders.takeFirstValues(maxCount);
+  }
+
+  @NotNull
+  public static <V> LoopYielder<?, V, V> takeLast(final int maxCount) {
+    return EventualYielders.takeLast(maxCount);
+  }
+
+  @NotNull
+  public static <V> LoopYielder<?, V, V> takeLastFailures(final int maxCount) {
+    return EventualYielders.takeLastFailures(maxCount);
+  }
+
+  @NotNull
+  public static <V> LoopYielder<?, V, V> takeLastValues(final int maxCount) {
+    return EventualYielders.takeLastValues(maxCount);
   }
 
   @NotNull
