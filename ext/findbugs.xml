@@ -24,4 +24,20 @@
         http://stackoverflow.com/questions/26156523/is-writeobject-not-neccesary-using-the-serialization-proxy-pattern
         -->
     </Match>
+    <Match>
+        <Class name="dm.jale.ext.yielder.AllMatchYielder"/>
+        <Or>
+            <Method name="failure"/>
+            <Method name="value"/>
+        </Or>
+        <Bug pattern="NP_BOOLEAN_RETURN_NULL"/>
+    </Match>
+    <Match>
+        <Class name="dm.jale.ext.yielder.AnyMatchYielder"/>
+        <Or>
+            <Method name="failure"/>
+            <Method name="value"/>
+        </Or>
+        <Bug pattern="NP_BOOLEAN_RETURN_NULL"/>
+    </Match>
 </FindBugsFilter>

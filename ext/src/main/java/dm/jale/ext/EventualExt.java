@@ -73,7 +73,8 @@ import static dm.jale.executor.ExecutorPool.withThrottling;
 public class EventualExt extends Eventual {
 
   // TODO: 26/02/2018 Mappers: fallbackStatement()?
-  // TODO: 21/02/2018 Yielders: throttle(), throttleValues(), debounce(), groupBy()?
+  // TODO: 21/02/2018 Yielders: elementAt(), until(Tester), throttle(), throttleValues(),
+  // debounce(), groupBy()?
   // TODO: 21/02/2018 Joiners:
   // TODO: 16/02/2018 Forkers: retry(Backoff)
   // TODO: 20/02/2018 (BackPressure): withBackPressure(Backoff, Executor)
