@@ -65,6 +65,7 @@ class ReplaySinceForker<V> implements LoopForker<ForkerStack<V>, V>, Serializabl
       @NotNull final EvaluationCollection<V> evaluation, @NotNull final Loop<V> context) {
     final int maxTimes = mMaxTimes;
     if ((maxTimes > 0) && (stack.count >= maxTimes)) {
+      stack.states = null;
       evaluation.addFailure(new IllegalStateException("the loop evaluation cannot be propagated"))
           .set();
       return stack;
@@ -91,8 +92,13 @@ class ReplaySinceForker<V> implements LoopForker<ForkerStack<V>, V>, Serializabl
       evaluation.addFailure(failure);
     }
 
-    stack.states.add(TimedState.<V>ofFailure(failure));
-    return purgeStates(stack);
+    final DoubleQueue<TimedState<V>> states = stack.states;
+    if (states != null) {
+      states.add(TimedState.<V>ofFailure(failure));
+      return purgeStates(stack);
+    }
+
+    return stack;
   }
 
   public ForkerStack<V> init(@NotNull final Loop<V> context) {
@@ -106,8 +112,13 @@ class ReplaySinceForker<V> implements LoopForker<ForkerStack<V>, V>, Serializabl
       evaluation.addValue(value);
     }
 
-    stack.states.add(TimedState.ofValue(value));
-    return purgeStates(stack);
+    final DoubleQueue<TimedState<V>> states = stack.states;
+    if (states != null) {
+      states.add(TimedState.ofValue(value));
+      return purgeStates(stack);
+    }
+
+    return stack;
   }
 
   @NotNull
@@ -132,11 +143,11 @@ class ReplaySinceForker<V> implements LoopForker<ForkerStack<V>, V>, Serializabl
 
   static class ForkerStack<V> {
 
-    private final DoubleQueue<TimedState<V>> states = new DoubleQueue<TimedState<V>>();
-
     private int count;
 
     private ArrayList<EvaluationCollection<V>> evaluations =
         new ArrayList<EvaluationCollection<V>>();
+
+    private DoubleQueue<TimedState<V>> states = new DoubleQueue<TimedState<V>>();
   }
 }

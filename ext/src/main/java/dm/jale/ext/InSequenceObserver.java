@@ -42,11 +42,11 @@ class InSequenceObserver<V> implements Observer<EvaluationCollection<V>>, Serial
 
   private final V mStart;
 
-  InSequenceObserver(@NotNull final V start, final long count,
+  InSequenceObserver(final V start, final long count,
       @NotNull final Mapper<? super V, ? extends V> increment) {
-    mStart = ConstantConditions.notNull("start", start);
     mCount = ConstantConditions.notNegative("count", count);
     mIncrement = ConstantConditions.notNull("increment", increment);
+    mStart = start;
   }
 
   public void accept(final EvaluationCollection<V> evaluation) throws Exception {

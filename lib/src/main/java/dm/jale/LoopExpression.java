@@ -47,6 +47,10 @@ class LoopExpression<V, R> {
     evaluation.addValues((Iterable<R>) values).set();
   }
 
+  boolean isComplete() {
+    return false;
+  }
+
   @NotNull
   LoopExpression<V, R> renew() {
     return this;

@@ -19,10 +19,10 @@ package dm.jale.executor;
 import org.jetbrains.annotations.NotNull;
 
 import java.io.Serializable;
-import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.TimeUnit;
 
 import dm.jale.config.BuildConfig;
+import dm.jale.eventual.FailureException;
 import dm.jale.util.ConstantConditions;
 
 /**
@@ -47,6 +47,7 @@ class BackPropagationErrorExecutor extends ScheduledExecutorDecorator implements
   public void execute(@NotNull final Runnable command) {
     if (command instanceof FailingRunnable) {
       super.execute(new FailingRunnableWrapper((FailingRunnable) command));
+      return;
     }
 
     checkFailed();
@@ -58,6 +59,7 @@ class BackPropagationErrorExecutor extends ScheduledExecutorDecorator implements
       @NotNull final TimeUnit timeUnit) {
     if (command instanceof FailingRunnable) {
       super.execute(new FailingRunnableWrapper((FailingRunnable) command), delay, timeUnit);
+      return;
     }
 
     checkFailed();
@@ -67,7 +69,7 @@ class BackPropagationErrorExecutor extends ScheduledExecutorDecorator implements
   private void checkFailed() {
     final Throwable error = mError;
     if (error != null) {
-      throw new RejectedExecutionException(error);
+      throw FailureException.wrapIfNot(RuntimeException.class, error);
     }
   }
 

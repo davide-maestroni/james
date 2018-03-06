@@ -60,6 +60,7 @@ class ReplayLastForker<V> implements LoopForker<ForkerStack<V>, V>, Serializable
       @NotNull final EvaluationCollection<V> evaluation, @NotNull final Loop<V> context) {
     final int maxTimes = mMaxTimes;
     if ((maxTimes > 0) && (stack.count >= maxTimes)) {
+      stack.states = null;
       evaluation.addFailure(new IllegalStateException("the loop evaluation cannot be propagated"))
           .set();
       return stack;
@@ -87,10 +88,12 @@ class ReplayLastForker<V> implements LoopForker<ForkerStack<V>, V>, Serializable
     }
 
     final DoubleQueue<SimpleState<V>> states = stack.states;
-    states.add(SimpleState.<V>ofFailure(failure));
-    @SuppressWarnings("UnnecessaryLocalVariable") final int maxCount = mMaxCount;
-    while (states.size() > maxCount) {
-      states.removeFirst();
+    if (states != null) {
+      states.add(SimpleState.<V>ofFailure(failure));
+      @SuppressWarnings("UnnecessaryLocalVariable") final int maxCount = mMaxCount;
+      while (states.size() > maxCount) {
+        states.removeFirst();
+      }
     }
 
     return stack;
@@ -108,10 +111,12 @@ class ReplayLastForker<V> implements LoopForker<ForkerStack<V>, V>, Serializable
     }
 
     final DoubleQueue<SimpleState<V>> states = stack.states;
-    states.add(SimpleState.ofValue(value));
-    @SuppressWarnings("UnnecessaryLocalVariable") final int maxCount = mMaxCount;
-    while (states.size() > maxCount) {
-      states.removeFirst();
+    if (states != null) {
+      states.add(SimpleState.ofValue(value));
+      @SuppressWarnings("UnnecessaryLocalVariable") final int maxCount = mMaxCount;
+      while (states.size() > maxCount) {
+        states.removeFirst();
+      }
     }
 
     return stack;
@@ -119,11 +124,11 @@ class ReplayLastForker<V> implements LoopForker<ForkerStack<V>, V>, Serializable
 
   static class ForkerStack<V> {
 
-    private final DoubleQueue<SimpleState<V>> states = new DoubleQueue<SimpleState<V>>();
-
     private int count;
 
     private ArrayList<EvaluationCollection<V>> evaluations =
         new ArrayList<EvaluationCollection<V>>();
+
+    private DoubleQueue<SimpleState<V>> states = new DoubleQueue<SimpleState<V>>();
   }
 }

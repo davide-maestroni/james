@@ -39,7 +39,7 @@ import dm.jale.util.Iterables;
 import dm.jale.util.SerializableProxy;
 
 import static dm.jale.executor.ExecutorPool.immediateExecutor;
-import static dm.jale.executor.ExecutorPool.withThrottling;
+import static dm.jale.executor.ExecutorPool.ordered;
 
 /**
  * Created by davide-maestroni on 02/14/2018.
@@ -65,7 +65,7 @@ class JoinLoopObserver<S, V, R>
         Iterables.toList(ConstantConditions.notNullElements("loops", loops));
     mJoiner = ConstantConditions.notNull("joiner", joiner);
     mLoopList = Collections.unmodifiableList(loopList);
-    mExecutor = withThrottling(1, immediateExecutor());
+    mExecutor = ordered(immediateExecutor());
     mLogger = Logger.newLogger(this, loggerName);
   }
 

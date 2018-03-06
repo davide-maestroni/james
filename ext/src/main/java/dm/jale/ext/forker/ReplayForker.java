@@ -55,6 +55,8 @@ class ReplayForker<V> implements StatementForker<ForkerStack<V>, V>, Serializabl
       @NotNull final Evaluation<V> evaluation, @NotNull final Statement<V> context) {
     final int maxTimes = mMaxTimes;
     if ((maxTimes > 0) && (stack.count >= maxTimes)) {
+      stack.isMax = true;
+      stack.state = null;
       evaluation.fail(new IllegalStateException("the statement evaluation cannot be propagated"));
       return stack;
     }
@@ -73,10 +75,13 @@ class ReplayForker<V> implements StatementForker<ForkerStack<V>, V>, Serializabl
 
   public ForkerStack<V> failure(final ForkerStack<V> stack, @NotNull final Throwable failure,
       @NotNull final Statement<V> context) {
-    final SimpleState<V> state = (stack.state = SimpleState.ofFailure(failure));
     final ArrayList<Evaluation<V>> evaluations = stack.evaluations;
     for (final Evaluation<V> evaluation : evaluations) {
-      state.to(evaluation);
+      evaluation.fail(failure);
+    }
+
+    if (!stack.isMax) {
+      stack.state = SimpleState.ofFailure(failure);
     }
 
     return stack;
@@ -88,10 +93,13 @@ class ReplayForker<V> implements StatementForker<ForkerStack<V>, V>, Serializabl
 
   public ForkerStack<V> value(final ForkerStack<V> stack, final V value,
       @NotNull final Statement<V> context) {
-    final SimpleState<V> state = (stack.state = SimpleState.ofValue(value));
     final ArrayList<Evaluation<V>> evaluations = stack.evaluations;
     for (final Evaluation<V> evaluation : evaluations) {
-      state.to(evaluation);
+      evaluation.set(value);
+    }
+
+    if (!stack.isMax) {
+      stack.state = SimpleState.ofValue(value);
     }
 
     return stack;
@@ -102,6 +110,8 @@ class ReplayForker<V> implements StatementForker<ForkerStack<V>, V>, Serializabl
     private int count;
 
     private ArrayList<Evaluation<V>> evaluations = new ArrayList<Evaluation<V>>();
+
+    private boolean isMax;
 
     private SimpleState<V> state;
   }

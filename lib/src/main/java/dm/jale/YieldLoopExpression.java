@@ -37,8 +37,8 @@ import dm.jale.util.ConstantConditions;
 import dm.jale.util.SerializableProxy;
 
 import static dm.jale.executor.ExecutorPool.immediateExecutor;
+import static dm.jale.executor.ExecutorPool.ordered;
 import static dm.jale.executor.ExecutorPool.withErrorBackPropagation;
-import static dm.jale.executor.ExecutorPool.withThrottling;
 
 /**
  * Created by davide-maestroni on 02/05/2018.
@@ -55,11 +55,13 @@ class YieldLoopExpression<S, V, R> extends LoopExpression<V, R> implements Seria
 
   private boolean mIsInitialized;
 
+  private volatile boolean mIsLoop = true;
+
   private S mStack;
 
   YieldLoopExpression(@NotNull final Yielder<S, ? super V, ? super YieldOutputs<R>> yielder) {
     mYielder = ConstantConditions.notNull("yielder", yielder);
-    mExecutor = withErrorBackPropagation(withThrottling(1, immediateExecutor()));
+    mExecutor = withErrorBackPropagation(ordered(immediateExecutor()));
   }
 
   @Override
@@ -123,6 +125,11 @@ class YieldLoopExpression<S, V, R> extends LoopExpression<V, R> implements Seria
     });
   }
 
+  @Override
+  boolean isComplete() {
+    return !mIsLoop;
+  }
+
   @NotNull
   @Override
   LoopExpression<V, R> renew() {
@@ -131,7 +138,7 @@ class YieldLoopExpression<S, V, R> extends LoopExpression<V, R> implements Seria
 
   @Override
   void set(@NotNull final EvaluationCollection<R> evaluation) {
-    mExecutor.execute(new YielderRunnable(evaluation) {
+    mExecutor.execute(new YielderRunnable(evaluation, true) {
 
       @Override
       protected void innerRun(@NotNull final YielderOutputs<R> outputs) throws Exception {
@@ -305,19 +312,35 @@ class YieldLoopExpression<S, V, R> extends LoopExpression<V, R> implements Seria
 
     private final EvaluationCollection<R> mEvaluation;
 
+    private final boolean mForceRun;
+
     private YielderRunnable(@NotNull final EvaluationCollection<R> evaluation) {
+      this(evaluation, false);
+    }
+
+    private YielderRunnable(@NotNull final EvaluationCollection<R> evaluation,
+        final boolean forceRun) {
       mEvaluation = evaluation;
+      mForceRun = forceRun;
     }
 
     public void run() {
       final EvaluationCollection<R> evaluation = mEvaluation;
       try {
+        final Yielder<S, ? super V, ? super YieldOutputs<R>> yielder = mYielder;
         if (!mIsInitialized) {
           mIsInitialized = true;
-          mStack = mYielder.init();
+          mStack = yielder.init();
         }
 
-        innerRun(mYielderOutputs.withEvaluations(evaluation));
+        if (mIsLoop) {
+          mIsLoop = yielder.loop(mStack);
+        }
+
+        if (mIsLoop || mForceRun) {
+          innerRun(mYielderOutputs.withEvaluations(evaluation));
+        }
+
         evaluation.set();
 
       } catch (final Throwable t) {

@@ -40,12 +40,12 @@ public class EventualForkers {
 
   @NotNull
   public static <V> StatementForker<?, V> repeat() {
-    return new RepeatForker<V>();
+    return RepeatForker.newForker();
   }
 
   @NotNull
   public static <V> StatementForker<?, V> repeat(final int maxTimes) {
-    return new RepeatForker<V>(maxTimes);
+    return RepeatForker.newForker(maxTimes);
   }
 
   @NotNull
@@ -62,12 +62,12 @@ public class EventualForkers {
 
   @NotNull
   public static <V> LoopForker<?, V> repeatAll() {
-    return new RepeatAllForker<V>();
+    return RepeatAllForker.newForker();
   }
 
   @NotNull
   public static <V> LoopForker<?, V> repeatAll(final int maxTimes) {
-    return new RepeatAllForker<V>(maxTimes);
+    return RepeatAllForker.newForker(maxTimes);
   }
 
   @NotNull

@@ -20,6 +20,7 @@ import org.jetbrains.annotations.NotNull;
 
 import java.io.Serializable;
 
+import dm.jale.Eventual;
 import dm.jale.eventual.Evaluation;
 import dm.jale.eventual.Statement;
 import dm.jale.eventual.StatementForker;
@@ -30,54 +31,75 @@ import dm.jale.util.ConstantConditions;
 /**
  * Created by davide-maestroni on 02/19/2018.
  */
-class RepeatForker<V> implements StatementForker<ForkerStack, V>, Serializable {
+class RepeatForker<V> implements StatementForker<ForkerStack<V>, V>, Serializable {
 
   private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
 
   private final int mMaxTimes;
 
-  RepeatForker() {
+  private RepeatForker() {
     mMaxTimes = -1;
   }
 
-  RepeatForker(final int maxTimes) {
+  private RepeatForker(final int maxTimes) {
     mMaxTimes = ConstantConditions.positive("maxTimes", maxTimes);
   }
 
-  public ForkerStack done(final ForkerStack stack, @NotNull final Statement<V> context) {
+  @NotNull
+  static <V> StatementForker<?, V> newForker() {
+    return Eventual.bufferedStatement(new RepeatForker<V>());
+  }
+
+  @NotNull
+  static <V> StatementForker<?, V> newForker(final int maxTimes) {
+    return Eventual.bufferedStatement(new RepeatForker<V>(maxTimes));
+  }
+
+  public ForkerStack<V> done(final ForkerStack<V> stack, @NotNull final Statement<V> context) {
+    stack.evaluation = null;
     return stack;
   }
 
-  public ForkerStack evaluation(final ForkerStack stack, @NotNull final Evaluation<V> evaluation,
-      @NotNull final Statement<V> context) {
+  public ForkerStack<V> evaluation(final ForkerStack<V> stack,
+      @NotNull final Evaluation<V> evaluation, @NotNull final Statement<V> context) {
     final int maxTimes = mMaxTimes;
     if ((maxTimes < 0) || (stack.count < maxTimes)) {
-      context.evaluate().to(evaluation);
+      if (stack.evaluation == null) {
+        stack.evaluation = evaluation;
+
+      } else {
+        context.evaluate().to(evaluation);
+      }
+
       ++stack.count;
 
     } else {
       evaluation.fail(new IllegalStateException("the statement evaluation cannot be propagated"));
     }
 
-    return null;
-  }
-
-  public ForkerStack failure(final ForkerStack stack, @NotNull final Throwable failure,
-      @NotNull final Statement<V> context) {
     return stack;
   }
 
-  public ForkerStack init(@NotNull final Statement<V> context) {
-    return new ForkerStack();
-  }
-
-  public ForkerStack value(final ForkerStack stack, final V value,
+  public ForkerStack<V> failure(final ForkerStack<V> stack, @NotNull final Throwable failure,
       @NotNull final Statement<V> context) {
+    stack.evaluation.fail(failure);
     return stack;
   }
 
-  static class ForkerStack {
+  public ForkerStack<V> init(@NotNull final Statement<V> context) {
+    return new ForkerStack<V>();
+  }
+
+  public ForkerStack<V> value(final ForkerStack<V> stack, final V value,
+      @NotNull final Statement<V> context) {
+    stack.evaluation.set(value);
+    return stack;
+  }
+
+  static class ForkerStack<V> {
 
     private int count;
+
+    private Evaluation<V> evaluation;
   }
 }

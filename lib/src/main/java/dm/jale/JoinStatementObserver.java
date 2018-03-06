@@ -38,7 +38,7 @@ import dm.jale.util.Iterables;
 import dm.jale.util.SerializableProxy;
 
 import static dm.jale.executor.ExecutorPool.immediateExecutor;
-import static dm.jale.executor.ExecutorPool.withThrottling;
+import static dm.jale.executor.ExecutorPool.ordered;
 
 /**
  * Created by davide-maestroni on 02/14/2018.
@@ -63,7 +63,7 @@ class JoinStatementObserver<S, V, R> implements RenewableObserver<Evaluation<R>>
         Iterables.toList(ConstantConditions.notNullElements("statements", statements));
     mJoiner = ConstantConditions.notNull("joiner", joiner);
     mStatementList = Collections.unmodifiableList(statementList);
-    mExecutor = withThrottling(1, immediateExecutor());
+    mExecutor = ordered(immediateExecutor());
     mLogger = Logger.newLogger(this, loggerName);
   }
 

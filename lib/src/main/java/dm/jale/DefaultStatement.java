@@ -54,8 +54,8 @@ import dm.jale.util.TimeUnits;
 import dm.jale.util.TimeUnits.Condition;
 
 import static dm.jale.executor.ExecutorPool.loopExecutor;
+import static dm.jale.executor.ExecutorPool.ordered;
 import static dm.jale.executor.ExecutorPool.withErrorBackPropagation;
-import static dm.jale.executor.ExecutorPool.withThrottling;
 
 /**
  * Created by davide-maestroni on 01/12/2018.
@@ -700,7 +700,7 @@ class DefaultStatement<V> implements Statement<V>, Serializable {
 
     private final Forker<S, V, Evaluation<V>, Statement<V>> mForker;
 
-    private final Executor mThrottlingExecutor;
+    private final Executor mOrderedExecutor;
 
     private S mStack;
 
@@ -711,8 +711,8 @@ class DefaultStatement<V> implements Statement<V>, Serializable {
         @NotNull final Forker<S, ? super V, ? super Evaluation<V>, ? super Statement<V>> forker) {
       mForker =
           (Forker<S, V, Evaluation<V>, Statement<V>>) ConstantConditions.notNull("forker", forker);
-      mThrottlingExecutor = withThrottling(1, loopExecutor());
-      mExecutor = withErrorBackPropagation(mThrottlingExecutor);
+      mOrderedExecutor = ordered(loopExecutor());
+      mExecutor = withErrorBackPropagation(mOrderedExecutor);
       mStatement = statement;
     }
 
@@ -809,7 +809,7 @@ class DefaultStatement<V> implements Statement<V>, Serializable {
     }
 
     void stopPropagation(final Evaluation<V> evaluation) {
-      mThrottlingExecutor.execute(new Runnable() {
+      mOrderedExecutor.execute(new Runnable() {
 
         public void run() {
           mEvaluations.remove(evaluation);

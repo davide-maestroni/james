@@ -66,8 +66,8 @@ import dm.jale.util.TimeUnits.Condition;
 
 import static dm.jale.executor.ExecutorPool.NO_OP;
 import static dm.jale.executor.ExecutorPool.loopExecutor;
+import static dm.jale.executor.ExecutorPool.ordered;
 import static dm.jale.executor.ExecutorPool.withErrorBackPropagation;
-import static dm.jale.executor.ExecutorPool.withThrottling;
 
 /**
  * Created by davide-maestroni on 02/01/2018.
@@ -544,7 +544,7 @@ class DefaultLoop<V> implements Loop<V>, Serializable {
 
   @NotNull
   public Loop<V> forkOn(@NotNull final Executor executor) {
-    return forkLoop(new ExecutorLoopForker<V>(withThrottling(1, executor)));
+    return forkLoop(new ExecutorLoopForker<V>(ordered(executor)));
   }
 
   @NotNull
@@ -726,8 +726,7 @@ class DefaultLoop<V> implements Loop<V>, Serializable {
   @NotNull
   public Loop<V> forkOn(@NotNull final Executor executor, final int maxValues,
       final int maxFailures) {
-    return forkLoop(
-        new ExecutorLoopBatchForker<V>(withThrottling(1, executor), maxValues, maxFailures));
+    return forkLoop(new ExecutorLoopBatchForker<V>(ordered(executor), maxValues, maxFailures));
   }
 
   @NotNull
@@ -1107,7 +1106,7 @@ class DefaultLoop<V> implements Loop<V>, Serializable {
 
     private final Forker<S, V, EvaluationCollection<V>, Loop<V>> mForker;
 
-    private final Executor mThrottlingExecutor;
+    private final Executor mOrderedExecutor;
 
     private DefaultLoop<V> mLoop;
 
@@ -1120,8 +1119,8 @@ class DefaultLoop<V> implements Loop<V>, Serializable {
       mForker =
           (Forker<S, V, EvaluationCollection<V>, Loop<V>>) ConstantConditions.notNull("forker",
               forker);
-      mThrottlingExecutor = withThrottling(1, loopExecutor());
-      mExecutor = withErrorBackPropagation(mThrottlingExecutor);
+      mOrderedExecutor = ordered(loopExecutor());
+      mExecutor = withErrorBackPropagation(mOrderedExecutor);
       mLoop = loop;
     }
 
@@ -1279,7 +1278,7 @@ class DefaultLoop<V> implements Loop<V>, Serializable {
     }
 
     void stopPropagation(final EvaluationCollection<V> evaluation) {
-      mThrottlingExecutor.execute(new Runnable() {
+      mOrderedExecutor.execute(new Runnable() {
 
         public void run() {
           mEvaluations.remove(evaluation);
@@ -1361,7 +1360,12 @@ class DefaultLoop<V> implements Loop<V>, Serializable {
 
       if (command != null) {
         command.run();
-        addFailure(mNext, failure);
+        try {
+          addFailure(mNext, failure);
+
+        } catch (final Throwable t) {
+          getLogger().dbg(t, "Suppressed failure");
+        }
       }
     }
 
@@ -1372,7 +1376,7 @@ class DefaultLoop<V> implements Loop<V>, Serializable {
 
     abstract void addValues(LoopPropagation<R, ?> next, @NotNull Iterable<? extends V> values);
 
-    boolean cancel(@NotNull final Throwable exception) {
+    boolean cancel(@NotNull final CancellationException exception) {
       final Runnable command;
       synchronized (mMutex) {
         command = mInnerState.cancel(exception);
@@ -1392,6 +1396,18 @@ class DefaultLoop<V> implements Loop<V>, Serializable {
     @NotNull
     abstract LoopPropagation<V, R> copy();
 
+    final void fail(@NotNull final Throwable failure) {
+      final Runnable command;
+      synchronized (mMutex) {
+        command = mInnerState.cancel(new CancellationException());
+      }
+
+      if (command != null) {
+        command.run();
+        mNext.failSafe(failure);
+      }
+    }
+
     final void failSafe(@NotNull final Throwable failure) {
       final Runnable command;
       synchronized (mMutex) {
@@ -1401,8 +1417,13 @@ class DefaultLoop<V> implements Loop<V>, Serializable {
       if (command != null) {
         command.run();
         final LoopPropagation<R, ?> next = mNext;
-        addFailure(next, failure);
-        set(next);
+        try {
+          addFailure(next, failure);
+          set(next);
+
+        } catch (final Throwable t) {
+          getLogger().dbg(t, "Suppressed failure");
+        }
       }
     }
 
@@ -1444,6 +1465,49 @@ class DefaultLoop<V> implements Loop<V>, Serializable {
       mNext = next;
     }
 
+    private class StateCancelled extends StateEvaluating {
+
+      private final CancellationException mException;
+
+      private StateCancelled(@NotNull final CancellationException exception) {
+        mException = exception;
+      }
+
+      @Nullable
+      @Override
+      Runnable add() {
+        mLogger.wrn("Loop has been cancelled");
+        throw mException;
+      }
+
+      @Nullable
+      @Override
+      Runnable cancel(@NotNull final CancellationException exception) {
+        return null;
+      }
+
+      @Nullable
+      @Override
+      Runnable addFailureSafe(@NotNull final Throwable failure) {
+        mLogger.wrn("Loop has been cancelled");
+        return null;
+      }
+
+      @Nullable
+      @Override
+      Runnable failSafe(@NotNull final Throwable failure) {
+        mLogger.wrn(failure, "Suppressed failure");
+        return null;
+      }
+
+      @Nullable
+      @Override
+      Runnable set() {
+        mLogger.wrn("Loop has been cancelled");
+        throw mException;
+      }
+    }
+
     private class StateEvaluating {
 
       @Nullable
@@ -1457,8 +1521,8 @@ class DefaultLoop<V> implements Loop<V>, Serializable {
       }
 
       @Nullable
-      Runnable cancel(@NotNull final Throwable failure) {
-        mInnerState = new StateFailed(failure);
+      Runnable cancel(@NotNull final CancellationException exception) {
+        mInnerState = new StateCancelled(exception);
         return NO_OP;
       }
 
@@ -1485,6 +1549,12 @@ class DefaultLoop<V> implements Loop<V>, Serializable {
 
       @Nullable
       @Override
+      Runnable cancel(@NotNull final CancellationException exception) {
+        return null;
+      }
+
+      @Nullable
+      @Override
       Runnable add() {
         mLogger.wrn("Loop has already failed with reason: %s", mFailure);
         throw FailureException.wrap(new IllegalStateException("loop has already completed"));
@@ -1494,12 +1564,6 @@ class DefaultLoop<V> implements Loop<V>, Serializable {
       @Override
       Runnable addFailureSafe(@NotNull final Throwable failure) {
         mLogger.wrn("Loop has already failed with reason: %s", mFailure);
-        return null;
-      }
-
-      @Nullable
-      @Override
-      Runnable cancel(@NotNull final Throwable failure) {
         return null;
       }
 
@@ -1539,8 +1603,11 @@ class DefaultLoop<V> implements Loop<V>, Serializable {
             state.addTo(LoopPropagation.this);
           }
 
+        } catch (final CompletionException e) {
+          mLogger.dbg(e, "Loop has completed");
+
         } catch (final CancellationException e) {
-          mLogger.wrn(e, "Loop has been cancelled");
+          mLogger.dbg(e, "Loop has been cancelled");
           failSafe(e);
 
         } catch (final Throwable t) {
@@ -1584,7 +1651,7 @@ class DefaultLoop<V> implements Loop<V>, Serializable {
 
       @Nullable
       @Override
-      Runnable cancel(@NotNull final Throwable failure) {
+      Runnable cancel(@NotNull final CancellationException exception) {
         return null;
       }
 
@@ -1605,7 +1672,7 @@ class DefaultLoop<V> implements Loop<V>, Serializable {
       @Nullable
       @Override
       Runnable failSafe(@NotNull final Throwable failure) {
-        mLogger.wrn(failure, "Suppressed rejection");
+        mLogger.wrn(failure, "Suppressed failure");
         return null;
       }
 
@@ -1952,7 +2019,12 @@ class DefaultLoop<V> implements Loop<V>, Serializable {
         return new Runnable() {
 
           public void run() {
-            propagation.set();
+            try {
+              propagation.set();
+
+            } catch (final Throwable ignore) {
+              // TODO: 06/03/2018 what?
+            }
           }
         };
       }
@@ -2007,9 +2079,9 @@ class DefaultLoop<V> implements Loop<V>, Serializable {
       mExpression = ConstantConditions.notNull("expression", expression);
     }
 
-    private void innerFailSafe(final LoopPropagation<R, ?> next, @NotNull final Throwable failure) {
+    private void innerFail(@NotNull final Throwable failure) {
       mPendingCount.set(0);
-      next.failSafe(failure);
+      fail(failure);
     }
 
     private void innerSet(final LoopPropagation<R, ?> next) {
@@ -2088,49 +2160,94 @@ class DefaultLoop<V> implements Loop<V>, Serializable {
 
     @Override
     void addFailure(final LoopPropagation<R, ?> next, @NotNull final Throwable failure) {
+      final LoopExpression<V, R> expression = mExpression;
+      if (expression.isComplete()) {
+        set(next);
+        throw new CompletionException();
+      }
+
       mPendingCount.incrementAndGet();
       try {
-        mExpression.addFailure(failure, mEvaluation.withNext(next));
+        expression.addFailure(failure, mEvaluation.withNext(next));
+
+      } catch (final CompletionException e) {
+        getLogger().dbg(e, "Loop has completed");
+        throw e;
 
       } catch (final CancellationException e) {
-        getLogger().wrn(e, "Loop has been cancelled");
-        innerFailSafe(next, e);
+        getLogger().dbg(e, "Loop has been cancelled");
+        innerFail(e);
 
       } catch (final Throwable t) {
         getLogger().err(t, "Error while processing failure with reason: %s", failure);
-        innerFailSafe(next, t);
+        innerFail(t);
+      }
+
+      if (expression.isComplete()) {
+        set(next);
+        throw new CompletionException();
       }
     }
 
     @Override
     void addValue(final LoopPropagation<R, ?> next, final V value) {
+      final LoopExpression<V, R> expression = mExpression;
+      if (expression.isComplete()) {
+        set(next);
+        throw new CompletionException();
+      }
+
       mPendingCount.incrementAndGet();
       try {
-        mExpression.addValue(value, mEvaluation.withNext(next));
+        expression.addValue(value, mEvaluation.withNext(next));
+
+      } catch (final CompletionException e) {
+        getLogger().dbg(e, "Loop has completed");
+        throw e;
 
       } catch (final CancellationException e) {
-        getLogger().wrn(e, "Loop has been cancelled");
-        innerFailSafe(next, e);
+        getLogger().dbg(e, "Loop has been cancelled");
+        innerFail(e);
 
       } catch (final Throwable t) {
         getLogger().err(t, "Error while processing value: %s", value);
-        innerFailSafe(next, t);
+        innerFail(t);
+      }
+
+      if (expression.isComplete()) {
+        set(next);
+        throw new CompletionException();
       }
     }
 
     @Override
     void addValues(final LoopPropagation<R, ?> next, @NotNull final Iterable<? extends V> values) {
+      final LoopExpression<V, R> expression = mExpression;
+      if (expression.isComplete()) {
+        set(next);
+        throw new CompletionException();
+      }
+
       mPendingCount.incrementAndGet();
       try {
-        mExpression.addValues(values, mEvaluation.withNext(next));
+        expression.addValues(values, mEvaluation.withNext(next));
+
+      } catch (final CompletionException e) {
+        getLogger().dbg(e, "Loop has completed");
+        throw e;
 
       } catch (final CancellationException e) {
-        getLogger().wrn(e, "Loop has been cancelled");
-        innerFailSafe(next, e);
+        getLogger().dbg(e, "Loop has been cancelled");
+        innerFail(e);
 
       } catch (final Throwable t) {
         getLogger().err(t, "Error while processing values: %s", Iterables.toString(values));
-        innerFailSafe(next, t);
+        innerFail(t);
+      }
+
+      if (expression.isComplete()) {
+        set(next);
+        throw new CompletionException();
       }
     }
 
@@ -2143,17 +2260,32 @@ class DefaultLoop<V> implements Loop<V>, Serializable {
     @Override
     void addFailures(final LoopPropagation<R, ?> next,
         @NotNull final Iterable<? extends Throwable> failures) {
+      final LoopExpression<V, R> expression = mExpression;
+      if (expression.isComplete()) {
+        set(next);
+        throw new CompletionException();
+      }
+
       mPendingCount.incrementAndGet();
       try {
-        mExpression.addFailures(failures, mEvaluation.withNext(next));
+        expression.addFailures(failures, mEvaluation.withNext(next));
+
+      } catch (final CompletionException e) {
+        getLogger().dbg(e, "Loop has completed");
+        throw e;
 
       } catch (final CancellationException e) {
-        getLogger().wrn(e, "Loop has been cancelled");
-        innerFailSafe(next, e);
+        getLogger().dbg(e, "Loop has been cancelled");
+        innerFail(e);
 
       } catch (final Throwable t) {
         getLogger().err(t, "Error while processing value: %s", Iterables.toString(failures));
-        innerFailSafe(next, t);
+        innerFail(t);
+      }
+
+      if (expression.isComplete()) {
+        set(next);
+        throw new CompletionException();
       }
     }
 
@@ -2162,13 +2294,17 @@ class DefaultLoop<V> implements Loop<V>, Serializable {
       try {
         mExpression.set(mEvaluation.withNext(next));
 
+      } catch (final CompletionException e) {
+        getLogger().dbg(e, "Loop has completed");
+        throw e;
+
       } catch (final CancellationException e) {
-        getLogger().wrn(e, "Loop has been cancelled");
-        innerFailSafe(next, e);
+        getLogger().dbg(e, "Loop has been cancelled");
+        innerFail(e);
 
       } catch (final Throwable t) {
         getLogger().err(t, "Error while completing loop");
-        innerFailSafe(next, t);
+        innerFail(t);
       }
     }
   }
@@ -2194,13 +2330,13 @@ class DefaultLoop<V> implements Loop<V>, Serializable {
       addTo(mMutex, mQueue, next);
     }
 
-    private void innerFailSafe(final LoopPropagation<R, ?> next, @NotNull final Throwable failure) {
+    private void innerFail(@NotNull final Throwable failure) {
       mPendingCount.set(0);
       synchronized (mMutex) {
         mQueue.clear();
       }
 
-      next.failSafe(failure);
+      fail(failure);
     }
 
     private void innerSet(final LoopPropagation<R, ?> next) {
@@ -2317,49 +2453,94 @@ class DefaultLoop<V> implements Loop<V>, Serializable {
 
     @Override
     void addFailure(final LoopPropagation<R, ?> next, @NotNull final Throwable failure) {
+      final LoopExpression<V, R> expression = mExpression;
+      if (expression.isComplete()) {
+        set(next);
+        throw new CompletionException();
+      }
+
       mPendingCount.incrementAndGet();
       try {
-        mExpression.addFailure(failure, new PropagationEvaluations(mQueue.addNested(), next));
+        expression.addFailure(failure, new PropagationEvaluations(mQueue.addNested(), next));
+
+      } catch (final CompletionException e) {
+        getLogger().dbg(e, "Loop has completed");
+        throw e;
 
       } catch (final CancellationException e) {
-        getLogger().wrn(e, "Loop has been cancelled");
-        innerFailSafe(next, e);
+        getLogger().dbg(e, "Loop has been cancelled");
+        innerFail(e);
 
       } catch (final Throwable t) {
         getLogger().err(t, "Error while processing failure with reason: %s", failure);
-        innerFailSafe(next, t);
+        innerFail(t);
+      }
+
+      if (expression.isComplete()) {
+        set(next);
+        throw new CompletionException();
       }
     }
 
     @Override
     void addValue(final LoopPropagation<R, ?> next, final V value) {
+      final LoopExpression<V, R> expression = mExpression;
+      if (expression.isComplete()) {
+        set(next);
+        throw new CompletionException();
+      }
+
       mPendingCount.incrementAndGet();
       try {
-        mExpression.addValue(value, new PropagationEvaluations(mQueue.addNested(), next));
+        expression.addValue(value, new PropagationEvaluations(mQueue.addNested(), next));
+
+      } catch (final CompletionException e) {
+        getLogger().dbg(e, "Loop has completed");
+        throw e;
 
       } catch (final CancellationException e) {
-        getLogger().wrn(e, "Loop has been cancelled");
-        innerFailSafe(next, e);
+        getLogger().dbg(e, "Loop has been cancelled");
+        innerFail(e);
 
       } catch (final Throwable t) {
         getLogger().err(t, "Error while processing value: %s", value);
-        innerFailSafe(next, t);
+        innerFail(t);
+      }
+
+      if (expression.isComplete()) {
+        set(next);
+        throw new CompletionException();
       }
     }
 
     @Override
     void addValues(final LoopPropagation<R, ?> next, @NotNull final Iterable<? extends V> values) {
+      final LoopExpression<V, R> expression = mExpression;
+      if (expression.isComplete()) {
+        set(next);
+        throw new CompletionException();
+      }
+
       mPendingCount.incrementAndGet();
       try {
-        mExpression.addValues(values, new PropagationEvaluations(mQueue.addNested(), next));
+        expression.addValues(values, new PropagationEvaluations(mQueue.addNested(), next));
+
+      } catch (final CompletionException e) {
+        getLogger().dbg(e, "Loop has completed");
+        throw e;
 
       } catch (final CancellationException e) {
-        getLogger().wrn(e, "Loop has been cancelled");
-        innerFailSafe(next, e);
+        getLogger().dbg(e, "Loop has been cancelled");
+        innerFail(e);
 
       } catch (final Throwable t) {
         getLogger().err(t, "Error while processing values: %s", Iterables.toString(values));
-        innerFailSafe(next, t);
+        innerFail(t);
+      }
+
+      if (expression.isComplete()) {
+        set(next);
+        throw new CompletionException();
       }
     }
 
@@ -2372,17 +2553,32 @@ class DefaultLoop<V> implements Loop<V>, Serializable {
     @Override
     void addFailures(final LoopPropagation<R, ?> next,
         @NotNull final Iterable<? extends Throwable> failures) {
+      final LoopExpression<V, R> expression = mExpression;
+      if (expression.isComplete()) {
+        set(next);
+        throw new CompletionException();
+      }
+
       mPendingCount.incrementAndGet();
       try {
-        mExpression.addFailures(failures, new PropagationEvaluations(mQueue.addNested(), next));
+        expression.addFailures(failures, new PropagationEvaluations(mQueue.addNested(), next));
+
+      } catch (final CompletionException e) {
+        getLogger().dbg(e, "Loop has completed");
+        throw e;
 
       } catch (final CancellationException e) {
-        getLogger().wrn(e, "Loop has been cancelled");
-        innerFailSafe(next, e);
+        getLogger().dbg(e, "Loop has been cancelled");
+        innerFail(e);
 
       } catch (final Throwable t) {
         getLogger().err(t, "Error while processing failures: %s", Iterables.toString(failures));
-        innerFailSafe(next, t);
+        innerFail(t);
+      }
+
+      if (expression.isComplete()) {
+        set(next);
+        throw new CompletionException();
       }
     }
 
@@ -2391,13 +2587,17 @@ class DefaultLoop<V> implements Loop<V>, Serializable {
       try {
         mExpression.set(new PropagationEvaluations(mQueue.addNested(), next));
 
+      } catch (final CompletionException e) {
+        getLogger().dbg(e, "Loop has completed");
+        throw e;
+
       } catch (final CancellationException e) {
-        getLogger().wrn(e, "Loop has been cancelled");
-        innerFailSafe(next, e);
+        getLogger().dbg(e, "Loop has been cancelled");
+        innerFail(e);
 
       } catch (final Throwable t) {
         getLogger().err(t, "Error while completing loop");
-        innerFailSafe(next, t);
+        innerFail(t);
       }
     }
   }
@@ -2417,9 +2617,9 @@ class DefaultLoop<V> implements Loop<V>, Serializable {
       mExpression = ConstantConditions.notNull("expression", expression);
     }
 
-    private void innerFailSafe(final LoopPropagation<R, ?> next, @NotNull final Throwable failure) {
+    private void innerFail(@NotNull final Throwable failure) {
       mPendingCount.set(0);
-      next.failSafe(failure);
+      fail(failure);
     }
 
     private void innerSet(final LoopPropagation<R, ?> next) {
@@ -2485,13 +2685,17 @@ class DefaultLoop<V> implements Loop<V>, Serializable {
       try {
         mExpression.failure(failure, mEvaluation.withNext(next));
 
+      } catch (final CompletionException e) {
+        getLogger().dbg(e, "Loop has completed");
+        throw e;
+
       } catch (final CancellationException e) {
-        getLogger().wrn(e, "Loop has been cancelled");
-        innerFailSafe(next, e);
+        getLogger().dbg(e, "Loop has been cancelled");
+        innerFail(e);
 
       } catch (final Throwable t) {
         getLogger().err(t, "Error while processing failure with reason: %s", failure);
-        innerFailSafe(next, t);
+        innerFail(t);
       }
     }
 
@@ -2501,13 +2705,17 @@ class DefaultLoop<V> implements Loop<V>, Serializable {
       try {
         mExpression.value(value, mEvaluation.withNext(next));
 
+      } catch (final CompletionException e) {
+        getLogger().dbg(e, "Loop has completed");
+        throw e;
+
       } catch (final CancellationException e) {
-        getLogger().wrn(e, "Loop has been cancelled");
-        innerFailSafe(next, e);
+        getLogger().dbg(e, "Loop has been cancelled");
+        innerFail(e);
 
       } catch (final Throwable t) {
         getLogger().err(t, "Error while processing value: %s", value);
-        innerFailSafe(next, t);
+        innerFail(t);
       }
     }
 
@@ -2519,14 +2727,18 @@ class DefaultLoop<V> implements Loop<V>, Serializable {
         try {
           mExpression.value(value, evaluation);
 
+        } catch (final CompletionException e) {
+          getLogger().dbg(e, "Loop has completed");
+          throw e;
+
         } catch (final CancellationException e) {
-          getLogger().wrn(e, "Loop has been cancelled");
-          innerFailSafe(next, e);
+          getLogger().dbg(e, "Loop has been cancelled");
+          innerFail(e);
           break;
 
         } catch (final Throwable t) {
           getLogger().err(t, "Error while processing value: %s", value);
-          innerFailSafe(next, t);
+          innerFail(t);
           break;
         }
       }
@@ -2547,14 +2759,18 @@ class DefaultLoop<V> implements Loop<V>, Serializable {
         try {
           mExpression.failure(failure, evaluation);
 
+        } catch (final CompletionException e) {
+          getLogger().dbg(e, "Loop has completed");
+          throw e;
+
         } catch (final CancellationException e) {
-          getLogger().wrn(e, "Loop has been cancelled");
-          innerFailSafe(next, e);
+          getLogger().dbg(e, "Loop has been cancelled");
+          innerFail(e);
           break;
 
         } catch (final Throwable t) {
           getLogger().err(t, "Error while processing failure with reason: %s", failure);
-          innerFailSafe(next, t);
+          innerFail(t);
           break;
         }
       }
@@ -2597,13 +2813,13 @@ class DefaultLoop<V> implements Loop<V>, Serializable {
       }
     }
 
-    private void innerFailSafe(final LoopPropagation<R, ?> next, @NotNull final Throwable failure) {
+    private void innerFail(@NotNull final Throwable failure) {
       mPendingCount.set(0);
       synchronized (mMutex) {
         mQueue.clear();
       }
 
-      next.failSafe(failure);
+      fail(failure);
     }
 
     private void innerSet(final LoopPropagation<R, ?> next) {
@@ -2679,13 +2895,17 @@ class DefaultLoop<V> implements Loop<V>, Serializable {
       try {
         mExpression.failure(failure, new PropagationEvaluation(mQueue.addNested(), next));
 
+      } catch (final CompletionException e) {
+        getLogger().dbg(e, "Loop has completed");
+        throw e;
+
       } catch (final CancellationException e) {
-        getLogger().wrn(e, "Loop has been cancelled");
-        innerFailSafe(next, e);
+        getLogger().dbg(e, "Loop has been cancelled");
+        innerFail(e);
 
       } catch (final Throwable t) {
         getLogger().err(t, "Error while processing failure with reason: %s", failure);
-        innerFailSafe(next, t);
+        innerFail(t);
       }
     }
 
@@ -2695,13 +2915,17 @@ class DefaultLoop<V> implements Loop<V>, Serializable {
       try {
         mExpression.value(value, new PropagationEvaluation(mQueue.addNested(), next));
 
+      } catch (final CompletionException e) {
+        getLogger().dbg(e, "Loop has completed");
+        throw e;
+
       } catch (final CancellationException e) {
-        getLogger().wrn(e, "Loop has been cancelled");
-        innerFailSafe(next, e);
+        getLogger().dbg(e, "Loop has been cancelled");
+        innerFail(e);
 
       } catch (final Throwable t) {
         getLogger().err(t, "Error while processing value: %s", value);
-        innerFailSafe(next, t);
+        innerFail(t);
       }
     }
 
@@ -2712,14 +2936,18 @@ class DefaultLoop<V> implements Loop<V>, Serializable {
         try {
           mExpression.value(value, new PropagationEvaluation(mQueue.addNested(), next));
 
+        } catch (final CompletionException e) {
+          getLogger().dbg(e, "Loop has completed");
+          throw e;
+
         } catch (final CancellationException e) {
-          getLogger().wrn(e, "Loop has been cancelled");
-          innerFailSafe(next, e);
+          getLogger().dbg(e, "Loop has been cancelled");
+          innerFail(e);
           break;
 
         } catch (final Throwable t) {
           getLogger().err(t, "Error while processing value: %s", value);
-          innerFailSafe(next, t);
+          innerFail(t);
           break;
         }
       }
@@ -2739,14 +2967,18 @@ class DefaultLoop<V> implements Loop<V>, Serializable {
         try {
           mExpression.failure(failure, new PropagationEvaluation(mQueue.addNested(), next));
 
+        } catch (final CompletionException e) {
+          getLogger().dbg(e, "Loop has completed");
+          throw e;
+
         } catch (final CancellationException e) {
-          getLogger().wrn(e, "Loop has been cancelled");
-          innerFailSafe(next, e);
+          getLogger().dbg(e, "Loop has been cancelled");
+          innerFail(e);
           break;
 
         } catch (final Throwable t) {
           getLogger().err(t, "Error while processing value: %s", failure);
-          innerFailSafe(next, t);
+          innerFail(t);
           break;
         }
       }
@@ -2776,9 +3008,9 @@ class DefaultLoop<V> implements Loop<V>, Serializable {
       mExpression = ConstantConditions.notNull("expression", expression);
     }
 
-    private void innerFailSafe(final LoopPropagation<R, ?> next, @NotNull final Throwable failure) {
+    private void innerFail(@NotNull final Throwable failure) {
       mPendingCount.set(0);
-      next.failSafe(failure);
+      fail(failure);
     }
 
     private void innerSet(final LoopPropagation<R, ?> next) {
@@ -2861,13 +3093,17 @@ class DefaultLoop<V> implements Loop<V>, Serializable {
       try {
         mExpression.failure(failure, mEvaluation.withNext(next));
 
+      } catch (final CompletionException e) {
+        getLogger().dbg(e, "Loop has completed");
+        throw e;
+
       } catch (final CancellationException e) {
-        getLogger().wrn(e, "Loop has been cancelled");
-        innerFailSafe(next, e);
+        getLogger().dbg(e, "Loop has been cancelled");
+        innerFail(e);
 
       } catch (final Throwable t) {
         getLogger().err(t, "Error while processing failure with reason: %s", failure);
-        innerFailSafe(next, t);
+        innerFail(t);
       }
     }
 
@@ -2877,13 +3113,17 @@ class DefaultLoop<V> implements Loop<V>, Serializable {
       try {
         mExpression.value(value, mEvaluation.withNext(next));
 
+      } catch (final CompletionException e) {
+        getLogger().dbg(e, "Loop has completed");
+        throw e;
+
       } catch (final CancellationException e) {
-        getLogger().wrn(e, "Loop has been cancelled");
-        innerFailSafe(next, e);
+        getLogger().dbg(e, "Loop has been cancelled");
+        innerFail(e);
 
       } catch (final Throwable t) {
         getLogger().err(t, "Error while processing value: %s", value);
-        innerFailSafe(next, t);
+        innerFail(t);
       }
     }
 
@@ -2895,14 +3135,18 @@ class DefaultLoop<V> implements Loop<V>, Serializable {
         try {
           mExpression.value(value, evaluation);
 
+        } catch (final CompletionException e) {
+          getLogger().dbg(e, "Loop has completed");
+          throw e;
+
         } catch (final CancellationException e) {
-          getLogger().wrn(e, "Loop has been cancelled");
-          innerFailSafe(next, e);
+          getLogger().dbg(e, "Loop has been cancelled");
+          innerFail(e);
           break;
 
         } catch (final Throwable t) {
           getLogger().err(t, "Error while processing value: %s", value);
-          innerFailSafe(next, t);
+          innerFail(t);
           break;
         }
       }
@@ -2923,14 +3167,18 @@ class DefaultLoop<V> implements Loop<V>, Serializable {
         try {
           mExpression.failure(failure, evaluation);
 
+        } catch (final CompletionException e) {
+          getLogger().dbg(e, "Loop has completed");
+          throw e;
+
         } catch (final CancellationException e) {
-          getLogger().wrn(e, "Loop has been cancelled");
-          innerFailSafe(next, e);
+          getLogger().dbg(e, "Loop has been cancelled");
+          innerFail(e);
           break;
 
         } catch (final Throwable t) {
           getLogger().err(t, "Error while processing failure with reason: %s", failure);
-          innerFailSafe(next, t);
+          innerFail(t);
           break;
         }
       }
@@ -2964,13 +3212,13 @@ class DefaultLoop<V> implements Loop<V>, Serializable {
       addTo(mMutex, mQueue, next);
     }
 
-    private void innerFailSafe(final LoopPropagation<R, ?> next, @NotNull final Throwable failure) {
+    private void innerFail(@NotNull final Throwable failure) {
       mPendingCount.set(0);
       synchronized (mMutex) {
         mQueue.clear();
       }
 
-      next.failSafe(failure);
+      fail(failure);
     }
 
     private void innerSet(final LoopPropagation<R, ?> next) {
@@ -3091,13 +3339,17 @@ class DefaultLoop<V> implements Loop<V>, Serializable {
       try {
         mExpression.failure(failure, new PropagationEvaluations(mQueue.addNested(), next));
 
+      } catch (final CompletionException e) {
+        getLogger().dbg(e, "Loop has completed");
+        throw e;
+
       } catch (final CancellationException e) {
-        getLogger().wrn(e, "Loop has been cancelled");
-        innerFailSafe(next, e);
+        getLogger().dbg(e, "Loop has been cancelled");
+        innerFail(e);
 
       } catch (final Throwable t) {
         getLogger().err(t, "Error while processing failure with reason: %s", failure);
-        innerFailSafe(next, t);
+        innerFail(t);
       }
     }
 
@@ -3107,13 +3359,17 @@ class DefaultLoop<V> implements Loop<V>, Serializable {
       try {
         mExpression.value(value, new PropagationEvaluations(mQueue.addNested(), next));
 
+      } catch (final CompletionException e) {
+        getLogger().dbg(e, "Loop has completed");
+        throw e;
+
       } catch (final CancellationException e) {
-        getLogger().wrn(e, "Loop has been cancelled");
-        innerFailSafe(next, e);
+        getLogger().dbg(e, "Loop has been cancelled");
+        innerFail(e);
 
       } catch (final Throwable t) {
         getLogger().err(t, "Error while processing value: %s", value);
-        innerFailSafe(next, t);
+        innerFail(t);
       }
     }
 
@@ -3124,14 +3380,18 @@ class DefaultLoop<V> implements Loop<V>, Serializable {
         try {
           mExpression.value(value, new PropagationEvaluations(mQueue.addNested(), next));
 
+        } catch (final CompletionException e) {
+          getLogger().dbg(e, "Loop has completed");
+          throw e;
+
         } catch (final CancellationException e) {
-          getLogger().wrn(e, "Loop has been cancelled");
-          innerFailSafe(next, e);
+          getLogger().dbg(e, "Loop has been cancelled");
+          innerFail(e);
           break;
 
         } catch (final Throwable t) {
           getLogger().err(t, "Error while processing value: %s", value);
-          innerFailSafe(next, t);
+          innerFail(t);
           break;
         }
       }
@@ -3151,14 +3411,18 @@ class DefaultLoop<V> implements Loop<V>, Serializable {
         try {
           mExpression.failure(failure, new PropagationEvaluations(mQueue.addNested(), next));
 
+        } catch (final CompletionException e) {
+          getLogger().dbg(e, "Loop has completed");
+          throw e;
+
         } catch (final CancellationException e) {
-          getLogger().wrn(e, "Loop has been cancelled");
-          innerFailSafe(next, e);
+          getLogger().dbg(e, "Loop has been cancelled");
+          innerFail(e);
           break;
 
         } catch (final Throwable t) {
           getLogger().err(t, "Error while processing failure with reason: %s", failure);
-          innerFailSafe(next, t);
+          innerFail(t);
           break;
         }
       }

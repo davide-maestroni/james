@@ -55,6 +55,7 @@ class ReplayAllForker<V> implements LoopForker<ForkerStack<V>, V>, Serializable 
       @NotNull final EvaluationCollection<V> evaluation, @NotNull final Loop<V> context) {
     final int maxTimes = mMaxTimes;
     if ((maxTimes > 0) && (stack.count >= maxTimes)) {
+      stack.states = null;
       evaluation.addFailure(new IllegalStateException("the loop evaluation cannot be propagated"))
           .set();
       return stack;
@@ -68,7 +69,7 @@ class ReplayAllForker<V> implements LoopForker<ForkerStack<V>, V>, Serializable 
 
     final ArrayList<EvaluationCollection<V>> evaluations = stack.evaluations;
     if (evaluations != null) {
-      stack.evaluations.add(evaluation);
+      evaluations.add(evaluation);
     }
 
     return stack;
@@ -81,7 +82,11 @@ class ReplayAllForker<V> implements LoopForker<ForkerStack<V>, V>, Serializable 
       evaluation.addFailure(failure);
     }
 
-    stack.states.add(SimpleState.<V>ofFailure(failure));
+    final ArrayList<SimpleState<V>> states = stack.states;
+    if (states != null) {
+      states.add(SimpleState.<V>ofFailure(failure));
+    }
+
     return stack;
   }
 
@@ -96,17 +101,21 @@ class ReplayAllForker<V> implements LoopForker<ForkerStack<V>, V>, Serializable 
       evaluation.addValue(value);
     }
 
-    stack.states.add(SimpleState.ofValue(value));
+    final ArrayList<SimpleState<V>> states = stack.states;
+    if (states != null) {
+      states.add(SimpleState.ofValue(value));
+    }
+
     return stack;
   }
 
   static class ForkerStack<V> {
 
-    private final ArrayList<SimpleState<V>> states = new ArrayList<SimpleState<V>>();
-
     private int count;
 
     private ArrayList<EvaluationCollection<V>> evaluations =
         new ArrayList<EvaluationCollection<V>>();
+
+    private ArrayList<SimpleState<V>> states = new ArrayList<SimpleState<V>>();
   }
 }

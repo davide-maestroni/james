@@ -255,6 +255,11 @@ public class ExecutorPool {
   }
 
   @NotNull
+  public static Executor ordered(@NotNull final Executor executor) {
+    return OrderedExecutor.of(asOwner(executor));
+  }
+
+  @NotNull
   public static ScheduledExecutor register(@NotNull final ScheduledExecutor executor) {
     // TODO: 17/02/2018 remove...
     return registerOwner(ConstantConditions.notNull("executor", executor));

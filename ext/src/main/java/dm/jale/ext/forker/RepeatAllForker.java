@@ -20,6 +20,7 @@ import org.jetbrains.annotations.NotNull;
 
 import java.io.Serializable;
 
+import dm.jale.Eventual;
 import dm.jale.eventual.EvaluationCollection;
 import dm.jale.eventual.Loop;
 import dm.jale.eventual.LoopForker;
@@ -30,29 +31,48 @@ import dm.jale.util.ConstantConditions;
 /**
  * Created by davide-maestroni on 02/19/2018.
  */
-class RepeatAllForker<V> implements LoopForker<ForkerStack, V>, Serializable {
+class RepeatAllForker<V> implements LoopForker<ForkerStack<V>, V>, Serializable {
 
   private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
 
   private final int mMaxTimes;
 
-  RepeatAllForker() {
+  private RepeatAllForker() {
     mMaxTimes = -1;
   }
 
-  RepeatAllForker(final int maxTimes) {
+  private RepeatAllForker(final int maxTimes) {
     mMaxTimes = ConstantConditions.positive("maxTimes", maxTimes);
   }
 
-  public ForkerStack done(final ForkerStack stack, @NotNull final Loop<V> context) {
+  @NotNull
+  static <V> LoopForker<?, V> newForker() {
+    return Eventual.bufferedLoop(new RepeatAllForker<V>());
+  }
+
+  @NotNull
+  static <V> LoopForker<?, V> newForker(final int maxTimes) {
+    return Eventual.bufferedLoop(new RepeatAllForker<V>(maxTimes));
+  }
+
+  public ForkerStack<V> done(final ForkerStack<V> stack, @NotNull final Loop<V> context) {
+    stack.evaluation.set();
+    stack.evaluation = null;
     return stack;
   }
 
-  public ForkerStack evaluation(final ForkerStack stack,
+  public ForkerStack<V> evaluation(final ForkerStack<V> stack,
       @NotNull final EvaluationCollection<V> evaluation, @NotNull final Loop<V> context) {
+
     final int maxTimes = mMaxTimes;
     if ((maxTimes < 0) || (stack.count < maxTimes)) {
-      context.evaluate().to(evaluation);
+      if (stack.evaluation == null) {
+        stack.evaluation = evaluation;
+
+      } else {
+        context.evaluate().to(evaluation);
+      }
+
       ++stack.count;
 
     } else {
@@ -60,24 +80,29 @@ class RepeatAllForker<V> implements LoopForker<ForkerStack, V>, Serializable {
           .set();
     }
 
-    return null;
+    return stack;
   }
 
-  public ForkerStack failure(final ForkerStack stack, @NotNull final Throwable failure,
+  public ForkerStack<V> failure(final ForkerStack<V> stack, @NotNull final Throwable failure,
       @NotNull final Loop<V> context) {
+    stack.evaluation.addFailure(failure);
     return stack;
   }
 
-  public ForkerStack init(@NotNull final Loop<V> context) {
-    return new ForkerStack();
+  public ForkerStack<V> init(@NotNull final Loop<V> context) {
+    return new ForkerStack<V>();
   }
 
-  public ForkerStack value(final ForkerStack stack, final V value, @NotNull final Loop<V> context) {
+  public ForkerStack<V> value(final ForkerStack<V> stack, final V value,
+      @NotNull final Loop<V> context) {
+    stack.evaluation.addValue(value);
     return stack;
   }
 
-  static class ForkerStack {
+  static class ForkerStack<V> {
 
     private int count;
+
+    private EvaluationCollection<V> evaluation;
   }
 }

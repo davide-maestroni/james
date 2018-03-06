@@ -837,7 +837,7 @@ public class EventualExt extends Eventual {
   }
 
   @NotNull
-  public <V> Loop<V> loopSequence(@NotNull final V start, final long count,
+  public <V> Loop<V> loopSequence(final V start, final long count,
       @NotNull final Mapper<? super V, ? extends V> increment) {
     return loop(new InSequenceObserver<V>(start, count, increment));
   }
