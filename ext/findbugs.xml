@@ -25,7 +25,7 @@
         -->
     </Match>
     <Match>
-        <Class name="dm.jale.ext.yielder.AllMatchYielder"/>
+        <Class name="dm.jale.ext.yield.AllMatchYielder"/>
         <Or>
             <Method name="failure"/>
             <Method name="value"/>
@@ -33,7 +33,7 @@
         <Bug pattern="NP_BOOLEAN_RETURN_NULL"/>
     </Match>
     <Match>
-        <Class name="dm.jale.ext.yielder.AnyMatchYielder"/>
+        <Class name="dm.jale.ext.yield.AnyMatchYielder"/>
         <Or>
             <Method name="failure"/>
             <Method name="value"/>

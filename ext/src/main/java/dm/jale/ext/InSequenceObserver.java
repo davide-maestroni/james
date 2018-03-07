@@ -23,9 +23,9 @@ import java.io.ObjectStreamException;
 import java.io.Serializable;
 
 import dm.jale.eventual.EvaluationCollection;
-import dm.jale.eventual.Mapper;
 import dm.jale.eventual.Observer;
 import dm.jale.ext.config.BuildConfig;
+import dm.jale.ext.eventual.BiMapper;
 import dm.jale.util.ConstantConditions;
 import dm.jale.util.SerializableProxy;
 
@@ -38,12 +38,12 @@ class InSequenceObserver<V> implements Observer<EvaluationCollection<V>>, Serial
 
   private final long mCount;
 
-  private final Mapper<? super V, ? extends V> mIncrement;
+  private final BiMapper<? super V, ? super Integer, ? extends V> mIncrement;
 
   private final V mStart;
 
   InSequenceObserver(final V start, final long count,
-      @NotNull final Mapper<? super V, ? extends V> increment) {
+      @NotNull final BiMapper<? super V, ? super Integer, ? extends V> increment) {
     mCount = ConstantConditions.notNegative("count", count);
     mIncrement = ConstantConditions.notNull("increment", increment);
     mStart = start;
@@ -52,11 +52,12 @@ class InSequenceObserver<V> implements Observer<EvaluationCollection<V>>, Serial
   public void accept(final EvaluationCollection<V> evaluation) throws Exception {
     V value = mStart;
     @SuppressWarnings("UnnecessaryLocalVariable") final long count = mCount;
-    @SuppressWarnings("UnnecessaryLocalVariable") final Mapper<? super V, ? extends V> increment =
-        mIncrement;
+    @SuppressWarnings(
+        "UnnecessaryLocalVariable") final BiMapper<? super V, ? super Integer, ? extends V>
+        increment = mIncrement;
     for (int i = 0; i < count; ++i) {
       evaluation.addValue(value);
-      value = increment.apply(value);
+      value = increment.apply(value, i);
     }
 
     evaluation.set();
@@ -72,7 +73,7 @@ class InSequenceObserver<V> implements Observer<EvaluationCollection<V>>, Serial
     private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
 
     private ObserverProxy(final V start, final long count,
-        final Mapper<? super V, ? extends V> increment) {
+        final BiMapper<? super V, ? super Integer, ? extends V> increment) {
       super(start, count, proxy(increment));
     }
 
@@ -82,7 +83,7 @@ class InSequenceObserver<V> implements Observer<EvaluationCollection<V>>, Serial
       try {
         final Object[] args = deserializeArgs();
         return new InSequenceObserver<V>((V) args[0], (Long) args[2],
-            (Mapper<? super V, ? extends V>) args[3]);
+            (BiMapper<? super V, ? super Integer, ? extends V>) args[3]);
 
       } catch (final Throwable t) {
         throw new InvalidObjectException(t.getMessage());
