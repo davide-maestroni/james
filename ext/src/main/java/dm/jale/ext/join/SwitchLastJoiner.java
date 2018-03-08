@@ -26,8 +26,8 @@ import dm.jale.eventual.FailureException;
 import dm.jale.eventual.Loop;
 import dm.jale.eventual.LoopJoiner;
 import dm.jale.eventual.SimpleState;
-import dm.jale.ext.join.SwitchLastJoiner.JoinerStack;
 import dm.jale.ext.config.BuildConfig;
+import dm.jale.ext.join.SwitchLastJoiner.JoinerStack;
 import dm.jale.util.ConstantConditions;
 import dm.jale.util.DoubleQueue;
 

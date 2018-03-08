@@ -25,8 +25,8 @@ import java.util.List;
 import dm.jale.eventual.EvaluationCollection;
 import dm.jale.eventual.Loop;
 import dm.jale.eventual.LoopJoiner;
-import dm.jale.ext.join.ZipFillJoiner.JoinerStack;
 import dm.jale.ext.config.BuildConfig;
+import dm.jale.ext.join.ZipFillJoiner.JoinerStack;
 import dm.jale.util.ConstantConditions;
 import dm.jale.util.DoubleQueue;
 

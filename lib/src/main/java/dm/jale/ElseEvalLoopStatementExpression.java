@@ -32,33 +32,47 @@ import dm.jale.util.SerializableProxy;
 /**
  * Created by davide-maestroni on 02/01/2018.
  */
-class ForEachLoopIfStatementExpression<V, R> extends StatementLoopExpression<V, R>
+class ElseEvalLoopStatementExpression<V> extends StatementLoopExpression<V, V>
     implements Serializable {
 
   private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
 
-  private final Mapper<? super V, ? extends Loop<R>> mMapper;
+  private final Mapper<? super Throwable, ? extends Loop<? extends V>> mMapper;
 
-  ForEachLoopIfStatementExpression(@NotNull final Mapper<? super V, ? extends Loop<R>> mapper) {
+  private final Class<?>[] mTypes;
+
+  ElseEvalLoopStatementExpression(
+      @NotNull final Mapper<? super Throwable, ? extends Loop<? extends V>> mapper,
+      @NotNull final Class<?>[] exceptionTypes) {
     mMapper = ConstantConditions.notNull("mapper", mapper);
+    mTypes = ConstantConditions.notNullElements("exception types", exceptionTypes);
   }
 
   @Override
-  void value(final V value, @NotNull final EvaluationCollection<R> evaluation) throws Exception {
-    mMapper.apply(value).to(evaluation);
+  void failure(@NotNull final Throwable failure,
+      @NotNull final EvaluationCollection<V> evaluation) throws Exception {
+    for (final Class<?> type : mTypes) {
+      if (type.isInstance(failure)) {
+        mMapper.apply(failure).evaluated().to(evaluation);
+        return;
+      }
+    }
+
+    super.failure(failure, evaluation);
   }
 
   @NotNull
   private Object writeReplace() throws ObjectStreamException {
-    return new HandlerProxy<V, R>(mMapper);
+    return new HandlerProxy<V>(mMapper, mTypes);
   }
 
-  private static class HandlerProxy<V, R> extends SerializableProxy {
+  private static class HandlerProxy<V> extends SerializableProxy {
 
     private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
 
-    private HandlerProxy(final Mapper<? super V, ? extends Loop<R>> mapper) {
-      super(proxy(mapper));
+    private HandlerProxy(final Mapper<? super Throwable, ? extends Loop<? extends V>> mapper,
+        final Class<?>[] exceptionTypes) {
+      super(proxy(mapper), exceptionTypes);
     }
 
     @NotNull
@@ -66,8 +80,8 @@ class ForEachLoopIfStatementExpression<V, R> extends StatementLoopExpression<V, 
     private Object readResolve() throws ObjectStreamException {
       try {
         final Object[] args = deserializeArgs();
-        return new ForEachLoopIfStatementExpression<V, R>(
-            (Mapper<? super V, ? extends Loop<R>>) args[0]);
+        return new ElseEvalLoopStatementExpression<V>(
+            (Mapper<? super Throwable, ? extends Loop<? extends V>>) args[0], (Class<?>[]) args[1]);
 
       } catch (final Throwable t) {
         throw new InvalidObjectException(t.getMessage());

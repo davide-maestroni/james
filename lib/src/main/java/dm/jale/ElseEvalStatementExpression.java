@@ -21,44 +21,43 @@ import org.jetbrains.annotations.NotNull;
 import java.io.InvalidObjectException;
 import java.io.ObjectStreamException;
 import java.io.Serializable;
-import java.util.ArrayList;
 
 import dm.jale.config.BuildConfig;
-import dm.jale.eventual.Loop.YieldOutputs;
+import dm.jale.eventual.Evaluation;
 import dm.jale.eventual.Mapper;
 import dm.jale.eventual.Statement;
 import dm.jale.util.ConstantConditions;
 import dm.jale.util.SerializableProxy;
 
 /**
- * Created by davide-maestroni on 02/05/2018.
+ * Created by davide-maestroni on 02/01/2018.
  */
-class ElseIfYielder<V> extends CollectionYielder<V> implements Serializable {
+class ElseEvalStatementExpression<V> extends StatementExpression<V, V> implements Serializable {
 
   private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
 
-  private final Mapper<? super Throwable, ? extends Statement<? extends Iterable<V>>> mMapper;
+  private final Mapper<? super Throwable, ? extends Statement<? extends V>> mMapper;
 
   private final Class<?>[] mTypes;
 
-  ElseIfYielder(
-      @NotNull final Mapper<? super Throwable, ? extends Statement<? extends Iterable<V>>> mapper,
+  ElseEvalStatementExpression(
+      @NotNull final Mapper<? super Throwable, ? extends Statement<? extends V>> mapper,
       @NotNull final Class<?>[] exceptionTypes) {
     mMapper = ConstantConditions.notNull("mapper", mapper);
     mTypes = ConstantConditions.notNullElements("exception types", exceptionTypes);
   }
 
   @Override
-  public ArrayList<V> failure(final ArrayList<V> stack, @NotNull final Throwable failure,
-      @NotNull final YieldOutputs<V> outputs) throws Exception {
+  void failure(@NotNull final Throwable failure, @NotNull final Evaluation<V> evaluation) throws
+      Exception {
     for (final Class<?> type : mTypes) {
       if (type.isInstance(failure)) {
-        outputs.yieldLoopIf(mMapper.apply(failure));
-        return null;
+        mMapper.apply(failure).evaluated().to(evaluation);
+        return;
       }
     }
 
-    return super.failure(stack, failure, outputs);
+    super.failure(failure, evaluation);
   }
 
   @NotNull
@@ -70,8 +69,7 @@ class ElseIfYielder<V> extends CollectionYielder<V> implements Serializable {
 
     private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
 
-    private HandlerProxy(
-        final Mapper<? super Throwable, ? extends Statement<? extends Iterable<V>>> mapper,
+    private HandlerProxy(final Mapper<? super Throwable, ? extends Statement<? extends V>> mapper,
         final Class<?>[] exceptionTypes) {
       super(proxy(mapper), exceptionTypes);
     }
@@ -81,8 +79,8 @@ class ElseIfYielder<V> extends CollectionYielder<V> implements Serializable {
     private Object readResolve() throws ObjectStreamException {
       try {
         final Object[] args = deserializeArgs();
-        return new ElseIfYielder<V>(
-            (Mapper<? super Throwable, ? extends Statement<? extends Iterable<V>>>) args[0],
+        return new ElseEvalStatementExpression<V>(
+            (Mapper<? super Throwable, ? extends Statement<? extends V>>) args[0],
             (Class<?>[]) args[1]);
 
       } catch (final Throwable t) {

@@ -354,9 +354,9 @@ class DefaultLoop<V> implements Loop<V>, Serializable {
   }
 
   @NotNull
-  public <R> Statement<R> eventuallyIf(
+  public <R> Statement<R> eventuallyEval(
       @NotNull final Mapper<? super Iterable<V>, ? extends Statement<R>> mapper) {
-    return toStatement().eventuallyIf(mapper);
+    return toStatement().eventuallyEval(mapper);
   }
 
   @NotNull
@@ -374,10 +374,10 @@ class DefaultLoop<V> implements Loop<V>, Serializable {
   }
 
   @NotNull
-  public <R> Statement<R> eventuallyTryIf(
+  public <R> Statement<R> eventuallyTryEval(
       @NotNull final Mapper<? super Iterable<V>, ? extends Closeable> closeable,
       @NotNull final Mapper<? super Iterable<V>, ? extends Statement<R>> mapper) {
-    return toStatement().eventuallyTryIf(closeable, mapper);
+    return toStatement().eventuallyTryEval(closeable, mapper);
   }
 
   public boolean getDone() {
@@ -492,10 +492,10 @@ class DefaultLoop<V> implements Loop<V>, Serializable {
   }
 
   @NotNull
-  public Loop<V> elseIf(
+  public Loop<V> elseEval(
       @NotNull final Mapper<? super Throwable, ? extends Statement<? extends Iterable<V>>> mapper,
       @Nullable final Class<?>... exceptionTypes) {
-    return yield(new ElseIfYielder<V>(mapper, Eventuals.cloneExceptionTypes(exceptionTypes)));
+    return yield(new ElseEvalYielder<V>(mapper, Eventuals.cloneExceptionTypes(exceptionTypes)));
   }
 
   @NotNull
@@ -562,11 +562,35 @@ class DefaultLoop<V> implements Loop<V>, Serializable {
   }
 
   @NotNull
-  public Loop<V> elseForEachIf(
+  public Loop<V> elseForEachEval(
       @NotNull final Mapper<? super Throwable, ? extends Statement<? extends V>> mapper,
       @Nullable Class<?>... exceptionTypes) {
     return propagate(
-        new ElseIfStatementExpression<V>(mapper, Eventuals.cloneExceptionTypes(exceptionTypes)));
+        new ElseEvalStatementExpression<V>(mapper, Eventuals.cloneExceptionTypes(exceptionTypes)));
+  }
+
+  @NotNull
+  public Loop<V> elseForEachEvalLoop(
+      @NotNull final Mapper<? super Throwable, ? extends Loop<? extends V>> mapper,
+      @Nullable Class<?>... exceptionTypes) {
+    return propagate(new ElseEvalLoopStatementExpression<V>(mapper,
+        Eventuals.cloneExceptionTypes(exceptionTypes)));
+  }
+
+  @NotNull
+  public Loop<V> elseForEachEvalLoopOrdered(
+      @NotNull final Mapper<? super Throwable, ? extends Loop<? extends V>> mapper,
+      @Nullable Class<?>... exceptionTypes) {
+    return propagateOrdered(new ElseEvalLoopStatementExpression<V>(mapper,
+        Eventuals.cloneExceptionTypes(exceptionTypes)));
+  }
+
+  @NotNull
+  public Loop<V> elseForEachEvalOrdered(
+      @NotNull final Mapper<? super Throwable, ? extends Statement<? extends V>> mapper,
+      @Nullable Class<?>... exceptionTypes) {
+    return propagateOrdered(
+        new ElseEvalStatementExpression<V>(mapper, Eventuals.cloneExceptionTypes(exceptionTypes)));
   }
 
   @NotNull
@@ -578,39 +602,15 @@ class DefaultLoop<V> implements Loop<V>, Serializable {
   }
 
   @NotNull
-  public Loop<V> elseForEachLoopIf(
-      @NotNull final Mapper<? super Throwable, ? extends Loop<? extends V>> mapper,
-      @Nullable Class<?>... exceptionTypes) {
-    return propagate(new ElseLoopIfStatementExpression<V>(mapper,
-        Eventuals.cloneExceptionTypes(exceptionTypes)));
-  }
-
-  @NotNull
-  public Loop<V> elseForEachOrderedIf(
-      @NotNull final Mapper<? super Throwable, ? extends Statement<? extends V>> mapper,
-      @Nullable Class<?>... exceptionTypes) {
-    return propagateOrdered(
-        new ElseIfStatementExpression<V>(mapper, Eventuals.cloneExceptionTypes(exceptionTypes)));
-  }
-
-  @NotNull
-  public Loop<V> elseForEachOrderedLoopIf(
-      @NotNull final Mapper<? super Throwable, ? extends Loop<? extends V>> mapper,
-      @Nullable Class<?>... exceptionTypes) {
-    return propagateOrdered(new ElseLoopIfStatementExpression<V>(mapper,
-        Eventuals.cloneExceptionTypes(exceptionTypes)));
+  public <R> Loop<R> eventuallyEvalLoop(
+      @NotNull final Mapper<? super Iterable<V>, ? extends Loop<R>> mapper) {
+    return yield(ListYielder.<V>instance()).forEachEvalLoop(mapper);
   }
 
   @NotNull
   public <R> Loop<R> eventuallyLoop(
       @NotNull final Mapper<? super Iterable<V>, ? extends Iterable<R>> mapper) {
     return yield(ListYielder.<V>instance()).forEachLoop(mapper);
-  }
-
-  @NotNull
-  public <R> Loop<R> eventuallyLoopIf(
-      @NotNull final Mapper<? super Iterable<V>, ? extends Loop<R>> mapper) {
-    return yield(ListYielder.<V>instance()).forEachLoopIf(mapper);
   }
 
   @NotNull
@@ -629,46 +629,30 @@ class DefaultLoop<V> implements Loop<V>, Serializable {
   }
 
   @NotNull
-  public <R> Loop<R> forEachIf(@NotNull final Mapper<? super V, ? extends Statement<R>> mapper) {
-    return propagate(new EventuallyIfStatementExpression<V, R>(mapper));
+  public <R> Loop<R> forEachEval(@NotNull final Mapper<? super V, ? extends Statement<R>> mapper) {
+    return propagate(new EventuallyEvalStatementExpression<V, R>(mapper));
+  }
+
+  @NotNull
+  public <R> Loop<R> forEachEvalLoop(@NotNull final Mapper<? super V, ? extends Loop<R>> mapper) {
+    return propagate(new ForEachEvalLoopStatementExpression<V, R>(mapper));
+  }
+
+  @NotNull
+  public <R> Loop<R> forEachEvalLoopOrdered(
+      @NotNull final Mapper<? super V, ? extends Loop<R>> mapper) {
+    return propagateOrdered(new ForEachEvalLoopStatementExpression<V, R>(mapper));
+  }
+
+  @NotNull
+  public <R> Loop<R> forEachEvalOrdered(
+      @NotNull final Mapper<? super V, ? extends Statement<R>> mapper) {
+    return propagateOrdered(new EventuallyEvalStatementExpression<V, R>(mapper));
   }
 
   @NotNull
   public <R> Loop<R> forEachLoop(@NotNull final Mapper<? super V, ? extends Iterable<R>> mapper) {
     return propagate(new ForEachLoopLoopExpression<V, R>(mapper));
-  }
-
-  @NotNull
-  public <R> Loop<R> forEachLoopIf(@NotNull final Mapper<? super V, ? extends Loop<R>> mapper) {
-    return propagate(new ForEachLoopIfStatementExpression<V, R>(mapper));
-  }
-
-  @NotNull
-  public <R> Loop<R> forEachOrderedIf(
-      @NotNull final Mapper<? super V, ? extends Statement<R>> mapper) {
-    return propagateOrdered(new EventuallyIfStatementExpression<V, R>(mapper));
-  }
-
-  @NotNull
-  public <R> Loop<R> forEachOrderedLoopIf(
-      @NotNull final Mapper<? super V, ? extends Loop<R>> mapper) {
-    return propagateOrdered(new ForEachLoopIfStatementExpression<V, R>(mapper));
-  }
-
-  @NotNull
-  public <R> Loop<R> forEachOrderedTryIf(
-      @NotNull final Mapper<? super V, ? extends Closeable> closeable,
-      @NotNull final Mapper<? super V, ? extends Statement<R>> mapper) {
-    return propagateOrdered(
-        new TryIfStatementExpression<V, R>(closeable, mapper, mLogger.getName()));
-  }
-
-  @NotNull
-  public <R> Loop<R> forEachOrderedTryLoopIf(
-      @NotNull final Mapper<? super V, ? extends Closeable> closeable,
-      @NotNull final Mapper<? super V, ? extends Loop<R>> mapper) {
-    return propagateOrdered(new TryStatementLoopExpression<V, R>(closeable,
-        new ForEachLoopIfStatementExpression<V, R>(mapper), mLogger.getName()));
   }
 
   @NotNull
@@ -687,9 +671,33 @@ class DefaultLoop<V> implements Loop<V>, Serializable {
   }
 
   @NotNull
-  public <R> Loop<R> forEachTryIf(@NotNull final Mapper<? super V, ? extends Closeable> closeable,
+  public <R> Loop<R> forEachTryEval(@NotNull final Mapper<? super V, ? extends Closeable> closeable,
       @NotNull final Mapper<? super V, ? extends Statement<R>> mapper) {
-    return propagate(new TryIfStatementExpression<V, R>(closeable, mapper, mLogger.getName()));
+    return propagate(new TryEvalStatementExpression<V, R>(closeable, mapper, mLogger.getName()));
+  }
+
+  @NotNull
+  public <R> Loop<R> forEachTryEvalLoop(
+      @NotNull final Mapper<? super V, ? extends Closeable> closeable,
+      @NotNull final Mapper<? super V, ? extends Loop<R>> mapper) {
+    return propagate(new TryStatementLoopExpression<V, R>(closeable,
+        new ForEachEvalLoopStatementExpression<V, R>(mapper), mLogger.getName()));
+  }
+
+  @NotNull
+  public <R> Loop<R> forEachTryEvalLoopOrdered(
+      @NotNull final Mapper<? super V, ? extends Closeable> closeable,
+      @NotNull final Mapper<? super V, ? extends Loop<R>> mapper) {
+    return propagateOrdered(new TryStatementLoopExpression<V, R>(closeable,
+        new ForEachEvalLoopStatementExpression<V, R>(mapper), mLogger.getName()));
+  }
+
+  @NotNull
+  public <R> Loop<R> forEachTryEvalOrdered(
+      @NotNull final Mapper<? super V, ? extends Closeable> closeable,
+      @NotNull final Mapper<? super V, ? extends Statement<R>> mapper) {
+    return propagateOrdered(
+        new TryEvalStatementExpression<V, R>(closeable, mapper, mLogger.getName()));
   }
 
   @NotNull
@@ -697,14 +705,6 @@ class DefaultLoop<V> implements Loop<V>, Serializable {
       @NotNull final Mapper<? super V, ? extends Iterable<R>> mapper) {
     return propagate(new TryStatementLoopExpression<V, R>(closeable,
         new ForEachLoopStatementExpression<V, R>(mapper), mLogger.getName()));
-  }
-
-  @NotNull
-  public <R> Loop<R> forEachTryLoopIf(
-      @NotNull final Mapper<? super V, ? extends Closeable> closeable,
-      @NotNull final Mapper<? super V, ? extends Loop<R>> mapper) {
-    return propagate(new TryStatementLoopExpression<V, R>(closeable,
-        new ForEachLoopIfStatementExpression<V, R>(mapper), mLogger.getName()));
   }
 
   @NotNull

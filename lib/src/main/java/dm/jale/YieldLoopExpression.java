@@ -207,28 +207,12 @@ class YieldLoopExpression<S, V, R> extends LoopExpression<V, R> implements Seria
     }
 
     @NotNull
-    public YieldOutputs<V> yieldIf(@NotNull final Statement<? extends V> statement) {
-      checkSet();
-      statement.to(new Evaluation<V>() {
-
-        public void fail(@NotNull final Throwable failure) {
-          mEvaluation.addFailure(failure);
-        }
-
-        public void set(final V value) {
-          mEvaluation.addValue(value);
-        }
-      });
-      return this;
-    }
-
-    @NotNull
     @SuppressWarnings("unchecked")
-    public YieldOutputs<V> yieldLoopIf(
+    public YieldOutputs<V> yieldLoop(
         @NotNull final Statement<? extends Iterable<? extends V>> loop) {
       checkSet();
       if (loop instanceof Loop) {
-        ((Loop<V>) loop).to(new EvaluationCollection<V>() {
+        ((Loop<V>) loop).evaluated().to(new EvaluationCollection<V>() {
 
           @NotNull
           public EvaluationCollection<V> addFailure(@NotNull final Throwable failure) {
@@ -260,7 +244,7 @@ class YieldLoopExpression<S, V, R> extends LoopExpression<V, R> implements Seria
         });
 
       } else {
-        loop.to(new Evaluation<Iterable<? extends V>>() {
+        loop.evaluated().to(new Evaluation<Iterable<? extends V>>() {
 
           public void fail(@NotNull final Throwable failure) {
             mEvaluation.addFailure(failure);
@@ -272,6 +256,22 @@ class YieldLoopExpression<S, V, R> extends LoopExpression<V, R> implements Seria
         });
       }
 
+      return this;
+    }
+
+    @NotNull
+    public YieldOutputs<V> yieldStatement(@NotNull final Statement<? extends V> statement) {
+      checkSet();
+      statement.evaluated().to(new Evaluation<V>() {
+
+        public void fail(@NotNull final Throwable failure) {
+          mEvaluation.addFailure(failure);
+        }
+
+        public void set(final V value) {
+          mEvaluation.addValue(value);
+        }
+      });
       return this;
     }
 

@@ -306,11 +306,11 @@ class DefaultStatement<V> implements Statement<V>, Serializable {
   }
 
   @NotNull
-  public Statement<V> elseIf(
+  public Statement<V> elseEval(
       @NotNull final Mapper<? super Throwable, ? extends Statement<? extends V>> mapper,
       @Nullable final Class<?>... exceptionTypes) {
     return propagate(
-        new ElseIfStatementExpression<V>(mapper, Eventuals.cloneExceptionTypes(exceptionTypes)));
+        new ElseEvalStatementExpression<V>(mapper, Eventuals.cloneExceptionTypes(exceptionTypes)));
   }
 
   @NotNull
@@ -351,9 +351,9 @@ class DefaultStatement<V> implements Statement<V>, Serializable {
   }
 
   @NotNull
-  public <R> Statement<R> eventuallyIf(
+  public <R> Statement<R> eventuallyEval(
       @NotNull final Mapper<? super V, ? extends Statement<R>> mapper) {
-    return propagate(new EventuallyIfStatementExpression<V, R>(mapper));
+    return propagate(new EventuallyEvalStatementExpression<V, R>(mapper));
   }
 
   @NotNull
@@ -374,10 +374,10 @@ class DefaultStatement<V> implements Statement<V>, Serializable {
   }
 
   @NotNull
-  public <R> Statement<R> eventuallyTryIf(
+  public <R> Statement<R> eventuallyTryEval(
       @NotNull final Mapper<? super V, ? extends Closeable> closeable,
       @NotNull final Mapper<? super V, ? extends Statement<R>> mapper) {
-    return propagate(new TryIfStatementExpression<V, R>(closeable, mapper, mLogger.getName()));
+    return propagate(new TryEvalStatementExpression<V, R>(closeable, mapper, mLogger.getName()));
   }
 
   @NotNull

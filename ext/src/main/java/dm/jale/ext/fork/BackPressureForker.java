@@ -209,41 +209,7 @@ class BackPressureForker<S, V> implements LoopForker<ForkerOutputs<S, V>, V>, Se
     }
 
     @NotNull
-    public YieldOutputs<V> yieldIf(@NotNull final Statement<? extends V> statement) {
-      checkSet();
-      synchronized (mMutex) {
-        ++mPendingCount;
-      }
-
-      final Executor executor = mExecutor;
-      executor.execute(NO_OP);
-      final EvaluationCollection<V> evaluation = mEvaluation;
-      statement.forkOn(executor).eventuallyDo(new Observer<V>() {
-
-        public void accept(final V value) throws Exception {
-          try {
-            evaluation.addValue(value);
-
-          } finally {
-            decrementPendingCount();
-          }
-        }
-      }).elseDo(new Observer<Throwable>() {
-
-        public void accept(final Throwable failure) throws Exception {
-          try {
-            evaluation.addFailure(failure);
-
-          } finally {
-            decrementPendingCount();
-          }
-        }
-      }).consume();
-      return this;
-    }
-
-    @NotNull
-    public YieldOutputs<V> yieldLoopIf(
+    public YieldOutputs<V> yieldLoop(
         @NotNull final Statement<? extends Iterable<? extends V>> loop) {
       checkSet();
       synchronized (mMutex) {
@@ -273,7 +239,41 @@ class BackPressureForker<S, V> implements LoopForker<ForkerOutputs<S, V>, V>, Se
             decrementPendingCount();
           }
         }
-      }).consume();
+      }).evaluated().consume();
+      return this;
+    }
+
+    @NotNull
+    public YieldOutputs<V> yieldStatement(@NotNull final Statement<? extends V> statement) {
+      checkSet();
+      synchronized (mMutex) {
+        ++mPendingCount;
+      }
+
+      final Executor executor = mExecutor;
+      executor.execute(NO_OP);
+      final EvaluationCollection<V> evaluation = mEvaluation;
+      statement.forkOn(executor).eventuallyDo(new Observer<V>() {
+
+        public void accept(final V value) throws Exception {
+          try {
+            evaluation.addValue(value);
+
+          } finally {
+            decrementPendingCount();
+          }
+        }
+      }).elseDo(new Observer<Throwable>() {
+
+        public void accept(final Throwable failure) throws Exception {
+          try {
+            evaluation.addFailure(failure);
+
+          } finally {
+            decrementPendingCount();
+          }
+        }
+      }).evaluated().consume();
       return this;
     }
 

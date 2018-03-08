@@ -38,6 +38,6 @@ public class MyClass {
     statement.eventually(String::toLowerCase);
     statement.eventually(CharSequence::length);
     statement.eventually(MyClass::count);
-    statement.eventually(CharSequence.class::cast).eventuallyIf(MyClass::convert);
+    statement.eventually(CharSequence.class::cast).eventuallyEval(MyClass::convert);
   }
 }

@@ -568,8 +568,8 @@ public class EventualExt extends Eventual {
   @Override
   public <S, V, R> Loop<R> joinLoops(
       @NotNull final Joiner<S, ? super V, ? super EvaluationCollection<R>, Loop<V>> joiner,
-      @NotNull final Iterable<? extends Loop<? extends V>> asyncLoops) {
-    return mEventual.joinLoops(joiner, asyncLoops);
+      @NotNull final Iterable<? extends Loop<? extends V>> loops) {
+    return mEventual.joinLoops(joiner, loops);
   }
 
   @NotNull
@@ -581,8 +581,8 @@ public class EventualExt extends Eventual {
           R>, Loop<V>> failure,
       @Nullable final JoinCompleter<S, ? super EvaluationCollection<? extends R>, Loop<V>> done,
       @Nullable final JoinSettler<S, ? super EvaluationCollection<? extends R>, Loop<V>> settle,
-      @NotNull final Iterable<? extends Loop<? extends V>> asyncLoops) {
-    return mEventual.joinLoops(init, value, failure, done, settle, asyncLoops);
+      @NotNull final Iterable<? extends Loop<? extends V>> loops) {
+    return mEventual.joinLoops(init, value, failure, done, settle, loops);
   }
 
   @NotNull

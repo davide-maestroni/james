@@ -364,23 +364,9 @@ public class StatementTest {
   }
 
   @Test
-  public void elseFail() {
-    final Statement<String> statement =
-        new Eventual().<String>failure(new IllegalStateException("test")).elseCatch(
-            new Mapper<Throwable, String>() {
-
-              public String apply(final Throwable input) {
-                throw new IllegalArgumentException();
-              }
-            });
-    assertThat(ConstantConditions.notNull(statement.getFailure()).getCause()).isExactlyInstanceOf(
-        IllegalArgumentException.class);
-  }
-
-  @Test
-  public void elseIf() {
+  public void elseEval() {
     final Statement<Integer> statement =
-        new Eventual().<Integer>failure(new IllegalStateException("test")).elseIf(
+        new Eventual().<Integer>failure(new IllegalStateException("test")).elseEval(
             new Mapper<Throwable, Statement<Integer>>() {
 
               public Statement<Integer> apply(final Throwable input) {
@@ -391,9 +377,9 @@ public class StatementTest {
   }
 
   @Test
-  public void elseIfAsync() {
+  public void elseEvalAsync() {
     final Statement<Integer> statement =
-        new Eventual().<Integer>failure(new IllegalStateException("test")).elseIf(
+        new Eventual().<Integer>failure(new IllegalStateException("test")).elseEval(
             new Mapper<Throwable, Statement<Integer>>() {
 
               public Statement<Integer> apply(final Throwable input) {
@@ -405,9 +391,9 @@ public class StatementTest {
   }
 
   @Test
-  public void elseIfAsyncFiltered() {
+  public void elseEvalAsyncFiltered() {
     final Statement<Integer> statement =
-        new Eventual().<Integer>failure(new IllegalStateException("test")).elseIf(
+        new Eventual().<Integer>failure(new IllegalStateException("test")).elseEval(
             new Mapper<Throwable, Statement<Integer>>() {
 
               public Statement<Integer> apply(final Throwable input) {
@@ -419,9 +405,9 @@ public class StatementTest {
   }
 
   @Test
-  public void elseIfAsyncNotFiltered() {
+  public void elseEvalAsyncNotFiltered() {
     final Statement<Integer> statement =
-        new Eventual().<Integer>failure(new IllegalStateException("test")).elseIf(
+        new Eventual().<Integer>failure(new IllegalStateException("test")).elseEval(
             new Mapper<Throwable, Statement<Integer>>() {
 
               public Statement<Integer> apply(final Throwable input) {
@@ -434,9 +420,9 @@ public class StatementTest {
   }
 
   @Test
-  public void elseIfFail() {
+  public void elseEvalFail() {
     final Statement<Integer> statement =
-        new Eventual().<Integer>failure(new IllegalStateException("test")).elseIf(
+        new Eventual().<Integer>failure(new IllegalStateException("test")).elseEval(
             new Mapper<Throwable, Statement<Integer>>() {
 
               public Statement<Integer> apply(final Throwable input) {
@@ -448,9 +434,9 @@ public class StatementTest {
   }
 
   @Test
-  public void elseIfFiltered() {
+  public void elseEvalFiltered() {
     final Statement<Integer> statement =
-        new Eventual().<Integer>failure(new IllegalStateException("test")).elseIf(
+        new Eventual().<Integer>failure(new IllegalStateException("test")).elseEval(
             new Mapper<Throwable, Statement<Integer>>() {
 
               public Statement<Integer> apply(final Throwable input) {
@@ -462,14 +448,14 @@ public class StatementTest {
 
   @Test(expected = NullPointerException.class)
   @SuppressWarnings("ConstantConditions")
-  public void elseIfNPE() {
-    new Eventual().value(null).elseIf(null);
+  public void elseEvalNPE() {
+    new Eventual().value(null).elseEval(null);
   }
 
   @Test
-  public void elseIfNoType() {
+  public void elseEvalNoType() {
     assertThat(
-        new Eventual().failure(new Exception()).elseIf(new Mapper<Throwable, Statement<?>>() {
+        new Eventual().failure(new Exception()).elseEval(new Mapper<Throwable, Statement<?>>() {
 
           public Statement<?> apply(final Throwable input) {
             return new Eventual().value(null);
@@ -478,9 +464,9 @@ public class StatementTest {
   }
 
   @Test
-  public void elseIfNotFiltered() {
+  public void elseEvalNotFiltered() {
     final Statement<Integer> statement =
-        new Eventual().<Integer>failure(new IllegalStateException("test")).elseIf(
+        new Eventual().<Integer>failure(new IllegalStateException("test")).elseEval(
             new Mapper<Throwable, Statement<Integer>>() {
 
               public Statement<Integer> apply(final Throwable input) {
@@ -492,9 +478,9 @@ public class StatementTest {
   }
 
   @Test
-  public void elseIfStatementNPE() {
+  public void elseEvalStatementNPE() {
     assertThat(
-        new Eventual().failure(new Exception()).elseIf(new Mapper<Throwable, Statement<?>>() {
+        new Eventual().failure(new Exception()).elseEval(new Mapper<Throwable, Statement<?>>() {
 
           public Statement<?> apply(final Throwable input) {
             return null;
@@ -503,13 +489,27 @@ public class StatementTest {
   }
 
   @Test(expected = NullPointerException.class)
-  public void elseIfTypesNPE() {
-    new Eventual().value(null).elseIf(new Mapper<Throwable, Statement<?>>() {
+  public void elseEvalTypesNPE() {
+    new Eventual().value(null).elseEval(new Mapper<Throwable, Statement<?>>() {
 
       public Statement<?> apply(final Throwable input) {
         return new Eventual().value(null);
       }
     }, new Class<?>[]{null});
+  }
+
+  @Test
+  public void elseFail() {
+    final Statement<String> statement =
+        new Eventual().<String>failure(new IllegalStateException("test")).elseCatch(
+            new Mapper<Throwable, String>() {
+
+              public String apply(final Throwable input) {
+                throw new IllegalArgumentException();
+              }
+            });
+    assertThat(ConstantConditions.notNull(statement.getFailure()).getCause()).isExactlyInstanceOf(
+        IllegalArgumentException.class);
   }
 
   @Test
@@ -690,22 +690,9 @@ public class StatementTest {
   }
 
   @Test
-  public void eventuallyFail() {
-    final Statement<String> statement =
-        new Eventual().value("test").eventually(new Mapper<String, String>() {
-
-          public String apply(final String input) {
-            throw new IllegalArgumentException();
-          }
-        });
-    assertThat(ConstantConditions.notNull(statement.getFailure()).getCause()).isExactlyInstanceOf(
-        IllegalArgumentException.class);
-  }
-
-  @Test
-  public void eventuallyIf() {
+  public void eventuallyEval() {
     final Statement<Integer> statement =
-        new Eventual().value("test").eventuallyIf(new Mapper<String, Statement<Integer>>() {
+        new Eventual().value("test").eventuallyEval(new Mapper<String, Statement<Integer>>() {
 
           public Statement<Integer> apply(final String input) {
             return new Eventual().value(input.length());
@@ -715,9 +702,9 @@ public class StatementTest {
   }
 
   @Test
-  public void eventuallyIfAsync() {
+  public void eventuallyEvalAsync() {
     final Statement<Integer> statement =
-        new Eventual().value("test").eventuallyIf(new Mapper<String, Statement<Integer>>() {
+        new Eventual().value("test").eventuallyEval(new Mapper<String, Statement<Integer>>() {
 
           public Statement<Integer> apply(final String input) {
             return new Eventual().value(input.length())
@@ -728,9 +715,9 @@ public class StatementTest {
   }
 
   @Test
-  public void eventuallyIfFail() {
+  public void eventuallyEvalFail() {
     final Statement<Integer> statement =
-        new Eventual().value("test").eventuallyIf(new Mapper<String, Statement<Integer>>() {
+        new Eventual().value("test").eventuallyEval(new Mapper<String, Statement<Integer>>() {
 
           public Statement<Integer> apply(final String input) {
             return new Eventual().failure(new IllegalArgumentException());
@@ -742,18 +729,31 @@ public class StatementTest {
 
   @Test(expected = NullPointerException.class)
   @SuppressWarnings("ConstantConditions")
-  public void eventuallyIfNPE() {
-    new Eventual().value(null).eventuallyIf(null);
+  public void eventuallyEvalNPE() {
+    new Eventual().value(null).eventuallyEval(null);
   }
 
   @Test
-  public void eventuallyIfStatementNPE() {
-    assertThat(new Eventual().value(null).eventuallyIf(new Mapper<Object, Statement<Object>>() {
+  public void eventuallyEvalStatementNPE() {
+    assertThat(new Eventual().value(null).eventuallyEval(new Mapper<Object, Statement<Object>>() {
 
       public Statement<Object> apply(final Object input) {
         return null;
       }
     }).failure()).isExactlyInstanceOf(NullPointerException.class);
+  }
+
+  @Test
+  public void eventuallyFail() {
+    final Statement<String> statement =
+        new Eventual().value("test").eventually(new Mapper<String, String>() {
+
+          public String apply(final String input) {
+            throw new IllegalArgumentException();
+          }
+        });
+    assertThat(ConstantConditions.notNull(statement.getFailure()).getCause()).isExactlyInstanceOf(
+        IllegalArgumentException.class);
   }
 
   @Test(expected = IllegalStateException.class)
@@ -930,6 +930,199 @@ public class StatementTest {
   }
 
   @Test
+  public void eventuallyTryEval() {
+    final AtomicCloseable closeable = new AtomicCloseable();
+    final Statement<Integer> statement =
+        new Eventual().value("test").eventuallyTryEval(new Mapper<String, Closeable>() {
+
+          public Closeable apply(final String input) {
+            return closeable;
+          }
+        }, new Mapper<String, Statement<Integer>>() {
+
+          public Statement<Integer> apply(final String input) {
+            return new Eventual().value(input.length());
+          }
+        });
+    assertThat(statement.getValue()).isEqualTo(4);
+    assertThat(closeable.isCalled()).isTrue();
+  }
+
+  @Test
+  public void eventuallyTryEvalAsync() {
+    final AtomicCloseable closeable = new AtomicCloseable();
+    final Statement<Integer> statement =
+        new Eventual().value("test").eventuallyTryEval(new Mapper<String, Closeable>() {
+
+          public Closeable apply(final String input) {
+            return closeable;
+          }
+        }, new Mapper<String, Statement<Integer>>() {
+
+          public Statement<Integer> apply(final String input) {
+            return new Eventual().value(input.length())
+                .forkOn(withDelay(100, TimeUnit.MILLISECONDS, backgroundExecutor()));
+          }
+        });
+    assertThat(statement.getValue()).isEqualTo(4);
+    assertThat(closeable.isCalled()).isTrue();
+  }
+
+  @Test
+  public void eventuallyTryEvalAsyncException() {
+    final Statement<Integer> statement =
+        new Eventual().value("test").eventuallyTryEval(new Mapper<String, Closeable>() {
+
+          public Closeable apply(final String input) {
+            throw new RuntimeException();
+          }
+        }, new Mapper<String, Statement<Integer>>() {
+
+          public Statement<Integer> apply(final String input) {
+            return new Eventual().value(input.length())
+                .forkOn(withDelay(100, TimeUnit.MILLISECONDS, backgroundExecutor()));
+          }
+        });
+    assertThat(statement.getFailure()).isNotNull();
+  }
+
+  @Test
+  public void eventuallyTryEvalAsyncIOException() {
+    final Statement<Integer> statement =
+        new Eventual().value("test").eventuallyTryEval(new Mapper<String, Closeable>() {
+
+          public Closeable apply(final String input) {
+            return new Closeable() {
+
+              public void close() throws IOException {
+                throw new IOException();
+              }
+            };
+          }
+        }, new Mapper<String, Statement<Integer>>() {
+
+          public Statement<Integer> apply(final String input) {
+            return new Eventual().value(input.length())
+                .forkOn(withDelay(100, TimeUnit.MILLISECONDS, backgroundExecutor()));
+          }
+        });
+    assertThat(statement.getFailure()).isNotNull();
+  }
+
+  @Test(expected = NullPointerException.class)
+  @SuppressWarnings("ConstantConditions")
+  public void eventuallyTryEvalCloseableNPE() {
+    new Eventual().value(null).eventuallyTryEval(null, new Mapper<Object, Statement<Object>>() {
+
+      public Statement<Object> apply(final Object input) {
+        return new Eventual().value(null);
+      }
+    });
+  }
+
+  @Test
+  public void eventuallyTryEvalException() {
+    final Statement<Integer> statement =
+        new Eventual().value("test").eventuallyTryEval(new Mapper<String, Closeable>() {
+
+          public Closeable apply(final String input) {
+            throw new RuntimeException();
+          }
+        }, new Mapper<String, Statement<Integer>>() {
+
+          public Statement<Integer> apply(final String input) {
+            return new Eventual().value(input.length());
+          }
+        });
+    assertThat(statement.isFailed()).isTrue();
+  }
+
+  @Test
+  public void eventuallyTryEvalFail() {
+    final AtomicCloseable closeable = new AtomicCloseable();
+    final Statement<Integer> statement =
+        new Eventual().value("test").eventuallyTryEval(new Mapper<String, Closeable>() {
+
+          public Closeable apply(final String input) {
+            return closeable;
+          }
+        }, new Mapper<String, Statement<Integer>>() {
+
+          public Statement<Integer> apply(final String input) {
+            return new Eventual().failure(new IllegalArgumentException());
+          }
+        });
+    assertThat(ConstantConditions.notNull(statement.getFailure()).getCause()).isExactlyInstanceOf(
+        IllegalArgumentException.class);
+    assertThat(closeable.isCalled()).isTrue();
+  }
+
+  @Test
+  public void eventuallyTryEvalIOException() {
+    final Statement<Integer> statement =
+        new Eventual().value("test").eventuallyTryEval(new Mapper<String, Closeable>() {
+
+          public Closeable apply(final String input) {
+            return new Closeable() {
+
+              public void close() throws IOException {
+                throw new IOException();
+              }
+            };
+          }
+        }, new Mapper<String, Statement<Integer>>() {
+
+          public Statement<Integer> apply(final String input) {
+            return new Eventual().value(input.length());
+          }
+        });
+    assertThat(statement.isFailed()).isTrue();
+  }
+
+  @Test(expected = NullPointerException.class)
+  @SuppressWarnings("ConstantConditions")
+  public void eventuallyTryEvalNPE() {
+    new Eventual().value(null).eventuallyTryEval(new Mapper<Object, Closeable>() {
+
+      public Closeable apply(final Object input) {
+        return null;
+      }
+    }, null);
+  }
+
+  @Test
+  public void eventuallyTryEvalNull() {
+    final Statement<Integer> statement =
+        new Eventual().value("test").eventuallyTryEval(new Mapper<String, Closeable>() {
+
+          public Closeable apply(final String input) {
+            return null;
+          }
+        }, new Mapper<String, Statement<Integer>>() {
+
+          public Statement<Integer> apply(final String input) {
+            return new Eventual().value(input.length());
+          }
+        });
+    assertThat(statement.getValue()).isEqualTo(4);
+  }
+
+  @Test
+  public void eventuallyTryEvalStatementNPE() {
+    assertThat(new Eventual().value(null).eventuallyTryEval(new Mapper<Object, Closeable>() {
+
+      public Closeable apply(final Object input) {
+        return null;
+      }
+    }, new Mapper<Object, Statement<Object>>() {
+
+      public Statement<Object> apply(final Object input) {
+        return null;
+      }
+    }).failure()).isExactlyInstanceOf(NullPointerException.class);
+  }
+
+  @Test
   public void eventuallyTryException() {
     final Statement<String> statement =
         new Eventual().value("test").eventuallyTry(new Mapper<String, Closeable>() {
@@ -986,199 +1179,6 @@ public class StatementTest {
           }
         });
     assertThat(statement.getValue()).isEqualTo("TEST");
-  }
-
-  @Test
-  public void eventuallyTryIf() {
-    final AtomicCloseable closeable = new AtomicCloseable();
-    final Statement<Integer> statement =
-        new Eventual().value("test").eventuallyTryIf(new Mapper<String, Closeable>() {
-
-          public Closeable apply(final String input) {
-            return closeable;
-          }
-        }, new Mapper<String, Statement<Integer>>() {
-
-          public Statement<Integer> apply(final String input) {
-            return new Eventual().value(input.length());
-          }
-        });
-    assertThat(statement.getValue()).isEqualTo(4);
-    assertThat(closeable.isCalled()).isTrue();
-  }
-
-  @Test
-  public void eventuallyTryIfAsync() {
-    final AtomicCloseable closeable = new AtomicCloseable();
-    final Statement<Integer> statement =
-        new Eventual().value("test").eventuallyTryIf(new Mapper<String, Closeable>() {
-
-          public Closeable apply(final String input) {
-            return closeable;
-          }
-        }, new Mapper<String, Statement<Integer>>() {
-
-          public Statement<Integer> apply(final String input) {
-            return new Eventual().value(input.length())
-                .forkOn(withDelay(100, TimeUnit.MILLISECONDS, backgroundExecutor()));
-          }
-        });
-    assertThat(statement.getValue()).isEqualTo(4);
-    assertThat(closeable.isCalled()).isTrue();
-  }
-
-  @Test
-  public void eventuallyTryIfAsyncException() {
-    final Statement<Integer> statement =
-        new Eventual().value("test").eventuallyTryIf(new Mapper<String, Closeable>() {
-
-          public Closeable apply(final String input) {
-            throw new RuntimeException();
-          }
-        }, new Mapper<String, Statement<Integer>>() {
-
-          public Statement<Integer> apply(final String input) {
-            return new Eventual().value(input.length())
-                .forkOn(withDelay(100, TimeUnit.MILLISECONDS, backgroundExecutor()));
-          }
-        });
-    assertThat(statement.getFailure()).isNotNull();
-  }
-
-  @Test
-  public void eventuallyTryIfAsyncIOException() {
-    final Statement<Integer> statement =
-        new Eventual().value("test").eventuallyTryIf(new Mapper<String, Closeable>() {
-
-          public Closeable apply(final String input) {
-            return new Closeable() {
-
-              public void close() throws IOException {
-                throw new IOException();
-              }
-            };
-          }
-        }, new Mapper<String, Statement<Integer>>() {
-
-          public Statement<Integer> apply(final String input) {
-            return new Eventual().value(input.length())
-                .forkOn(withDelay(100, TimeUnit.MILLISECONDS, backgroundExecutor()));
-          }
-        });
-    assertThat(statement.getFailure()).isNotNull();
-  }
-
-  @Test(expected = NullPointerException.class)
-  @SuppressWarnings("ConstantConditions")
-  public void eventuallyTryIfCloseableNPE() {
-    new Eventual().value(null).eventuallyTryIf(null, new Mapper<Object, Statement<Object>>() {
-
-      public Statement<Object> apply(final Object input) {
-        return new Eventual().value(null);
-      }
-    });
-  }
-
-  @Test
-  public void eventuallyTryIfException() {
-    final Statement<Integer> statement =
-        new Eventual().value("test").eventuallyTryIf(new Mapper<String, Closeable>() {
-
-          public Closeable apply(final String input) {
-            throw new RuntimeException();
-          }
-        }, new Mapper<String, Statement<Integer>>() {
-
-          public Statement<Integer> apply(final String input) {
-            return new Eventual().value(input.length());
-          }
-        });
-    assertThat(statement.isFailed()).isTrue();
-  }
-
-  @Test
-  public void eventuallyTryIfFail() {
-    final AtomicCloseable closeable = new AtomicCloseable();
-    final Statement<Integer> statement =
-        new Eventual().value("test").eventuallyTryIf(new Mapper<String, Closeable>() {
-
-          public Closeable apply(final String input) {
-            return closeable;
-          }
-        }, new Mapper<String, Statement<Integer>>() {
-
-          public Statement<Integer> apply(final String input) {
-            return new Eventual().failure(new IllegalArgumentException());
-          }
-        });
-    assertThat(ConstantConditions.notNull(statement.getFailure()).getCause()).isExactlyInstanceOf(
-        IllegalArgumentException.class);
-    assertThat(closeable.isCalled()).isTrue();
-  }
-
-  @Test
-  public void eventuallyTryIfIOException() {
-    final Statement<Integer> statement =
-        new Eventual().value("test").eventuallyTryIf(new Mapper<String, Closeable>() {
-
-          public Closeable apply(final String input) {
-            return new Closeable() {
-
-              public void close() throws IOException {
-                throw new IOException();
-              }
-            };
-          }
-        }, new Mapper<String, Statement<Integer>>() {
-
-          public Statement<Integer> apply(final String input) {
-            return new Eventual().value(input.length());
-          }
-        });
-    assertThat(statement.isFailed()).isTrue();
-  }
-
-  @Test(expected = NullPointerException.class)
-  @SuppressWarnings("ConstantConditions")
-  public void eventuallyTryIfNPE() {
-    new Eventual().value(null).eventuallyTryIf(new Mapper<Object, Closeable>() {
-
-      public Closeable apply(final Object input) {
-        return null;
-      }
-    }, null);
-  }
-
-  @Test
-  public void eventuallyTryIfNull() {
-    final Statement<Integer> statement =
-        new Eventual().value("test").eventuallyTryIf(new Mapper<String, Closeable>() {
-
-          public Closeable apply(final String input) {
-            return null;
-          }
-        }, new Mapper<String, Statement<Integer>>() {
-
-          public Statement<Integer> apply(final String input) {
-            return new Eventual().value(input.length());
-          }
-        });
-    assertThat(statement.getValue()).isEqualTo(4);
-  }
-
-  @Test
-  public void eventuallyTryIfStatementNPE() {
-    assertThat(new Eventual().value(null).eventuallyTryIf(new Mapper<Object, Closeable>() {
-
-      public Closeable apply(final Object input) {
-        return null;
-      }
-    }, new Mapper<Object, Statement<Object>>() {
-
-      public Statement<Object> apply(final Object input) {
-        return null;
-      }
-    }).failure()).isExactlyInstanceOf(NullPointerException.class);
   }
 
   @Test(expected = NullPointerException.class)
@@ -1825,9 +1825,9 @@ public class StatementTest {
   }
 
   @Test
-  public void serializeElseIf() throws IOException, ClassNotFoundException {
+  public void serializeElseEval() throws IOException, ClassNotFoundException {
     final Statement<String> statement =
-        new Eventual().<String>failure(new IllegalArgumentException("test")).elseIf(
+        new Eventual().<String>failure(new IllegalArgumentException("test")).elseEval(
             new ToMessageStatement());
     final ByteArrayOutputStream byteOutputStream = new ByteArrayOutputStream();
     final ObjectOutputStream objectOutputStream = new ObjectOutputStream(byteOutputStream);
@@ -1918,9 +1918,9 @@ public class StatementTest {
   }
 
   @Test
-  public void serializeEventuallyIf() throws IOException, ClassNotFoundException {
+  public void serializeEventuallyEval() throws IOException, ClassNotFoundException {
     final Statement<String> statement =
-        new Eventual().value("test").eventuallyIf(new ToUpperStatement());
+        new Eventual().value("test").eventuallyEval(new ToUpperStatement());
     final ByteArrayOutputStream byteOutputStream = new ByteArrayOutputStream();
     final ObjectOutputStream objectOutputStream = new ObjectOutputStream(byteOutputStream);
     objectOutputStream.writeObject(statement);
@@ -1963,9 +1963,9 @@ public class StatementTest {
   }
 
   @Test
-  public void serializeEventuallyTryIf() throws IOException, ClassNotFoundException {
+  public void serializeEventuallyTryEval() throws IOException, ClassNotFoundException {
     final Statement<AtomicBoolean> statement = new Eventual().value(new AtomicBoolean())
-        .eventuallyTryIf(new ToCloseable(), new ToStatement<AtomicBoolean>());
+        .eventuallyTryEval(new ToCloseable(), new ToStatement<AtomicBoolean>());
     final ByteArrayOutputStream byteOutputStream = new ByteArrayOutputStream();
     final ObjectOutputStream objectOutputStream = new ObjectOutputStream(byteOutputStream);
     objectOutputStream.writeObject(statement);

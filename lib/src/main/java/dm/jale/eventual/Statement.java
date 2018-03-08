@@ -41,7 +41,7 @@ public interface Statement<V> extends EvaluationState<V>, Future<V>, Serializabl
       @Nullable Class<?>... exceptionTypes);
 
   @NotNull
-  Statement<V> elseIf(@NotNull Mapper<? super Throwable, ? extends Statement<? extends V>> mapper,
+  Statement<V> elseEval(@NotNull Mapper<? super Throwable, ? extends Statement<? extends V>> mapper,
       @Nullable Class<?>... exceptionTypes);
 
   @NotNull
@@ -57,7 +57,7 @@ public interface Statement<V> extends EvaluationState<V>, Future<V>, Serializabl
   Statement<V> eventuallyDo(@NotNull Observer<? super V> observer);
 
   @NotNull
-  <R> Statement<R> eventuallyIf(@NotNull Mapper<? super V, ? extends Statement<R>> mapper);
+  <R> Statement<R> eventuallyEval(@NotNull Mapper<? super V, ? extends Statement<R>> mapper);
 
   @NotNull
   <R> Statement<R> eventuallyTry(@NotNull Mapper<? super V, ? extends Closeable> closeable,
@@ -68,7 +68,7 @@ public interface Statement<V> extends EvaluationState<V>, Future<V>, Serializabl
       @NotNull Observer<? super V> observer);
 
   @NotNull
-  <R> Statement<R> eventuallyTryIf(@NotNull Mapper<? super V, ? extends Closeable> closeable,
+  <R> Statement<R> eventuallyTryEval(@NotNull Mapper<? super V, ? extends Closeable> closeable,
       @NotNull Mapper<? super V, ? extends Statement<R>> mapper);
 
   @NotNull

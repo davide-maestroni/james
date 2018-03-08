@@ -83,29 +83,29 @@ class BufferedForker<S, V, R, C> implements Forker<ForkerStack<S, V, R, C>, V, R
     private ArrayList<SimpleState<V>> mStates = new ArrayList<SimpleState<V>>();
 
     private ForkerStack(@NotNull final Forker<S, ? super V, ? super R, ? super C> forker,
-        @NotNull final C async) throws Exception {
+        @NotNull final C context) throws Exception {
       mForker = forker;
-      mStack = forker.init(async);
+      mStack = forker.init(context);
     }
 
     @NotNull
     private ForkerStack<S, V, R, C> addEvaluations(@NotNull final R evaluation,
-        @NotNull final C async) throws Exception {
+        @NotNull final C context) throws Exception {
       final boolean isFirst = !mHasEvaluation;
       mHasEvaluation = true;
       if (isFirst) {
-        mStack = mForker.evaluation(mStack, evaluation, async);
+        mStack = mForker.evaluation(mStack, evaluation, context);
         final ArrayList<SimpleState<V>> states = mStates;
         try {
           for (final SimpleState<V> state : states) {
             if (state.isSet()) {
-              mStack = mForker.value(mStack, state.value(), async);
+              mStack = mForker.value(mStack, state.value(), context);
 
             } else if (state.isFailed()) {
-              mStack = mForker.failure(mStack, state.failure(), async);
+              mStack = mForker.failure(mStack, state.failure(), context);
 
             } else {
-              mStack = mForker.done(mStack, async);
+              mStack = mForker.done(mStack, context);
             }
           }
 
@@ -119,9 +119,9 @@ class BufferedForker<S, V, R, C> implements Forker<ForkerStack<S, V, R, C>, V, R
 
     @NotNull
     private ForkerStack<S, V, R, C> addFailure(@NotNull final Throwable failure,
-        @NotNull final C async) throws Exception {
+        @NotNull final C context) throws Exception {
       if (mHasEvaluation) {
-        mStack = mForker.failure(mStack, failure, async);
+        mStack = mForker.failure(mStack, failure, context);
 
       } else {
         mStates.add(SimpleState.<V>ofFailure(failure));
@@ -131,10 +131,10 @@ class BufferedForker<S, V, R, C> implements Forker<ForkerStack<S, V, R, C>, V, R
     }
 
     @NotNull
-    private ForkerStack<S, V, R, C> addValue(final V value, @NotNull final C async) throws
+    private ForkerStack<S, V, R, C> addValue(final V value, @NotNull final C context) throws
         Exception {
       if (mHasEvaluation) {
-        mStack = mForker.value(mStack, value, async);
+        mStack = mForker.value(mStack, value, context);
 
       } else {
         mStates.add(SimpleState.ofValue(value));
@@ -144,9 +144,9 @@ class BufferedForker<S, V, R, C> implements Forker<ForkerStack<S, V, R, C>, V, R
     }
 
     @NotNull
-    private ForkerStack<S, V, R, C> settle(@NotNull final C async) throws Exception {
+    private ForkerStack<S, V, R, C> settle(@NotNull final C context) throws Exception {
       if (mHasEvaluation) {
-        mStack = mForker.done(mStack, async);
+        mStack = mForker.done(mStack, context);
 
       } else {
         mStates.add(SimpleState.<V>settled());

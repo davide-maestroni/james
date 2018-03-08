@@ -90,8 +90,8 @@ class RepeatAfterForker<V> implements StatementForker<ForkerStack<V>, V>, Serial
       } else {
         final Statement<V> statement = context.evaluate().fork(new ReplayForker<V>());
         stack.statement = statement;
-        stack.valueStatement = statement.eventually(dm.jale.ext.fork.TimedStateValueMapper.<V>instance())
-            .elseCatch(dm.jale.ext.fork.TimedStateFailureMapper.<V>instance());
+        stack.valueStatement = statement.eventually(TimedStateValueMapper.<V>instance())
+            .elseCatch(TimedStateFailureMapper.<V>instance());
         statement.to(evaluation);
       }
 

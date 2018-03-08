@@ -41,7 +41,7 @@ public interface Loop<V> extends Statement<Iterable<V>>, Serializable {
       @Nullable Class<?>... exceptionTypes);
 
   @NotNull
-  Loop<V> elseIf(
+  Loop<V> elseEval(
       @NotNull Mapper<? super Throwable, ? extends Statement<? extends Iterable<V>>> mapper,
       @Nullable Class<?>... exceptionTypes);
 
@@ -76,7 +76,23 @@ public interface Loop<V> extends Statement<Iterable<V>>, Serializable {
       @Nullable Class<?>... exceptionTypes);
 
   @NotNull
-  Loop<V> elseForEachIf(@NotNull Mapper<? super Throwable, ? extends Statement<? extends V>> mapper,
+  Loop<V> elseForEachEval(
+      @NotNull Mapper<? super Throwable, ? extends Statement<? extends V>> mapper,
+      @Nullable Class<?>... exceptionTypes);
+
+  @NotNull
+  Loop<V> elseForEachEvalLoop(
+      @NotNull Mapper<? super Throwable, ? extends Loop<? extends V>> mapper,
+      @Nullable Class<?>... exceptionTypes);
+
+  @NotNull
+  Loop<V> elseForEachEvalLoopOrdered(
+      @NotNull Mapper<? super Throwable, ? extends Loop<? extends V>> mapper,
+      @Nullable Class<?>... exceptionTypes);
+
+  @NotNull
+  Loop<V> elseForEachEvalOrdered(
+      @NotNull Mapper<? super Throwable, ? extends Statement<? extends V>> mapper,
       @Nullable Class<?>... exceptionTypes);
 
   @NotNull
@@ -85,24 +101,10 @@ public interface Loop<V> extends Statement<Iterable<V>>, Serializable {
       @Nullable Class<?>... exceptionTypes);
 
   @NotNull
-  Loop<V> elseForEachLoopIf(@NotNull Mapper<? super Throwable, ? extends Loop<? extends V>> mapper,
-      @Nullable Class<?>... exceptionTypes);
-
-  @NotNull
-  Loop<V> elseForEachOrderedIf(
-      @NotNull Mapper<? super Throwable, ? extends Statement<? extends V>> mapper,
-      @Nullable Class<?>... exceptionTypes);
-
-  @NotNull
-  Loop<V> elseForEachOrderedLoopIf(
-      @NotNull Mapper<? super Throwable, ? extends Loop<? extends V>> mapper,
-      @Nullable Class<?>... exceptionTypes);
+  <R> Loop<R> eventuallyEvalLoop(@NotNull Mapper<? super Iterable<V>, ? extends Loop<R>> mapper);
 
   @NotNull
   <R> Loop<R> eventuallyLoop(@NotNull Mapper<? super Iterable<V>, ? extends Iterable<R>> mapper);
-
-  @NotNull
-  <R> Loop<R> eventuallyLoopIf(@NotNull Mapper<? super Iterable<V>, ? extends Loop<R>> mapper);
 
   @NotNull
   <R> Loop<R> forEach(@NotNull Mapper<? super V, R> mapper);
@@ -114,27 +116,19 @@ public interface Loop<V> extends Statement<Iterable<V>>, Serializable {
   Loop<V> forEachDone(@NotNull Action action);
 
   @NotNull
-  <R> Loop<R> forEachIf(@NotNull Mapper<? super V, ? extends Statement<R>> mapper);
+  <R> Loop<R> forEachEval(@NotNull Mapper<? super V, ? extends Statement<R>> mapper);
+
+  @NotNull
+  <R> Loop<R> forEachEvalLoop(@NotNull Mapper<? super V, ? extends Loop<R>> mapper);
+
+  @NotNull
+  <R> Loop<R> forEachEvalLoopOrdered(@NotNull Mapper<? super V, ? extends Loop<R>> mapper);
+
+  @NotNull
+  <R> Loop<R> forEachEvalOrdered(@NotNull Mapper<? super V, ? extends Statement<R>> mapper);
 
   @NotNull
   <R> Loop<R> forEachLoop(@NotNull Mapper<? super V, ? extends Iterable<R>> mapper);
-
-  @NotNull
-  <R> Loop<R> forEachLoopIf(@NotNull Mapper<? super V, ? extends Loop<R>> mapper);
-
-  @NotNull
-  <R> Loop<R> forEachOrderedIf(@NotNull Mapper<? super V, ? extends Statement<R>> mapper);
-
-  @NotNull
-  <R> Loop<R> forEachOrderedLoopIf(@NotNull Mapper<? super V, ? extends Loop<R>> mapper);
-
-  @NotNull
-  <R> Loop<R> forEachOrderedTryIf(@NotNull Mapper<? super V, ? extends Closeable> closeable,
-      @NotNull Mapper<? super V, ? extends Statement<R>> mapper);
-
-  @NotNull
-  <R> Loop<R> forEachOrderedTryLoopIf(@NotNull Mapper<? super V, ? extends Closeable> closeable,
-      @NotNull Mapper<? super V, ? extends Loop<R>> mapper);
 
   @NotNull
   <R> Loop<R> forEachTry(@NotNull Mapper<? super V, ? extends Closeable> closeable,
@@ -145,16 +139,24 @@ public interface Loop<V> extends Statement<Iterable<V>>, Serializable {
       @NotNull Observer<? super V> observer);
 
   @NotNull
-  <R> Loop<R> forEachTryIf(@NotNull Mapper<? super V, ? extends Closeable> closeable,
+  <R> Loop<R> forEachTryEval(@NotNull Mapper<? super V, ? extends Closeable> closeable,
+      @NotNull Mapper<? super V, ? extends Statement<R>> mapper);
+
+  @NotNull
+  <R> Loop<R> forEachTryEvalLoop(@NotNull Mapper<? super V, ? extends Closeable> closeable,
+      @NotNull Mapper<? super V, ? extends Loop<R>> mapper);
+
+  @NotNull
+  <R> Loop<R> forEachTryEvalLoopOrdered(@NotNull Mapper<? super V, ? extends Closeable> closeable,
+      @NotNull Mapper<? super V, ? extends Loop<R>> mapper);
+
+  @NotNull
+  <R> Loop<R> forEachTryEvalOrdered(@NotNull Mapper<? super V, ? extends Closeable> closeable,
       @NotNull Mapper<? super V, ? extends Statement<R>> mapper);
 
   @NotNull
   <R> Loop<R> forEachTryLoop(@NotNull Mapper<? super V, ? extends Closeable> closeable,
       @NotNull Mapper<? super V, ? extends Iterable<R>> mapper);
-
-  @NotNull
-  <R> Loop<R> forEachTryLoopIf(@NotNull Mapper<? super V, ? extends Closeable> closeable,
-      @NotNull Mapper<? super V, ? extends Loop<R>> mapper);
 
   @NotNull
   <S> Loop<V> forkLoop(
@@ -250,10 +252,10 @@ public interface Loop<V> extends Statement<Iterable<V>>, Serializable {
     YieldOutputs<V> yieldFailures(@Nullable Iterable<Throwable> failures);
 
     @NotNull
-    YieldOutputs<V> yieldIf(@NotNull Statement<? extends V> statement);
+    YieldOutputs<V> yieldLoop(@NotNull Statement<? extends Iterable<? extends V>> loop);
 
     @NotNull
-    YieldOutputs<V> yieldLoopIf(@NotNull Statement<? extends Iterable<? extends V>> loop);
+    YieldOutputs<V> yieldStatement(@NotNull Statement<? extends V> statement);
 
     @NotNull
     YieldOutputs<V> yieldValue(V value);

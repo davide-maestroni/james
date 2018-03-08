@@ -17,66 +17,48 @@
 package dm.jale;
 
 import org.jetbrains.annotations.NotNull;
-import org.jetbrains.annotations.Nullable;
 
-import java.io.Closeable;
 import java.io.InvalidObjectException;
 import java.io.ObjectStreamException;
 import java.io.Serializable;
-import java.util.Locale;
 
 import dm.jale.config.BuildConfig;
-import dm.jale.eventual.Action;
-import dm.jale.eventual.Evaluation;
+import dm.jale.eventual.EvaluationCollection;
+import dm.jale.eventual.Loop;
 import dm.jale.eventual.Mapper;
-import dm.jale.eventual.Statement;
-import dm.jale.log.Logger;
 import dm.jale.util.ConstantConditions;
 import dm.jale.util.SerializableProxy;
 
 /**
  * Created by davide-maestroni on 02/01/2018.
  */
-class TryIfStatementExpression<V, R> extends StatementExpression<V, R> implements Serializable {
+class ForEachEvalLoopStatementExpression<V, R> extends StatementLoopExpression<V, R>
+    implements Serializable {
 
   private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
 
-  private final Mapper<? super V, ? extends Closeable> mCloseable;
+  private final Mapper<? super V, ? extends Loop<R>> mMapper;
 
-  private final Logger mLogger;
-
-  private final Mapper<? super V, ? extends Statement<R>> mMapper;
-
-  TryIfStatementExpression(@NotNull final Mapper<? super V, ? extends Closeable> closeable,
-      @NotNull final Mapper<? super V, ? extends Statement<R>> mapper,
-      @Nullable final String loggerName) {
-    mCloseable = ConstantConditions.notNull("closeable", closeable);
+  ForEachEvalLoopStatementExpression(@NotNull final Mapper<? super V, ? extends Loop<R>> mapper) {
     mMapper = ConstantConditions.notNull("mapper", mapper);
-    mLogger = Logger.newLogger(this, loggerName, Locale.ENGLISH);
   }
 
   @Override
-  void value(final V value, @NotNull final Evaluation<R> evaluation) throws Exception {
-    mMapper.apply(value).whenDone(new Action() {
-
-      public void perform() throws Exception {
-        Eventuals.close(mCloseable.apply(value), mLogger);
-      }
-    }).to(evaluation);
+  void value(final V value, @NotNull final EvaluationCollection<R> evaluation) throws Exception {
+    mMapper.apply(value).evaluated().to(evaluation);
   }
 
   @NotNull
   private Object writeReplace() throws ObjectStreamException {
-    return new HandlerProxy<V, R>(mCloseable, mMapper, mLogger.getName());
+    return new HandlerProxy<V, R>(mMapper);
   }
 
   private static class HandlerProxy<V, R> extends SerializableProxy {
 
     private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
 
-    private HandlerProxy(final Mapper<? super V, ? extends Closeable> closeable,
-        final Mapper<? super V, ? extends Statement<R>> mapper, final String loggerName) {
-      super(proxy(closeable), proxy(mapper), loggerName);
+    private HandlerProxy(final Mapper<? super V, ? extends Loop<R>> mapper) {
+      super(proxy(mapper));
     }
 
     @NotNull
@@ -84,8 +66,8 @@ class TryIfStatementExpression<V, R> extends StatementExpression<V, R> implement
     private Object readResolve() throws ObjectStreamException {
       try {
         final Object[] args = deserializeArgs();
-        return new TryIfStatementExpression<V, R>((Mapper<? super V, ? extends Closeable>) args[0],
-            (Mapper<? super V, ? extends Statement<R>>) args[1], (String) args[2]);
+        return new ForEachEvalLoopStatementExpression<V, R>(
+            (Mapper<? super V, ? extends Loop<R>>) args[0]);
 
       } catch (final Throwable t) {
         throw new InvalidObjectException(t.getMessage());

@@ -17,61 +17,66 @@
 package dm.jale;
 
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 
+import java.io.Closeable;
 import java.io.InvalidObjectException;
 import java.io.ObjectStreamException;
 import java.io.Serializable;
+import java.util.Locale;
 
 import dm.jale.config.BuildConfig;
+import dm.jale.eventual.Action;
 import dm.jale.eventual.Evaluation;
 import dm.jale.eventual.Mapper;
 import dm.jale.eventual.Statement;
+import dm.jale.log.Logger;
 import dm.jale.util.ConstantConditions;
 import dm.jale.util.SerializableProxy;
 
 /**
  * Created by davide-maestroni on 02/01/2018.
  */
-class ElseIfStatementExpression<V> extends StatementExpression<V, V> implements Serializable {
+class TryEvalStatementExpression<V, R> extends StatementExpression<V, R> implements Serializable {
 
   private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
 
-  private final Mapper<? super Throwable, ? extends Statement<? extends V>> mMapper;
+  private final Mapper<? super V, ? extends Closeable> mCloseable;
 
-  private final Class<?>[] mTypes;
+  private final Logger mLogger;
 
-  ElseIfStatementExpression(
-      @NotNull final Mapper<? super Throwable, ? extends Statement<? extends V>> mapper,
-      @NotNull final Class<?>[] exceptionTypes) {
+  private final Mapper<? super V, ? extends Statement<R>> mMapper;
+
+  TryEvalStatementExpression(@NotNull final Mapper<? super V, ? extends Closeable> closeable,
+      @NotNull final Mapper<? super V, ? extends Statement<R>> mapper,
+      @Nullable final String loggerName) {
+    mCloseable = ConstantConditions.notNull("closeable", closeable);
     mMapper = ConstantConditions.notNull("mapper", mapper);
-    mTypes = ConstantConditions.notNullElements("exception types", exceptionTypes);
+    mLogger = Logger.newLogger(this, loggerName, Locale.ENGLISH);
   }
 
   @Override
-  void failure(@NotNull final Throwable failure, @NotNull final Evaluation<V> evaluation) throws
-      Exception {
-    for (final Class<?> type : mTypes) {
-      if (type.isInstance(failure)) {
-        mMapper.apply(failure).to(evaluation);
-        return;
-      }
-    }
+  void value(final V value, @NotNull final Evaluation<R> evaluation) throws Exception {
+    mMapper.apply(value).whenDone(new Action() {
 
-    super.failure(failure, evaluation);
+      public void perform() throws Exception {
+        Eventuals.close(mCloseable.apply(value), mLogger);
+      }
+    }).evaluated().to(evaluation);
   }
 
   @NotNull
   private Object writeReplace() throws ObjectStreamException {
-    return new HandlerProxy<V>(mMapper, mTypes);
+    return new HandlerProxy<V, R>(mCloseable, mMapper, mLogger.getName());
   }
 
-  private static class HandlerProxy<V> extends SerializableProxy {
+  private static class HandlerProxy<V, R> extends SerializableProxy {
 
     private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
 
-    private HandlerProxy(final Mapper<? super Throwable, ? extends Statement<? extends V>> mapper,
-        final Class<?>[] exceptionTypes) {
-      super(proxy(mapper), exceptionTypes);
+    private HandlerProxy(final Mapper<? super V, ? extends Closeable> closeable,
+        final Mapper<? super V, ? extends Statement<R>> mapper, final String loggerName) {
+      super(proxy(closeable), proxy(mapper), loggerName);
     }
 
     @NotNull
@@ -79,9 +84,9 @@ class ElseIfStatementExpression<V> extends StatementExpression<V, V> implements 
     private Object readResolve() throws ObjectStreamException {
       try {
         final Object[] args = deserializeArgs();
-        return new ElseIfStatementExpression<V>(
-            (Mapper<? super Throwable, ? extends Statement<? extends V>>) args[0],
-            (Class<?>[]) args[1]);
+        return new TryEvalStatementExpression<V, R>(
+            (Mapper<? super V, ? extends Closeable>) args[0],
+            (Mapper<? super V, ? extends Statement<R>>) args[1], (String) args[2]);
 
       } catch (final Throwable t) {
         throw new InvalidObjectException(t.getMessage());
