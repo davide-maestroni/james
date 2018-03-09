@@ -17,7 +17,6 @@
 
 <FindBugsFilter>
     <Match>
-        <Package name="~dm\.jale.*"/>
         <Bug pattern="SE_BAD_FIELD,SE_BAD_FIELD_STORE,SE_NO_SUITABLE_CONSTRUCTOR,SE_TRANSIENT_FIELD_NOT_RESTORED"/>
         <!--
         writeReplace makes objects serializable. This is a limitation of FindBugs as discussed here:
@@ -25,32 +24,32 @@
         -->
     </Match>
     <Match>
-        <Class name="dm.jale.util.TimeUnits"/>
+        <Class name="dm.fates.util.TimeUnits"/>
         <Method name="~waitSince.*"/>
         <Bug pattern="WA_NOT_IN_LOOP"/>
     </Match>
     <Match>
-        <Class name="dm.jale.eventual.FailureException"/>
+        <Class name="dm.fates.eventual.FailureException"/>
         <Method name="wrapIfNot"/>
         <Bug pattern="BC_UNCONFIRMED_CAST"/>
     </Match>
     <Match>
-        <Class name="dm.jale.eventual.RuntimeInterruptedException"/>
+        <Class name="dm.fates.eventual.RuntimeInterruptedException"/>
         <Method name="toInterruptedException"/>
         <Bug pattern="BC_UNCONFIRMED_CAST_OF_RETURN_VALUE"/>
     </Match>
     <Match>
-        <Class name="dm.jale.eventual.RuntimeTimeoutException"/>
+        <Class name="dm.fates.eventual.RuntimeTimeoutException"/>
         <Method name="toTimeoutException"/>
         <Bug pattern="BC_UNCONFIRMED_CAST_OF_RETURN_VALUE"/>
     </Match>
     <Match>
-        <Class name="dm.jale.DefaultStatement"/>
+        <Class name="dm.fates.DefaultStatement"/>
         <Method name="failure"/>
         <Bug pattern="NP_NULL_ON_SOME_PATH_FROM_RETURN_VALUE"/>
     </Match>
     <Match>
-        <Class name="dm.jale.DefaultLoop"/>
+        <Class name="dm.fates.DefaultLoop"/>
         <Method name="failure"/>
         <Bug pattern="NP_NULL_ON_SOME_PATH_FROM_RETURN_VALUE"/>
     </Match>

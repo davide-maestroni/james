@@ -49,7 +49,7 @@ dependencies {
 }
 
 buildConfig {
-  packageName 'dm.jale.config'
+  packageName 'dm.fates.config'
   buildConfigField 'long', 'VERSION_HASH_CODE', project.version.hashCode() + 'L'
 }
 

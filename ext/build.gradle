@@ -57,7 +57,7 @@ project.conditionalDependencies {
 }
 
 buildConfig {
-  packageName 'dm.jale.ext.config'
+  packageName 'dm.fates.ext.config'
   buildConfigField 'long', 'VERSION_HASH_CODE', project.version.hashCode() + 'L'
 }
 

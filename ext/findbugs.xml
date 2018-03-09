@@ -17,7 +17,10 @@
 
 <FindBugsFilter>
     <Match>
-        <Package name="~dm\.jale.*"/>
+        <Bug pattern="RV_RETURN_VALUE_IGNORED_NO_SIDE_EFFECT"/>
+        <!-- Too many false positives... -->
+    </Match>
+    <Match>
         <Bug pattern="SE_BAD_FIELD,SE_BAD_FIELD_STORE,SE_NO_SUITABLE_CONSTRUCTOR"/>
         <!--
         writeReplace makes objects serializable. This is a limitation of FindBugs as discussed here:
@@ -25,7 +28,7 @@
         -->
     </Match>
     <Match>
-        <Class name="dm.jale.ext.yield.AllMatchYielder"/>
+        <Class name="dm.fates.ext.yield.AllMatchYielder"/>
         <Or>
             <Method name="failure"/>
             <Method name="value"/>
@@ -33,11 +36,28 @@
         <Bug pattern="NP_BOOLEAN_RETURN_NULL"/>
     </Match>
     <Match>
-        <Class name="dm.jale.ext.yield.AnyMatchYielder"/>
+        <Class name="dm.fates.ext.yield.AnyMatchYielder"/>
         <Or>
             <Method name="failure"/>
             <Method name="value"/>
         </Or>
         <Bug pattern="NP_BOOLEAN_RETURN_NULL"/>
+    </Match>
+    <Match>
+        <Class name="dm.fates.ext.join.ZipFillJoiner"/>
+        <Bug pattern="UC_USELESS_OBJECT"/>
+    </Match>
+    <Match>
+        <Class name="dm.fates.ext.join.ZipJoiner"/>
+        <Bug pattern="UC_USELESS_OBJECT"/>
+    </Match>
+    <Match>
+        <Class name="dm.fates.ext.join.ZipStrictJoiner"/>
+        <Bug pattern="UC_USELESS_OBJECT"/>
+    </Match>
+    <Match>
+        <Class name="dm.fates.ext.yield.GroupByYielder"/>
+        <Method name="failSafe"/>
+        <Bug pattern="UC_USELESS_VOID_METHOD"/>
     </Match>
 </FindBugsFilter>
