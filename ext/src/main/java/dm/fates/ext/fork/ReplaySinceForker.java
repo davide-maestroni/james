@@ -22,6 +22,7 @@ import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.concurrent.TimeUnit;
 
+import dm.fates.Eventual;
 import dm.fates.eventual.EvaluationCollection;
 import dm.fates.eventual.Loop;
 import dm.fates.eventual.LoopForker;
@@ -44,19 +45,36 @@ class ReplaySinceForker<V> implements LoopForker<ForkerStack<V>, V>, Serializabl
 
   private final long mTimeout;
 
-  ReplaySinceForker(final long timeout, @NotNull final TimeUnit timeUnit) {
+  private ReplaySinceForker(final long timeout, @NotNull final TimeUnit timeUnit) {
     mTimeUnit = ConstantConditions.notNull("timeUnit", timeUnit);
     mMaxTimes = -1;
     mTimeout = timeout;
   }
 
-  ReplaySinceForker(final long timeout, @NotNull final TimeUnit timeUnit, final int maxTimes) {
+  private ReplaySinceForker(final long timeout, @NotNull final TimeUnit timeUnit,
+      final int maxTimes) {
     mTimeUnit = ConstantConditions.notNull("timeUnit", timeUnit);
     mMaxTimes = ConstantConditions.positive("maxTimes", maxTimes);
     mTimeout = timeout;
   }
 
+  @NotNull
+  static <V> LoopForker<?, V> newForker(final long timeout, @NotNull final TimeUnit timeUnit) {
+    return Eventual.safeLoopForker(new ReplaySinceForker<V>(timeout, timeUnit));
+  }
+
+  @NotNull
+  static <V> LoopForker<?, V> newForker(final long timeout, @NotNull final TimeUnit timeUnit,
+      final int maxTimes) {
+    return Eventual.safeLoopForker(new ReplaySinceForker<V>(timeout, timeUnit, maxTimes));
+  }
+
   public ForkerStack<V> done(final ForkerStack<V> stack, @NotNull final Loop<V> context) {
+    final ArrayList<EvaluationCollection<V>> evaluations = stack.evaluations;
+    for (final EvaluationCollection<V> evaluation : evaluations) {
+      evaluation.set();
+    }
+
     stack.evaluations = null;
     return stack;
   }
@@ -79,7 +97,10 @@ class ReplaySinceForker<V> implements LoopForker<ForkerStack<V>, V>, Serializabl
 
     final ArrayList<EvaluationCollection<V>> evaluations = stack.evaluations;
     if (evaluations != null) {
-      stack.evaluations.add(evaluation);
+      evaluations.add(evaluation);
+
+    } else {
+      evaluation.set();
     }
 
     return stack;

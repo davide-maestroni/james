@@ -51,13 +51,13 @@ public class EventualForkers {
   @NotNull
   public static <V> StatementForker<?, V> repeatAfter(final long timeout,
       @NotNull final TimeUnit timeUnit) {
-    return new RepeatAfterForker<V>(timeout, timeUnit);
+    return RepeatAfterForker.newForker(timeout, timeUnit);
   }
 
   @NotNull
   public static <V> StatementForker<?, V> repeatAfter(final long timeout,
       @NotNull final TimeUnit timeUnit, final int maxTimes) {
-    return new RepeatAfterForker<V>(timeout, timeUnit, maxTimes);
+    return RepeatAfterForker.newForker(timeout, timeUnit, maxTimes);
   }
 
   @NotNull
@@ -73,65 +73,65 @@ public class EventualForkers {
   @NotNull
   public static <V> LoopForker<?, V> repeatAllAfter(final long timeout,
       @NotNull final TimeUnit timeUnit) {
-    return new RepeatAllAfterForker<V>(timeout, timeUnit);
+    return RepeatAllAfterForker.newForker(timeout, timeUnit);
   }
 
   @NotNull
   public static <V> LoopForker<?, V> repeatAllAfter(final long timeout,
       @NotNull final TimeUnit timeUnit, final int maxTimes) {
-    return new RepeatAllAfterForker<V>(timeout, timeUnit, maxTimes);
+    return RepeatAllAfterForker.newForker(timeout, timeUnit, maxTimes);
   }
 
   @NotNull
   public static <V> StatementForker<?, V> replay() {
-    return new ReplayForker<V>();
+    return ReplayForker.newForker();
   }
 
   @NotNull
   public static <V> StatementForker<?, V> replay(final int maxTimes) {
-    return new ReplayForker<V>(maxTimes);
+    return ReplayForker.newForker(maxTimes);
   }
 
   @NotNull
   public static <V> LoopForker<?, V> replayAll() {
-    return new ReplayAllForker<V>();
+    return ReplayAllForker.newForker();
   }
 
   @NotNull
   public static <V> LoopForker<?, V> replayAll(final int maxTimes) {
-    return new ReplayAllForker<V>(maxTimes);
+    return ReplayAllForker.newForker(maxTimes);
   }
 
   @NotNull
   public static <V> LoopForker<?, V> replayFirst(final int maxCount) {
-    return new ReplayFirstForker<V>(maxCount);
+    return ReplayFirstForker.newForker(maxCount);
   }
 
   @NotNull
   public static <V> LoopForker<?, V> replayFirst(final int maxCount, final int maxTimes) {
-    return new ReplayFirstForker<V>(maxCount, maxTimes);
+    return ReplayFirstForker.newForker(maxCount, maxTimes);
   }
 
   @NotNull
   public static <V> LoopForker<?, V> replayLast(final int maxCount) {
-    return new ReplayLastForker<V>(maxCount);
+    return ReplayLastForker.newForker(maxCount);
   }
 
   @NotNull
   public static <V> LoopForker<?, V> replayLast(final int maxCount, final int maxTimes) {
-    return new ReplayLastForker<V>(maxCount, maxTimes);
+    return ReplayLastForker.newForker(maxCount, maxTimes);
   }
 
   @NotNull
   public static <V> LoopForker<?, V> replaySince(final long timeout,
       @NotNull final TimeUnit timeUnit) {
-    return new ReplaySinceForker<V>(timeout, timeUnit);
+    return ReplaySinceForker.newForker(timeout, timeUnit);
   }
 
   @NotNull
   public static <V> LoopForker<?, V> replaySince(final long timeout,
       @NotNull final TimeUnit timeUnit, final int maxTimes) {
-    return new ReplaySinceForker<V>(timeout, timeUnit, maxTimes);
+    return ReplaySinceForker.newForker(timeout, timeUnit, maxTimes);
   }
 
   @NotNull

@@ -53,6 +53,7 @@ import dm.fates.eventual.RuntimeTimeoutException;
 import dm.fates.eventual.Settler;
 import dm.fates.eventual.SimpleState;
 import dm.fates.eventual.Statement;
+import dm.fates.eventual.Tester;
 import dm.fates.eventual.Updater;
 import dm.fates.executor.ExecutorPool;
 import dm.fates.executor.FailingRunnable;
@@ -544,7 +545,7 @@ class DefaultLoop<V> implements Loop<V>, Serializable {
 
   @NotNull
   public Loop<V> forkOn(@NotNull final Executor executor) {
-    return forkLoop(new ExecutorLoopForker<V>(ordered(executor)));
+    return forkLoop(new ExecutorLoopForker<V>(executor));
   }
 
   @NotNull
@@ -726,18 +727,18 @@ class DefaultLoop<V> implements Loop<V>, Serializable {
   @NotNull
   public Loop<V> forkOn(@NotNull final Executor executor, final int maxValues,
       final int maxFailures) {
-    return forkLoop(new ExecutorLoopBatchForker<V>(ordered(executor), maxValues, maxFailures));
+    return forkLoop(new ExecutorBatchLoopForker<V>(executor, maxValues, maxFailures));
   }
 
   @NotNull
-  public Loop<V> forkOnParallel(@NotNull final Executor executor, final int maxValues,
+  public Loop<V> forkOnOrdered(@NotNull final Executor executor, final int maxValues,
       final int maxFailures) {
-    return forkLoop(new ExecutorLoopBatchForker<V>(executor, maxValues, maxFailures));
+    return forkLoop(new ExecutorOrderedBatchLoopForker<V>(executor, maxValues, maxFailures));
   }
 
   @NotNull
-  public Loop<V> forkOnParallel(@NotNull final Executor executor) {
-    return forkLoop(new ExecutorLoopForker<V>(executor));
+  public Loop<V> forkOnOrdered(@NotNull final Executor executor) {
+    return forkLoop(new ExecutorOrderedLoopForker<V>(executor));
   }
 
   @NotNull
@@ -861,8 +862,7 @@ class DefaultLoop<V> implements Loop<V>, Serializable {
   }
 
   @NotNull
-  public <S, R> Loop<R> yield(@Nullable final Provider<S> init,
-      @Nullable final Mapper<S, ? extends Boolean> loop,
+  public <S, R> Loop<R> yield(@Nullable final Provider<S> init, @Nullable final Tester<S> loop,
       @Nullable final Updater<S, ? super V, ? super YieldOutputs<R>> value,
       @Nullable final Updater<S, ? super Throwable, ? super YieldOutputs<R>> failure,
       @Nullable final Settler<S, ? super YieldOutputs<R>> done) {
@@ -877,7 +877,7 @@ class DefaultLoop<V> implements Loop<V>, Serializable {
 
   @NotNull
   public <S, R> Loop<R> yieldOrdered(@Nullable final Provider<S> init,
-      @Nullable final Mapper<S, ? extends Boolean> loop,
+      @Nullable final Tester<S> loop,
       @Nullable final Updater<S, ? super V, ? super YieldOutputs<R>> value,
       @Nullable final Updater<S, ? super Throwable, ? super YieldOutputs<R>> failure,
       @Nullable final Settler<S, ? super YieldOutputs<R>> done) {

@@ -27,10 +27,10 @@ import dm.fates.eventual.LoopYielder;
 import dm.fates.eventual.Mapper;
 import dm.fates.eventual.Observer;
 import dm.fates.eventual.Provider;
+import dm.fates.eventual.Tester;
 import dm.fates.ext.eventual.BiMapper;
 import dm.fates.ext.eventual.BiObserver;
 import dm.fates.ext.eventual.KeyedValue;
-import dm.fates.ext.eventual.Tester;
 import dm.fates.ext.eventual.TimedState;
 import dm.fates.util.ConstantConditions;
 

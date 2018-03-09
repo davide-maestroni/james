@@ -17,58 +17,45 @@
 package dm.fates;
 
 import org.jetbrains.annotations.NotNull;
-import org.jetbrains.annotations.Nullable;
 
 import java.io.InvalidObjectException;
 import java.io.ObjectStreamException;
 import java.io.Serializable;
 import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
 import java.util.concurrent.Executor;
 import java.util.concurrent.atomic.AtomicLong;
 
-import dm.fates.ExecutorLoopBatchForker.Stack;
+import dm.fates.ExecutorOrderedLoopForker.Stack;
 import dm.fates.config.BuildConfig;
 import dm.fates.eventual.EvaluationCollection;
 import dm.fates.eventual.FailureException;
 import dm.fates.eventual.Loop;
 import dm.fates.eventual.LoopForker;
+import dm.fates.eventual.SimpleState;
 import dm.fates.executor.EvaluationExecutor;
 import dm.fates.executor.ExecutorPool;
-import dm.fates.util.ConstantConditions;
 
 import static dm.fates.executor.ExecutorPool.withErrorBackPropagation;
 
 /**
  * Created by davide-maestroni on 02/12/2018.
  */
-class ExecutorLoopBatchForker<V>
+class ExecutorOrderedLoopForker<V>
     extends BufferedForker<Stack<V>, V, EvaluationCollection<V>, Loop<V>> {
 
   private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
 
-  ExecutorLoopBatchForker(@NotNull final Executor executor, final int maxValues,
-      final int maxFailures) {
-    super(new InnerForker<V>(executor, maxValues, maxFailures));
-  }
-
-  @Nullable
-  private static <E> List<E> copyOrNull(@NotNull final List<E> list) {
-    final int size = list.size();
-    return (size == 0) ? null
-        : (size == 1) ? Collections.singletonList(list.get(0)) : new ArrayList<E>(list);
+  ExecutorOrderedLoopForker(@NotNull final Executor executor) {
+    super(new InnerForker<V>(executor));
   }
 
   static class Stack<V> implements Executor {
-
-    private final ArrayList<Throwable> failures = new ArrayList<Throwable>();
 
     private final Executor mExecutor;
 
     private final AtomicLong pendingCount = new AtomicLong(1);
 
-    private final ArrayList<V> values = new ArrayList<V>();
+    private final NestedQueue<SimpleState<V>> queue = new NestedQueue<SimpleState<V>>();
 
     private EvaluationCollection<V> evaluation;
 
@@ -79,6 +66,17 @@ class ExecutorLoopBatchForker<V>
     public void execute(@NotNull final Runnable runnable) {
       mExecutor.execute(runnable);
     }
+
+    private void flushQueue(@NotNull final EvaluationCollection<V> evaluation) {
+      final ArrayList<SimpleState<V>> states = new ArrayList<SimpleState<V>>();
+      synchronized (this) {
+        queue.transferTo(states);
+      }
+
+      for (final SimpleState<V> state : states) {
+        state.addTo(evaluation);
+      }
+    }
   }
 
   private static class InnerForker<V> implements LoopForker<Stack<V>, V>, Serializable {
@@ -87,22 +85,14 @@ class ExecutorLoopBatchForker<V>
 
     private final EvaluationExecutor mExecutor;
 
-    private final int mMaxFailures;
-
-    private final int mMaxValues;
-
-    private InnerForker(@NotNull final Executor executor, final int maxValues,
-        final int maxFailures) {
+    private InnerForker(@NotNull final Executor executor) {
       mExecutor = ExecutorPool.register(executor);
-      mMaxValues = ConstantConditions.positive("maxValues", maxValues);
-      mMaxFailures = ConstantConditions.positive("maxFailures", maxFailures);
     }
 
     public Stack<V> done(final Stack<V> stack, @NotNull final Loop<V> context) {
       stack.execute(new ForkerRunnable(stack) {
 
-        protected void innerRun(@NotNull final EvaluationCollection<V> evaluation) {
-          evaluation.addFailures(stack.failures).addValues(stack.values);
+        protected void innerRun() {
         }
       });
       return stack;
@@ -123,26 +113,19 @@ class ExecutorLoopBatchForker<V>
 
     public Stack<V> failure(final Stack<V> stack, @NotNull final Throwable failure,
         @NotNull final Loop<V> context) {
-      final AtomicLong pendingCount = stack.pendingCount;
-      final ArrayList<V> values = stack.values;
-      final List<V> valueList = copyOrNull(values);
-      values.clear();
-      final ArrayList<Throwable> failures = stack.failures;
-      failures.add(failure);
-      final List<Throwable> failureList;
-      if (failures.size() >= mMaxFailures) {
-        failureList = copyOrNull(failures);
-        failures.clear();
-
-      } else {
-        failureList = null;
+      stack.pendingCount.incrementAndGet();
+      final NestedQueue<SimpleState<V>> queue;
+      synchronized (stack) {
+        queue = stack.queue.addNested();
       }
 
-      pendingCount.incrementAndGet();
       stack.execute(new ForkerRunnable(stack) {
 
-        protected void innerRun(@NotNull final EvaluationCollection<V> evaluation) {
-          evaluation.addValues(valueList).addFailures(failureList);
+        protected void innerRun() {
+          synchronized (stack) {
+            queue.add(SimpleState.<V>ofFailure(failure));
+            queue.close();
+          }
         }
       });
       return stack;
@@ -154,26 +137,19 @@ class ExecutorLoopBatchForker<V>
 
     public Stack<V> value(final Stack<V> stack, final V value,
         @NotNull final Loop<V> context) throws Exception {
-      final AtomicLong pendingCount = stack.pendingCount;
-      final ArrayList<Throwable> failures = stack.failures;
-      final List<Throwable> failureList = copyOrNull(failures);
-      failures.clear();
-      final ArrayList<V> values = stack.values;
-      values.add(value);
-      final List<V> valueList;
-      if (values.size() >= mMaxValues) {
-        valueList = copyOrNull(values);
-        values.clear();
-
-      } else {
-        valueList = null;
+      stack.pendingCount.incrementAndGet();
+      final NestedQueue<SimpleState<V>> queue;
+      synchronized (stack) {
+        queue = stack.queue.addNested();
       }
 
-      pendingCount.incrementAndGet();
       stack.execute(new ForkerRunnable(stack) {
 
-        protected void innerRun(@NotNull final EvaluationCollection<V> evaluation) {
-          evaluation.addFailures(failureList).addValues(valueList);
+        protected void innerRun() {
+          synchronized (stack) {
+            queue.add(SimpleState.ofValue(value));
+            queue.close();
+          }
         }
       });
       return stack;
@@ -181,7 +157,7 @@ class ExecutorLoopBatchForker<V>
 
     @NotNull
     private Object writeReplace() throws ObjectStreamException {
-      return new ForkerProxy<V>(mExecutor, mMaxValues, mMaxFailures);
+      return new ForkerProxy<V>(mExecutor);
     }
 
     private static class ForkerProxy<V> implements Serializable {
@@ -190,20 +166,14 @@ class ExecutorLoopBatchForker<V>
 
       private final Executor mExecutor;
 
-      private final int mMaxFailures;
-
-      private final int mMaxValues;
-
-      private ForkerProxy(final Executor executor, final int maxValues, final int maxFailures) {
+      private ForkerProxy(final Executor executor) {
         mExecutor = executor;
-        mMaxValues = maxValues;
-        mMaxFailures = maxFailures;
       }
 
       @NotNull
       private Object readResolve() throws ObjectStreamException {
         try {
-          return new ExecutorLoopBatchForker<V>(mExecutor, mMaxValues, mMaxFailures);
+          return new ExecutorOrderedLoopForker<V>(mExecutor);
 
         } catch (final Throwable t) {
           throw new InvalidObjectException(t.getMessage());
@@ -223,7 +193,8 @@ class ExecutorLoopBatchForker<V>
         final Stack<V> stack = mStack;
         final EvaluationCollection<V> evaluation = stack.evaluation;
         try {
-          innerRun(evaluation);
+          innerRun();
+          stack.flushQueue(evaluation);
           if (stack.pendingCount.decrementAndGet() == 0) {
             evaluation.set();
           }
@@ -233,8 +204,7 @@ class ExecutorLoopBatchForker<V>
         }
       }
 
-      protected abstract void innerRun(@NotNull EvaluationCollection<V> evaluation) throws
-          Exception;
+      protected abstract void innerRun() throws Exception;
     }
   }
 }

@@ -22,6 +22,7 @@ import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.concurrent.TimeUnit;
 
+import dm.fates.Eventual;
 import dm.fates.eventual.EvaluationCollection;
 import dm.fates.eventual.Loop;
 import dm.fates.eventual.Loop.YieldOutputs;
@@ -48,16 +49,28 @@ class RepeatAllAfterForker<V> implements LoopForker<ForkerStack<V>, V>, Serializ
 
   private final long mTimeout;
 
-  RepeatAllAfterForker(final long timeout, @NotNull final TimeUnit timeUnit) {
+  private RepeatAllAfterForker(final long timeout, @NotNull final TimeUnit timeUnit) {
     mTimeUnit = ConstantConditions.notNull("timeUnit", timeUnit);
     mTimeout = timeout;
     mMaxTimes = -1;
   }
 
-  RepeatAllAfterForker(final long timeout, @NotNull final TimeUnit timeUnit, final int maxTimes) {
+  private RepeatAllAfterForker(final long timeout, @NotNull final TimeUnit timeUnit,
+      final int maxTimes) {
     mTimeUnit = ConstantConditions.notNull("timeUnit", timeUnit);
     mMaxTimes = ConstantConditions.positive("maxTimes", maxTimes);
     mTimeout = timeout;
+  }
+
+  @NotNull
+  static <V> LoopForker<?, V> newForker(final long timeout, @NotNull final TimeUnit timeUnit) {
+    return Eventual.safeLoopForker(new RepeatAllAfterForker<V>(timeout, timeUnit));
+  }
+
+  @NotNull
+  static <V> LoopForker<?, V> newForker(final long timeout, @NotNull final TimeUnit timeUnit,
+      final int maxTimes) {
+    return Eventual.safeLoopForker(new RepeatAllAfterForker<V>(timeout, timeUnit, maxTimes));
   }
 
   public ForkerStack<V> done(final ForkerStack<V> stack, @NotNull final Loop<V> context) {
@@ -105,7 +118,7 @@ class RepeatAllAfterForker<V> implements LoopForker<ForkerStack<V>, V>, Serializ
         evaluation.set();
 
       } else {
-        final Loop<V> loop = context.evaluate().forkLoop(new ReplayAllForker<V>());
+        final Loop<V> loop = context.evaluate().forkLoop(ReplayAllForker.<V>newForker());
         stack.loop = loop;
         stack.valueStatement =
             loop.yield(new ToSimpleStateYielder<V>()).eventually(new ToTimedStatesMapper<V>());

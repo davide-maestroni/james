@@ -173,10 +173,10 @@ public interface Loop<V> extends Statement<Iterable<V>>, Serializable {
   Loop<V> forkOn(@NotNull Executor executor, int maxValues, final int maxFailures);
 
   @NotNull
-  Loop<V> forkOnParallel(@NotNull Executor executor, int maxValues, final int maxFailures);
+  Loop<V> forkOnOrdered(@NotNull Executor executor, int maxValues, final int maxFailures);
 
   @NotNull
-  Loop<V> forkOnParallel(@NotNull Executor executor);
+  Loop<V> forkOnOrdered(@NotNull Executor executor);
 
   @NotNull
   Generator<EvaluationState<V>> generateStates();
@@ -208,7 +208,7 @@ public interface Loop<V> extends Statement<Iterable<V>>, Serializable {
   <S, R> Loop<R> yield(@NotNull Yielder<S, ? super V, ? super YieldOutputs<R>> yielder);
 
   @NotNull
-  <S, R> Loop<R> yield(@Nullable Provider<S> init, @Nullable Mapper<S, ? extends Boolean> loop,
+  <S, R> Loop<R> yield(@Nullable Provider<S> init, @Nullable Tester<S> loop,
       @Nullable Updater<S, ? super V, ? super YieldOutputs<R>> value,
       @Nullable Updater<S, ? super Throwable, ? super YieldOutputs<R>> failure,
       @Nullable Settler<S, ? super YieldOutputs<R>> done);
@@ -217,8 +217,7 @@ public interface Loop<V> extends Statement<Iterable<V>>, Serializable {
   <S, R> Loop<R> yieldOrdered(@NotNull Yielder<S, ? super V, ? super YieldOutputs<R>> yielder);
 
   @NotNull
-  <S, R> Loop<R> yieldOrdered(@Nullable Provider<S> init,
-      @Nullable Mapper<S, ? extends Boolean> loop,
+  <S, R> Loop<R> yieldOrdered(@Nullable Provider<S> init, @Nullable Tester<S> loop,
       @Nullable Updater<S, ? super V, ? super YieldOutputs<R>> value,
       @Nullable Updater<S, ? super Throwable, ? super YieldOutputs<R>> failure,
       @Nullable Settler<S, ? super YieldOutputs<R>> done);

@@ -53,7 +53,7 @@ class RetryMapperForker<S, V> implements StatementForker<ForkerStack<S, V>, V>, 
   @NotNull
   static <S, V> StatementForker<?, V> newForker(
       @NotNull final BiMapper<S, ? super Throwable, ? extends Statement<S>> mapper) {
-    return Eventual.bufferedStatement(new RetryMapperForker<S, V>(mapper, null));
+    return Eventual.bufferedStatementForker(new RetryMapperForker<S, V>(mapper, null));
   }
 
   public ForkerStack<S, V> done(final ForkerStack<S, V> stack,

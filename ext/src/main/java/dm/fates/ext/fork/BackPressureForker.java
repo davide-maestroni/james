@@ -67,7 +67,7 @@ class BackPressureForker<S, V> implements LoopForker<ForkerOutputs<S, V>, V>, Se
   @NotNull
   static <S, V> LoopForker<?, V> newForker(@NotNull final Executor executor,
       @NotNull final Yielder<S, V, ? super PendingOutputs<V>> yielder) {
-    return Eventual.bufferedLoop(new BackPressureForker<S, V>(executor, yielder));
+    return Eventual.bufferedLoopForker(new BackPressureForker<S, V>(executor, yielder));
   }
 
   public ForkerOutputs<S, V> done(final ForkerOutputs<S, V> stack,

@@ -47,12 +47,13 @@ class RepeatForker<V> implements StatementForker<ForkerStack<V>, V>, Serializabl
 
   @NotNull
   static <V> StatementForker<?, V> newForker() {
-    return Eventual.bufferedStatement(new RepeatForker<V>());
+    return Eventual.bufferedStatementForker(Eventual.safeStatementForker(new RepeatForker<V>()));
   }
 
   @NotNull
   static <V> StatementForker<?, V> newForker(final int maxTimes) {
-    return Eventual.bufferedStatement(new RepeatForker<V>(maxTimes));
+    return Eventual.bufferedStatementForker(
+        Eventual.safeStatementForker(new RepeatForker<V>(maxTimes)));
   }
 
   public ForkerStack<V> done(final ForkerStack<V> stack, @NotNull final Statement<V> context) {

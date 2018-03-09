@@ -47,6 +47,7 @@ import dm.fates.eventual.Statement;
 import dm.fates.eventual.Statement.Forker;
 import dm.fates.eventual.StatementForker;
 import dm.fates.eventual.StatementJoiner;
+import dm.fates.eventual.Tester;
 import dm.fates.eventual.Updater;
 import dm.fates.util.ConstantConditions;
 import dm.fates.util.SerializableProxy;
@@ -78,14 +79,14 @@ public class Eventual {
   }
 
   @NotNull
-  public static <S, V> LoopForker<?, V> bufferedLoop(
+  public static <S, V> LoopForker<?, V> bufferedLoopForker(
       @NotNull final Forker<S, ? super V, ? super EvaluationCollection<V>, ? super Loop<V>>
           forker) {
     return new BufferedLoopForker<S, V>(forker);
   }
 
   @NotNull
-  public static <S, V> StatementForker<?, V> bufferedStatement(
+  public static <S, V> StatementForker<?, V> bufferedStatementForker(
       @NotNull final Forker<S, ? super V, ? super Evaluation<V>, ? super Statement<V>> forker) {
     return new BufferedStatementForker<S, V>(forker);
   }
@@ -113,11 +114,24 @@ public class Eventual {
 
   @NotNull
   public static <S, V, R> LoopYielder<S, V, R> loopYielder(@Nullable final Provider<S> init,
-      @Nullable final Mapper<S, ? extends Boolean> loop,
+      @Nullable final Tester<S> loop,
       @Nullable final Updater<S, ? super V, ? super YieldOutputs<R>> value,
       @Nullable final Updater<S, ? super Throwable, ? super YieldOutputs<R>> failure,
       @Nullable final Settler<S, ? super YieldOutputs<R>> done) {
     return new ComposedLoopYielder<S, V, R>(init, loop, value, failure, done);
+  }
+
+  @NotNull
+  public static <S, V> LoopForker<S, V> safeLoopForker(
+      @NotNull final Forker<S, ? super V, ? super EvaluationCollection<V>, ? super Loop<V>>
+          forker) {
+    return new SafeLoopForker<S, V>(forker);
+  }
+
+  @NotNull
+  public static <S, V> StatementForker<?, V> safeStatementForker(
+      @NotNull final Forker<S, ? super V, ? super Evaluation<V>, ? super Statement<V>> forker) {
+    return new SafeStatementForker<S, V>(forker);
   }
 
   @NotNull
@@ -144,8 +158,7 @@ public class Eventual {
 
   @NotNull
   public static <S, V, O> Yielder<S, V, O> yielder(@Nullable final Provider<S> init,
-      @Nullable final Mapper<S, ? extends Boolean> loop,
-      @Nullable final Updater<S, ? super V, ? super O> value,
+      @Nullable final Tester<S> loop, @Nullable final Updater<S, ? super V, ? super O> value,
       @Nullable final Updater<S, ? super Throwable, ? super O> failure,
       @Nullable final Settler<S, ? super O> done) {
     return new ComposedYielder<S, V, O>(init, loop, value, failure, done);

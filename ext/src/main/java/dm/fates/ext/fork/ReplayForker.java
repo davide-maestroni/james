@@ -21,6 +21,7 @@ import org.jetbrains.annotations.NotNull;
 import java.io.Serializable;
 import java.util.ArrayList;
 
+import dm.fates.Eventual;
 import dm.fates.eventual.Evaluation;
 import dm.fates.eventual.SimpleState;
 import dm.fates.eventual.Statement;
@@ -38,12 +39,22 @@ class ReplayForker<V> implements StatementForker<ForkerStack<V>, V>, Serializabl
 
   private final int mMaxTimes;
 
-  ReplayForker() {
+  private ReplayForker() {
     mMaxTimes = -1;
   }
 
-  ReplayForker(final int maxTimes) {
+  private ReplayForker(final int maxTimes) {
     mMaxTimes = ConstantConditions.positive("maxTimes", maxTimes);
+  }
+
+  @NotNull
+  static <V> StatementForker<?, V> newForker() {
+    return Eventual.safeStatementForker(new ReplayForker<V>());
+  }
+
+  @NotNull
+  static <V> StatementForker<?, V> newForker(final int maxTimes) {
+    return Eventual.safeStatementForker(new ReplayForker<V>(maxTimes));
   }
 
   public ForkerStack<V> done(final ForkerStack<V> stack, @NotNull final Statement<V> context) {

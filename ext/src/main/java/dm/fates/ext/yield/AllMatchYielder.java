@@ -24,8 +24,8 @@ import java.io.Serializable;
 
 import dm.fates.eventual.Loop.YieldOutputs;
 import dm.fates.eventual.LoopYielder;
+import dm.fates.eventual.Tester;
 import dm.fates.ext.config.BuildConfig;
-import dm.fates.ext.eventual.Tester;
 import dm.fates.util.ConstantConditions;
 import dm.fates.util.SerializableProxy;
 

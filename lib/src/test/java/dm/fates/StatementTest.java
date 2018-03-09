@@ -93,7 +93,7 @@ public class StatementTest {
 
   @NotNull
   private static <V> Statement<V> fork(@NotNull final Statement<V> statement) {
-    return statement.fork(Eventual.bufferedStatement(new StatementForker<Evaluation<V>, V>() {
+    return statement.fork(Eventual.bufferedStatementForker(new StatementForker<Evaluation<V>, V>() {
 
       public Evaluation<V> done(final Evaluation<V> stack, @NotNull final Statement<V> context) {
         return stack;

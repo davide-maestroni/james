@@ -50,13 +50,13 @@ import dm.fates.eventual.Settler;
 import dm.fates.eventual.SimpleState;
 import dm.fates.eventual.Statement;
 import dm.fates.eventual.StatementForker;
+import dm.fates.eventual.Tester;
 import dm.fates.eventual.Updater;
 import dm.fates.ext.backpressure.PendingOutputs;
 import dm.fates.ext.eventual.BiMapper;
 import dm.fates.ext.eventual.BiObserver;
 import dm.fates.ext.eventual.KeyedValue;
 import dm.fates.ext.eventual.QuadriMapper;
-import dm.fates.ext.eventual.Tester;
 import dm.fates.ext.eventual.TimedState;
 import dm.fates.ext.eventual.TriMapper;
 import dm.fates.ext.fork.EventualForkers;
@@ -514,7 +514,7 @@ public class EventualExt extends Eventual {
 
   @NotNull
   public static <S, V> LoopForker<?, V> withBackPressure(@Nullable final Provider<S> init,
-      @Nullable final Mapper<S, ? extends Boolean> loop,
+      @Nullable final Tester<S> loop,
       @Nullable final Updater<S, ? super V, ? super PendingOutputs<V>> value,
       @Nullable final Updater<S, ? super Throwable, ? super PendingOutputs<V>> failure,
       @Nullable final Settler<S, ? super PendingOutputs<V>> done,

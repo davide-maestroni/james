@@ -26,9 +26,9 @@ import java.io.Serializable;
 import dm.fates.config.BuildConfig;
 import dm.fates.eventual.Loop.YieldOutputs;
 import dm.fates.eventual.Loop.Yielder;
-import dm.fates.eventual.Mapper;
 import dm.fates.eventual.Provider;
 import dm.fates.eventual.Settler;
+import dm.fates.eventual.Tester;
 import dm.fates.eventual.Updater;
 import dm.fates.util.SerializableProxy;
 
@@ -45,18 +45,17 @@ class ComposedYielder<S, V, O> implements Yielder<S, V, O>, Serializable {
 
   private final Provider<S> mInit;
 
-  private final Mapper<S, ? extends Boolean> mLoop;
+  private final Tester<S> mLoop;
 
   private final Updater<S, ? super V, ? super O> mValue;
 
   @SuppressWarnings("unchecked")
-  ComposedYielder(@Nullable final Provider<S> init,
-      @Nullable final Mapper<S, ? extends Boolean> loop,
+  ComposedYielder(@Nullable final Provider<S> init, @Nullable final Tester<S> loop,
       @Nullable final Updater<S, ? super V, ? super O> value,
       @Nullable final Updater<S, ? super Throwable, ? super O> failure,
       @Nullable final Settler<S, ? super O> done) {
     mInit = (Provider<S>) ((init != null) ? init : DefaultInit.sInstance);
-    mLoop = (Mapper<S, ? extends Boolean>) ((loop != null) ? loop : DefaultLoop.sInstance);
+    mLoop = (Tester<S>) ((loop != null) ? loop : DefaultLoop.sInstance);
     mValue =
         (Updater<S, ? super V, ? super O>) ((value != null) ? value : DefaultUpdater.sInstance);
     mFailure = (Updater<S, ? super Throwable, ? super O>) ((failure != null) ? failure
@@ -78,7 +77,7 @@ class ComposedYielder<S, V, O> implements Yielder<S, V, O>, Serializable {
   }
 
   public boolean loop(final S stack) throws Exception {
-    return mLoop.apply(stack);
+    return mLoop.test(stack);
   }
 
   public S value(final S stack, final V value, @NotNull final O outputs) throws Exception {
@@ -106,14 +105,14 @@ class ComposedYielder<S, V, O> implements Yielder<S, V, O>, Serializable {
     }
   }
 
-  private static class DefaultLoop<S> implements Mapper<S, Boolean>, Serializable {
+  private static class DefaultLoop<S> implements Tester<S>, Serializable {
 
     private static final DefaultLoop<?> sInstance = new DefaultLoop<Object>();
 
     private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
 
-    public Boolean apply(final S input) {
-      return Boolean.TRUE;
+    public boolean test(final S input) throws Exception {
+      return true;
     }
 
     @NotNull
@@ -159,7 +158,7 @@ class ComposedYielder<S, V, O> implements Yielder<S, V, O>, Serializable {
 
     private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
 
-    private YielderProxy(final Provider<S> init, final Mapper<S, ? extends Boolean> loop,
+    private YielderProxy(final Provider<S> init, final Tester<S> loop,
         final Updater<S, ? super V, ? super R> value,
         final Updater<S, ? super Throwable, ? super R> failure, final Settler<S, ? super R> done) {
       super(proxy(init), proxy(loop), proxy(value), proxy(failure), proxy(done));
@@ -170,8 +169,8 @@ class ComposedYielder<S, V, O> implements Yielder<S, V, O>, Serializable {
     private Object readResolve() throws ObjectStreamException {
       try {
         final Object[] args = deserializeArgs();
-        return new ComposedYielder<S, V, R>((Provider<S>) args[0],
-            (Mapper<S, ? extends Boolean>) args[1], (Updater<S, ? super V, ? super R>) args[2],
+        return new ComposedYielder<S, V, R>((Provider<S>) args[0], (Tester<S>) args[1],
+            (Updater<S, ? super V, ? super R>) args[2],
             (Updater<S, ? super Throwable, ? super R>) args[3], (Settler<S, ? super R>) args[4]);
 
       } catch (final Throwable t) {

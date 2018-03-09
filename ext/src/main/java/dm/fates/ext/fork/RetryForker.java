@@ -42,7 +42,7 @@ class RetryForker<V> implements StatementForker<Evaluation<V>, V>, Serializable 
 
   @NotNull
   static <V> StatementForker<?, V> newForker(final int maxCount) {
-    return Eventual.bufferedStatement(new RetryForker<V>(maxCount));
+    return Eventual.bufferedStatementForker(new RetryForker<V>(maxCount));
   }
 
   public Evaluation<V> done(final Evaluation<V> stack, @NotNull final Statement<V> context) {

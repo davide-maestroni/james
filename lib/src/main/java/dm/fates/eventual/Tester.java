@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package dm.fates.ext.eventual;
+package dm.fates.eventual;
 
 /**
  * Created by davide-maestroni on 02/19/2018.

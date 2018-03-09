@@ -25,9 +25,9 @@ import java.io.ObjectStreamException;
 import dm.fates.config.BuildConfig;
 import dm.fates.eventual.Loop.YieldOutputs;
 import dm.fates.eventual.LoopYielder;
-import dm.fates.eventual.Mapper;
 import dm.fates.eventual.Provider;
 import dm.fates.eventual.Settler;
+import dm.fates.eventual.Tester;
 import dm.fates.eventual.Updater;
 import dm.fates.util.SerializableProxy;
 
@@ -45,12 +45,11 @@ class ComposedLoopYielder<S, V, R> extends ComposedYielder<S, V, YieldOutputs<R>
 
   private final Provider<S> mInit;
 
-  private final Mapper<S, ? extends Boolean> mLoop;
+  private final Tester<S> mLoop;
 
   private final Updater<S, ? super V, ? super YieldOutputs<R>> mValue;
 
-  ComposedLoopYielder(@Nullable final Provider<S> init,
-      @Nullable final Mapper<S, ? extends Boolean> loop,
+  ComposedLoopYielder(@Nullable final Provider<S> init, @Nullable final Tester<S> loop,
       @Nullable final Updater<S, ? super V, ? super YieldOutputs<R>> value,
       @Nullable final Updater<S, ? super Throwable, ? super YieldOutputs<R>> failure,
       @Nullable final Settler<S, ? super YieldOutputs<R>> done) {
@@ -71,7 +70,7 @@ class ComposedLoopYielder<S, V, R> extends ComposedYielder<S, V, YieldOutputs<R>
 
     private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
 
-    private YielderProxy(final Provider<S> init, final Mapper<S, ? extends Boolean> loop,
+    private YielderProxy(final Provider<S> init, final Tester<S> loop,
         final Updater<S, ? super V, ? super YieldOutputs<R>> value,
         final Updater<S, ? super Throwable, ? super YieldOutputs<R>> failure,
         final Settler<S, ? super YieldOutputs<R>> done) {
@@ -83,8 +82,7 @@ class ComposedLoopYielder<S, V, R> extends ComposedYielder<S, V, YieldOutputs<R>
     private Object readResolve() throws ObjectStreamException {
       try {
         final Object[] args = deserializeArgs();
-        return new ComposedLoopYielder<S, V, R>((Provider<S>) args[0],
-            (Mapper<S, ? extends Boolean>) args[1],
+        return new ComposedLoopYielder<S, V, R>((Provider<S>) args[0], (Tester<S>) args[1],
             (Updater<S, ? super V, ? super YieldOutputs<R>>) args[2],
             (Updater<S, ? super Throwable, ? super YieldOutputs<R>>) args[3],
             (Settler<S, ? super YieldOutputs<R>>) args[4]);

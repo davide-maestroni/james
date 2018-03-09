@@ -47,12 +47,12 @@ class RepeatAllForker<V> implements LoopForker<ForkerStack<V>, V>, Serializable 
 
   @NotNull
   static <V> LoopForker<?, V> newForker() {
-    return Eventual.bufferedLoop(new RepeatAllForker<V>());
+    return Eventual.bufferedLoopForker(Eventual.safeLoopForker(new RepeatAllForker<V>()));
   }
 
   @NotNull
   static <V> LoopForker<?, V> newForker(final int maxTimes) {
-    return Eventual.bufferedLoop(new RepeatAllForker<V>(maxTimes));
+    return Eventual.bufferedLoopForker(Eventual.safeLoopForker(new RepeatAllForker<V>(maxTimes)));
   }
 
   public ForkerStack<V> done(final ForkerStack<V> stack, @NotNull final Loop<V> context) {

@@ -21,6 +21,7 @@ import org.jetbrains.annotations.NotNull;
 import java.io.Serializable;
 import java.util.ArrayList;
 
+import dm.fates.Eventual;
 import dm.fates.eventual.EvaluationCollection;
 import dm.fates.eventual.Loop;
 import dm.fates.eventual.LoopForker;
@@ -38,15 +39,30 @@ class ReplayAllForker<V> implements LoopForker<ForkerStack<V>, V>, Serializable 
 
   private final int mMaxTimes;
 
-  ReplayAllForker() {
+  private ReplayAllForker() {
     mMaxTimes = -1;
   }
 
-  ReplayAllForker(final int maxTimes) {
+  private ReplayAllForker(final int maxTimes) {
     mMaxTimes = ConstantConditions.positive("maxTimes", maxTimes);
   }
 
+  @NotNull
+  static <V> LoopForker<?, V> newForker() {
+    return Eventual.safeLoopForker(new ReplayAllForker<V>());
+  }
+
+  @NotNull
+  static <V> LoopForker<?, V> newForker(final int maxTimes) {
+    return Eventual.safeLoopForker(new ReplayAllForker<V>(maxTimes));
+  }
+
   public ForkerStack<V> done(final ForkerStack<V> stack, @NotNull final Loop<V> context) {
+    final ArrayList<EvaluationCollection<V>> evaluations = stack.evaluations;
+    for (final EvaluationCollection<V> evaluation : evaluations) {
+      evaluation.set();
+    }
+
     stack.evaluations = null;
     return stack;
   }
@@ -70,6 +86,9 @@ class ReplayAllForker<V> implements LoopForker<ForkerStack<V>, V>, Serializable 
     final ArrayList<EvaluationCollection<V>> evaluations = stack.evaluations;
     if (evaluations != null) {
       evaluations.add(evaluation);
+
+    } else {
+      evaluation.set();
     }
 
     return stack;

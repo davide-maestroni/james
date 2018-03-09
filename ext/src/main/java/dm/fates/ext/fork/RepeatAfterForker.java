@@ -22,6 +22,7 @@ import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.concurrent.TimeUnit;
 
+import dm.fates.Eventual;
 import dm.fates.eventual.Evaluation;
 import dm.fates.eventual.Statement;
 import dm.fates.eventual.StatementForker;
@@ -43,16 +44,28 @@ class RepeatAfterForker<V> implements StatementForker<ForkerStack<V>, V>, Serial
 
   private final long mTimeout;
 
-  RepeatAfterForker(final long timeout, @NotNull final TimeUnit timeUnit) {
+  private RepeatAfterForker(final long timeout, @NotNull final TimeUnit timeUnit) {
     mTimeUnit = ConstantConditions.notNull("timeUnit", timeUnit);
     mTimeout = timeout;
     mMaxTimes = -1;
   }
 
-  RepeatAfterForker(final long timeout, @NotNull final TimeUnit timeUnit, final int maxTimes) {
+  private RepeatAfterForker(final long timeout, @NotNull final TimeUnit timeUnit,
+      final int maxTimes) {
     mTimeUnit = ConstantConditions.notNull("timeUnit", timeUnit);
     mMaxTimes = ConstantConditions.positive("maxTimes", maxTimes);
     mTimeout = timeout;
+  }
+
+  @NotNull
+  static <V> StatementForker<?, V> newForker(final long timeout, @NotNull final TimeUnit timeUnit) {
+    return Eventual.safeStatementForker(new RepeatAfterForker<V>(timeout, timeUnit));
+  }
+
+  @NotNull
+  static <V> StatementForker<?, V> newForker(final long timeout, @NotNull final TimeUnit timeUnit,
+      final int maxTimes) {
+    return Eventual.safeStatementForker(new RepeatAfterForker<V>(timeout, timeUnit, maxTimes));
   }
 
   public ForkerStack<V> done(final ForkerStack<V> stack, @NotNull final Statement<V> context) {
@@ -88,7 +101,7 @@ class RepeatAfterForker<V> implements StatementForker<ForkerStack<V>, V>, Serial
         state.to(evaluation);
 
       } else {
-        final Statement<V> statement = context.evaluate().fork(new ReplayForker<V>());
+        final Statement<V> statement = context.evaluate().fork(ReplayForker.<V>newForker());
         stack.statement = statement;
         stack.valueStatement = statement.eventually(TimedStateValueMapper.<V>instance())
             .elseCatch(TimedStateFailureMapper.<V>instance());
