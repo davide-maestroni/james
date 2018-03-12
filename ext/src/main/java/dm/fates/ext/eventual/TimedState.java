@@ -24,6 +24,7 @@ import java.util.concurrent.CancellationException;
 import dm.fates.eventual.Evaluation;
 import dm.fates.eventual.EvaluationCollection;
 import dm.fates.eventual.EvaluationState;
+import dm.fates.eventual.Loop.YieldOutputs;
 import dm.fates.ext.config.BuildConfig;
 import dm.fates.util.ConstantConditions;
 
@@ -32,13 +33,19 @@ import dm.fates.util.ConstantConditions;
  */
 public abstract class TimedState<V> implements EvaluationState<V>, Serializable {
 
-  private TimedState() {
+  private final String mStateName;
+
+  private final long mTimestamp;
+
+  private TimedState(@NotNull final String stateName) {
+    mStateName = stateName;
+    mTimestamp = System.currentTimeMillis();
   }
 
   @NotNull
   @SuppressWarnings("unchecked")
   public static <V> TimedState<V> cancelled() {
-    return new FailureState<V>(new CancellationException("cancelled state"));
+    return new FailureState<V>(new CancellationException());
   }
 
   @NotNull
@@ -65,16 +72,24 @@ public abstract class TimedState<V> implements EvaluationState<V>, Serializable 
 
   public abstract void addTo(@NotNull EvaluationCollection<? super V> evaluation);
 
-  public abstract long timestamp();
+  public long timestamp() {
+    return mTimestamp;
+  }
+
+  @Override
+  public String toString() {
+    return TimedState.class.getSimpleName() + ": {state=" + mStateName + ", timestamp=" + mTimestamp
+        + "}";
+  }
+
+  public abstract void yieldTo(@NotNull YieldOutputs<? super V> outputs);
 
   private static class EvaluatingState<V> extends TimedState<V> {
 
     private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
 
-    private final long mTimestamp;
-
     private EvaluatingState() {
-      mTimestamp = System.currentTimeMillis();
+      super("Evaluating");
     }
 
     public void addTo(@NotNull final EvaluationCollection<? super V> evaluation) {
@@ -86,8 +101,8 @@ public abstract class TimedState<V> implements EvaluationState<V>, Serializable 
       throw new IllegalStateException("invalid state: Evaluating");
     }
 
-    public long timestamp() {
-      return mTimestamp;
+    public void yieldTo(@NotNull final YieldOutputs<? super V> outputs) {
+      ConstantConditions.unsupported();
     }
 
     public boolean isCancelled() {
@@ -121,19 +136,17 @@ public abstract class TimedState<V> implements EvaluationState<V>, Serializable 
 
     private final Throwable mFailure;
 
-    private final long mTimestamp;
-
     private FailureState(@NotNull final Throwable failure) {
+      super("Failed, failure=" + failure);
       mFailure = ConstantConditions.notNull("failure", failure);
-      mTimestamp = System.currentTimeMillis();
     }
 
     public void addTo(@NotNull final EvaluationCollection<? super V> evaluation) {
       evaluation.addFailure(mFailure);
     }
 
-    public long timestamp() {
-      return mTimestamp;
+    public void yieldTo(@NotNull final YieldOutputs<? super V> outputs) {
+      outputs.yieldFailure(mFailure);
     }
 
     @NotNull
@@ -170,18 +183,16 @@ public abstract class TimedState<V> implements EvaluationState<V>, Serializable 
 
     private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
 
-    private final long mTimestamp;
-
     private SettledState() {
-      mTimestamp = System.currentTimeMillis();
+      super("Settled");
     }
 
     public void addTo(@NotNull final EvaluationCollection<? super V> evaluation) {
       evaluation.set();
     }
 
-    public long timestamp() {
-      return mTimestamp;
+    public void yieldTo(@NotNull final YieldOutputs<? super V> outputs) {
+      ConstantConditions.unsupported();
     }
 
     @NotNull
@@ -218,21 +229,19 @@ public abstract class TimedState<V> implements EvaluationState<V>, Serializable 
 
     private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
 
-    private final long mTimestamp;
-
     private final V mValue;
 
     private ValueState(final V value) {
+      super("Set, value=" + value);
       mValue = value;
-      mTimestamp = System.currentTimeMillis();
+    }
+
+    public void yieldTo(@NotNull final YieldOutputs<? super V> outputs) {
+      outputs.yieldValue(mValue);
     }
 
     public void addTo(@NotNull final EvaluationCollection<? super V> evaluation) {
       evaluation.addValue(mValue);
-    }
-
-    public long timestamp() {
-      return mTimestamp;
     }
 
     @NotNull

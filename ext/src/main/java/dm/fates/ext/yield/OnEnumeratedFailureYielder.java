@@ -25,42 +25,51 @@ import java.io.Serializable;
 import dm.fates.eventual.Loop.YieldOutputs;
 import dm.fates.eventual.LoopYielder;
 import dm.fates.ext.config.BuildConfig;
-import dm.fates.ext.eventual.BiMapper;
+import dm.fates.ext.eventual.TriMapper;
+import dm.fates.ext.yield.OnEnumeratedFailureYielder.YielderStack;
 import dm.fates.util.ConstantConditions;
 import dm.fates.util.SerializableProxy;
 
 /**
  * Created by davide-maestroni on 02/27/2018.
  */
-class OnFailureYielder<V> implements LoopYielder<Boolean, V, V>, Serializable {
+class OnEnumeratedFailureYielder<V> implements LoopYielder<YielderStack, V, V>, Serializable {
 
   private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
 
-  private final BiMapper<? super Throwable, ? super YieldOutputs<V>, Boolean> mMapper;
+  private final TriMapper<? super Long, ? super Throwable, ? super YieldOutputs<V>, Boolean>
+      mMapper;
 
-  OnFailureYielder(
-      @NotNull final BiMapper<? super Throwable, ? super YieldOutputs<V>, Boolean> mapper) {
+  OnEnumeratedFailureYielder(
+      @NotNull final TriMapper<? super Long, ? super Throwable, ? super YieldOutputs<V>, Boolean>
+          mapper) {
     mMapper = ConstantConditions.notNull("mapper", mapper);
   }
 
-  public void done(final Boolean stack, @NotNull final YieldOutputs<V> outputs) {
+  public void done(final YielderStack stack, @NotNull final YieldOutputs<V> outputs) {
   }
 
-  public Boolean failure(final Boolean stack, @NotNull final Throwable failure,
+  public YielderStack failure(final YielderStack stack, @NotNull final Throwable failure,
       @NotNull final YieldOutputs<V> outputs) throws Exception {
-    final Boolean isLoop = mMapper.apply(failure, outputs);
-    return (isLoop != null) ? isLoop : stack;
-  }
+    final Boolean isLoop = mMapper.apply(stack.count, failure, outputs);
+    ++stack.count;
+    if (isLoop != null) {
+      stack.isLoop = isLoop;
+    }
 
-  public Boolean init() {
-    return Boolean.TRUE;
-  }
-
-  public boolean loop(final Boolean stack) {
     return stack;
   }
 
-  public Boolean value(final Boolean stack, final V value, @NotNull final YieldOutputs<V> outputs) {
+  public YielderStack init() {
+    return new YielderStack();
+  }
+
+  public boolean loop(final YielderStack stack) {
+    return stack.isLoop;
+  }
+
+  public YielderStack value(final YielderStack stack, final V value,
+      @NotNull final YieldOutputs<V> outputs) {
     outputs.yieldValue(value);
     return stack;
   }
@@ -70,12 +79,19 @@ class OnFailureYielder<V> implements LoopYielder<Boolean, V, V>, Serializable {
     return new YielderProxy<V>(mMapper);
   }
 
+  static class YielderStack {
+
+    private long count;
+
+    private boolean isLoop = true;
+  }
+
   private static class YielderProxy<V> extends SerializableProxy {
 
     private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
 
     private YielderProxy(
-        final BiMapper<? super Throwable, ? super YieldOutputs<V>, Boolean> mapper) {
+        final TriMapper<? super Long, ? super Throwable, ? super YieldOutputs<V>, Boolean> mapper) {
       super(proxy(mapper));
     }
 
@@ -84,8 +100,8 @@ class OnFailureYielder<V> implements LoopYielder<Boolean, V, V>, Serializable {
     private Object readResolve() throws ObjectStreamException {
       try {
         final Object[] args = deserializeArgs();
-        return new OnFailureYielder<V>(
-            (BiMapper<? super Throwable, ? super YieldOutputs<V>, Boolean>) args[0]);
+        return new OnEnumeratedFailureYielder<V>(
+            (TriMapper<? super Long, ? super Throwable, ? super YieldOutputs<V>, Boolean>) args[0]);
 
       } catch (final Throwable t) {
         throw new InvalidObjectException(t.getMessage());

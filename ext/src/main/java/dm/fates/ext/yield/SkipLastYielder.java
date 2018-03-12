@@ -68,13 +68,7 @@ class SkipLastYielder<V> implements LoopYielder<DoubleQueue<SimpleState<V>>, V, 
   private DoubleQueue<SimpleState<V>> flush(@NotNull final DoubleQueue<SimpleState<V>> stack,
       final @NotNull YieldOutputs<V> outputs) {
     while (stack.size() > mMaxCount) {
-      final SimpleState<V> state = stack.removeFirst();
-      if (state.isSet()) {
-        outputs.yieldValue(state.value());
-
-      } else {
-        outputs.yieldFailure(state.failure());
-      }
+      stack.removeFirst().yieldTo(outputs);
     }
 
     return stack;

@@ -61,7 +61,8 @@ class OnValueYielder<V, R> implements LoopYielder<Boolean, V, R>, Serializable {
 
   public Boolean value(final Boolean stack, final V value,
       @NotNull final YieldOutputs<R> outputs) throws Exception {
-    return mMapper.apply(value, outputs);
+    final Boolean isLoop = mMapper.apply(value, outputs);
+    return (isLoop != null) ? isLoop : stack;
   }
 
   @NotNull

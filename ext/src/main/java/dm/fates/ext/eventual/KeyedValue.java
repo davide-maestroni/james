@@ -50,4 +50,9 @@ public class KeyedValue<K, V> implements Serializable {
   public V getValue() {
     return mValue;
   }
+
+  @Override
+  public String toString() {
+    return "KeyedValue: {key=" + mKey + ", value=" + mValue + "}";
+  }
 }

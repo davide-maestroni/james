@@ -43,12 +43,7 @@ class TakeLastYielder<V> implements LoopYielder<DoubleQueue<SimpleState<V>>, V, 
   public void done(final DoubleQueue<SimpleState<V>> stack,
       @NotNull final YieldOutputs<V> outputs) {
     for (final SimpleState<V> state : stack) {
-      if (state.isSet()) {
-        outputs.yieldValue(state.value());
-
-      } else {
-        outputs.yieldFailure(state.failure());
-      }
+      state.yieldTo(outputs);
     }
   }
 

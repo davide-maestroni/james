@@ -29,7 +29,7 @@ import dm.fates.ext.yield.CountYielder.YielderStack;
 /**
  * Created by davide-maestroni on 02/19/2018.
  */
-class CountYielder<V> implements LoopYielder<YielderStack, V, Integer>, Serializable {
+class CountYielder<V> implements LoopYielder<YielderStack, V, Long>, Serializable {
 
   private static final CountYielder<?> sInstance = new CountYielder<Object>();
 
@@ -44,14 +44,14 @@ class CountYielder<V> implements LoopYielder<YielderStack, V, Integer>, Serializ
     return (CountYielder<V>) sInstance;
   }
 
-  public void done(final YielderStack stack, @NotNull final YieldOutputs<Integer> outputs) {
+  public void done(final YielderStack stack, @NotNull final YieldOutputs<Long> outputs) {
     if (stack != null) {
       outputs.yieldValue(stack.count);
     }
   }
 
   public YielderStack failure(final YielderStack stack, @NotNull final Throwable failure,
-      @NotNull final YieldOutputs<Integer> outputs) {
+      @NotNull final YieldOutputs<Long> outputs) {
     outputs.yieldFailure(failure);
     return null;
   }
@@ -65,7 +65,7 @@ class CountYielder<V> implements LoopYielder<YielderStack, V, Integer>, Serializ
   }
 
   public YielderStack value(final YielderStack stack, final V value,
-      @NotNull final YieldOutputs<Integer> outputs) {
+      @NotNull final YieldOutputs<Long> outputs) {
     ++stack.count;
     return stack;
   }
@@ -77,6 +77,6 @@ class CountYielder<V> implements LoopYielder<YielderStack, V, Integer>, Serializ
 
   static class YielderStack {
 
-    private int count;
+    private long count;
   }
 }

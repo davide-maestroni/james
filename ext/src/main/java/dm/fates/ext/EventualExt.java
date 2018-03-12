@@ -76,8 +76,7 @@ import static dm.fates.executor.ExecutorPool.withThrottling;
 public class EventualExt extends Eventual {
 
   // TODO: 26/02/2018 Mappers: fallbackStatement()?
-  // TODO: 21/02/2018 Yielders: elementAt(), until(Tester), throttle(), throttleValues(),
-  // debounce(), groupBy()?
+  // TODO: 21/02/2018 Yielders: throttle(), throttleValues(), debounce(), groupBy()?
   // TODO: 21/02/2018 Joiners:
   // TODO: 16/02/2018 Forkers: retry(Backoff)
   // TODO: 20/02/2018 (BackPressure): withBackPressure(Backoff, Executor)
@@ -134,7 +133,7 @@ public class EventualExt extends Eventual {
   }
 
   @NotNull
-  public static <V> LoopYielder<?, V, Integer> count() {
+  public static <V> LoopYielder<?, V, Long> count() {
     return EventualYielders.count();
   }
 
@@ -215,6 +214,19 @@ public class EventualExt extends Eventual {
   @NotNull
   public static <V> LoopYielder<?, V, Boolean> notAllMatch(@NotNull final Tester<V> tester) {
     return EventualYielders.anyMatch(new NegatedTester<V>(tester));
+  }
+
+  @NotNull
+  public static <V> LoopYielder<?, V, V> onEnumeratedFailure(
+      @NotNull final TriMapper<? super Long, ? super Throwable, ? super YieldOutputs<V>, Boolean>
+          mapper) {
+    return EventualYielders.onEnumeratedFailure(mapper);
+  }
+
+  @NotNull
+  public static <V, R> LoopYielder<?, V, R> onEnumeratedValue(
+      @NotNull final TriMapper<? super Long, ? super V, ? super YieldOutputs<R>, Boolean> mapper) {
+    return EventualYielders.onEnumeratedValue(mapper);
   }
 
   @NotNull

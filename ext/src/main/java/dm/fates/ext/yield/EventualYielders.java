@@ -32,6 +32,7 @@ import dm.fates.ext.eventual.BiMapper;
 import dm.fates.ext.eventual.BiObserver;
 import dm.fates.ext.eventual.KeyedValue;
 import dm.fates.ext.eventual.TimedState;
+import dm.fates.ext.eventual.TriMapper;
 import dm.fates.util.ConstantConditions;
 
 /**
@@ -85,7 +86,7 @@ public class EventualYielders {
   }
 
   @NotNull
-  public static <V> LoopYielder<?, V, Integer> count() {
+  public static <V> LoopYielder<?, V, Long> count() {
     return CountYielder.instance();
   }
 
@@ -156,6 +157,19 @@ public class EventualYielders {
   @NotNull
   public static <V> LoopYielder<?, V, V> minBy(@NotNull final Comparator<? super V> comparator) {
     return new MinByYielder<V>(comparator);
+  }
+
+  @NotNull
+  public static <V> LoopYielder<?, V, V> onEnumeratedFailure(
+      @NotNull final TriMapper<? super Long, ? super Throwable, ? super YieldOutputs<V>, Boolean>
+          mapper) {
+    return new OnEnumeratedFailureYielder<V>(mapper);
+  }
+
+  @NotNull
+  public static <V, R> LoopYielder<?, V, R> onEnumeratedValue(
+      @NotNull final TriMapper<? super Long, ? super V, ? super YieldOutputs<R>, Boolean> mapper) {
+    return new OnEnumeratedValueYielder<V, R>(mapper);
   }
 
   @NotNull
