@@ -136,19 +136,19 @@ public class EventualForkers {
 
   @NotNull
   public static <V> StatementForker<?, V> retry(final int maxCount) {
-    return RetryForker.newForker(maxCount);
+    return new RetryForker<V>(maxCount);
   }
 
   @NotNull
   public static <S, V> StatementForker<?, V> retryIf(
       @NotNull final BiMapper<S, ? super Throwable, ? extends Statement<S>> mapper) {
-    return RetryMapperForker.newForker(mapper);
+    return new RetryMapperForker<S, V>(mapper, null);
   }
 
   @NotNull
   public static <S, V> LoopForker<?, V> withBackPressure(
       @NotNull final Yielder<S, V, ? super PendingOutputs<V>> yielder,
       @NotNull final Executor executor) {
-    return BackPressureForker.newForker(executor, yielder);
+    return new BackPressureForker<S, V>(executor, yielder);
   }
 }

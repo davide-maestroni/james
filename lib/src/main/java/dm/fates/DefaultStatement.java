@@ -52,6 +52,7 @@ import dm.fates.util.ConstantConditions;
 import dm.fates.util.SerializableProxy;
 import dm.fates.util.TimeUnits;
 import dm.fates.util.TimeUnits.Condition;
+import dm.fates.util.WeakIdentityHashMap;
 
 import static dm.fates.executor.ExecutorPool.loopExecutor;
 import static dm.fates.executor.ExecutorPool.ordered;
@@ -694,7 +695,8 @@ class DefaultStatement<V> implements Statement<V>, Serializable {
 
     private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
 
-    private final ArrayList<Evaluation<V>> mEvaluations = new ArrayList<Evaluation<V>>();
+    private final WeakIdentityHashMap<Evaluation<V>, Void> mEvaluations =
+        new WeakIdentityHashMap<Evaluation<V>, Void>();
 
     private final Executor mExecutor;
 
@@ -796,7 +798,7 @@ class DefaultStatement<V> implements Statement<V>, Serializable {
         }
 
         public void run() {
-          mEvaluations.add(evaluation);
+          mEvaluations.put(evaluation, null);
           try {
             mStack = mForker.evaluation(mStack, evaluation, mStatement);
 
@@ -818,13 +820,10 @@ class DefaultStatement<V> implements Statement<V>, Serializable {
     }
 
     private void clearEvaluations(@NotNull final Throwable failure) {
-      final ArrayList<Evaluation<V>> evaluations = mEvaluations;
-      for (final Evaluation<V> evaluation : evaluations) {
-        try {
-          evaluation.fail(failure);
-
-        } catch (final Throwable ignored) {
-          // cannot take any action
+      final WeakIdentityHashMap<Evaluation<V>, Void> evaluations = mEvaluations;
+      for (final Evaluation<V> evaluation : evaluations.keySet()) {
+        if (evaluation != null) {
+          Eventuals.failSafe(evaluation, failure);
         }
       }
 

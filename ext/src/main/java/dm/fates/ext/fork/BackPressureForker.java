@@ -22,11 +22,11 @@ import org.jetbrains.annotations.Nullable;
 import java.io.InvalidObjectException;
 import java.io.ObjectStreamException;
 import java.io.Serializable;
+import java.util.ArrayList;
 import java.util.concurrent.Executor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 
-import dm.fates.Eventual;
 import dm.fates.eventual.EvaluationCollection;
 import dm.fates.eventual.Loop;
 import dm.fates.eventual.Loop.YieldOutputs;
@@ -34,6 +34,7 @@ import dm.fates.eventual.Loop.Yielder;
 import dm.fates.eventual.LoopForker;
 import dm.fates.eventual.Observer;
 import dm.fates.eventual.RuntimeInterruptedException;
+import dm.fates.eventual.SimpleState;
 import dm.fates.eventual.Statement;
 import dm.fates.executor.EvaluationExecutor;
 import dm.fates.executor.ExecutorPool;
@@ -58,22 +59,15 @@ class BackPressureForker<S, V> implements LoopForker<ForkerOutputs<S, V>, V>, Se
 
   private final Yielder<S, V, ? super PendingOutputs<V>> mYielder;
 
-  private BackPressureForker(@NotNull final Executor executor,
+  BackPressureForker(@NotNull final Executor executor,
       @NotNull final Yielder<S, V, ? super PendingOutputs<V>> yielder) {
-    mYielder = ConstantConditions.notNull("yielder", yielder);
     mExecutor = ExecutorPool.register(executor);
-  }
-
-  @NotNull
-  static <S, V> LoopForker<?, V> newForker(@NotNull final Executor executor,
-      @NotNull final Yielder<S, V, ? super PendingOutputs<V>> yielder) {
-    return Eventual.bufferedLoopForker(new BackPressureForker<S, V>(executor, yielder));
+    mYielder = ConstantConditions.notNull("yielder", yielder);
   }
 
   public ForkerOutputs<S, V> done(final ForkerOutputs<S, V> stack,
       @NotNull final Loop<V> context) throws Exception {
-    mYielder.done(stack.getStack(), stack);
-    return stack.withStack(null).set();
+    return stack.set();
   }
 
   public ForkerOutputs<S, V> evaluation(final ForkerOutputs<S, V> stack,
@@ -89,16 +83,16 @@ class BackPressureForker<S, V> implements LoopForker<ForkerOutputs<S, V>, V>, Se
 
   public ForkerOutputs<S, V> failure(final ForkerOutputs<S, V> stack,
       @NotNull final Throwable failure, @NotNull final Loop<V> context) throws Exception {
-    return stack.withStack(mYielder.failure(stack.getStack(), failure, stack));
+    return stack.addFailure(failure);
   }
 
   public ForkerOutputs<S, V> init(@NotNull final Loop<V> context) throws Exception {
-    return new ForkerOutputs<S, V>(mExecutor, mYielder.init());
+    return new ForkerOutputs<S, V>(mExecutor, mYielder);
   }
 
   public ForkerOutputs<S, V> value(final ForkerOutputs<S, V> stack, final V value,
       @NotNull final Loop<V> context) throws Exception {
-    return stack.withStack(mYielder.value(stack.getStack(), value, stack));
+    return stack.addValue(value);
   }
 
   @NotNull
@@ -116,16 +110,22 @@ class BackPressureForker<S, V> implements LoopForker<ForkerOutputs<S, V>, V>, Se
 
     private final Object mMutex = new Object();
 
+    private final Yielder<S, V, ? super PendingOutputs<V>> mYielder;
+
     private EvaluationCollection<V> mEvaluation;
 
     private int mPendingCount = 1;
 
     private S mStack;
 
-    private ForkerOutputs(@NotNull final EvaluationExecutor executor, final S stack) {
+    private ArrayList<SimpleState<V>> mStates = new ArrayList<SimpleState<V>>();
+
+    private ForkerOutputs(@NotNull final EvaluationExecutor executor,
+        @NotNull final Yielder<S, V, ? super PendingOutputs<V>> yielder) throws Exception {
       mExecutor = ExecutorPool.withErrorBackPropagation(executor);
       mEvaluationExecutor = executor;
-      mStack = stack;
+      mYielder = yielder;
+      mStack = yielder.init();
     }
 
     public int pendingCount() {
@@ -321,6 +321,30 @@ class BackPressureForker<S, V> implements LoopForker<ForkerOutputs<S, V>, V>, Se
       return this;
     }
 
+    @NotNull
+    private ForkerOutputs<S, V> addFailure(@NotNull final Throwable failure) throws Exception {
+      if (mEvaluation != null) {
+        mStack = mYielder.failure(mStack, failure, this);
+
+      } else {
+        mStates.add(SimpleState.<V>ofFailure(failure));
+      }
+
+      return this;
+    }
+
+    @NotNull
+    private ForkerOutputs<S, V> addValue(final V value) throws Exception {
+      if (mEvaluation != null) {
+        mStack = mYielder.value(mStack, value, this);
+
+      } else {
+        mStates.add(SimpleState.ofValue(value));
+      }
+
+      return this;
+    }
+
     private void checkOwner() {
       final EvaluationExecutor executor = mEvaluationExecutor;
       if (executor.isOwnedThread()) {
@@ -347,34 +371,52 @@ class BackPressureForker<S, V> implements LoopForker<ForkerOutputs<S, V>, V>, Se
       }
     }
 
-    private S getStack() {
-      return mStack;
-    }
-
     @NotNull
     private ForkerOutputs<S, V> set() {
-      mIsSet.set(true);
-      mExecutor.execute(new Runnable() {
+      if (mEvaluation != null) {
+        mIsSet.set(true);
+        mStack = null;
+        mExecutor.execute(new Runnable() {
 
-        public void run() {
-          decrementPendingCount();
-        }
-      });
+          public void run() {
+            decrementPendingCount();
+          }
+        });
+
+      } else {
+        mStates.add(SimpleState.<V>settled());
+      }
+
       return this;
     }
 
-    private boolean setEvaluations(@NotNull final EvaluationCollection<V> evaluation) {
+    private boolean setEvaluations(@NotNull final EvaluationCollection<V> evaluation) throws
+        Exception {
       if (mEvaluation == null) {
         mEvaluation = evaluation;
+        try {
+          final Yielder<S, V, ? super PendingOutputs<V>> yielder = mYielder;
+          for (final SimpleState<V> state : mStates) {
+            if (state.isSet()) {
+              mStack = yielder.value(mStack, state.value(), this);
+
+            } else if (state.isFailed()) {
+              mStack = yielder.failure(mStack, state.failure(), this);
+
+            } else {
+              yielder.done(mStack, this);
+              set();
+            }
+          }
+
+        } finally {
+          mStates = null;
+        }
+
         return true;
       }
 
       return false;
-    }
-
-    private ForkerOutputs<S, V> withStack(final S stack) {
-      mStack = stack;
-      return this;
     }
   }
 

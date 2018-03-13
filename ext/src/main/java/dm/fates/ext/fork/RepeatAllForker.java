@@ -19,11 +19,13 @@ package dm.fates.ext.fork;
 import org.jetbrains.annotations.NotNull;
 
 import java.io.Serializable;
+import java.util.ArrayList;
 
 import dm.fates.Eventual;
 import dm.fates.eventual.EvaluationCollection;
 import dm.fates.eventual.Loop;
 import dm.fates.eventual.LoopForker;
+import dm.fates.eventual.SimpleState;
 import dm.fates.ext.config.BuildConfig;
 import dm.fates.ext.fork.RepeatAllForker.ForkerStack;
 import dm.fates.util.ConstantConditions;
@@ -47,27 +49,40 @@ class RepeatAllForker<V> implements LoopForker<ForkerStack<V>, V>, Serializable 
 
   @NotNull
   static <V> LoopForker<?, V> newForker() {
-    return Eventual.bufferedLoopForker(Eventual.safeLoopForker(new RepeatAllForker<V>()));
+    return Eventual.safeLoopForker(new RepeatAllForker<V>());
   }
 
   @NotNull
   static <V> LoopForker<?, V> newForker(final int maxTimes) {
-    return Eventual.bufferedLoopForker(Eventual.safeLoopForker(new RepeatAllForker<V>(maxTimes)));
+    return Eventual.safeLoopForker(new RepeatAllForker<V>(maxTimes));
   }
 
   public ForkerStack<V> done(final ForkerStack<V> stack, @NotNull final Loop<V> context) {
-    stack.evaluation.set();
-    stack.evaluation = null;
+    final EvaluationCollection<V> evaluation = stack.evaluation;
+    if (evaluation != null) {
+      evaluation.set();
+
+    } else {
+      stack.states.add(SimpleState.<V>settled());
+    }
+
     return stack;
   }
 
   public ForkerStack<V> evaluation(final ForkerStack<V> stack,
       @NotNull final EvaluationCollection<V> evaluation, @NotNull final Loop<V> context) {
-
     final int maxTimes = mMaxTimes;
     if ((maxTimes < 0) || (stack.count < maxTimes)) {
       if (stack.evaluation == null) {
         stack.evaluation = evaluation;
+        try {
+          for (final SimpleState<V> state : stack.states) {
+            state.addTo(evaluation);
+          }
+
+        } finally {
+          stack.states = null;
+        }
 
       } else {
         context.evaluate().to(evaluation);
@@ -85,7 +100,14 @@ class RepeatAllForker<V> implements LoopForker<ForkerStack<V>, V>, Serializable 
 
   public ForkerStack<V> failure(final ForkerStack<V> stack, @NotNull final Throwable failure,
       @NotNull final Loop<V> context) {
-    stack.evaluation.addFailure(failure);
+    final EvaluationCollection<V> evaluation = stack.evaluation;
+    if (evaluation != null) {
+      evaluation.addFailure(failure);
+
+    } else {
+      stack.states.add(SimpleState.<V>ofFailure(failure));
+    }
+
     return stack;
   }
 
@@ -95,7 +117,14 @@ class RepeatAllForker<V> implements LoopForker<ForkerStack<V>, V>, Serializable 
 
   public ForkerStack<V> value(final ForkerStack<V> stack, final V value,
       @NotNull final Loop<V> context) {
-    stack.evaluation.addValue(value);
+    final EvaluationCollection<V> evaluation = stack.evaluation;
+    if (evaluation != null) {
+      evaluation.addValue(value);
+
+    } else {
+      stack.states.add(SimpleState.ofValue(value));
+    }
+
     return stack;
   }
 
@@ -104,5 +133,7 @@ class RepeatAllForker<V> implements LoopForker<ForkerStack<V>, V>, Serializable 
     private int count;
 
     private EvaluationCollection<V> evaluation;
+
+    private ArrayList<SimpleState<V>> states = new ArrayList<SimpleState<V>>();
   }
 }

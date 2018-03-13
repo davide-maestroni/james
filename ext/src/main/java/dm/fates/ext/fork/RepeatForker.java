@@ -22,6 +22,7 @@ import java.io.Serializable;
 
 import dm.fates.Eventual;
 import dm.fates.eventual.Evaluation;
+import dm.fates.eventual.SimpleState;
 import dm.fates.eventual.Statement;
 import dm.fates.eventual.StatementForker;
 import dm.fates.ext.config.BuildConfig;
@@ -47,17 +48,15 @@ class RepeatForker<V> implements StatementForker<ForkerStack<V>, V>, Serializabl
 
   @NotNull
   static <V> StatementForker<?, V> newForker() {
-    return Eventual.bufferedStatementForker(Eventual.safeStatementForker(new RepeatForker<V>()));
+    return Eventual.safeStatementForker(new RepeatForker<V>());
   }
 
   @NotNull
   static <V> StatementForker<?, V> newForker(final int maxTimes) {
-    return Eventual.bufferedStatementForker(
-        Eventual.safeStatementForker(new RepeatForker<V>(maxTimes)));
+    return Eventual.safeStatementForker(new RepeatForker<V>(maxTimes));
   }
 
   public ForkerStack<V> done(final ForkerStack<V> stack, @NotNull final Statement<V> context) {
-    stack.evaluation = null;
     return stack;
   }
 
@@ -67,6 +66,15 @@ class RepeatForker<V> implements StatementForker<ForkerStack<V>, V>, Serializabl
     if ((maxTimes < 0) || (stack.count < maxTimes)) {
       if (stack.evaluation == null) {
         stack.evaluation = evaluation;
+        final SimpleState<V> state = stack.state;
+        if (state != null) {
+          try {
+            state.to(evaluation);
+
+          } finally {
+            stack.state = null;
+          }
+        }
 
       } else {
         context.evaluate().to(evaluation);
@@ -83,7 +91,14 @@ class RepeatForker<V> implements StatementForker<ForkerStack<V>, V>, Serializabl
 
   public ForkerStack<V> failure(final ForkerStack<V> stack, @NotNull final Throwable failure,
       @NotNull final Statement<V> context) {
-    stack.evaluation.fail(failure);
+    final Evaluation<V> evaluation = stack.evaluation;
+    if (evaluation != null) {
+      evaluation.fail(failure);
+
+    } else {
+      stack.state = SimpleState.ofFailure(failure);
+    }
+
     return stack;
   }
 
@@ -93,7 +108,14 @@ class RepeatForker<V> implements StatementForker<ForkerStack<V>, V>, Serializabl
 
   public ForkerStack<V> value(final ForkerStack<V> stack, final V value,
       @NotNull final Statement<V> context) {
-    stack.evaluation.set(value);
+    final Evaluation<V> evaluation = stack.evaluation;
+    if (evaluation != null) {
+      evaluation.set(value);
+
+    } else {
+      stack.state = SimpleState.ofValue(value);
+    }
+
     return stack;
   }
 
@@ -102,5 +124,7 @@ class RepeatForker<V> implements StatementForker<ForkerStack<V>, V>, Serializabl
     private int count;
 
     private Evaluation<V> evaluation;
+
+    private SimpleState<V> state;
   }
 }

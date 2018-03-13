@@ -22,9 +22,9 @@ import java.io.InvalidObjectException;
 import java.io.ObjectStreamException;
 import java.io.Serializable;
 
-import dm.fates.Eventual;
 import dm.fates.eventual.Evaluation;
 import dm.fates.eventual.Observer;
+import dm.fates.eventual.SimpleState;
 import dm.fates.eventual.Statement;
 import dm.fates.eventual.StatementForker;
 import dm.fates.ext.config.BuildConfig;
@@ -44,16 +44,10 @@ class RetryMapperForker<S, V> implements StatementForker<ForkerStack<S, V>, V>, 
 
   private final S mStack;
 
-  private RetryMapperForker(
-      @NotNull final BiMapper<S, ? super Throwable, ? extends Statement<S>> mapper, final S stack) {
+  RetryMapperForker(@NotNull final BiMapper<S, ? super Throwable, ? extends Statement<S>> mapper,
+      final S stack) {
     mMapper = ConstantConditions.notNull("mapper", mapper);
     mStack = stack;
-  }
-
-  @NotNull
-  static <S, V> StatementForker<?, V> newForker(
-      @NotNull final BiMapper<S, ? super Throwable, ? extends Statement<S>> mapper) {
-    return Eventual.bufferedStatementForker(new RetryMapperForker<S, V>(mapper, null));
   }
 
   public ForkerStack<S, V> done(final ForkerStack<S, V> stack,
@@ -62,24 +56,50 @@ class RetryMapperForker<S, V> implements StatementForker<ForkerStack<S, V>, V>, 
   }
 
   public ForkerStack<S, V> evaluation(final ForkerStack<S, V> stack,
-      @NotNull final Evaluation<V> evaluation, @NotNull final Statement<V> context) {
-    if (stack.evaluation != null) {
+      @NotNull final Evaluation<V> evaluation, @NotNull final Statement<V> context) throws
+      Exception {
+    if (stack.evaluation == null) {
+      stack.evaluation = evaluation;
+      final SimpleState<V> state = stack.state;
+      if (state != null) {
+        if (state.isFailed()) {
+          final BiMapper<S, ? super Throwable, ? extends Statement<S>> mapper = mMapper;
+          mapper.apply(stack.stack, state.failure())
+              .eventuallyDo(new ValueObserver<S, V>(mapper, evaluation, context))
+              .elseDo(new FailureObserver(evaluation))
+              .consume();
+          return stack;
+        }
+
+        try {
+          state.to(evaluation);
+
+        } finally {
+          stack.state = null;
+        }
+      }
+
+    } else {
       evaluation.fail(new IllegalStateException("the statement evaluation cannot be propagated"));
-      return stack;
     }
 
-    stack.evaluation = evaluation;
     return stack;
   }
 
   public ForkerStack<S, V> failure(final ForkerStack<S, V> stack, @NotNull final Throwable failure,
       @NotNull final Statement<V> context) throws Exception {
     final Evaluation<V> evaluation = stack.evaluation;
-    final BiMapper<S, ? super Throwable, ? extends Statement<S>> mapper = mMapper;
-    mapper.apply(stack.stack, failure)
-        .eventuallyDo(new ValueObserver<S, V>(mapper, evaluation, context))
-        .elseDo(new FailureObserver(evaluation))
-        .consume();
+    if (evaluation != null) {
+      final BiMapper<S, ? super Throwable, ? extends Statement<S>> mapper = mMapper;
+      mapper.apply(stack.stack, failure)
+          .eventuallyDo(new ValueObserver<S, V>(mapper, evaluation, context))
+          .elseDo(new FailureObserver(evaluation))
+          .consume();
+
+    } else {
+      stack.state = SimpleState.ofFailure(failure);
+    }
+
     return stack;
   }
 
@@ -91,7 +111,14 @@ class RetryMapperForker<S, V> implements StatementForker<ForkerStack<S, V>, V>, 
 
   public ForkerStack<S, V> value(final ForkerStack<S, V> stack, final V value,
       @NotNull final Statement<V> context) {
-    stack.evaluation.set(value);
+    final Evaluation<V> evaluation = stack.evaluation;
+    if (evaluation != null) {
+      evaluation.set(value);
+
+    } else {
+      stack.state = SimpleState.ofValue(value);
+    }
+
     return stack;
   }
 
@@ -105,6 +132,8 @@ class RetryMapperForker<S, V> implements StatementForker<ForkerStack<S, V>, V>, 
     private Evaluation<V> evaluation;
 
     private S stack;
+
+    private SimpleState<V> state;
   }
 
   private static class FailureObserver implements Observer<Throwable> {

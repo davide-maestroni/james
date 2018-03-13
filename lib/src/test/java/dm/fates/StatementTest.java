@@ -93,40 +93,63 @@ public class StatementTest {
 
   @NotNull
   private static <V> Statement<V> fork(@NotNull final Statement<V> statement) {
-    return statement.fork(Eventual.bufferedStatementForker(new StatementForker<Evaluation<V>, V>() {
+    class ForkerStack {
 
-      public Evaluation<V> done(final Evaluation<V> stack, @NotNull final Statement<V> context) {
+      Evaluation<V> evaluation;
+
+      SimpleState<V> state;
+    }
+
+    return statement.fork(new StatementForker<ForkerStack, V>() {
+
+      public ForkerStack done(final ForkerStack stack, @NotNull final Statement<V> context) {
         return stack;
       }
 
-      public Evaluation<V> evaluation(final Evaluation<V> stack,
+      public ForkerStack evaluation(final ForkerStack stack,
           @NotNull final Evaluation<V> evaluation, @NotNull final Statement<V> context) {
-        if (stack != null) {
-          evaluation.fail(new IllegalStateException());
+        if (stack.evaluation == null) {
+          stack.evaluation = evaluation;
+          if (stack.state != null) {
+            stack.state.to(evaluation);
+            stack.state = null;
+          }
 
         } else {
-          return evaluation;
+          evaluation.fail(new IllegalStateException());
         }
 
         return stack;
       }
 
-      public Evaluation<V> failure(final Evaluation<V> stack, @NotNull final Throwable failure,
+      public ForkerStack failure(final ForkerStack stack, @NotNull final Throwable failure,
           @NotNull final Statement<V> context) {
-        stack.fail(failure);
+        if (stack.evaluation != null) {
+          stack.evaluation.fail(failure);
+
+        } else {
+          stack.state = SimpleState.ofFailure(failure);
+        }
+
         return stack;
       }
 
-      public Evaluation<V> init(@NotNull final Statement<V> context) {
-        return null;
+      public ForkerStack init(@NotNull final Statement<V> context) {
+        return new ForkerStack();
       }
 
-      public Evaluation<V> value(final Evaluation<V> stack, final V value,
+      public ForkerStack value(final ForkerStack stack, final V value,
           @NotNull final Statement<V> context) {
-        stack.set(value);
+        if (stack.evaluation != null) {
+          stack.evaluation.set(value);
+
+        } else {
+          stack.state = SimpleState.ofValue(value);
+        }
+
         return stack;
       }
-    }));
+    });
   }
 
   @Test

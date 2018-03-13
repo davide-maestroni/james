@@ -64,6 +64,7 @@ import dm.fates.util.Iterables;
 import dm.fates.util.SerializableProxy;
 import dm.fates.util.TimeUnits;
 import dm.fates.util.TimeUnits.Condition;
+import dm.fates.util.WeakIdentityHashMap;
 
 import static dm.fates.executor.ExecutorPool.NO_OP;
 import static dm.fates.executor.ExecutorPool.loopExecutor;
@@ -1099,8 +1100,8 @@ class DefaultLoop<V> implements Loop<V>, Serializable {
 
     private static final long serialVersionUID = BuildConfig.VERSION_HASH_CODE;
 
-    private final ArrayList<EvaluationCollection<V>> mEvaluations =
-        new ArrayList<EvaluationCollection<V>>();
+    private final WeakIdentityHashMap<EvaluationCollection<V>, Void> mEvaluations =
+        new WeakIdentityHashMap<EvaluationCollection<V>, Void>();
 
     private final Executor mExecutor;
 
@@ -1265,7 +1266,7 @@ class DefaultLoop<V> implements Loop<V>, Serializable {
         }
 
         public void run() {
-          mEvaluations.add(evaluation);
+          mEvaluations.put(evaluation, null);
           try {
             mStack = mForker.evaluation(mStack, evaluation, mLoop);
 
@@ -1287,9 +1288,11 @@ class DefaultLoop<V> implements Loop<V>, Serializable {
     }
 
     private void clearEvaluations(@NotNull final Throwable failure) {
-      final ArrayList<EvaluationCollection<V>> evaluations = mEvaluations;
-      for (final EvaluationCollection<V> evaluation : evaluations) {
-        Eventuals.failSafe(evaluation, failure);
+      final WeakIdentityHashMap<EvaluationCollection<V>, Void> evaluations = mEvaluations;
+      for (final EvaluationCollection<V> evaluation : evaluations.keySet()) {
+        if (evaluation != null) {
+          Eventuals.failSafe(evaluation, failure);
+        }
       }
 
       evaluations.clear();

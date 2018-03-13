@@ -79,19 +79,6 @@ public class Eventual {
   }
 
   @NotNull
-  public static <S, V> LoopForker<?, V> bufferedLoopForker(
-      @NotNull final Forker<S, ? super V, ? super EvaluationCollection<V>, ? super Loop<V>>
-          forker) {
-    return new BufferedLoopForker<S, V>(forker);
-  }
-
-  @NotNull
-  public static <S, V> StatementForker<?, V> bufferedStatementForker(
-      @NotNull final Forker<S, ? super V, ? super Evaluation<V>, ? super Statement<V>> forker) {
-    return new BufferedStatementForker<S, V>(forker);
-  }
-
-  @NotNull
   public static <S, V> LoopForker<S, V> loopForker(@Nullable final Mapper<? super Loop<V>, S> init,
       @Nullable final Updater<S, ? super V, ? super Loop<V>> value,
       @Nullable final Updater<S, ? super Throwable, ? super Loop<V>> failure,
