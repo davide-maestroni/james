@@ -9,7 +9,7 @@ import org.jetbrains.annotations.Nullable;
 public interface Eventual<V> {
 
   @NotNull
-  <R> Eventual<R> eventually(@NotNull OperationFactory<? super V, R> factory);
+  <R> Eventual<R> eventually(@NotNull OperationFactory<? super V, R> operationFactory);
 
   interface Consumer<V> {
 
@@ -45,7 +45,11 @@ public interface Eventual<V> {
 
     void failure(@NotNull Throwable failure) throws Exception;
 
+    void failures(@Nullable Iterable<? extends Throwable> failures) throws Exception;
+
     void value(V value) throws Exception;
+
+    void values(@Nullable Iterable<? extends V> values) throws Exception;
   }
 
   interface OperationFactory<V, R> {
