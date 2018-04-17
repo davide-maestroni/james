@@ -3,58 +3,52 @@ package dm.fates.eventual2;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
+import dm.fates.eventual.Mapper;
+
 /**
  * Created by davide-maestroni on 03/22/2018.
  */
 public interface Eventual<V> {
 
   @NotNull
-  <R> Eventual<R> eventually(@NotNull OperationFactory<? super V, R> operationFactory);
+  <R> Eventual<R> lift(@NotNull Mapper<? super Flow<R>, ? extends Flow<V>> flowMapper);
 
   interface Consumer<V> {
 
-    void complete();
-
-    @NotNull
-    Consumer<V> failure(@NotNull Throwable failure);
-
-    @NotNull
-    Consumer<V> failures(@Nullable Iterable<? extends Throwable> failures);
-
-    @NotNull
-    Consumer<V> value(V value);
-
-    @NotNull
-    Consumer<V> values(@Nullable Iterable<? extends V> values);
-  }
-
-  interface Controller {
-
-    void cancel(boolean mayInterruptIfRunning);
-
-    void consume(int maxCount);
-  }
-
-  interface Operation<V, R> {
-
-    void cancel(boolean mayInterruptIfRunning, @NotNull Consumer<R> consumer) throws Exception;
-
     void complete() throws Exception;
 
-    void consume(int maxCount, @NotNull Consumer<R> consumer) throws Exception;
-
-    void failure(@NotNull Throwable failure) throws Exception;
-
-    void failures(@Nullable Iterable<? extends Throwable> failures) throws Exception;
-
-    void value(V value) throws Exception;
-
-    void values(@Nullable Iterable<? extends V> values) throws Exception;
-  }
-
-  interface OperationFactory<V, R> {
+    @NotNull
+    Consumer<V> failure(@NotNull Throwable failure) throws Exception;
 
     @NotNull
-    Operation<V, R> create(@NotNull Controller controller);
+    Consumer<V> failures(@Nullable Iterable<? extends Throwable> failures) throws Exception;
+
+    @NotNull
+    Consumer<V> value(V value) throws Exception;
+
+    @NotNull
+    Consumer<V> values(@Nullable Iterable<? extends V> values) throws Exception;
+  }
+
+  interface Flow<V> extends Producer, Consumer<V> {
+
+    @NotNull
+    Flow<V> failure(@NotNull Throwable failure) throws Exception;
+
+    @NotNull
+    Flow<V> failures(@Nullable Iterable<? extends Throwable> failures) throws Exception;
+
+    @NotNull
+    Flow<V> value(V value) throws Exception;
+
+    @NotNull
+    Flow<V> values(@Nullable Iterable<? extends V> values) throws Exception;
+  }
+
+  interface Producer {
+
+    void cancel() throws Exception;
+
+    void consume() throws Exception;
   }
 }
