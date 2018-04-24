@@ -5,8 +5,8 @@ import org.jetbrains.annotations.NotNull;
 /**
  * Created by davide-maestroni on 04/16/2018.
  */
-public interface StreamForker<V> {
+public interface StreamForker<S extends ConsumableStream> {
 
   @NotNull
-  EventualStream<V> fork();
+  S fork();
 }

@@ -3,15 +3,20 @@ package dm.fates.eventual2;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
-import dm.fates.eventual.Mapper;
-
 /**
  * Created by davide-maestroni on 03/22/2018.
  */
-public interface Eventual<V> {
+public interface Consumable<V> {
+
+  boolean cancel();
+
+  void consume();
+
+  void consume(int minCount);
 
   @NotNull
-  <R> Eventual<R> lift(@NotNull Mapper<? super Flow<R>, ? extends Flow<V>> flowMapper);
+  <M> Consumable<M> lift(
+      @NotNull BiMapper<? super Producer, ? super Consumer<M>, ? extends Flow<V>> flowMapper);
 
   interface Consumer<V> {
 
