@@ -57,3 +57,7 @@ jacoco {
 findbugs {
   toolVersion project.getProperty('findbugsVersion')
 }
+
+tasks.withType(FindBugs) {
+  ignoreFailures true
+}
