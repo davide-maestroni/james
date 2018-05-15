@@ -5,6 +5,7 @@ import org.jetbrains.annotations.Nullable;
 
 import java.io.InputStream;
 import java.nio.ByteBuffer;
+import java.util.concurrent.Executor;
 import java.util.concurrent.TimeUnit;
 
 /**
@@ -52,6 +53,12 @@ public abstract class EventualIterable<V> extends Eventual<Iterable<V>> {
 
   @NotNull
   public static EventualIterable<ByteBuffer> buffers(@NotNull InputStream stream) {
+    return null;
+  }
+
+  @NotNull
+  public static <V, A> EventualIterable<A> eachAwait(@NotNull EventualIterable<V> eventualIterable,
+      @NotNull AsyncUnaryFunction<? super V, A> asyncFunction) {
     return null;
   }
 
@@ -308,8 +315,14 @@ public abstract class EventualIterable<V> extends Eventual<Iterable<V>> {
     return null;
   }
 
-  abstract void eventuallyEach(@Nullable Tester<? super V> valueTester,
+  public abstract void evaluateEach(@Nullable Tester<? super V> valueTester,
       @Nullable Tester<? super Throwable> errorTester, @Nullable Action completeAction);
+
+  @NotNull
+  public abstract EventualIterable<V> logWithName(@Nullable String loggerName);
+
+  @NotNull
+  public abstract EventualIterable<V> on(@Nullable Executor executor);
 
   public interface Yielder<V> {
 
